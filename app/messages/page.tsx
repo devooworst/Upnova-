@@ -1,0 +1,126 @@
+"use client";
+
+import { useState } from "react";
+import { Send, ChevronLeft, Briefcase, Paperclip } from "lucide-react";
+import Avatar from "@/components/Avatar";
+import { conversations } from "@/lib/data";
+
+export default function MessagesPage() {
+  const [activeId, setActiveId] = useState<string>(conversations[0].id);
+  const [draft, setDraft] = useState("");
+  const active = conversations.find((c) => c.id === activeId);
+
+  return (
+    <div className="card flex h-[calc(100dvh-12rem)] min-h-[480px] overflow-hidden md:h-[calc(100vh-8.5rem)]">
+      {/* conversation list */}
+      <div
+        className={`w-full shrink-0 overflow-y-auto border-line sm:w-72 sm:border-r ${
+          active ? "hidden sm:block" : "block"
+        }`}
+      >
+        <div className="border-b border-line-soft p-4">
+          <h1 className="font-display text-lg font-bold text-zinc-50">Messages</h1>
+          <p className="text-xs text-zinc-500">Creators, clients, brands, and communities.</p>
+        </div>
+        <ul>
+          {conversations.map((c) => (
+            <li key={c.id}>
+              <button
+                onClick={() => setActiveId(c.id)}
+                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-card-raised ${
+                  c.id === activeId ? "bg-card-raised" : ""
+                }`}
+              >
+                <span className="relative">
+                  <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" />
+                  {c.online && (
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-violet-400" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-zinc-100">{c.name}</span>
+                    <span className="shrink-0 text-[10px] text-zinc-500">{c.time}</span>
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-2">
+                    <span className="truncate text-xs text-zinc-500">{c.lastMessage}</span>
+                    {c.unread > 0 && (
+                      <span className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-400 text-[9px] font-bold text-zinc-950">
+                        {c.unread}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* chat */}
+      {active && (
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-3 border-b border-line-soft p-3.5">
+          <button className="icon-btn -ml-1 sm:hidden" onClick={() => setActiveId("")} aria-label="Back">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <Avatar src={active.avatar} initials={active.initials} gradient={active.gradient} size="sm" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-zinc-100">{active.name}</p>
+            <p className="text-xs text-zinc-500">
+              {active.role} • {active.online ? <span className="text-lime-400">online</span> : "offline"}
+            </p>
+          </div>
+          <button className="btn-ghost px-3 py-1.5 text-xs" title="Turn this conversation into a project">
+            <Briefcase className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Create Project</span>
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {active.messages.map((m, i) => (
+            <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                  m.from === "me"
+                    ? "rounded-br-md bg-zinc-100 text-zinc-950"
+                    : "rounded-bl-md border border-line bg-card-raised text-zinc-200"
+                }`}
+              >
+                {m.text}
+                <span
+                  className={`mt-1 block text-[10px] ${
+                    m.from === "me" ? "text-zinc-800/70" : "text-zinc-500"
+                  }`}
+                >
+                  {m.time}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 border-t border-line-soft p-3">
+          <button className="icon-btn h-9 w-9" aria-label="Attach">
+            <Paperclip className="h-4 w-4" />
+          </button>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={`Message ${active.name}…`}
+            className="input-dark rounded-full"
+            onKeyDown={(e) => e.key === "Enter" && setDraft("")}
+          />
+          <button
+            onClick={() => setDraft("")}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white"
+            aria-label="Send"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      )}
+    </div>
+  );
+}

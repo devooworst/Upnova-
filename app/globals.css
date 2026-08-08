@@ -1,0 +1,115 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/syne";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --font-inter: "Inter Variable", system-ui, sans-serif;
+  --font-display: "Syne Variable", "Inter Variable", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-ink text-zinc-200 antialiased;
+}
+
+::selection {
+  @apply bg-lime-400/30 text-lime-100;
+}
+
+/* ---------- shared component classes ---------- */
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-card shadow-card;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-3 py-1 text-xs font-medium text-zinc-300 transition-colors;
+  }
+
+  .chip-active {
+    @apply border-white/50 bg-white/10 text-zinc-100;
+  }
+
+  .btn-lime {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-transparent px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-card-raised active:scale-[0.98];
+  }
+
+  .icon-btn {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-400 transition hover:bg-card-raised hover:text-zinc-100;
+  }
+
+  .input-dark {
+    @apply w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/50 focus:ring-2 focus:ring-lime-400/15;
+  }
+}
+
+/* ---------- scrollbars ---------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2b2b33 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2b2b33;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- text gradient ---------- */
+
+.text-gradient-lime {
+  @apply bg-gradient-to-r from-lime-300 to-lime-500 bg-clip-text text-transparent;
+}
+
+/* ---------- category card DNA ----------
+   Accent color roles (see README):
+   lime   = money / opportunity / availability
+   violet = people / community
+   amber  = events / energy / trending
+   white  = navigation / active / verified
+
+   Card shapes also carry the category:
+   money  = sharp corners, receipt/ticket, perforations
+   people = round corners, avatar-forward
+   events = ticket with date block                   */
+
+.card-money {
+  @apply rounded-md border border-line border-t-2 border-t-lime-400/70 bg-card shadow-card;
+}
+
+.card-people {
+  @apply rounded-3xl border border-line bg-card shadow-card;
+}
+
+.card-event {
+  @apply rounded-xl border border-line bg-card shadow-card;
+}

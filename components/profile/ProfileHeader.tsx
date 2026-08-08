@@ -1,0 +1,78 @@
+import Image from "next/image";
+import { PencilLine, MapPin } from "lucide-react";
+import Avatar from "../Avatar";
+import VerifiedBadge from "../VerifiedBadge";
+import { currentUser, profileStats, contact } from "@/lib/data";
+
+export default function ProfileHeader() {
+  return (
+    <header className="card overflow-hidden">
+      {/* banner */}
+      <div className="relative h-36 sm:h-48">
+        <Image
+          src="/images/banner.jpg"
+          alt="Profile banner — studio session"
+          fill
+          sizes="(max-width: 1024px) 100vw, 1024px"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-black/30" />
+      </div>
+
+      <div className="px-5 pb-5 sm:px-6">
+        {/* avatar + actions */}
+        <div className="flex items-end justify-between">
+          <span className="-mt-12 inline-block rounded-full bg-gradient-to-tr from-white/70 via-white/20 to-white/40 p-[2px] sm:-mt-14">
+            <span className="block rounded-full bg-card p-1">
+              <Avatar src={currentUser.avatar} initials={currentUser.initials} size="xl" />
+            </span>
+          </span>
+          <div className="flex items-center gap-2 pb-1">
+            <button className="btn-ghost px-4 py-1.5 text-xs sm:text-sm">
+              <PencilLine className="h-4 w-4" />
+              Edit Profile
+            </button>
+          </div>
+        </div>
+
+        {/* identity */}
+        <div className="mt-3">
+          <h1 className="flex flex-wrap items-center gap-2 font-display text-2xl font-bold text-zinc-50">
+            {currentUser.name}
+            {currentUser.verified && <VerifiedBadge className="h-5 w-5" />}
+            <span className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-lime-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse-dot" />
+              Open to Work
+            </span>
+          </h1>
+          <p className="mt-1 text-sm font-medium text-zinc-400">{currentUser.role}</p>
+          <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-zinc-300">{currentUser.bio}</p>
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+            <MapPin className="h-3.5 w-3.5 text-lime-400" />
+            {currentUser.location} • {contact.joined} • {contact.responseTime.toLowerCase()}
+          </p>
+        </div>
+
+        {/* stats */}
+        <dl className="mt-5 grid grid-cols-4 gap-2 border-t border-line-soft pt-4">
+          {profileStats.map((s) => (
+            <div key={s.label} className="text-center sm:text-left">
+              <dd className="font-display text-xl font-bold text-zinc-50">{s.value}</dd>
+              <dt className="text-xs text-zinc-500">{s.label}</dt>
+            </div>
+          ))}
+        </dl>
+
+        {/* skills */}
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {currentUser.skills.map((skill) => (
+            <span key={skill} className="chip">
+              {skill}
+            </span>
+          ))}
+        </div>
+      </div>
+    </header>
+  );
+}
