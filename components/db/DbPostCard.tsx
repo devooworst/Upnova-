@@ -7,6 +7,8 @@ import { Heart, MessageCircle, MapPin, Send, Bookmark, MoreHorizontal, EyeOff, B
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { BadgeCheck } from "lucide-react";
+import { useSession } from "@/lib/session";
+import { promptJoin } from "@/components/GuestGate";
 
 export interface FeedAuthor {
   id: string;
@@ -63,6 +65,8 @@ export default function DbPostCard({
   onHidden?: (id: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user: me } = useSession();
+  const guest = me === null;
   const [saved, setSaved] = useState(savedInitial);
   const [liked, setLiked] = useState(post.likedByMe);
   const [likes, setLikes] = useState(post.likes);
@@ -72,6 +76,7 @@ export default function DbPostCard({
   const [draft, setDraft] = useState("");
 
   const toggleLike = async () => {
+    if (guest) return promptJoin("like"); // UX only — the API 401s regardless
     // optimistic — server is source of truth
     setLiked(!liked);
     setLikes((n) => n + (liked ? -1 : 1));
@@ -83,6 +88,7 @@ export default function DbPostCard({
   };
 
   const toggleSave = async () => {
+    if (guest) return promptJoin("save");
     const res = await fetch("/api/bookmarks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -102,6 +108,7 @@ export default function DbPostCard({
 
   const feedback = async (action: "hide" | "not_interested", meta = "") => {
     setMenuOpen(false);
+    if (guest) return promptJoin("personalize");
     onHidden?.(post.id); // gone immediately — the server remembers
     await fetch("/api/track", {
       method: "POST",
@@ -111,6 +118,7 @@ export default function DbPostCard({
   };
 
   const sendComment = async () => {
+    if (guest) return promptJoin("comment");
     const body = draft.trim();
     if (!body) return;
     setDraft("");

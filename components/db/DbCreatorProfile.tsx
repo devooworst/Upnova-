@@ -15,6 +15,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
 import PostsGrid from "@/components/db/PostsGrid";
 import { useSession } from "@/lib/session";
+import { promptJoin } from "@/components/GuestGate";
 
 interface PublicProfile {
   user: {
@@ -97,6 +98,7 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
   const isMe = me?.id === user.id;
 
   const follow = async () => {
+    if (me === null) return promptJoin("follow"); // UX only — the API 401s regardless
     setBusy(true);
     await fetch(`/api/follow/${user.id}`, { method: data.followedByMe ? "DELETE" : "POST" });
     await load();
@@ -104,6 +106,7 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
   };
 
   const message = async () => {
+    if (me === null) return promptJoin("message");
     const res = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -111,7 +114,7 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
     });
     const d = await res.json();
     if (res.ok) router.push(`/messages?c=${d.conversationId}`);
-    else if (res.status === 401) router.push("/login");
+    else if (res.status === 401) promptJoin("message");
   };
 
   return (

@@ -23,6 +23,7 @@ import { useEffect } from "react";
 import { getTheme, setTheme } from "@/lib/theme";
 import DbNotificationBell from "./db/DbNotificationBell";
 import Avatar from "./Avatar";
+import { promptJoin } from "./GuestGate";
 import { useSession, logout } from "@/lib/session";
 import { openCreateModal } from "./CreateModalTrigger";
 
@@ -77,12 +78,24 @@ export default function Navbar() {
 
         {/* Right actions */}
         <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:gap-1.5">
-          <button onClick={() => openCreateModal()} className="btn-lime hidden md:inline-flex">
+          {/* Create stays visible to guests — pressing it explains what an
+              account unlocks. Server-side auth is the real gate. */}
+          <button onClick={() => (user ? openCreateModal() : promptJoin("create"))} className="btn-lime hidden md:inline-flex">
             <Plus className="h-4 w-4" />
             Create
           </button>
 
-          <Link href="/messages" className="icon-btn relative hidden sm:inline-flex" aria-label="Messages">
+          <Link
+            href={user ? "/messages" : "#"}
+            onClick={(e) => {
+              if (!user) {
+                e.preventDefault();
+                promptJoin("message");
+              }
+            }}
+            className="icon-btn relative hidden sm:inline-flex"
+            aria-label="Messages"
+          >
             <MessageSquare className="h-5 w-5" />
           </Link>
 

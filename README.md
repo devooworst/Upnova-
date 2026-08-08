@@ -233,6 +233,11 @@ npm run db:seed          # load development seed data (see below)
 npm run dev              # http://localhost:3000
 ```
 
+> `better-sqlite3` is pinned to 12.4.1 — the newest line with published prebuilt binaries for
+> Node 22 (13.0.x has none, forcing a source build). If your environment has to compile it
+> anyway, local Node headers work: `npx node-gyp rebuild --nodedir=/usr/local` inside
+> `node_modules/better-sqlite3`.
+
 ## Backend (production transition)
 
 The app is now a real multi-user application. localStorage mock state has been replaced by a
@@ -406,6 +411,25 @@ the only location string public surfaces render; exact addresses and coordinates
 regardless of setting (lat/lng are server-side scoping only). Service providers show a service
 area ("Within 25 miles"), never an address. Identity verification shows only the badge — never
 documents.
+
+**Guest access — three states, not two** — Guest → Member → Verified/Professional/Business.
+A guest can LOOK: the homepage becomes **Discover** (a capped, unpersonalized slice of public
+posts — 12 of N, ranked by recency + engagement, no taste profile, no reasons, no promoted slot),
+plus public Services, Opportunities, Events, and creator profiles. Location privacy is identical
+for guests and members: `locationLabel` is the only public location string, computed from each
+creator's own visibility setting (a `hidden` creator shows no location to anyone). A member can
+PARTICIPATE; verification layers capabilities on top and is never granted by Pro/Business
+subscriptions. The enforcement is server-side: every create/interact endpoint calls
+`requireUser()` and 401s guests — hiding buttons is presentation, never the access control
+(verified endpoint-by-endpoint: posts, comments, likes, bookmarks, follows, conversations,
+bookings, services, opportunities, projects, applications, track, profile all 401 without a
+session; only signup/login/forgot/reset are public). The conversion UX is contextual, not a
+wall: `components/GuestGate.tsx` provides `promptJoin(action)` — pressing Book says "Create an
+account to book", Apply says "Create an account to apply … your profile becomes your
+application", Create says "Join UpNova to create", likes/saves/follows/messages/personalization
+each get their own copy, always with a "Already have an account? Sign in" path. Guests browse
+freely first: one inline join card after the Discover feed, one dismissible banner after ~6 page
+views per session (sessionStorage), and never a repeat nag after dismissal.
 
 **Payments** — no card data is ever stored. The `payments` table records payout + 5 % buyer-side
 fee in cents with `provider="stripe_connect"` and a `providerRef` seam where the PaymentIntent /

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Search, Plus, MessageSquare, User } from "lucide-react";
 import { openCreateModal } from "./CreateModalTrigger";
+import { promptJoin } from "./GuestGate";
+import { useSession } from "@/lib/session";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
@@ -15,6 +17,7 @@ const items = [
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const { user } = useSession();
 
   return (
     <nav
@@ -27,7 +30,7 @@ export default function MobileNav() {
             return (
               <button
                 key={item.label}
-                onClick={() => openCreateModal()}
+                onClick={() => (user ? openCreateModal() : promptJoin("create"))}
                 className="flex flex-col items-center gap-1 py-2.5"
                 aria-label="Create"
               >

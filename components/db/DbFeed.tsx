@@ -69,7 +69,9 @@ interface Props {
 
 export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
   const { user } = useSession();
+  const guest = user === null;
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
+  const [guestTotal, setGuestTotal] = useState(0);
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [promoted, setPromoted] = useState<{
     id: string;
@@ -103,10 +105,12 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       const data = await res.json();
       setError(null);
       setPosts(data.items ?? []);
+      setGuestTotal(data.totalPublic ?? 0);
       setPromoted(data.promoted ?? null);
       // passive view signals for what actually rendered (deduped server-side)
+      // — members only; guests have no interaction log to write to
       const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
-      if (viewed.length)
+      if (viewed.length && !data.guest)
         fetch("/api/track", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -127,9 +131,10 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
 
   return (
     <>
-      {/* feed type — what kind of content */}
+      {/* feed type — what kind of content. Guests get the public Discover
+          set; member tabs (Following, Trending) need a taste to rank with */}
       <div className="flex items-center gap-4 overflow-x-auto border-b border-line-soft pb-0 text-sm no-scrollbar">
-        {tabs.map((t) => (
+        {(guest ? (["For You", "Opportunities"] as FeedTab[]) : tabs).map((t) => (
           <button
             key={t}
             onClick={() => onTabChange(t)}
@@ -139,7 +144,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                 : "border-transparent font-medium text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {t}
+            {guest && t === "For You" ? "Discover" : t}
           </button>
         ))}
       </div>
@@ -160,7 +165,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
 
       {tab === "Opportunities" ? (
         <OpportunityList scope={scopeParam[scope]} compact />
-      ) : user === null || error === "signin" ? (
+      ) : error === "signin" ? (
         <div className="card p-8 text-center">
           <p className="text-sm font-semibold text-zinc-200">Sign in to see your feed</p>
           <p className="mt-1 text-xs text-zinc-500">
@@ -202,6 +207,23 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
               )}
             </span>
           ))}
+          {/* guest conversion — after the browse, not before it */}
+          {guest && posts.length > 0 && (
+            <aside className="card p-6 text-center">
+              <p className="text-sm font-bold text-zinc-100">You&apos;re exploring UpNova as a guest.</p>
+              <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-400">
+                {guestTotal > posts.length
+                  ? `That's ${posts.length} of ${guestTotal} public posts. `
+                  : ""}
+                Create a free account to keep exploring, follow creators, save posts, message people, book
+                services, and apply to opportunities.
+              </p>
+              <div className="mt-4 flex justify-center gap-2">
+                <Link href="/signup" className="btn-lime px-5 py-2 text-sm">Create account</Link>
+                <Link href="/login" className="btn-ghost px-4 py-2 text-sm">Sign in</Link>
+              </div>
+            </aside>
+          )}
           {posts.length === 0 && (
             <p className="py-10 text-center text-sm text-zinc-500">
               Nothing here{["5mi", "25mi", "city", "county", "state", "school"].includes(scopeParam[scope]) ? " at this range — widen the scope" : " yet"}.

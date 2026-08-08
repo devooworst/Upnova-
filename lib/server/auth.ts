@@ -2,6 +2,18 @@
 /*  Auth — email/password with DB-backed sessions.                     */
 /*  httpOnly cookie carries an opaque token; the session row is the    */
 /*  source of truth. No JWT, nothing user-forgeable.                   */
+/*                                                                     */
+/*  Access model — three states, enforced HERE, never by hidden UI:    */
+/*    Guest    — no session. May READ limited public content            */
+/*               (getSessionUser() returns null; public GETs handle    */
+/*               it). Every create/interact endpoint calls             */
+/*               requireUser() and 401s guests.                        */
+/*    Member   — session exists. Can participate: post, message,       */
+/*               follow, save, book, apply, pay.                       */
+/*    Verified — capabilities layered on top of Member (identity /     */
+/*               student / creator / business verification, admin).    */
+/*               Verification is EARNED, never granted by Pro or       */
+/*               Business subscriptions.                               */
 /* ------------------------------------------------------------------ */
 
 import { cookies } from "next/headers";

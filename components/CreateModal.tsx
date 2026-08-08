@@ -18,6 +18,8 @@ import {
 import { CREATE_MODAL_EVENT } from "./CreateModalTrigger";
 import Avatar from "./Avatar";
 import { currentUser } from "@/lib/data";
+import { useSession } from "@/lib/session";
+import { promptJoin } from "./GuestGate";
 
 /* ------------------------------------------------------------------ */
 /* The Create system. One rule: each creation type gets its own        */
@@ -85,6 +87,17 @@ export default function CreateModal() {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind | null>(null);
   const [published, setPublished] = useState(false);
+  const { user: sessionUser } = useSession();
+
+  // no guest creation, ever — if a guest reaches this modal through any
+  // path, convert the attempt into the contextual join prompt. (The APIs
+  // behind every kind require a session regardless.)
+  useEffect(() => {
+    if (open && sessionUser === null) {
+      setOpen(false);
+      promptJoin("create");
+    }
+  }, [open, sessionUser]);
 
   /* post */
   const [postText, setPostText] = useState("");

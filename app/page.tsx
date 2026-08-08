@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, ChevronDown, MapPin } from "lucide-react";
 import DbComposer from "@/components/db/DbComposer";
 import DbFeed, { type FeedTab } from "@/components/db/DbFeed";
@@ -78,9 +79,10 @@ export default function Home() {
             · {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
           </p>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Home</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user === null ? "Discover" : "Home"}</h1>
 
-            {/* feed scope */}
+            {/* feed scope — members only: scopes rank around YOUR location */}
+            {user !== null && (
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -120,7 +122,29 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
           </div>
+
+          {/* guests: what this place is, plus the public surfaces they CAN browse */}
+          {user === null && (
+            <div className="mt-2">
+              <p className="text-sm text-zinc-400">
+                Find what&apos;s happening around you — and the people who can make it happen. You&apos;re
+                browsing the public side of UpNova.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/services" className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100">
+                  Browse Services
+                </Link>
+                <Link href="/opportunities" className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100">
+                  Browse Opportunities
+                </Link>
+                <Link href="/events" className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100">
+                  Browse Events
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* active scope indicator */}
           {scope !== "foryou" && (

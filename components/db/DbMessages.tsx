@@ -229,9 +229,14 @@ export default function DbMessages() {
   if (user === null)
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
-        <p className="text-sm font-semibold text-zinc-200">Sign in to open Messages</p>
-        <p className="mt-1 text-xs text-zinc-500">Conversations belong to real accounts.</p>
-        <Link href="/login" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Sign in</Link>
+        <p className="text-sm font-semibold text-zinc-200">Create an account to message people</p>
+        <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-zinc-500">
+          Messages, bookings, and payments live in one thread — that requires knowing who you are.
+        </p>
+        <div className="mt-4 flex justify-center gap-2">
+          <Link href="/signup" className="btn-lime px-5 py-2 text-sm">Create account</Link>
+          <Link href="/login" className="btn-ghost px-4 py-2 text-sm">Sign in</Link>
+        </div>
       </div>
     );
 

@@ -15,6 +15,7 @@ import { policyLines, travelLabel, computeSelection, menuSummary, type ServiceCo
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useSession } from "@/lib/session";
+import { promptJoin } from "@/components/GuestGate";
 
 interface ServiceItem {
   id: string;
@@ -76,13 +77,14 @@ export default function ServicesPage() {
   }, []);
 
   const toggleSave = async (id: string) => {
+    if (me === null) return promptJoin("save"); // UX only — the API 401s regardless
     const res = await fetch("/api/bookmarks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ targetType: "service", targetId: id }),
     });
     if (!res.ok) {
-      if (res.status === 401) router.push("/login");
+      if (res.status === 401) promptJoin("save");
       return;
     }
     const d = await res.json();
@@ -108,7 +110,8 @@ export default function ServicesPage() {
 
   const hire = (s: ServiceItem) => {
     if (!me) {
-      router.push("/login");
+      // contextual, not a generic wall: booking vs project request
+      promptJoin(s.fulfillment === "appointment" ? "book" : "hire");
       return;
     }
     // service-view signal for the recommendation engine

@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import CreateModal from "@/components/CreateModal";
+import GuestGate from "@/components/GuestGate";
 import { FollowProvider } from "@/lib/follow";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default function RootLayout({
         </div>
         <MobileNav />
         <CreateModal />
+        <GuestGate />
         </FollowProvider>
       </body>
     </html>

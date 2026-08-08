@@ -205,9 +205,14 @@ export default function Sidebar() {
           <span className="ml-auto h-2 w-2 rounded-full bg-lime-400" title="Online" />
         </Link>
       ) : (
-        <Link href="/login" className="card flex items-center justify-center gap-2 p-3 text-sm font-semibold text-zinc-200 transition hover:border-zinc-600">
-          Sign in to UpNova
-        </Link>
+        <div className="card space-y-2 p-4">
+          <p className="text-sm font-bold text-zinc-100">New here?</p>
+          <p className="text-xs leading-relaxed text-zinc-500">
+            You&apos;re browsing as a guest. Join free to follow, save, message, book, and apply.
+          </p>
+          <Link href="/signup" className="btn-lime w-full justify-center py-2 text-xs">Create free account</Link>
+          <Link href="/login" className="btn-ghost w-full justify-center py-2 text-xs">Sign in</Link>
+        </div>
       )}
     </aside>
   );

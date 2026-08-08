@@ -11,6 +11,8 @@ import Link from "next/link";
 import { MapPin, Users, X, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import PosterBadge, { PosterOverline, type PosterType } from "@/components/PosterBadge";
+import { useSession } from "@/lib/session";
+import { promptJoin } from "@/components/GuestGate";
 
 export interface OpportunityItem {
   id: string;
@@ -40,6 +42,7 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
   const [items, setItems] = useState<OpportunityItem[] | null>(null);
   const [applying, setApplying] = useState<OpportunityItem | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const { user: me } = useSession();
 
   useEffect(() => {
     fetch("/api/bookmarks", { cache: "no-store" })
@@ -52,6 +55,7 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
   }, []);
 
   const toggleSave = async (id: string) => {
+    if (me === null) return promptJoin("save"); // UX only — the API 401s regardless
     const res = await fetch("/api/bookmarks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -155,7 +159,10 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
                   ✓ Applied
                 </span>
               ) : (
-                <button onClick={() => setApplying(o)} className="btn-lime px-4 py-1.5 text-xs">
+                <button
+                  onClick={() => (me === null ? promptJoin("apply") : setApplying(o))}
+                  className="btn-lime px-4 py-1.5 text-xs"
+                >
                   {o.budget == null ? "Express Interest" : "Apply Now"}
                 </button>
               )}

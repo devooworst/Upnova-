@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded } from "@/lib/server/auth";
+import { getSessionUser, guarded } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
@@ -10,6 +10,10 @@ import { ctaFor } from "@/lib/server/cta";
 
 export const dynamic = "force-dynamic";
 
+/** How many posts a guest can browse before the join card — see the
+ *  product first, convert naturally. */
+const GUEST_FEED_LIMIT = 12;
+
 /**
  * GET /api/feed?tab=for-you|following|trending&scope=for-you|5mi|25mi|city|county|state|country|global|school
  * Tab picks the ranking, scope picks the geography — orthogonal by design.
@@ -17,11 +21,15 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   return guarded(() => {
-    const user = requireUser();
-    const tab = req.nextUrl.searchParams.get("tab") || "for-you";
-    const scope = (req.nextUrl.searchParams.get("scope") || "for-you") as FeedScope;
+    // Guests may look: they get a LIMITED public Discover slice — global,
+    // unpersonalized, capped. Members get the full ranked feed. Location
+    // privacy is identical for both (locationLabel is computed server-side
+    // from each author's own visibility setting; exact coords never leave).
+    const user = getSessionUser();
+    const tab = user ? req.nextUrl.searchParams.get("tab") || "for-you" : "discover";
+    const scope = (user ? req.nextUrl.searchParams.get("scope") || "for-you" : "global") as FeedScope;
 
-    const ctx = viewerContext(user.id, user.profile);
+    const ctx = user ? viewerContext(user.id, user.profile) : null;
 
     const rows = db
       .select({ post: tables.posts, user: tables.users, profile: tables.profiles })
@@ -55,7 +63,7 @@ export async function GET(req: NextRequest) {
     const likedByMe = new Set<string>();
     for (const l of likeRows) {
       likesByPost.set(l.postId, (likesByPost.get(l.postId) ?? 0) + 1);
-      if (l.userId === user.id) likedByMe.add(l.postId);
+      if (user && l.userId === user.id) likedByMe.add(l.postId);
     }
     const commentsByPost = new Map<string, number>();
     for (const c of commentRows) commentsByPost.set(c.postId, (commentsByPost.get(c.postId) ?? 0) + 1);
@@ -66,7 +74,8 @@ export async function GET(req: NextRequest) {
     }
 
     // ---- the recommendation engine ranks; the route only maps shapes ----
-    const taste = buildTaste(user.id, user.profile);
+    // guests have no taste profile — nothing personal exists to rank with
+    const taste = user ? buildTaste(user.id, user.profile) : null;
 
     const parseTags = (s: string) => {
       try {
@@ -76,7 +85,7 @@ export async function GET(req: NextRequest) {
       }
     };
 
-    const scoped = rows.filter((r) => inScope(scope, ctx, r.profile, campusMap.get(r.post.authorId)));
+    const scoped = ctx ? rows.filter((r) => inScope(scope, ctx, r.profile, campusMap.get(r.post.authorId))) : rows;
     const mapped = scoped.map((r) => {
       const likes = likesByPost.get(r.post.id) ?? 0;
       const commentsCount = commentsByPost.get(r.post.id) ?? 0;
@@ -89,7 +98,7 @@ export async function GET(req: NextRequest) {
         lat: r.profile.lat,
         lng: r.profile.lng,
         locationOk: r.profile.locationVisibility !== "hidden",
-        sameCity: !!user.profile.city && r.profile.city === user.profile.city,
+        sameCity: !!user?.profile.city && r.profile.city === user.profile.city,
         createdAt: r.post.createdAt,
         engagement: likes + 2 * commentsCount,
         authorCommunityIds: communitiesByUser.get(r.post.authorId) ?? new Set(),
@@ -106,14 +115,25 @@ export async function GET(req: NextRequest) {
         likes,
         comments: commentsCount,
         likedByMe: likedByMe.has(r.post.id),
-        isMine: r.post.authorId === user.id,
+        isMine: !!user && r.post.authorId === user.id,
       };
       return { item, scorable };
     });
 
     let items: (typeof mapped)[number]["item"][];
     let reasons: Record<string, string[]> = {};
-    if (tab === "following") {
+    if (!user || !taste) {
+      // guest Discover: recent + engaging public posts, hard-capped.
+      // Enough to see the product — personalization needs an account.
+      const now = Date.now();
+      const discover = (x: (typeof mapped)[number]) =>
+        x.scorable.engagement - ((now - Date.parse(x.item.createdAt)) / 86400_000) * 2;
+      items = mapped
+        .slice()
+        .sort((a, b) => discover(b) - discover(a))
+        .map(({ item }) => item)
+        .slice(0, GUEST_FEED_LIMIT);
+    } else if (tab === "following") {
       // chronological — you asked for these people, don't reorder them.
       // hides still apply.
       items = mapped
@@ -132,7 +152,7 @@ export async function GET(req: NextRequest) {
 
     // ---- promoted slot: labeled, separate, NEVER part of organic ranking ----
     let promoted: object | null = null;
-    if (tab === "for-you") {
+    if (tab === "for-you" && user && taste) {
       const promo = db
         .select({ service: tables.services, profile: tables.profiles, u: tables.users })
         .from(tables.services)
@@ -152,6 +172,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return { items: items.slice(0, 60), reasons, promoted };
+    return { items: items.slice(0, 60), reasons, promoted, guest: !user, totalPublic: mapped.length };
   });
 }
