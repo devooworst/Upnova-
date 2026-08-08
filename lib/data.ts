@@ -877,18 +877,18 @@ export type CommunityAccess = "public" | "private" | "invite" | "verified";
 export type CommunityMode = "discussion" | "announcements" | "broadcast" | "collaboration" | "qa";
 
 export const communityAccessInfo: Record<CommunityAccess, { label: string; desc: string }> = {
-  public: { label: "🌐 Public", desc: "Anyone can discover and join." },
-  private: { label: "🔒 Private", desc: "Discoverable — joining requires approval." },
-  invite: { label: "✉️ Invite-only", desc: "Hidden. Invitation or link required." },
-  verified: { label: "🎓 Verified-only", desc: "Only people who meet a requirement can join." },
+  public: { label: "Public", desc: "Anyone can discover and join." },
+  private: { label: "Private", desc: "Discoverable — joining requires approval." },
+  invite: { label: "Invite-only", desc: "Hidden. Invitation or link required." },
+  verified: { label: "Verified-only", desc: "Only people who meet a requirement can join." },
 };
 
 export const communityModeInfo: Record<CommunityMode, { label: string; desc: string }> = {
-  discussion: { label: "💬 Discussion", desc: "Everyone can post and respond." },
-  announcements: { label: "📢 Announcements", desc: "Admins post; members read and react." },
-  broadcast: { label: "🎤 Broadcast", desc: "Admin updates; replies limited." },
-  collaboration: { label: "🤝 Collaboration", desc: "Built for finding partners and projects." },
-  qa: { label: "❓ Q&A", desc: "Members ask; others answer." },
+  discussion: { label: "Discussion", desc: "Everyone can post and respond." },
+  announcements: { label: "Announcements", desc: "Admins post; members read and react." },
+  broadcast: { label: "Broadcast", desc: "Admin updates; replies limited." },
+  collaboration: { label: "Collaboration", desc: "Built for finding partners and projects." },
+  qa: { label: "Q&A", desc: "Members ask; others answer." },
 };
 
 export interface Community {

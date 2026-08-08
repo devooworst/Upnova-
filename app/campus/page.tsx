@@ -188,7 +188,7 @@ export default function CampusPage() {
                 : "border-line hover:border-zinc-600 hover:bg-card-raised"
             }`}
           >
-            <p className="text-sm font-semibold text-zinc-100">{s.emoji} {s.label}</p>
+            <p className="text-sm font-semibold text-zinc-100">{s.label}</p>
             <p className="mt-0.5 truncate text-[10px] text-zinc-500">{s.desc}</p>
           </button>
         ))}

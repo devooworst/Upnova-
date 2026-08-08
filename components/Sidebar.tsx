@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Bookmark,
   BarChart3,
+  GraduationCap,
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -132,7 +133,7 @@ export default function Sidebar() {
                   : "text-violet-300 hover:bg-violet-400/10"
               }`}
             >
-              <span aria-hidden>🎓</span> Your Campus
+              <GraduationCap className="h-[18px] w-[18px]" /> Your Campus
               <span className="ml-auto truncate font-mono text-[9px] text-zinc-500">Bowie State</span>
             </Link>
           </div>
@@ -159,7 +160,7 @@ export default function Sidebar() {
           </div>
         ) : plan === "college" ? (
           <div className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-400/10 to-card p-4">
-            <p className="text-sm font-bold text-violet-300">🎓 UpNova College+ ✓</p>
+            <p className="text-sm font-bold text-violet-300">UpNova College+ ✓</p>
             <p className="mt-0.5 text-xs text-zinc-400">Bowie State University</p>
             <p className="mt-1 text-[10px] text-zinc-500">College benefits active · Student Boost on</p>
             <Link href="/pro" className="btn-ghost mt-3 flex w-full border-violet-400/40 py-1.5 text-xs text-violet-300">
@@ -177,7 +178,7 @@ export default function Sidebar() {
               View Plans →
             </Link>
             <Link href="/pro" className="mt-2 block text-center text-[10px] font-semibold text-violet-400 hover:text-violet-300">
-              🎓 Student? Verification is free →
+              Student? Verification is free →
             </Link>
           </div>
         )}

@@ -296,7 +296,7 @@ export default function CreateModal() {
             <div>
               <p className={label}>Post type</p>
               <Chips
-                options={["Normal post", "🤝 Looking to Collaborate", "💼 Looking for Work", "📢 Announcement", "🎓 Campus", "🎨 Creative Work"]}
+                options={["Normal post", "Looking to Collaborate", "Looking for Work", "Announcement", "Campus", "Creative Work"]}
                 value={postType}
                 onChange={setPostType}
                 accent="violet"
