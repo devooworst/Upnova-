@@ -10,7 +10,7 @@ import OpportunityCard from "./OpportunityCard";
 import EventCard from "./EventCard";
 
 const secondaryFilters = ["Following", "Opportunities", "Trending"] as const;
-type Filter = "Near You" | (typeof secondaryFilters)[number];
+type Filter = "For You" | (typeof secondaryFilters)[number];
 
 function ringOf(post: Post): 0 | 1 | 2 {
   const d = post.distanceMi;
@@ -41,7 +41,7 @@ function renderItem(post: Post) {
 }
 
 export default function Feed({ radius }: { radius: RadiusId }) {
-  const [filter, setFilter] = useState<Filter>("Near You");
+  const [filter, setFilter] = useState<Filter>("For You");
   const [farOpen, setFarOpen] = useState(false);
 
   const groups = useMemo(() => {
@@ -77,14 +77,14 @@ export default function Feed({ radius }: { radius: RadiusId }) {
       {/* minimal filter row */}
       <div className="flex items-center gap-4 border-b border-line-soft pb-0 text-sm">
         <button
-          onClick={() => setFilter("Near You")}
+          onClick={() => setFilter("For You")}
           className={`-mb-px border-b-2 pb-2.5 font-semibold transition ${
-            filter === "Near You"
+            filter === "For You"
               ? "border-white text-zinc-50"
               : "border-transparent text-zinc-500 hover:text-zinc-300"
           }`}
         >
-          Near You
+          For You
         </button>
         {secondaryFilters.map((f) => (
           <button
@@ -104,7 +104,7 @@ export default function Feed({ radius }: { radius: RadiusId }) {
         </span>
       </div>
 
-      {filter !== "Near You" ? (
+      {filter !== "For You" ? (
         <div className="space-y-5">{flat.map(renderItem)}</div>
       ) : (
         <div className="space-y-8">
@@ -113,7 +113,7 @@ export default function Feed({ radius }: { radius: RadiusId }) {
               s.items.length > 0 && (
                 <section key={s.label}>
                   <header className="mb-3 flex items-baseline gap-2.5">
-                    <h2 className="font-display text-sm font-bold tracking-tight text-zinc-200">
+                    <h2 className="text-sm font-bold tracking-tight text-zinc-200">
                       {s.label.split("•")[0].trim()}
                     </h2>
                     <span className="font-mono text-[10px] tabular-nums text-zinc-500">

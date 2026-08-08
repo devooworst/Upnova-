@@ -35,7 +35,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
   return (
     <aside className="sticky top-20 hidden w-80 shrink-0 space-y-5 self-start xl:block">
       {/* ---- money: receipt. sharp corners, lime rule, mono, dashed rows ---- */}
-      <section className="card-money px-4 pb-4 pt-3.5">
+      <section className="card-money px-5 pb-5 pt-4">
         <div className="flex items-baseline justify-between">
           <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-300">
             Open money
@@ -50,7 +50,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
             <li key={o.id} className="border-t border-dashed border-zinc-700/60 first:border-t-0">
               <Link
                 href="/opportunities"
-                className="group block py-2.5 transition hover:bg-card-raised"
+                className="group -mx-2 block rounded-md px-2 py-3 transition hover:bg-card-raised"
               >
                 <p className="flex items-baseline justify-between gap-3">
                   <span className="truncate text-sm font-semibold text-zinc-100 group-hover:text-lime-300">
@@ -101,7 +101,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
       {/* ---- people: round, avatar-forward, violet ---- */}
       <section className="card-people p-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-base font-bold tracking-tight text-zinc-50">
+          <h2 className="text-base font-bold tracking-tight text-zinc-50">
             People near you
           </h2>
           <Link
@@ -143,7 +143,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
 
       {/* ---- events: ticket rows with real date blocks, amber ---- */}
       <section className="card-event overflow-hidden">
-        <h2 className="border-b border-line-soft px-4 pb-3 pt-4 font-display text-base font-bold tracking-tight text-zinc-50">
+        <h2 className="border-b border-line-soft px-5 pb-3 pt-4 text-base font-bold tracking-tight text-zinc-50">
           This week
         </h2>
         <ul className="divide-y divide-line-soft">
@@ -156,11 +156,11 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                     <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-400">
                       {mon}
                     </span>
-                    <span className="font-display text-xl font-extrabold leading-tight text-zinc-50">
+                    <span className="text-xl font-extrabold leading-tight text-zinc-50">
                       {day}
                     </span>
                   </span>
-                  <span className="min-w-0 flex-1 px-3.5 py-3">
+                  <span className="min-w-0 flex-1 px-4 py-3">
                     <span className="block truncate text-sm font-semibold text-zinc-100 group-hover:text-amber-300">
                       {e.title}
                     </span>

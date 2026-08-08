@@ -9,7 +9,7 @@ export default function AnalyticsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <header className="px-1">
-        <h1 className="flex items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-zinc-50">
+        <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-zinc-50">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
             <BarChart3 className="h-5 w-5 text-lime-400" />
           </span>
@@ -23,7 +23,7 @@ export default function AnalyticsPage() {
         {analytics.stats.map((s) => (
           <div key={s.label} className="card p-4">
             <p className="text-xs text-zinc-500">{s.label}</p>
-            <p className="mt-1 font-display text-2xl font-bold text-zinc-50">{s.value}</p>
+            <p className="mt-1 text-2xl font-bold text-zinc-50">{s.value}</p>
             <p className={`mt-1 flex items-center gap-1 text-xs font-semibold ${s.label === "Service Revenue" ? "text-lime-400" : "text-amber-400"}`}>
               <ArrowUpRight className="h-3.5 w-3.5" />
               {s.delta}
@@ -81,7 +81,7 @@ export default function AnalyticsPage() {
         <div className="mt-3 divide-y divide-line-soft">
           {analytics.topPosts.map((p, i) => (
             <div key={p.title} className="flex items-center gap-4 py-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-card-raised font-display text-sm font-bold text-lime-400">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-card-raised text-sm font-bold text-lime-400">
                 {i + 1}
               </span>
               <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-200">{p.title}</p>

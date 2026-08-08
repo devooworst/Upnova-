@@ -65,7 +65,7 @@ export default function CreateModal() {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={reset} />
       <div className="relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-line bg-card p-5 shadow-card animate-fade-up sm:max-w-lg sm:rounded-3xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-zinc-50">
+          <h2 className="text-lg font-bold text-zinc-50">
             {kind ? `Create ${kind}` : "Create on UpNova"}
           </h2>
           <button onClick={reset} className="icon-btn -mr-2" aria-label="Close">
@@ -78,7 +78,7 @@ export default function CreateModal() {
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-lime-400/15">
               <Check className="h-7 w-7 text-lime-400" />
             </span>
-            <p className="mt-4 font-display text-base font-semibold text-zinc-100">
+            <p className="mt-4 text-base font-semibold text-zinc-100">
               {kind} published 🎉
             </p>
             <p className="mt-1 max-w-xs text-sm text-zinc-400">

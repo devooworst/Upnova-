@@ -40,7 +40,7 @@ export default function PortfolioTab() {
               </span>
             </div>
             <div className="p-4">
-              <h3 className="font-display text-sm font-bold text-zinc-50">{p.title}</h3>
+              <h3 className="text-sm font-bold text-zinc-50">{p.title}</h3>
               <dl className="mt-2 space-y-1 text-xs text-zinc-500">
                 <div className="flex justify-between gap-2">
                   <dt>Client</dt>

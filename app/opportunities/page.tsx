@@ -30,7 +30,7 @@ export default function OpportunitiesPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <header className="px-1">
-        <h1 className="flex items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-zinc-50">
+        <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-zinc-50">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
             <Briefcase className="h-5 w-5 text-lime-400" />
           </span>

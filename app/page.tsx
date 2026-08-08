@@ -19,7 +19,7 @@ export default function Home() {
             {currentUser.location} · Thu Aug 7
           </p>
           <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-            <h1 className="font-display text-4xl font-extrabold leading-none tracking-tight text-zinc-50 sm:text-[2.75rem]">
+            <h1 className="text-4xl font-extrabold leading-none tracking-[-0.03em] text-zinc-50 sm:text-[2.75rem]">
               Near You
             </h1>
             {/* radius selector — the one place radius lives */}
@@ -39,18 +39,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-          </div>
-          {/* legend — colors have jobs */}
-          <div className="mt-3 flex items-center gap-4 font-mono text-[10px] text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> work &amp; money
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> people
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> events
-            </span>
           </div>
         </header>
 

@@ -23,6 +23,16 @@ body {
   @apply bg-lime-400/30 text-lime-100;
 }
 
+/* designed focus state — never browser-default blue */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 3px;
+}
+
 /* ---------- shared component classes ---------- */
 
 @layer components {

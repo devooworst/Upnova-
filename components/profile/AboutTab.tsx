@@ -9,7 +9,7 @@ export default function AboutTab() {
       {/* left column: bio + experience + contact */}
       <div className="space-y-4 lg:col-span-2">
         <section className="card p-5">
-          <h3 className="font-display text-sm font-bold text-zinc-100">About Me</h3>
+          <h3 className="text-sm font-bold text-zinc-100">About Me</h3>
           <p className="mt-2.5 text-sm leading-relaxed text-zinc-300">{currentUser.bio}</p>
           <p className="mt-2.5 text-sm leading-relaxed text-zinc-400">
             I&apos;m a music producer, content creator, and entrepreneur focused on helping creators
@@ -18,7 +18,7 @@ export default function AboutTab() {
         </section>
 
         <section className="card p-5">
-          <h3 className="font-display text-sm font-bold text-zinc-100">Experience</h3>
+          <h3 className="text-sm font-bold text-zinc-100">Experience</h3>
           <ol className="mt-4 space-y-4 border-l border-line pl-4">
             {experience.map((e) => (
               <li key={e.title} className="relative">
@@ -34,7 +34,7 @@ export default function AboutTab() {
         </section>
 
         <section className="card p-5">
-          <h3 className="font-display text-sm font-bold text-zinc-100">Contact</h3>
+          <h3 className="text-sm font-bold text-zinc-100">Contact</h3>
           <ul className="mt-3 space-y-2.5 text-sm text-zinc-300">
             <li className="flex items-center gap-2.5">
               <Mail className="h-4 w-4 text-lime-400" /> {contact.email}
@@ -53,7 +53,7 @@ export default function AboutTab() {
       <div className="lg:col-span-3">
         <section className="card p-5">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-sm font-bold text-zinc-100">Services</h3>
+            <h3 className="text-sm font-bold text-zinc-100">Services</h3>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold text-lime-300">
               <Check className="h-3 w-3" /> Accepting Clients
             </span>

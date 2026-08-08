@@ -21,7 +21,7 @@ export default function CommunityCard({ community }: { community: Community }) {
       </div>
 
       <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <h3 className="font-display text-base font-bold text-zinc-50">{community.name}</h3>
+        <h3 className="text-base font-bold text-zinc-50">{community.name}</h3>
         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
           <Users className="h-3.5 w-3.5" />
           {community.members} members

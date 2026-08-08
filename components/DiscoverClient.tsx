@@ -38,7 +38,7 @@ export default function DiscoverClient() {
   return (
     <div className="space-y-5">
       <header className="px-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-zinc-50">Discover</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Discover</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Search the entire UpNova ecosystem — people, services, work, and communities.
         </p>

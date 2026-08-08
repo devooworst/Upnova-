@@ -78,8 +78,8 @@ export default function NearbyNow() {
   ];
 
   return (
-    <section aria-label="Live near you">
-      <div className="no-scrollbar flex gap-2.5 overflow-x-auto pb-1">
+    <section aria-label="Live near you" className="relative">
+      <div className="no-scrollbar flex gap-2.5 overflow-x-auto pb-1 pr-6">
         {tiles.map((t) => (
           <button
             key={t.id}
@@ -122,6 +122,8 @@ export default function NearbyNow() {
           </button>
         ))}
       </div>
+      {/* edge fade — partial tiles read as "scroll for more", not clipped */}
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-ink to-transparent" />
     </section>
   );
 }

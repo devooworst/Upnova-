@@ -40,7 +40,7 @@ export default function EventCard({ id }: { id: string }) {
             <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-400">
               {mon}
             </span>
-            <span className="font-display text-2xl font-extrabold leading-none text-zinc-50">
+            <span className="text-2xl font-extrabold leading-none text-zinc-50">
               {day}
             </span>
           </div>
@@ -48,7 +48,7 @@ export default function EventCard({ id }: { id: string }) {
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-400">
               {weekday} · {event.time}
             </p>
-            <h3 className="mt-1 font-display text-lg font-extrabold tracking-tight text-zinc-50">
+            <h3 className="mt-1 text-lg font-extrabold tracking-tight text-zinc-50">
               {event.title}
             </h3>
           </div>

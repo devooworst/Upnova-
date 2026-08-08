@@ -38,7 +38,7 @@ export default function ProfileHeader() {
 
         {/* identity */}
         <div className="mt-3">
-          <h1 className="flex flex-wrap items-center gap-2 font-display text-2xl font-bold text-zinc-50">
+          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold text-zinc-50">
             {currentUser.name}
             {currentUser.verified && <VerifiedBadge className="h-5 w-5" />}
             <span className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-lime-300">
@@ -58,7 +58,7 @@ export default function ProfileHeader() {
         <dl className="mt-5 grid grid-cols-4 gap-2 border-t border-line-soft pt-4">
           {profileStats.map((s) => (
             <div key={s.label} className="text-center sm:text-left">
-              <dd className="font-display text-xl font-bold text-zinc-50">{s.value}</dd>
+              <dd className="text-xl font-bold text-zinc-50">{s.value}</dd>
               <dt className="text-xs text-zinc-500">{s.label}</dt>
             </div>
           ))}

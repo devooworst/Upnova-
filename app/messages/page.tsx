@@ -19,7 +19,7 @@ export default function MessagesPage() {
         }`}
       >
         <div className="border-b border-line-soft p-4">
-          <h1 className="font-display text-lg font-bold text-zinc-50">Messages</h1>
+          <h1 className="text-lg font-bold text-zinc-50">Messages</h1>
           <p className="text-xs text-zinc-500">Creators, clients, brands, and communities.</p>
         </div>
         <ul>

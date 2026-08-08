@@ -99,7 +99,7 @@ export default function Sidebar() {
       {/* UpNova Pro */}
       <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-gradient-to-b from-lime-400/10 to-card p-4">
         <Sparkles className="absolute -right-3 -top-3 h-16 w-16 text-lime-400/10" />
-        <p className="font-display text-sm font-bold text-lime-300">UpNova Pro</p>
+        <p className="text-sm font-bold text-lime-300">UpNova Pro</p>
         <p className="mt-1 text-xs leading-relaxed text-zinc-400">
           Unlock advanced tools, analytics, and more opportunities.
         </p>
