@@ -30,6 +30,11 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [busy, setBusy] = useState(false);
 
   const confirmState = mode === "signup" && confirm ? (confirm === password ? "match" : "differ") : null;
+  // carry the return destination across the login<->signup switch
+  const nextQ =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("next")
+      ? `?next=${encodeURIComponent(new URLSearchParams(window.location.search).get("next")!)}`
+      : "";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +74,12 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return;
     }
     invalidateSession();
-    router.push("/");
+    // return the user to what they were doing before auth (e.g. the
+    // opportunity they tried to apply to). Path-only — no open redirects.
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    router.push(safeNext);
     router.refresh();
   };
 
@@ -240,14 +250,14 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           {mode === "login" ? (
             <>
               New here?{" "}
-              <Link href="/signup" className="font-semibold text-violet-300 hover:underline">
+              <Link href={`/signup${nextQ}`} className="font-semibold text-violet-300 hover:underline">
                 Create an account
               </Link>
             </>
           ) : (
             <>
               Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-violet-300 hover:underline">
+              <Link href={`/login${nextQ}`} className="font-semibold text-violet-300 hover:underline">
                 Sign in
               </Link>
             </>

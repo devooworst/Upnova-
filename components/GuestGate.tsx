@@ -42,9 +42,14 @@ export type JoinAction =
 
 const JOIN_EVENT = "upnova:join-prompt";
 
-/** Open the contextual sign-up prompt from anywhere. */
-export function promptJoin(action: JoinAction) {
-  window.dispatchEvent(new CustomEvent<JoinAction>(JOIN_EVENT, { detail: action }));
+/**
+ * Open the contextual sign-up prompt from anywhere.
+ * `next` is where the user should land AFTER creating an account or
+ * signing in — e.g. `/services?book=<id>` resumes the exact booking they
+ * attempted. Defaults to the current page.
+ */
+export function promptJoin(action: JoinAction, next?: string) {
+  window.dispatchEvent(new CustomEvent<{ action: JoinAction; next?: string }>(JOIN_EVENT, { detail: { action, next } }));
 }
 
 /* contextual copy — the prompt explains WHY an account is needed for
@@ -111,11 +116,16 @@ export default function GuestGate() {
   const { user } = useSession();
   const pathname = usePathname();
   const [action, setAction] = useState<JoinAction | null>(null);
+  const [next, setNext] = useState<string | null>(null);
   const [banner, setBanner] = useState(false);
 
   /* contextual modal, opened by promptJoin() anywhere in the app */
   useEffect(() => {
-    const open = (e: Event) => setAction((e as CustomEvent<JoinAction>).detail);
+    const open = (e: Event) => {
+      const detail = (e as CustomEvent<{ action: JoinAction; next?: string }>).detail;
+      setAction(detail.action);
+      setNext(detail.next ?? null);
+    };
     window.addEventListener(JOIN_EVENT, open);
     return () => window.removeEventListener(JOIN_EVENT, open);
   }, []);
@@ -146,6 +156,11 @@ export default function GuestGate() {
   if (user) return null;
 
   const copy = action ? COPY[action] : null;
+  // where auth should return the user: the attempted action's resume URL,
+  // else the page they're on right now — never a dead-end at Home
+  const returnTo =
+    next ?? (typeof window !== "undefined" ? window.location.pathname + window.location.search : "/");
+  const q = `?next=${encodeURIComponent(returnTo)}`;
 
   return (
     <>
@@ -172,15 +187,16 @@ export default function GuestGate() {
             <h3 className="mt-3 text-base font-bold tracking-tight text-zinc-50">{copy.title}</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">{copy.body}</p>
             <div className="mt-4 space-y-2">
-              <Link href="/signup" className="btn-lime w-full justify-center py-2.5 text-sm" onClick={() => setAction(null)}>
+              <Link href={`/signup${q}`} className="btn-lime w-full justify-center py-2.5 text-sm" onClick={() => setAction(null)}>
                 Create free account
               </Link>
               <p className="text-center text-xs text-zinc-500">
                 Already have an account?{" "}
-                <Link href="/login" className="font-semibold text-zinc-300 underline-offset-2 hover:underline" onClick={() => setAction(null)}>
+                <Link href={`/login${q}`} className="font-semibold text-zinc-300 underline-offset-2 hover:underline" onClick={() => setAction(null)}>
                   Sign in
                 </Link>
               </p>
+              <p className="text-center text-[10px] text-zinc-600">You&apos;ll come right back to what you were doing.</p>
             </div>
           </div>
         </div>
@@ -198,10 +214,10 @@ export default function GuestGate() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Link href="/signup" className="btn-lime px-4 py-2 text-xs" onClick={dismissBanner}>
+              <Link href={`/signup${q}`} className="btn-lime px-4 py-2 text-xs" onClick={dismissBanner}>
                 Create account
               </Link>
-              <Link href="/login" className="btn-ghost px-3.5 py-2 text-xs" onClick={dismissBanner}>
+              <Link href={`/login${q}`} className="btn-ghost px-3.5 py-2 text-xs" onClick={dismissBanner}>
                 Sign in
               </Link>
               <button onClick={dismissBanner} className="rounded-md p-1.5 text-zinc-500 hover:text-zinc-200" aria-label="Dismiss">

@@ -233,6 +233,17 @@ npm run db:seed          # load development seed data (see below)
 npm run dev              # http://localhost:3000
 ```
 
+> **Self-initializing dev database:** if `db/upnova.dev.db` is missing (fresh clone, reset
+> workspace), the server creates the schema from `db/bootstrap.sql` and seeds the demo world on
+> first touch — the exact failure that used to surface as "Internal error" on login (better-sqlite3
+> silently creates an EMPTY file, then every query dies with `no such table: users`, which
+> `guarded()` masked). Route errors now surface their real message outside production
+> (`UPNOVA_VERBOSE_ERRORS=1` to force). Auto-seed is dev/demo behavior — set `UPNOVA_AUTOSEED=0`
+> to disable; a Postgres production deployment never hits this path. Nothing bypasses
+> authentication: bootstrap only guarantees the schema and seed accounts EXIST so real
+> scrypt/session auth can run against them. After schema changes run `npm run db:bootstrap` to
+> refresh the snapshot.
+
 > `better-sqlite3` is pinned to 12.4.1 — the newest line with published prebuilt binaries for
 > Node 22 (13.0.x has none, forcing a source build). If your environment has to compile it
 > anyway, local Node headers work: `npx node-gyp rebuild --nodedir=/usr/local` inside
@@ -455,6 +466,15 @@ application", Create says "Join UpNova to create", likes/saves/follows/messages/
 each get their own copy, always with a "Already have an account? Sign in" path. Guests browse
 freely first: one inline join card after the Discover feed, one dismissible banner after ~6 page
 views per session (sessionStorage), and never a repeat nag after dismissal.
+Conversion returns you to the moment: every prompt and banner carries `?next=` (path-only,
+validated against open redirects), and the flagship flows RESUME — a guest who pressed Apply
+lands back on `/opportunities?apply=<id>` with that application modal open; a guest who pressed
+Book lands on `/services?book=<id>` with that booking wizard open. **Public sharing is
+first-class**: `/creator/<handle>`, `/services/<id>`, and `/opportunities/<id>` are shareable
+guest-visible pages (price, menu, availability, policies, reviews, verification badges, poster
+identity — with copy-link Share buttons and inline "Create a free account to …" hints under the
+CTA), so a forwarded booking link or opportunity link is the growth loop: view as guest → care →
+account at the exact moment of intent.
 
 **Payments** — no card data is ever stored. The `payments` table records payout + 5 % buyer-side
 fee in cents with `provider="stripe_connect"` and a `providerRef` seam where the PaymentIntent /

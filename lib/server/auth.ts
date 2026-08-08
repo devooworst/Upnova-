@@ -110,8 +110,15 @@ export function guarded<T>(fn: () => T | Promise<T>): Promise<Response> {
     .catch((err) => {
       if (err instanceof AuthError) return Response.json({ error: err.message }, { status: err.status });
       if (err instanceof ApiError) return Response.json({ error: err.message }, { status: err.status });
-      console.error(err);
-      return Response.json({ error: "Internal error" }, { status: 500 });
+      // never mask the real failure while developing — surfacing
+      // "no such table: users" instead of "Internal error" is the
+      // difference between a 5-minute fix and a mystery
+      console.error("[upnova] unhandled route error:", err);
+      const detail =
+        process.env.NODE_ENV !== "production" || process.env.UPNOVA_VERBOSE_ERRORS === "1"
+          ? `: ${err instanceof Error ? err.message : String(err)}`
+          : "";
+      return Response.json({ error: `Internal error${detail}` }, { status: 500 });
     });
 }
 

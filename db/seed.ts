@@ -831,8 +831,16 @@ function seed() {
 }
 
 const args = process.argv.slice(2);
-if (args.includes("--wipe")) wipe();
-else if (args.includes("--fresh")) {
-  wipe();
-  seed();
-} else seed();
+// CLI dispatch — ONLY when executed directly (tsx db/seed.ts …).
+// The server imports { seed } from this file for dev auto-seeding and
+// must never trigger a run at import time.
+const runDirectly = !!process.argv[1] && /seed\.(ts|js|mjs|cjs)$/.test(process.argv[1]);
+if (runDirectly) {
+  if (args.includes("--wipe")) wipe();
+  else if (args.includes("--fresh")) {
+    wipe();
+    seed();
+  } else seed();
+}
+
+export { seed, wipe };

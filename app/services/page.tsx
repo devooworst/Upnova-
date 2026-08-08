@@ -76,6 +76,21 @@ export default function ServicesPage() {
       );
   }, []);
 
+  // resume-after-auth: a guest who pressed Book/Request signed up and came
+  // back to /services?book=<id> — reopen the exact flow they attempted
+  useEffect(() => {
+    if (!me || !items) return;
+    const params = new URLSearchParams(window.location.search);
+    const bookId = params.get("book");
+    const hireId = params.get("hire");
+    if (!bookId && !hireId) return;
+    const target = items.find((s) => s.id === (bookId ?? hireId));
+    window.history.replaceState(null, "", "/services"); // one-shot
+    if (!target || target.isMine) return;
+    if (bookId && target.fulfillment === "appointment") setBooking(target);
+    else if (target) setHiring(target);
+  }, [me, items]);
+
   const toggleSave = async (id: string) => {
     if (me === null) return promptJoin("save"); // UX only — the API 401s regardless
     const res = await fetch("/api/bookmarks", {
@@ -110,8 +125,12 @@ export default function ServicesPage() {
 
   const hire = (s: ServiceItem) => {
     if (!me) {
-      // contextual, not a generic wall: booking vs project request
-      promptJoin(s.fulfillment === "appointment" ? "book" : "hire");
+      // contextual, not a generic wall — and auth returns them HERE with
+      // the exact flow reopened (?book= / ?hire= resume below)
+      promptJoin(
+        s.fulfillment === "appointment" ? "book" : "hire",
+        `/services?${s.fulfillment === "appointment" ? "book" : "hire"}=${s.id}`
+      );
       return;
     }
     // service-view signal for the recommendation engine
@@ -186,7 +205,9 @@ export default function ServicesPage() {
                       Promoted
                     </p>
                   )}
-                  <h3 className="text-sm font-bold text-zinc-100">{s.title}</h3>
+                  <h3 className="text-sm font-bold text-zinc-100">
+                    <Link href={`/services/${s.id}`} className="transition hover:text-lime-300">{s.title}</Link>
+                  </h3>
                   <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">
                     From ${s.price}
                   </p>

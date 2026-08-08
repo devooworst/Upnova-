@@ -81,6 +81,18 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
     load();
   }, [load]);
 
+  // resume-after-auth: guest pressed Apply → signed up → returned to
+  // /opportunities?apply=<id> — open that application straight away
+  useEffect(() => {
+    if (!me || !items) return;
+    const params = new URLSearchParams(window.location.search);
+    const applyId = params.get("apply");
+    if (!applyId) return;
+    window.history.replaceState(null, "", window.location.pathname); // one-shot
+    const target = items.find((o) => o.id === applyId);
+    if (target && !target.isMine && !target.applied) setApplying(target);
+  }, [me, items]);
+
   if (items === null)
     return <div className="card animate-pulse p-5" aria-hidden><div className="h-3 w-1/2 rounded bg-card-raised" /><div className="mt-3 h-3 w-2/3 rounded bg-card-raised" /></div>;
 
@@ -97,7 +109,9 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
             <div className="min-w-0 flex-1">
               {o.posterType && <PosterOverline type={o.posterType} />}
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold text-zinc-100">{o.title}</h3>
+                <h3 className="text-sm font-bold text-zinc-100">
+                  <Link href={`/opportunities/${o.id}`} className="transition hover:text-amber-300">{o.title}</Link>
+                </h3>
                 {o.budget != null ? (
                   <span className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">${o.budget}</span>
                 ) : (
@@ -160,7 +174,7 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
                 </span>
               ) : (
                 <button
-                  onClick={() => (me === null ? promptJoin("apply") : setApplying(o))}
+                  onClick={() => (me === null ? promptJoin("apply", `/opportunities?apply=${o.id}`) : setApplying(o))}
                   className="btn-lime px-4 py-1.5 text-xs"
                 >
                   {o.budget == null ? "Express Interest" : "Apply Now"}
