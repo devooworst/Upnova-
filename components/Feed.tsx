@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { feed, type Post, type RadiusId } from "@/lib/data";
+import type { Post, RadiusId } from "@/lib/data";
 import PostCard from "./PostCard";
 import AudioPost from "./AudioPost";
 import PollCard from "./PollCard";
 import OpportunityCard from "./OpportunityCard";
 import EventCard from "./EventCard";
 
-const secondaryFilters = ["Following", "Opportunities", "Trending"] as const;
-type Filter = "For You" | (typeof secondaryFilters)[number];
+export type FeedTab = "For You" | "Near You" | "Following" | "Opportunities" | "Trending";
+const tabs: FeedTab[] = ["For You", "Near You", "Following", "Opportunities", "Trending"];
 
 function ringOf(post: Post): 0 | 1 | 2 {
   const d = post.distanceMi;
@@ -20,8 +20,8 @@ function ringOf(post: Post): 0 | 1 | 2 {
 }
 
 const ringLabels: Record<RadiusId, [string, string, string]> = {
-  "5": ["Within 5 mi", "5 – 25 mi", "Beyond 5 mi • farther & remote"],
-  "25": ["Within 5 mi", "5 – 25 mi", "Beyond 25 mi • farther & remote"],
+  "5": ["Within 5 mi", "5 – 25 mi", "Beyond 5 mi"],
+  "25": ["Within 5 mi", "5 – 25 mi", "Beyond 25 mi"],
   city: ["Within 5 mi", "5 – 25 mi", "City, remote & global"],
 };
 
@@ -40,72 +40,126 @@ function renderItem(post: Post) {
   }
 }
 
-export default function Feed({ radius }: { radius: RadiusId }) {
-  const [filter, setFilter] = useState<Filter>("For You");
+function Skeleton() {
+  return (
+    <div className="space-y-5" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="card-people animate-pulse p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-full bg-card-raised" />
+            <div className="space-y-2">
+              <div className="h-3 w-32 rounded bg-card-raised" />
+              <div className="h-2.5 w-48 rounded bg-card-raised" />
+            </div>
+          </div>
+          <div className="mt-4 h-3 w-4/5 rounded bg-card-raised" />
+          <div className="mt-2 h-3 w-3/5 rounded bg-card-raised" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface FeedProps {
+  radius: RadiusId;
+  tab: FeedTab;
+  onTabChange: (tab: FeedTab) => void;
+}
+
+export default function Feed({ radius, tab, onTabChange }: FeedProps) {
   const [farOpen, setFarOpen] = useState(false);
+  const [forYou, setForYou] = useState<Post[] | null>(null);
+  const [nearYou, setNearYou] = useState<Post[] | null>(null);
+
+  /* two separate data sources: global vs. location-based */
+  useEffect(() => {
+    let live = true;
+    fetch("/api/feed/for-you")
+      .then((r) => r.json())
+      .then((d) => live && setForYou(d.items))
+      .catch(() => live && setForYou([]));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    setNearYou(null); // radius changed → refetch the local feed
+    fetch(`/api/feed/near-you?radius=${radius}`)
+      .then((r) => r.json())
+      .then((d) => live && setNearYou(d.items))
+      .catch(() => live && setNearYou([]));
+    return () => {
+      live = false;
+    };
+  }, [radius]);
 
   const groups = useMemo(() => {
     const g: [Post[], Post[], Post[]] = [[], [], []];
-    feed.forEach((p) => g[ringOf(p)].push(p));
+    (nearYou ?? []).forEach((p) => g[ringOf(p)].push(p));
     return g;
-  }, []);
+  }, [nearYou]);
 
-  const flat = feed.filter((p) =>
-    filter === "Following"
+  const flat = (forYou ?? []).filter((p) =>
+    tab === "For You"
+      ? true
+      : tab === "Following"
       ? p.following
-      : filter === "Opportunities"
+      : tab === "Opportunities"
       ? p.type === "opportunity"
       : p.trending
   );
 
   const [l0, l1, l2] = ringLabels[radius];
   const farCollapsed = radius !== "city" && !farOpen;
-  const sections: { label: string; items: Post[]; collapsible: boolean; collapsed: boolean; ring: number }[] =
+  const sections: { label: string; items: Post[]; collapsible: boolean; collapsed: boolean }[] =
     radius === "5"
       ? [
-          { label: l0, items: groups[0], collapsible: false, collapsed: false, ring: 0 },
-          { label: l2, items: [...groups[1], ...groups[2]], collapsible: true, collapsed: farCollapsed, ring: 2 },
+          { label: l0, items: groups[0], collapsible: false, collapsed: false },
+          { label: l2, items: [...groups[1], ...groups[2]], collapsible: true, collapsed: farCollapsed },
         ]
       : [
-          { label: l0, items: groups[0], collapsible: false, collapsed: false, ring: 0 },
-          { label: l1, items: groups[1], collapsible: false, collapsed: false, ring: 1 },
-          { label: l2, items: groups[2], collapsible: true, collapsed: farCollapsed, ring: 2 },
+          { label: l0, items: groups[0], collapsible: false, collapsed: false },
+          { label: l1, items: groups[1], collapsible: false, collapsed: false },
+          { label: l2, items: groups[2], collapsible: true, collapsed: farCollapsed },
         ];
+
+  const loading = tab === "Near You" ? nearYou === null : forYou === null;
 
   return (
     <>
-      {/* minimal filter row */}
-      <div className="flex items-center gap-4 border-b border-line-soft pb-0 text-sm">
-        <button
-          onClick={() => setFilter("For You")}
-          className={`-mb-px border-b-2 pb-2.5 font-semibold transition ${
-            filter === "For You"
-              ? "border-white text-zinc-50"
-              : "border-transparent text-zinc-500 hover:text-zinc-300"
-          }`}
-        >
-          For You
-        </button>
-        {secondaryFilters.map((f) => (
+      {/* tab row */}
+      <div className="flex items-center gap-4 overflow-x-auto border-b border-line-soft pb-0 text-sm no-scrollbar">
+        {tabs.map((t) => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`-mb-px border-b-2 pb-2.5 font-medium transition ${
-              filter === f
-                ? "border-white text-zinc-50"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
+            key={t}
+            onClick={() => onTabChange(t)}
+            className={`-mb-px shrink-0 border-b-2 pb-2.5 transition ${
+              tab === t
+                ? "border-white font-semibold text-zinc-50"
+                : "border-transparent font-medium text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {f}
+            {t}
           </button>
         ))}
-        <span className="ml-auto hidden pb-2.5 font-mono text-[10px] uppercase tracking-widest text-zinc-600 sm:block">
-          sorted by distance
-        </span>
+        {tab === "Near You" && (
+          <span className="ml-auto hidden shrink-0 pb-2.5 font-mono text-[10px] uppercase tracking-widest text-zinc-600 sm:block">
+            sorted by distance
+          </span>
+        )}
       </div>
 
-      {filter !== "For You" ? (
-        <div key={filter} className="animate-fade-up space-y-5">{flat.map(renderItem)}</div>
+      {loading ? (
+        <Skeleton />
+      ) : tab !== "Near You" ? (
+        <div key={tab} className="animate-fade-up space-y-5">
+          {flat.map(renderItem)}
+          {flat.length === 0 && (
+            <p className="py-10 text-center text-sm text-zinc-500">Nothing here yet.</p>
+          )}
+        </div>
       ) : (
         <div key={radius} className="animate-fade-up space-y-8">
           {sections.map(
@@ -114,7 +168,7 @@ export default function Feed({ radius }: { radius: RadiusId }) {
                 <section key={s.label}>
                   <header className="mb-3 flex items-baseline gap-2.5">
                     <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">
-                      {s.label.split("•")[0].trim()}
+                      {s.label}
                     </h2>
                     <span className="font-mono text-[10px] tabular-nums text-zinc-500">
                       {s.items.length}

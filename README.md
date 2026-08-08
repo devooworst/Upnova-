@@ -72,6 +72,11 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   - **people** = round (`rounded-3xl`), avatar-forward, soft
   - **events** = ticket with a real date block (month/day tile), dashed stub divider,
     "admit one" stub detail
+- **Two feeds, two data sources.** `GET /api/feed/for-you` is the global feed: no
+  location logic, ranked by trending + engagement (Instagram/TikTok style).
+  `GET /api/feed/near-you?radius=5|25|city` is the local feed: located items only,
+  sorted nearest-first. Changing the radius selector always switches you to the
+  Near You feed, so the distance filter visibly does something.
 - Locality is spatial, not decorative: one radius selector (5 mi / 25 mi / City +) in
   the masthead is the single home for radius; the feed is grouped into distance rings
   ("Within 5 mi", "5–25 mi", "Beyond — collapsed") and every card carries a mono

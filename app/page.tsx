@@ -3,12 +3,13 @@
 import { useState } from "react";
 import NearbyNow from "@/components/NearbyNow";
 import CreatePost from "@/components/CreatePost";
-import Feed from "@/components/Feed";
+import Feed, { type FeedTab } from "@/components/Feed";
 import RightSidebar from "@/components/RightSidebar";
 import { radiusOptions, type RadiusId, currentUser } from "@/lib/data";
 
 export default function Home() {
   const [radius, setRadius] = useState<RadiusId>("25");
+  const [tab, setTab] = useState<FeedTab>("For You");
 
   return (
     <div className="flex gap-6">
@@ -20,14 +21,17 @@ export default function Home() {
           </p>
           <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">
-              Near You
+              {tab === "Near You" ? "Near You" : "Home"}
             </h1>
-            {/* radius selector — the one place radius lives */}
+            {/* radius selector — controls the Near You feed + the rail */}
             <div className="flex overflow-hidden rounded-full border border-line bg-card">
               {radiusOptions.map((r) => (
                 <button
                   key={r.id}
-                  onClick={() => setRadius(r.id)}
+                  onClick={() => {
+                    setRadius(r.id);
+                    setTab("Near You"); // touching distance always shows the local feed
+                  }}
                   aria-pressed={radius === r.id}
                   className={`px-3.5 py-1.5 font-mono text-xs transition ${
                     radius === r.id
@@ -50,7 +54,7 @@ export default function Home() {
 
         <NearbyNow />
         <CreatePost />
-        <Feed radius={radius} />
+        <Feed radius={radius} tab={tab} onTabChange={setTab} />
       </div>
 
       <RightSidebar radius={radius} />

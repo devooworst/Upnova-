@@ -27,7 +27,7 @@ const navGroups: {
   {
     label: null,
     items: [
-      { href: "/", label: "Near You", icon: Home },
+      { href: "/", label: "Home", icon: Home },
       { href: "/discover", label: "Discover", icon: Search },
       { href: "/messages", label: "Messages", icon: MessageSquare, badge: 3 },
       { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },

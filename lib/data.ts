@@ -503,6 +503,20 @@ export const feed: Post[] = [
     distanceMi: 18,
     tags: ["#UpNovaCreate"],
   },
+  {
+    id: "post-lena-covers",
+    type: "post",
+    creator: creators[5],
+    time: "6h",
+    text: "Three cover-art commissions out the door this week. Two slots left for August \u2014 grab one before they're gone. #CoverArt",
+    image: "/images/portfolio-spotify.jpg",
+    imageAlt: "Album cover art designs on a screen",
+    likes: 611,
+    comments: 89,
+    shares: 57,
+    trending: true,
+    tags: ["#CoverArt", "#OpenForWork"],
+  },
 ];
 
 /* ---------------------------------- events --------------------------------- */
