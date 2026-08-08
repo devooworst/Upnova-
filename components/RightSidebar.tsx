@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Briefcase, MapPin } from "lucide-react";
+import { ArrowRight, Briefcase, ChevronDown, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
 import { opportunities, creators, events, type RadiusId } from "@/lib/data";
 
@@ -19,6 +19,8 @@ function monthDay(date: string): [string, string] {
 
 export default function RightSidebar({ radius }: { radius: RadiusId }) {
   const [followed, setFollowed] = useState<Record<string, boolean>>({});
+  const [open, setOpen] = useState({ money: true, people: true, week: true });
+  const toggle = (k: keyof typeof open) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
   const inRange = (d?: number) =>
     radius === "city" ? true : d !== undefined && d <= Number(radius);
@@ -38,10 +40,21 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
       <section className="card-money px-5 pb-5 pt-4">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Open money</h2>
-          <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-            {radius === "city" ? "city +" : `≤ ${radius} mi`}
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+              {radius === "city" ? "city +" : `≤ ${radius} mi`}
+            </span>
+            <button
+              onClick={() => toggle("money")}
+              aria-label="Collapse open money"
+              className="text-zinc-500 transition hover:text-zinc-200"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${open.money ? "rotate-180" : ""}`} />
+            </button>
           </span>
         </div>
+        {open.money && (
+        <>
 
         <ul className="mt-2.5">
           {nearOpps.map((o) => (
@@ -85,13 +98,11 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
           <div className="mt-1">
             <div className="border-t border-zinc-600" />
             <div className="mt-[3px] border-t border-zinc-600" />
-            <p className="mt-2 flex items-baseline justify-between">
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
-                posted in range
-              </span>
+            <p className="mt-2.5 text-xs text-zinc-400">
               <span className="text-base font-extrabold tracking-tight tabular-nums text-lime-400">
                 ${total.toLocaleString()}
-              </span>
+              </span>{" "}
+              in paid work near you right now
             </p>
           </div>
         )}
@@ -102,24 +113,36 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
         >
           see all paid work <ArrowRight className="h-3 w-3" />
         </Link>
+        </>
+        )}
       </section>
 
       {/* ---- people: round, avatar-forward, violet ---- */}
       <section className="card-people p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">People near you</h2>
-          <Link
-            href="/discover"
-            className="text-xs font-semibold text-violet-400 transition hover:text-violet-300"
-          >
-            Discover
-          </Link>
+          <span className="flex items-center gap-2">
+            <Link
+              href="/discover"
+              className="text-xs font-semibold text-violet-400 transition hover:text-violet-300"
+            >
+              Discover
+            </Link>
+            <button
+              onClick={() => toggle("people")}
+              aria-label="Collapse people near you"
+              className="text-zinc-500 transition hover:text-zinc-200"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${open.people ? "rotate-180" : ""}`} />
+            </button>
+          </span>
         </div>
-        <ul className="mt-4 space-y-4">
+        {open.people && (
+        <ul className="mt-3 space-y-1">
           {nearPeople.map((c) => (
-            <li key={c.id} className="flex items-center gap-3">
+            <li key={c.id} className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-1.5 transition hover:bg-card-raised">
               <span className="relative shrink-0">
-                <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" />
+                <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" className="ring-1 ring-line" />
                 {c.online && (
                   <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-violet-400" />
                 )}
@@ -143,13 +166,22 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
             </li>
           ))}
         </ul>
+        )}
       </section>
 
       {/* ---- events: ticket rows with real date blocks, amber ---- */}
       <section className="card-event overflow-hidden">
-        <h2 className="border-b border-line-soft px-5 pb-3 pt-4 text-[15px] font-bold tracking-tight text-zinc-50">
-          This week
-        </h2>
+        <div className="flex items-center justify-between border-b border-line-soft px-5 pb-3 pt-4">
+          <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">This week</h2>
+          <button
+            onClick={() => toggle("week")}
+            aria-label="Collapse this week"
+            className="text-zinc-500 transition hover:text-zinc-200"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${open.week ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+        {open.week && (
         <ul className="divide-y divide-line-soft">
           {nearEvents.map((e) => {
             const [mon, day] = monthDay(e.date);
@@ -182,6 +214,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
             );
           })}
         </ul>
+        )}
       </section>
 
       <p className="px-2 font-mono text-[10px] leading-relaxed text-zinc-600">

@@ -9,6 +9,7 @@ import {
   Users,
   Briefcase,
   Calendar,
+  CalendarCheck,
   ShoppingBag,
   MessageSquare,
   Bookmark,
@@ -39,6 +40,7 @@ const navGroups: {
     items: [
       { href: "/opportunities", label: "Opportunities", icon: Briefcase },
       { href: "/discover?tab=Services", label: "Marketplace", icon: ShoppingBag },
+      { href: "/calendar", label: "Bookings", icon: CalendarCheck },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },

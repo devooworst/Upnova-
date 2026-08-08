@@ -668,6 +668,94 @@ export const communities: Community[] = [
   },
 ];
 
+/* -------------------------------- bookings --------------------------------- */
+/* Service providers live off their calendar: who booked, when, for how much. */
+
+export interface Booking {
+  id: string;
+  client: string;
+  clientAvatar?: string;
+  initials: string;
+  gradient: string;
+  service: string;
+  /** day of month, August 2026 */
+  day: number;
+  time: string;
+  duration: string;
+  price: string;
+  status: "confirmed" | "pending";
+  location: string;
+}
+
+export const bookings: Booking[] = [
+  {
+    id: "bk-maya",
+    client: "Maya Reyes",
+    initials: "M",
+    gradient: "from-rose-500 to-pink-600",
+    service: "Mixing session",
+    day: 9,
+    time: "2:00 PM",
+    duration: "3 hrs",
+    price: "$200",
+    status: "confirmed",
+    location: "Your studio",
+  },
+  {
+    id: "bk-harbor",
+    client: "Harbor & Oak",
+    initials: "H",
+    gradient: "from-teal-600 to-emerald-700",
+    service: "Brand audio package",
+    day: 12,
+    time: "10:00 AM",
+    duration: "Half day",
+    price: "$450",
+    status: "confirmed",
+    location: "On location, Fells Point",
+  },
+  {
+    id: "bk-jordan",
+    client: "Jordan Miles",
+    clientAvatar: "/images/jordan.jpg",
+    initials: "J",
+    gradient: "from-violet-500 to-fuchsia-600",
+    service: "Writing session (collab)",
+    day: 15,
+    time: "6:00 PM",
+    duration: "4 hrs",
+    price: "Split",
+    status: "confirmed",
+    location: "Remote",
+  },
+  {
+    id: "bk-kwame",
+    client: "K. Boateng",
+    initials: "K",
+    gradient: "from-amber-500 to-orange-600",
+    service: "Full production day",
+    day: 21,
+    time: "11:00 AM",
+    duration: "Full day",
+    price: "$450",
+    status: "pending",
+    location: "Your studio",
+  },
+  {
+    id: "bk-meetup",
+    client: "UpNova Events",
+    initials: "U",
+    gradient: "from-lime-400 to-emerald-600",
+    service: "Live set, Creator Meetup",
+    day: 22,
+    time: "7:00 PM",
+    duration: "2 hrs",
+    price: "$150",
+    status: "confirmed",
+    location: "Baltimore, MD",
+  },
+];
+
 /* ------------------------------ trending / follow ------------------------------ */
 
 export const trending = [

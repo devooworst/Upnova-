@@ -23,7 +23,7 @@ export default function OpportunityCard({ id }: { id: string }) {
               {opp.featured ? "Featured · " : ""}
               {opp.category}
             </p>
-            <h3 className="mt-2 text-xl font-extrabold tracking-tight text-zinc-50">
+            <h3 className="mt-2 text-xl font-bold tracking-tight text-zinc-50">
               {opp.title}
             </h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">

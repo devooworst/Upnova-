@@ -60,7 +60,7 @@ export default function EventCard({ id }: { id: string }) {
             <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-amber-400">
               {weekday} · {event.time}
             </p>
-            <h3 className="mt-1 text-lg font-extrabold tracking-tight text-zinc-50">
+            <h3 className="mt-1 text-lg font-bold tracking-tight text-zinc-50">
               {event.title}
             </h3>
           </div>
