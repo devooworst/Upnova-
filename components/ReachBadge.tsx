@@ -20,7 +20,7 @@ export default function ReachBadge({
       <Icon className="h-3.5 w-3.5 text-zinc-400" aria-hidden />
       {info.location}
       {distanceMi !== undefined && (
-        <span className="font-mono text-[10px] tracking-tight text-zinc-100">
+        <span className="font-mono text-[10px] font-medium text-zinc-100">
           {distanceMi} mi
         </span>
       )}

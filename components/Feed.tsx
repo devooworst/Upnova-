@@ -145,7 +145,7 @@ export default function Feed({ radius, tab, onTabChange }: FeedProps) {
           </button>
         ))}
         {tab === "Near You" && (
-          <span className="ml-auto hidden shrink-0 pb-2.5 font-mono text-[10px] uppercase tracking-widest text-zinc-600 sm:block">
+          <span className="ml-auto hidden shrink-0 pb-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600 sm:block">
             sorted by distance
           </span>
         )}
@@ -177,7 +177,7 @@ export default function Feed({ radius, tab, onTabChange }: FeedProps) {
                     {s.collapsible && (
                       <button
                         onClick={() => setFarOpen(!farOpen)}
-                        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-zinc-500 transition hover:text-zinc-200"
+                        className="flex items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 transition hover:text-zinc-200"
                       >
                         {s.collapsed ? `show ${s.items.length}` : "hide"}
                         <ChevronDown

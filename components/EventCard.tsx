@@ -40,7 +40,7 @@ export default function EventCard({ id }: { id: string }) {
             {event.emoji}
           </span>
         )}
-        <span className="absolute right-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-white backdrop-blur">
+        <span className="absolute right-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
           {event.price}
         </span>
       </div>
@@ -49,7 +49,7 @@ export default function EventCard({ id }: { id: string }) {
         <div className="flex items-start gap-4">
           {/* date block — overlaps the banner like a real events app */}
           <div className="-mt-11 flex w-14 shrink-0 flex-col items-center rounded-lg border border-line bg-card-raised py-2 shadow-card">
-            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-400">
+            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-400">
               {mon}
             </span>
             <span className="text-2xl font-extrabold leading-none text-zinc-50">
@@ -57,7 +57,7 @@ export default function EventCard({ id }: { id: string }) {
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-400">
+            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-amber-400">
               {weekday} · {event.time}
             </p>
             <h3 className="mt-1 text-lg font-extrabold tracking-tight text-zinc-50">

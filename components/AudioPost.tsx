@@ -53,7 +53,7 @@ export default function AudioPost({ post }: { post: Post }) {
               {c.location}
             </span>
             {post.distanceMi !== undefined && (
-              <span className="font-mono text-[10px] tracking-tight text-zinc-400">
+              <span className="font-mono text-[10px] font-medium text-zinc-400">
                 • {post.distanceMi} mi
               </span>
             )}

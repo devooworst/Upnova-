@@ -108,7 +108,7 @@ export default function NearbyNow() {
                 {t.name}
               </span>
               <span
-                className={`shrink-0 font-mono text-[10px] tracking-tight ${
+                className={`shrink-0 font-mono text-[10px] font-medium ${
                   t.role === "opportunity" ? "font-semibold text-lime-400" : "text-zinc-500"
                 }`}
               >

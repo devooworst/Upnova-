@@ -38,7 +38,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
       <section className="card-money px-5 pb-5 pt-4">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Open money</h2>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+          <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
             {radius === "city" ? "city +" : `≤ ${radius} mi`}
           </span>
         </div>
@@ -55,11 +55,11 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                     <Briefcase className="h-3 w-3 shrink-0 text-lime-400/70" />
                     <span className="truncate">{o.title.split("—")[0].trim()}</span>
                   </span>
-                  <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-lime-400">
+                  <span className="shrink-0 text-[15px] font-bold tracking-tight tabular-nums text-lime-400">
                     {o.budget}
                   </span>
                 </p>
-                <p className="mt-0.5 flex items-baseline justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+                <p className="mt-0.5 flex items-baseline justify-between gap-2 font-mono text-[10px] font-medium text-zinc-500">
                   <span className="truncate">
                     {o.distanceMi !== undefined && o.distanceMi <= 25
                       ? `${o.distanceMi} mi`
@@ -85,9 +85,11 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
           <div className="mt-1">
             <div className="border-t border-zinc-600" />
             <div className="mt-[3px] border-t border-zinc-600" />
-            <p className="mt-2 flex items-baseline justify-between font-mono text-[11px] uppercase tracking-widest">
-              <span className="text-zinc-400">posted in range</span>
-              <span className="font-bold tabular-nums text-lime-400">
+            <p className="mt-2 flex items-baseline justify-between">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
+                posted in range
+              </span>
+              <span className="text-base font-extrabold tracking-tight tabular-nums text-lime-400">
                 ${total.toLocaleString()}
               </span>
             </p>
@@ -96,7 +98,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
 
         <Link
           href="/opportunities"
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-lime-400/30 py-2 font-mono text-[11px] font-semibold uppercase tracking-widest text-lime-300 transition hover:border-lime-400/60 hover:bg-lime-400/5"
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-lime-400/30 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-lime-300 transition hover:border-lime-400/60 hover:bg-lime-400/5"
         >
           see all paid work <ArrowRight className="h-3 w-3" />
         </Link>
@@ -155,7 +157,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
               <li key={e.id}>
                 <Link href="/events" className="group flex items-stretch transition hover:bg-card-raised">
                   <span className="flex w-14 shrink-0 flex-col items-center justify-center border-r border-dashed border-zinc-700/60 bg-amber-400/[0.06] py-3">
-                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-400">
+                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-400">
                       {mon}
                     </span>
                     <span className="text-xl font-extrabold leading-tight text-zinc-50">
@@ -172,7 +174,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                       {e.location.split(",")[0]} · {e.attending} going
                     </span>
                   </span>
-                  <span className="mr-3 hidden shrink-0 self-center rounded-full border border-amber-400/40 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-amber-300 opacity-0 transition group-hover:opacity-100 sm:block">
+                  <span className="mr-3 hidden shrink-0 self-center rounded-full border border-amber-400/40 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-300 opacity-0 transition group-hover:opacity-100 sm:block">
                     rsvp
                   </span>
                 </Link>

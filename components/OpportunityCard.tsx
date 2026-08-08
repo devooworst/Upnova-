@@ -18,7 +18,7 @@ export default function OpportunityCard({ id }: { id: string }) {
         {/* stamp row: category + budget stub */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-lime-400">
+            <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
               {opp.featured && <Flame className="h-3.5 w-3.5" />}
               {opp.featured ? "Featured · " : ""}
               {opp.category}
@@ -41,10 +41,10 @@ export default function OpportunityCard({ id }: { id: string }) {
           </div>
           {/* budget stub */}
           <div className="shrink-0 text-right">
-            <p className="font-mono text-2xl font-bold tabular-nums leading-none text-lime-400">
+            <p className="text-[28px] font-extrabold leading-none tracking-tight tabular-nums text-lime-400">
               {opp.budget}
             </p>
-            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">
+            <p className="mt-1 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">
               budget
             </p>
           </div>
@@ -55,18 +55,18 @@ export default function OpportunityCard({ id }: { id: string }) {
         <Perforation className="mt-4" />
 
         {/* receipt line */}
-        <dl className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-wide">
+        <dl className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2">
           <div>
-            <dt className="text-[9px] tracking-[0.2em] text-zinc-500">deadline</dt>
-            <dd className="mt-0.5 font-semibold text-amber-400">{opp.deadline}</dd>
+            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">deadline</dt>
+            <dd className="mt-0.5 text-xs font-semibold tracking-tight text-amber-400">{opp.deadline}</dd>
           </div>
           <div>
-            <dt className="text-[9px] tracking-[0.2em] text-zinc-500">applicants</dt>
-            <dd className="mt-0.5 font-semibold tabular-nums text-zinc-200">{opp.applicants}</dd>
+            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">applicants</dt>
+            <dd className="mt-0.5 text-xs font-semibold tabular-nums tracking-tight text-zinc-200">{opp.applicants}</dd>
           </div>
           <div>
-            <dt className="text-[9px] tracking-[0.2em] text-zinc-500">where</dt>
-            <dd className="mt-0.5 font-semibold text-zinc-200">
+            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">where</dt>
+            <dd className="mt-0.5 text-xs font-semibold tracking-tight text-zinc-200">
               {opp.reach.reach === "Remote"
                 ? "remote"
                 : opp.distanceMi !== undefined && opp.distanceMi <= 25
@@ -75,8 +75,8 @@ export default function OpportunityCard({ id }: { id: string }) {
             </dd>
           </div>
           <div className="min-w-0">
-            <dt className="text-[9px] tracking-[0.2em] text-zinc-500">looking for</dt>
-            <dd className="mt-0.5 truncate font-semibold text-zinc-200">{opp.roles}</dd>
+            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">looking for</dt>
+            <dd className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-200">{opp.roles}</dd>
           </div>
         </dl>
 
