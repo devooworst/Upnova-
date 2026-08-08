@@ -688,6 +688,86 @@ export const communities: Community[] = [
   },
 ];
 
+/* ------------------------------ service catalog ----------------------------- */
+/* Services = clients are looking for a creator. Predefined offerings with
+   clear starting prices. CTA is Hire Me. (Opportunities are the inverse.)  */
+
+export interface CatalogService {
+  id: string;
+  creatorId: string;
+  title: string;
+  category: "Music" | "Video" | "Photography" | "Design" | "Fashion" | "Writing";
+  startingAt: number;
+  description: string;
+  delivery: string;
+}
+
+export const serviceCatalog: CatalogService[] = [
+  {
+    id: "svc-jordan-production",
+    creatorId: "jordan",
+    title: "Music Production",
+    category: "Music",
+    startingAt: 300,
+    description: "Custom beat, arrangement, and a radio-ready mix. Two revisions included.",
+    delivery: "5-7 days",
+  },
+  {
+    id: "svc-marcus-editing",
+    creatorId: "marcus",
+    title: "Video Editing",
+    category: "Video",
+    startingAt: 200,
+    description: "Cut, color grade, and sound polish for content up to 10 minutes.",
+    delivery: "3-5 days",
+  },
+  {
+    id: "svc-ava-photography",
+    creatorId: "ava",
+    title: "Photography",
+    category: "Photography",
+    startingAt: 250,
+    description: "Half-day shoot with an edited gallery of 40+ delivered shots.",
+    delivery: "1 week",
+  },
+  {
+    id: "svc-jordan-songwriting",
+    creatorId: "jordan",
+    title: "Songwriting",
+    category: "Writing",
+    startingAt: 150,
+    description: "Toplines, hooks, and full lyric sheets in your artist's voice.",
+    delivery: "3 days",
+  },
+  {
+    id: "svc-tre-beats",
+    creatorId: "tre",
+    title: "Beat Licensing",
+    category: "Music",
+    startingAt: 150,
+    description: "Exclusive licenses from a 200+ beat catalog. Trap, lo-fi, drill.",
+    delivery: "Instant",
+  },
+  {
+    id: "svc-lena-brand",
+    creatorId: "lena",
+    title: "Brand Identity",
+    category: "Design",
+    startingAt: 180,
+    description: "Logo, palette, and cover art system for artists and small brands.",
+    delivery: "1-2 weeks",
+  },
+  {
+    id: "svc-nia-content",
+    creatorId: "nia",
+    title: "Fashion Content",
+    category: "Fashion",
+    startingAt: 90,
+    description: "Styled looks and short-form content for your product or drop.",
+    delivery: "1 week",
+  },
+];
+
 /* --------------------------- community content ----------------------------- */
 /* Same framework for every community — the purpose determines the content. */
 

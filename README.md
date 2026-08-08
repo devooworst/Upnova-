@@ -72,6 +72,12 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   - **people** = round (`rounded-3xl`), avatar-forward, soft
   - **events** = ticket with a real date block (month/day tile), dashed stub divider,
     "admit one" stub detail
+- **Services vs Opportunities — never mixed.** Services (`/services`) is the creator
+  catalog: clients hire a creator's predefined offering; the CTA is always **Hire Me**.
+  Opportunities (`/opportunities`) is the job board: projects looking for people; the
+  CTA is always **Send Pitch** (portfolio + proposed rate + availability + message).
+  One direction per surface: Services = "I want to hire somebody." Opportunities =
+  "Somebody is looking for me."
 - **Two feeds, two data sources.** `GET /api/feed/for-you` is the global feed: no
   location logic, ranked by trending + engagement (Instagram/TikTok style).
   `GET /api/feed/near-you?radius=5|25|city` is the local feed: located items only,

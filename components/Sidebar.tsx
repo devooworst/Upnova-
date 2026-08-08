@@ -41,7 +41,7 @@ const navGroups: {
     dot: "bg-lime-400",
     items: [
       { href: "/opportunities", label: "Opportunities", icon: Briefcase },
-      { href: "/discover?tab=Services", label: "Marketplace", icon: ShoppingBag },
+      { href: "/services", label: "Services", icon: ShoppingBag },
       { href: "/calendar", label: "Bookings", icon: CalendarCheck },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
     ],

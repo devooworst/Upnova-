@@ -37,9 +37,17 @@ export default function OpportunitiesPage() {
           Opportunities
         </h1>
         <p className="mt-1.5 text-sm text-zinc-500">
-          Find work that matches your skills and location.
+          <span className="font-semibold text-zinc-300">Somebody is looking for you.</span> Brands,
+          creators, and clients post projects — send a pitch to get picked.
         </p>
       </header>
+
+      <a
+        href="/services"
+        className="flex items-center gap-3 rounded-xl border border-line px-4 py-2.5 text-xs text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
+      >
+        Want to hire someone instead? Browse Services — creators you can book directly →
+      </a>
 
       <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
         {opportunityFilters.map((f) => (
