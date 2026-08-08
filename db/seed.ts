@@ -339,7 +339,7 @@ function seed() {
     { owner: "devin", title: "Music Production", price: 300, desc: "Custom production, recording, mixing and arrangement.", reach: "Nationwide / Remote", ai: "disclosure" },
     { owner: "devin", title: "Video Editing", price: 200, desc: "Reels, music videos, and long-form edits with color and sound design.", reach: "Nationwide / Remote", ai: "assisted" },
     { owner: "devin", title: "Songwriting", price: 150, desc: "Hooks, toplines, and full lyrics tailored to your record.", reach: "Global / Remote", ai: "no-ai" },
-    { owner: "ava", title: "Event Photography", price: 250, desc: "Events, portraits, and content shoots in the Baltimore area.", reach: "Baltimore · 10 mi", ai: "no-ai" },
+    { owner: "ava", title: "Event Photography", price: 250, desc: "Events, portraits, and content shoots in the Baltimore area.", reach: "Baltimore · 10 mi", ai: "no-ai", category: "photography" },
     { owner: "jordanmiles", title: "Mixing & Mastering", price: 180, desc: "Radio-ready mixes with two rounds of revisions.", reach: "Remote", ai: "disclosure" },
     { owner: "lena", title: "Brand Identity", price: 180, desc: "Logo, palette, and brand guide for creators and small brands.", reach: "Remote", ai: "client-decides" },
     { owner: "marcusj", title: "Music Video Production", price: 450, desc: "Concept-to-delivery music videos in the DMV.", reach: "DMV · 40 mi", ai: "no-ai" },
@@ -363,12 +363,16 @@ function seed() {
   for (const s of serviceDefs) {
     const serviceId = id();
     sid[`${s.owner}:${s.title}`] = serviceId;
+    const cat = (s as { category?: string }).category ?? "creative";
     db.insert(t.services)
       .values({
         id: serviceId, ownerId: uid[s.owner], title: s.title, description: s.desc,
         price: s.price, reach: s.reach, aiPolicy: s.ai,
-        category: (s as { category?: string }).category ?? "creative",
+        category: cat,
         trustRequired: (s as { trust?: string }).trust ?? "standard",
+        // hair/nails/pet care/photo sessions/DJ sets book time slots;
+        // design/production/builds stay project requests
+        fulfillment: ["care", "beauty", "events", "photography"].includes(cat) ? "appointment" : "project",
         isSeed: true,
       })
       .run();
@@ -613,16 +617,43 @@ function seed() {
   ]).run();
 
   /* ------------------------------ bookings ------------------------------ */
-  db.insert(t.bookings).values({
-    id: id(), serviceId: sid["ava:Event Photography"], clientId: uid["devin"], providerId: uid["ava"],
-    title: "Event Photography", startsAt: daysFromNow(3), durationMin: 180, price: 250,
-    location: "Rooftop — Fells Point", status: "confirmed", isSeed: true,
-  }).run();
-  db.insert(t.bookings).values({
-    id: id(), serviceId: sid["devin:Music Production"], clientId: uid["marcusj"], providerId: uid["devin"],
-    title: "Music Production", startsAt: daysFromNow(5), durationMin: 240, price: 300,
-    location: "Devin's studio", status: "pending", isSeed: true,
-  }).run();
+  /* A real calendar month: requested → accepted → confirmed → completed,
+     plus a reschedule and a cancellation. Confirmed = payment secured.  */
+  const at = (days: number, hour: number, min = 0) => {
+    const d = daysFromNow(days);
+    d.setHours(hour, min, 0, 0);
+    return d;
+  };
+  const mkBooking = (o: {
+    service?: string; client: string; provider: string; title: string;
+    starts: Date; dur: number; price: number; loc: string; status: string; proposed?: Date;
+  }) => {
+    const bid = id();
+    db.insert(t.bookings).values({
+      id: bid, serviceId: o.service ? sid[o.service] : null, clientId: uid[o.client], providerId: uid[o.provider],
+      title: o.title, startsAt: o.starts, durationMin: o.dur, price: o.price,
+      location: o.loc, status: o.status, proposedStartsAt: o.proposed ?? null, isSeed: true,
+    }).run();
+    if (["confirmed", "completed"].includes(o.status)) {
+      db.insert(t.payments).values({
+        id: id(), bookingId: bid, payerId: uid[o.client], payeeId: uid[o.provider],
+        amountCents: o.price * 100, feeCents: o.price * 5,
+        status: o.status === "completed" ? "released" : "held",
+      }).run();
+    }
+    return bid;
+  };
+
+  // devin as PROVIDER — his calendar fills up
+  mkBooking({ service: "devin:Music Production", client: "maya", provider: "devin", title: "Music Production", starts: at(1, 14), dur: 180, price: 300, loc: "Devin's studio", status: "pending" });
+  mkBooking({ service: "devin:Music Production", client: "marcusj", provider: "devin", title: "Music Production", starts: at(5, 10), dur: 240, price: 300, loc: "Devin's studio", status: "confirmed" });
+  mkBooking({ service: "devin:Songwriting", client: "kofi", provider: "devin", title: "Songwriting", starts: at(8, 15), dur: 120, price: 150, loc: "Remote session", status: "accepted" });
+  mkBooking({ service: "devin:Music Production", client: "jordanmiles", provider: "devin", title: "Music Production", starts: at(-4, 11), dur: 240, price: 300, loc: "Devin's studio", status: "completed" });
+  mkBooking({ service: "devin:Songwriting", client: "tj", provider: "devin", title: "Songwriting", starts: at(-9, 13), dur: 120, price: 150, loc: "Remote session", status: "completed" });
+  // devin as CLIENT
+  mkBooking({ service: "ava:Event Photography", client: "devin", provider: "ava", title: "Event Photography", starts: at(3, 17), dur: 180, price: 250, loc: "Rooftop — Fells Point", status: "confirmed" });
+  mkBooking({ service: "imani:Gel Nail Set", client: "devin", provider: "imani", title: "Gel Nail Set (gift booking)", starts: at(6, 10), dur: 90, price: 55, loc: "Bowie campus", status: "reschedule_requested", proposed: at(7, 10) });
+  mkBooking({ service: "tj:Event DJ — 4 Hours", client: "devin", provider: "tj", title: "Event DJ — 4 Hours", starts: at(-2, 20), dur: 240, price: 400, loc: "The Assembly Room", status: "cancelled" });
 
   /* ------------------------- portfolio / experience ------------------------- */
   db.insert(t.portfolioItems).values([

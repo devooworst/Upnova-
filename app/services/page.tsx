@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, ShoppingBag, Zap, X, Bookmark, Check } from "lucide-react";
+import { Search, ShoppingBag, Zap, X, Bookmark, CalendarDays } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useSession } from "@/lib/session";
@@ -23,6 +23,7 @@ interface ServiceItem {
   category: string;
   aiPolicy: string;
   trustRequired: string;
+  fulfillment?: string; // appointment | project
   reach: string;
   owner: {
     id: string;
@@ -53,6 +54,7 @@ export default function ServicesPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [hiring, setHiring] = useState<ServiceItem | null>(null);
+  const [booking, setBooking] = useState<ServiceItem | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -102,7 +104,10 @@ export default function ServicesPage() {
       router.push("/login");
       return;
     }
-    setHiring(s);
+    // fulfillment model decides the flow — appointments book time slots,
+    // project work sends a project request. Never force a calendar.
+    if (s.fulfillment === "appointment") setBooking(s);
+    else setHiring(s);
   };
 
   return (
@@ -205,8 +210,15 @@ export default function ServicesPage() {
                       <Bookmark className={`h-3.5 w-3.5 ${saved.has(s.id) ? "fill-violet-300" : ""}`} />
                     </button>
                     <button onClick={() => hire(s)} className="btn-lime px-3.5 py-1.5 text-xs">
-                      <Zap className="h-3.5 w-3.5" />
-                      Hire Me
+                      {s.fulfillment === "appointment" ? (
+                        <>
+                          <CalendarDays className="h-3.5 w-3.5" /> Book
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3.5 w-3.5" /> Hire Me
+                        </>
+                      )}
                     </button>
                   </span>
                 )}
@@ -220,6 +232,142 @@ export default function ServicesPage() {
       </div>
 
       {hiring && <HireWizard service={hiring} onClose={() => setHiring(null)} />}
+      {booking && <BookWizard service={booking} onClose={() => setBooking(null)} />}
+    </div>
+  );
+}
+
+/* ------------------------------ book a slot ------------------------------ */
+/* Appointment services: pick a date and time. The provider accepts, you
+   pay, the calendar locks the slot — the server rejects double-booking. */
+
+const SLOT_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17];
+const DEFAULT_DURATION: Record<string, number> = {
+  care: 60,
+  beauty: 90,
+  photography: 120,
+  events: 240,
+};
+
+function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () => void }) {
+  const router = useRouter();
+  const firstName = service.owner.displayName.split(" ")[0];
+  const [date, setDate] = useState("");
+  const [hour, setHour] = useState<number | null>(null);
+  const [location, setLocation] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const durationMin = DEFAULT_DURATION[service.category] ?? 60;
+
+  const fmtHour = (h: number) =>
+    new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
+
+  const submit = async () => {
+    if (!date || hour == null) {
+      setError("Pick a date and time");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const startsAt = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`);
+    // the request rides with a conversation so details stay in one thread
+    if (note.trim()) {
+      await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toHandle: service.owner.handle, firstMessage: `Booking request — ${service.title}: ${note.trim()}` }),
+      });
+    }
+    const res = await fetch("/api/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serviceId: service.id, startsAt: startsAt.toISOString(), durationMin, location }),
+    });
+    const d = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(d.error || "Could not book");
+      return;
+    }
+    router.push("/calendar");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Book a time</p>
+            <h3 className="mt-1 text-sm font-bold text-zinc-100">{service.owner.displayName} — {service.title}</h3>
+            <p className="font-mono text-xs font-medium tracking-[0.08em] text-lime-300">
+              ${service.price} · {durationMin >= 60 ? `${durationMin / 60} hr${durationMin > 60 ? "s" : ""}` : `${durationMin} min`}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Date</p>
+            <input
+              type="date"
+              value={date}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
+            />
+          </div>
+          {date && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Time</p>
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                {SLOT_HOURS.map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => setHour(h)}
+                    className={`rounded-lg border px-2 py-1.5 font-mono text-xs tracking-[0.05em] transition ${
+                      hour === h ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
+                    }`}
+                  >
+                    {fmtHour(h)}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[10px] text-zinc-600">
+                Slots are confirmed at booking — taken times are rejected automatically.
+              </p>
+            </div>
+          )}
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Location (optional — their studio, your place, campus…)"
+            className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+          />
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder={`Anything ${firstName} should know? (optional — starts the conversation)`}
+            className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+          />
+          <p className="text-[10px] leading-relaxed text-zinc-600">
+            How it works: {firstName} accepts your request, you pay ${(service.price * 1.05).toFixed(2)} (incl. 5% fee)
+            to lock the slot, and payment releases after the booking is completed.
+          </p>
+          {error && (
+            <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+            </p>
+          )}
+          <button onClick={submit} disabled={busy || !date || hour == null} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+            {busy ? "Requesting…" : "Request booking"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -336,6 +336,10 @@ export const services = sqliteTable("services", {
   aiPolicy: text("ai_policy").notNull().default("client-decides"), // no-ai | disclosure | assisted | client-decides
   trustRequired: text("trust_required").notNull().default("standard"), // standard | identity | high-trust
   reach: text("reach").notNull().default("Remote"),
+  // fulfillment model — never force a calendar on project work:
+  // "appointment" (hair, nails, photo sessions, events → time slots)
+  // "project"     (design, production, builds → project request/quote)
+  fulfillment: text("fulfillment").notNull().default("project"),
   active: bool("active", true),
   paused: bool("paused", false),
   isSeed: seed(),
@@ -469,7 +473,11 @@ export const bookings = sqliteTable(
     durationMin: integer("duration_min").notNull().default(60),
     price: integer("price").notNull(),
     location: text("location").notNull().default(""),
-    status: text("status").notNull().default("pending"), // pending | confirmed | completed | cancelled
+    // lifecycle: pending (requested, awaiting creator) → accepted (payment
+    // pending) → confirmed (payment secured) → completed · cancelled ·
+    // reschedule_requested (proposedStartsAt holds the new time)
+    status: text("status").notNull().default("pending"),
+    proposedStartsAt: integer("proposed_starts_at", { mode: "timestamp_ms" }),
     isSeed: seed(),
     createdAt: ts("created_at"),
   },

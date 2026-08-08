@@ -279,6 +279,19 @@ never "escrow", which is a specific legal service UpNova does not claim to provi
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
+**Bookings** — calendar-first scheduling dashboard (no "Engagements"). Monthly Mon-first
+calendar with thin status bars (lime confirmed · amber pending · violet reschedule · zinc
+completed · rose cancelled — always paired with labels in the legend), click a day → that day's
+bookings, click a booking → the full record (client, time range, duration, price, payment state)
+with role-appropriate actions. Server-enforced lifecycle: pending (requested) → accepted (payment
+pending) → confirmed (payment secured) → completed (payment released), plus cancelled (full
+refund of secured payments) and reschedule_requested (proposed time approved/declined by the
+other side). Pending requests get their own Accept/Decline rail; accepted+paid bookings appear on
+the calendar automatically. Services carry a fulfillment model: appointment services (hair,
+nails, pet care, photo sessions, DJ sets) book real time slots with double-booking rejected
+server-side; project services keep the project-request flow — a calendar is never forced onto
+project work. Project work shows as a compact deadline-based strip below the calendar.
+
 **Poster identity** — every opportunity communicates WHO is posting and how much UpNova has
 verified them, never rank: `Verified Business` (dedicated sky accent — reserved alongside
 lime=money, violet=people, amber=events — subtle left border + overline + BadgeCheck icon),

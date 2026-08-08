@@ -19,19 +19,23 @@ export async function GET() {
       .orderBy(asc(tables.bookings.startsAt))
       .all();
 
+    const payRows = db.select().from(tables.payments).all().filter((p) => p.bookingId);
     return {
       bookings: rows.map((b) => {
         const otherId = b.clientId === user.id ? b.providerId : b.clientId;
         const otherUser = db.select().from(tables.users).where(eq(tables.users.id, otherId)).get()!;
         const otherProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get()!;
+        const payment = payRows.find((p) => p.bookingId === b.id);
         return {
           id: b.id,
           title: b.title,
           startsAt: b.startsAt.toISOString(),
+          proposedStartsAt: b.proposedStartsAt?.toISOString() ?? null,
           durationMin: b.durationMin,
           price: b.price,
           location: b.location,
           status: b.status,
+          paymentStatus: payment?.status ?? null,
           myRole: b.clientId === user.id ? "client" : "provider",
           with: publicUser(otherUser, otherProfile),
         };
@@ -60,6 +64,23 @@ export async function POST(req: NextRequest) {
     if (isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now())
       throw new ApiError(400, "Pick a future time");
 
+    // the calendar is the source of truth: no double-booking a taken slot
+    const durationMin = Math.min(480, Math.max(15, Number(body.durationMin) || 60));
+    const conflicts = db
+      .select()
+      .from(tables.bookings)
+      .where(eq(tables.bookings.providerId, service.ownerId))
+      .all()
+      .some((x) => {
+        if (!["accepted", "confirmed", "pending", "reschedule_requested"].includes(x.status)) return false;
+        const aStart = startsAt.getTime();
+        const aEnd = aStart + durationMin * 60_000;
+        const bStart = x.startsAt.getTime();
+        const bEnd = bStart + x.durationMin * 60_000;
+        return aStart < bEnd && bStart < aEnd;
+      });
+    if (conflicts) throw new ApiError(409, "That time is no longer available — pick another slot");
+
     const id = randomBytes(12).toString("hex");
     db.insert(tables.bookings)
       .values({
@@ -69,7 +90,7 @@ export async function POST(req: NextRequest) {
         providerId: service.ownerId,
         title: service.title,
         startsAt,
-        durationMin: Math.min(480, Math.max(15, Number(body.durationMin) || 60)),
+        durationMin,
         price: service.price,
         location: String(body.location || "").slice(0, 120),
       })

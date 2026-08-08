@@ -29,6 +29,7 @@ export async function GET() {
         category: r.service.category,
         aiPolicy: r.service.aiPolicy,
         trustRequired: r.service.trustRequired,
+        fulfillment: r.service.fulfillment,
         reach: r.service.reach,
         owner: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.service.ownerId,
