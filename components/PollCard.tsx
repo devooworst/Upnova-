@@ -31,6 +31,11 @@ export default function PollCard({ post }: { post: Post }) {
               <MapPin className="h-3 w-3" />
               {c.location}
             </span>
+            {post.distanceMi !== undefined && (
+              <span className="font-mono text-[10px] tracking-tight text-zinc-400">
+                • {post.distanceMi} mi
+              </span>
+            )}
           </p>
         </div>
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-400/10 text-violet-400">
@@ -58,17 +63,17 @@ export default function PollCard({ post }: { post: Post }) {
               {voted !== null && (
                 <span
                   className={`absolute inset-y-0 left-0 ${
-                    voted === i ? "bg-lime-400/20" : "bg-zinc-700/20"
+                    voted === i ? "bg-violet-400/20" : "bg-zinc-700/20"
                   }`}
                   style={{ width: `${pct}%` }}
                 />
               )}
               <span className="relative flex items-center justify-between gap-3">
-                <span className={voted === i ? "font-semibold text-lime-300" : "text-zinc-200"}>
+                <span className={voted === i ? "font-semibold text-violet-300" : "text-zinc-200"}>
                   {opt.label}
                 </span>
                 {voted !== null && (
-                  <span className={`font-mono text-xs ${voted === i ? "text-lime-300" : "text-zinc-500"}`}>
+                  <span className={`font-mono text-xs ${voted === i ? "text-violet-300" : "text-zinc-500"}`}>
                     {pct}%
                   </span>
                 )}
@@ -81,7 +86,7 @@ export default function PollCard({ post }: { post: Post }) {
       <p className="mt-2.5 text-xs text-zinc-500">
         {voted !== null ? (
           <>
-            <span className="font-medium text-lime-400">You voted</span> • {totalVotes.toLocaleString()} votes
+            <span className="font-medium text-violet-400">You voted</span> • {totalVotes.toLocaleString()} votes
           </>
         ) : (
           <>{totalVotes.toLocaleString()} votes • Tap to vote</>

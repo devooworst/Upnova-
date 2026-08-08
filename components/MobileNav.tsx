@@ -43,7 +43,7 @@ export default function MobileNav() {
               key={item.label}
               href={item.href}
               className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition ${
-                active ? "text-lime-400" : "text-zinc-500 hover:text-zinc-300"
+                active ? "text-zinc-50" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
               <item.icon className="h-5 w-5" strokeWidth={active ? 2.4 : 2} />

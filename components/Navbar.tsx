@@ -56,12 +56,12 @@ export default function Navbar() {
 
           <Link href="/messages" className="icon-btn relative hidden sm:inline-flex" aria-label="Messages">
             <MessageSquare className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-lime-400" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-400" />
           </Link>
 
           <button className="icon-btn relative" aria-label="Notifications">
             <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-lime-400 animate-pulse-dot" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-400 animate-pulse-dot" />
           </button>
 
           {/* Profile dropdown */}

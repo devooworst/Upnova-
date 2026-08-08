@@ -15,7 +15,7 @@ export default function CommunityCard({ community }: { community: Community }) {
           {community.emoji}
         </span>
         <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
-          <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse-dot" />
+          <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" />
           {community.online} online
         </span>
       </div>
@@ -40,7 +40,9 @@ export default function CommunityCard({ community }: { community: Community }) {
         <button
           onClick={() => setJoined(!joined)}
           className={`mt-4 w-full ${
-            joined ? "btn-ghost border-lime-400/40 text-lime-300" : "btn-lime"
+            joined
+              ? "btn-ghost border-violet-400/40 text-violet-300"
+              : "inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-violet-300 active:scale-[0.98]"
           }`}
         >
           {joined ? (

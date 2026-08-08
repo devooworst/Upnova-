@@ -52,13 +52,18 @@ export default function AudioPost({ post }: { post: Post }) {
               <MapPin className="h-3 w-3" />
               {c.location}
             </span>
+            {post.distanceMi !== undefined && (
+              <span className="font-mono text-[10px] tracking-tight text-zinc-400">
+                • {post.distanceMi} mi
+              </span>
+            )}
           </p>
         </div>
         {playing && (
           <span className="flex items-end gap-0.5 pb-1" aria-label="Playing">
-            <span className="w-1 rounded-full bg-lime-400 animate-eq-1" />
-            <span className="w-1 rounded-full bg-lime-400 animate-eq-2" />
-            <span className="w-1 rounded-full bg-lime-400 animate-eq-3" />
+            <span className="w-1 rounded-full bg-zinc-100 animate-eq-1" />
+            <span className="w-1 rounded-full bg-zinc-100 animate-eq-2" />
+            <span className="w-1 rounded-full bg-zinc-100 animate-eq-3" />
           </span>
         )}
       </div>
@@ -82,7 +87,7 @@ export default function AudioPost({ post }: { post: Post }) {
           <div className="mt-2 flex items-center gap-2">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
               <div
-                className="h-full rounded-full bg-lime-400 transition-[width] duration-100"
+                className="h-full rounded-full bg-zinc-100 transition-[width] duration-100"
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
@@ -93,7 +98,7 @@ export default function AudioPost({ post }: { post: Post }) {
         </div>
         <button
           onClick={() => setPlaying(!playing)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-400 text-zinc-950 shadow-glow transition hover:bg-lime-300 active:scale-95"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white active:scale-95"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}

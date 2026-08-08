@@ -37,6 +37,11 @@ export interface Creator {
   availability: "Available Now" | "Available This Week" | "Open to Work" | "Accepting Clients";
   reach: ReachInfo;
   bio?: string;
+  /** miles from the current user — powers the radius/ring UI */
+  distanceMi?: number;
+  /** live activity line for the "Live near you" strip */
+  activity?: string;
+  online?: boolean;
 }
 
 /* ------------------------------ current user ------------------------------ */
@@ -109,6 +114,8 @@ export const creators: Creator[] = [
     startingAt: 300,
     availability: "Open to Work",
     reach: { location: "United States", reach: "Remote" },
+    distanceMi: 612,
+    activity: "Dropped a beat preview 2h ago",
   },
   {
     id: "ava",
@@ -127,6 +134,9 @@ export const creators: Creator[] = [
     startingAt: 250,
     availability: "Available Now",
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
+    distanceMi: 2.4,
+    activity: "Booking photo sessions this week",
+    online: true,
   },
   {
     id: "marcus",
@@ -145,6 +155,8 @@ export const creators: Creator[] = [
     startingAt: 200,
     availability: "Available This Week",
     reach: { location: "Maryland", reach: "Local", radius: "25 mi" },
+    distanceMi: 18,
+    activity: "Color-grading a client film",
   },
   {
     id: "nia",
@@ -163,6 +175,9 @@ export const creators: Creator[] = [
     startingAt: 90,
     availability: "Accepting Clients",
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "10 mi" },
+    distanceMi: 4.8,
+    activity: "Open to collabs this month",
+    online: true,
   },
   {
     id: "tre",
@@ -181,6 +196,8 @@ export const creators: Creator[] = [
     startingAt: 150,
     availability: "Open to Work",
     reach: { location: "Global", reach: "Global" },
+    distanceMi: 102,
+    activity: "Selling new loop kits",
   },
   {
     id: "lena",
@@ -199,6 +216,8 @@ export const creators: Creator[] = [
     startingAt: 180,
     availability: "Available This Week",
     reach: { location: "United States", reach: "Remote" },
+    activity: "2 slots open for cover art",
+    online: true,
   },
 ];
 
@@ -228,6 +247,7 @@ export interface Opportunity {
   paid: boolean;
   tags: string[];
   reach: ReachInfo;
+  distanceMi?: number;
 }
 
 export const opportunities: Opportunity[] = [
@@ -249,6 +269,7 @@ export const opportunities: Opportunity[] = [
     paid: true,
     tags: ["Brand Deals", "Paid"],
     reach: { location: "Atlanta, GA", reach: "Local", radius: "25 mi" },
+    distanceMi: 612,
   },
   {
     id: "photo-gig",
@@ -267,6 +288,7 @@ export const opportunities: Opportunity[] = [
     paid: true,
     tags: ["Paid", "Freelance"],
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
+    distanceMi: 2.1,
   },
   {
     id: "music-video",
@@ -286,6 +308,7 @@ export const opportunities: Opportunity[] = [
     paid: true,
     tags: ["Paid", "Collaborations", "Remote"],
     reach: { location: "Atlanta, GA", reach: "Remote" },
+    distanceMi: 612,
   },
   {
     id: "brand-collab",
@@ -341,6 +364,7 @@ export const opportunities: Opportunity[] = [
     paid: true,
     tags: ["Events", "Paid"],
     reach: { location: "Baltimore, MD", reach: "City" },
+    distanceMi: 3.1,
   },
 ];
 
@@ -368,6 +392,8 @@ export interface Post {
   poll?: { question: string; options: { label: string; votes: number }[] };
   opportunityId?: string;
   eventId?: string;
+  /** miles from the current user — powers the distance-ring grouping */
+  distanceMi?: number;
 }
 
 export const feed: Post[] = [
@@ -382,6 +408,7 @@ export const feed: Post[] = [
     shares: 0,
     opportunityId: "nike-fall",
     trending: true,
+    distanceMi: 612,
   },
   {
     id: "post-jordan-audio",
@@ -415,6 +442,7 @@ export const feed: Post[] = [
     saved: true,
     following: true,
     trending: true,
+    distanceMi: 2.4,
     tags: ["#BehindTheShot", "#CreatorsUnited"],
   },
   {
@@ -426,6 +454,7 @@ export const feed: Post[] = [
     likes: 58,
     comments: 22,
     shares: 4,
+    distanceMi: 0,
     poll: {
       question: "What content do you want to see more of?",
       options: [
@@ -445,6 +474,7 @@ export const feed: Post[] = [
     comments: 0,
     shares: 0,
     eventId: "meetup",
+    distanceMi: 3.1,
   },
   {
     id: "post-marcus",
@@ -458,6 +488,7 @@ export const feed: Post[] = [
     comments: 47,
     shares: 19,
     following: true,
+    distanceMi: 18,
     tags: ["#UpNovaCreate"],
   },
 ];
@@ -923,3 +954,13 @@ export const categoryFilters = ["Music", "Photography", "Video", "Fashion", "Gam
 export const availabilityFilters = ["Available Now", "Available This Week", "Open to Work", "Accepting Clients"];
 
 export const opportunityFilters = ["Nearby", "Remote", "Paid", "Collaborations", "Brand Deals", "Freelance", "Events", "Full-time"];
+
+/* --------------------------------- radius UI -------------------------------- */
+
+export const radiusOptions = [
+  { id: "5", label: "5 mi" },
+  { id: "25", label: "25 mi" },
+  { id: "city", label: "City +" },
+] as const;
+
+export type RadiusId = (typeof radiusOptions)[number]["id"];

@@ -50,14 +50,14 @@ export default function Sidebar() {
                   href={item.href}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
                     active
-                      ? "bg-lime-400/10 text-lime-300"
+                      ? "bg-white/10 text-zinc-50"
                       : "text-zinc-300 hover:bg-card-raised hover:text-zinc-100"
                   }`}
                 >
-                  <item.icon className={`h-[18px] w-[18px] ${active ? "text-lime-400" : "text-zinc-500"}`} />
+                  <item.icon className={`h-[18px] w-[18px] ${active ? "text-zinc-50" : "text-zinc-500"}`} />
                   {item.label}
                   {item.badge ? (
-                    <span className="ml-auto rounded-full bg-lime-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-zinc-950">
+                    <span className="ml-auto rounded-full bg-violet-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-zinc-950">
                       {item.badge}
                     </span>
                   ) : null}
@@ -87,7 +87,7 @@ export default function Sidebar() {
                 </span>
                 <span className="truncate">{c.name}</span>
                 <span className="ml-auto flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span className="h-1.5 w-1.5 rounded-full bg-lime-400" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
                   {c.online}
                 </span>
               </Link>
@@ -118,7 +118,7 @@ export default function Sidebar() {
           </span>
           <span className="block truncate text-xs text-zinc-500">@{currentUser.handle}</span>
         </span>
-        <span className="ml-auto h-2 w-2 rounded-full bg-lime-400" title="Online" />
+        <span className="ml-auto h-2 w-2 rounded-full bg-violet-400" title="Online" />
       </Link>
     </aside>
   );

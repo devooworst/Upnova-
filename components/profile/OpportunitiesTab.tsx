@@ -4,7 +4,7 @@ import { profileOpportunities } from "@/lib/data";
 const statusStyle: Record<string, string> = {
   "Applied • Under Review": "border-amber-400/40 bg-amber-400/10 text-amber-300",
   Completed: "border-lime-400/40 bg-lime-400/10 text-lime-300",
-  Open: "border-sky-400/40 bg-sky-400/10 text-sky-300",
+  Open: "border-amber-400/40 bg-amber-400/10 text-amber-300",
   "Accepting Clients": "border-lime-400/40 bg-lime-400/10 text-lime-300",
 };
 

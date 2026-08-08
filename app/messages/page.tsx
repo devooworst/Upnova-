@@ -34,7 +34,7 @@ export default function MessagesPage() {
                 <span className="relative">
                   <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" />
                   {c.online && (
-                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-lime-400" />
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-violet-400" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -45,7 +45,7 @@ export default function MessagesPage() {
                   <span className="mt-0.5 flex items-center gap-2">
                     <span className="truncate text-xs text-zinc-500">{c.lastMessage}</span>
                     {c.unread > 0 && (
-                      <span className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-lime-400 text-[9px] font-bold text-zinc-950">
+                      <span className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-400 text-[9px] font-bold text-zinc-950">
                         {c.unread}
                       </span>
                     )}
@@ -83,7 +83,7 @@ export default function MessagesPage() {
               <div
                 className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                   m.from === "me"
-                    ? "rounded-br-md bg-lime-400 text-zinc-950"
+                    ? "rounded-br-md bg-zinc-100 text-zinc-950"
                     : "rounded-bl-md border border-line bg-card-raised text-zinc-200"
                 }`}
               >
@@ -113,7 +113,7 @@ export default function MessagesPage() {
           />
           <button
             onClick={() => setDraft("")}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lime-400 text-zinc-950 transition hover:bg-lime-300"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white"
             aria-label="Send"
           >
             <Send className="h-4 w-4" />

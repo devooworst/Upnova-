@@ -49,7 +49,7 @@ export default function OpportunitiesPage() {
             aria-pressed={active.includes(f)}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
               active.includes(f)
-                ? "bg-lime-400 text-zinc-950"
+                ? "bg-white text-zinc-950"
                 : "border border-line text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
             }`}
           >

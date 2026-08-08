@@ -1,76 +1,153 @@
 "use client";
 
-import { useState } from "react";
-import { feed } from "@/lib/data";
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { feed, type Post, type RadiusId } from "@/lib/data";
 import PostCard from "./PostCard";
 import AudioPost from "./AudioPost";
 import PollCard from "./PollCard";
 import OpportunityCard from "./OpportunityCard";
 import EventCard from "./EventCard";
 
-const tabs = ["Near You", "Following", "Opportunities", "Trending"] as const;
-type Tab = (typeof tabs)[number];
+const secondaryFilters = ["Following", "Opportunities", "Trending"] as const;
+type Filter = "Near You" | (typeof secondaryFilters)[number];
 
-export default function Feed() {
-  const [tab, setTab] = useState<Tab>("Near You");
+function ringOf(post: Post): 0 | 1 | 2 {
+  const d = post.distanceMi;
+  if (d !== undefined && d <= 5) return 0;
+  if (d !== undefined && d <= 25) return 1;
+  return 2;
+}
 
-  const items = feed.filter((post) => {
-    switch (tab) {
-      case "Following":
-        return post.following === true;
-      case "Opportunities":
-        return post.type === "opportunity";
-      case "Trending":
-        return post.trending === true;
-      default:
-        return true;
-    }
-  });
+const ringLabels: Record<RadiusId, [string, string, string]> = {
+  "5": ["Within 5 mi", "5 – 25 mi", "Beyond 5 mi • farther & remote"],
+  "25": ["Within 5 mi", "5 – 25 mi", "Beyond 25 mi • farther & remote"],
+  city: ["Within 5 mi", "5 – 25 mi", "City, remote & global"],
+};
+
+function renderItem(post: Post) {
+  switch (post.type) {
+    case "opportunity":
+      return <OpportunityCard key={post.id} id={post.opportunityId!} />;
+    case "audio":
+      return <AudioPost key={post.id} post={post} />;
+    case "poll":
+      return <PollCard key={post.id} post={post} />;
+    case "event":
+      return <EventCard key={post.id} id={post.eventId!} />;
+    default:
+      return <PostCard key={post.id} post={post} />;
+  }
+}
+
+export default function Feed({ radius }: { radius: RadiusId }) {
+  const [filter, setFilter] = useState<Filter>("Near You");
+  const [farOpen, setFarOpen] = useState(false);
+
+  const groups = useMemo(() => {
+    const g: [Post[], Post[], Post[]] = [[], [], []];
+    feed.forEach((p) => g[ringOf(p)].push(p));
+    return g;
+  }, []);
+
+  const flat = feed.filter((p) =>
+    filter === "Following"
+      ? p.following
+      : filter === "Opportunities"
+      ? p.type === "opportunity"
+      : p.trending
+  );
+
+  const [l0, l1, l2] = ringLabels[radius];
+  const farCollapsed = radius !== "city" && !farOpen;
+  const sections: { label: string; items: Post[]; collapsible: boolean; collapsed: boolean; ring: number }[] =
+    radius === "5"
+      ? [
+          { label: l0, items: groups[0], collapsible: false, collapsed: false, ring: 0 },
+          { label: l2, items: [...groups[1], ...groups[2]], collapsible: true, collapsed: farCollapsed, ring: 2 },
+        ]
+      : [
+          { label: l0, items: groups[0], collapsible: false, collapsed: false, ring: 0 },
+          { label: l1, items: groups[1], collapsible: false, collapsed: false, ring: 1 },
+          { label: l2, items: groups[2], collapsible: true, collapsed: farCollapsed, ring: 2 },
+        ];
 
   return (
     <>
-      {/* tabs */}
-      <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1" role="tablist" aria-label="Feed">
-        {tabs.map((t) => (
+      {/* minimal filter row */}
+      <div className="flex items-center gap-4 border-b border-line-soft pb-0 text-sm">
+        <button
+          onClick={() => setFilter("Near You")}
+          className={`-mb-px border-b-2 pb-2.5 font-semibold transition ${
+            filter === "Near You"
+              ? "border-white text-zinc-50"
+              : "border-transparent text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          Near You
+        </button>
+        {secondaryFilters.map((f) => (
           <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-              tab === t
-                ? "bg-lime-400 text-zinc-950"
-                : "text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`-mb-px border-b-2 pb-2.5 font-medium transition ${
+              filter === f
+                ? "border-white text-zinc-50"
+                : "border-transparent text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {t}
+            {f}
           </button>
         ))}
+        <span className="ml-auto hidden pb-2.5 font-mono text-[10px] uppercase tracking-widest text-zinc-600 sm:block">
+          sorted by distance
+        </span>
       </div>
 
-      {/* feed */}
-      <div className="space-y-5">
-        {items.map((post) => {
-          switch (post.type) {
-            case "opportunity":
-              return <OpportunityCard key={post.id} id={post.opportunityId!} />;
-            case "audio":
-              return <AudioPost key={post.id} post={post} />;
-            case "poll":
-              return <PollCard key={post.id} post={post} />;
-            case "event":
-              return <EventCard key={post.id} id={post.eventId!} />;
-            default:
-              return <PostCard key={post.id} post={post} />;
-          }
-        })}
-
-        {items.length === 0 && (
-          <div className="card p-10 text-center text-sm text-zinc-500">
-            Nothing here yet — check back soon.
-          </div>
-        )}
-      </div>
+      {filter !== "Near You" ? (
+        <div className="space-y-5">{flat.map(renderItem)}</div>
+      ) : (
+        <div className="space-y-8">
+          {sections.map(
+            (s) =>
+              s.items.length > 0 && (
+                <section key={s.label}>
+                  <header className="mb-3 flex items-center gap-2.5">
+                    {/* mini ring glyph */}
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden>
+                      <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,0.15)" />
+                      <circle
+                        cx="10"
+                        cy="10"
+                        r={s.ring === 0 ? 3 : s.ring === 1 ? 5.5 : 8}
+                        fill="none"
+                        stroke="rgba(255,255,255,0.7)"
+                        strokeWidth="1.5"
+                      />
+                      <circle cx="10" cy="10" r="1.5" fill="#fff" />
+                    </svg>
+                    <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-400">
+                      {s.label}
+                    </h2>
+                    <span className="h-px flex-1 bg-line-soft" />
+                    {s.collapsible && (
+                      <button
+                        onClick={() => setFarOpen(!farOpen)}
+                        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-zinc-500 transition hover:text-zinc-200"
+                      >
+                        {s.collapsed ? `show ${s.items.length}` : "hide"}
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 transition-transform ${s.collapsed ? "" : "rotate-180"}`}
+                        />
+                      </button>
+                    )}
+                  </header>
+                  {!s.collapsed && <div className="space-y-5">{s.items.map(renderItem)}</div>}
+                </section>
+              )
+          )}
+        </div>
+      )}
     </>
   );
 }

@@ -59,13 +59,13 @@ export default function OpportunityCard({ id }: { id: string }) {
         {/* details */}
         <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {[
-            { icon: Wallet, label: "Budget", value: opp.budget, lime: true },
-            { icon: CalendarClock, label: "Deadline", value: opp.deadline },
-            { icon: Users, label: "Applicants", value: `${opp.applicants}` },
+            { icon: Wallet, label: "Budget", value: opp.budget, lime: true, tint: "text-lime-400" },
+            { icon: CalendarClock, label: "Deadline", value: opp.deadline, tint: "text-amber-400" },
+            { icon: Users, label: "Applicants", value: `${opp.applicants}`, tint: "text-violet-400" },
           ].map((d) => (
             <div key={d.label} className="rounded-xl border border-line-soft bg-card-raised px-3 py-2.5">
               <dt className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
-                <d.icon className="h-3.5 w-3.5" />
+                <d.icon className={`h-3.5 w-3.5 ${d.tint}`} />
                 {d.label}
               </dt>
               <dd className={`mt-1 text-sm font-bold ${d.lime ? "text-lime-400" : "text-zinc-100"}`}>
@@ -77,7 +77,7 @@ export default function OpportunityCard({ id }: { id: string }) {
 
         {/* reach + roles */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <ReachBadge info={opp.reach} />
+          <ReachBadge info={opp.reach} distanceMi={opp.distanceMi} />
           <span className="chip">{opp.roles}</span>
         </div>
 

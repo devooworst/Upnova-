@@ -24,7 +24,7 @@ export default function AnalyticsPage() {
           <div key={s.label} className="card p-4">
             <p className="text-xs text-zinc-500">{s.label}</p>
             <p className="mt-1 font-display text-2xl font-bold text-zinc-50">{s.value}</p>
-            <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-lime-400">
+            <p className={`mt-1 flex items-center gap-1 text-xs font-semibold ${s.label === "Service Revenue" ? "text-lime-400" : "text-amber-400"}`}>
               <ArrowUpRight className="h-3.5 w-3.5" />
               {s.delta}
             </p>
@@ -43,7 +43,7 @@ export default function AnalyticsPage() {
                 <div
                   className={`w-full rounded-lg transition-all ${
                     d.value === max
-                      ? "bg-lime-400 shadow-glow"
+                      ? "bg-amber-400"
                       : "bg-zinc-700/60 hover:bg-zinc-600"
                   }`}
                   style={{ height: `${(d.value / max) * 100}%` }}
@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
                   <span className="text-zinc-500">{a.pct}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-line">
-                  <div className="h-full rounded-full bg-lime-400/80" style={{ width: `${a.pct}%` }} />
+                  <div className="h-full rounded-full bg-violet-400/80" style={{ width: `${a.pct}%` }} />
                 </div>
               </li>
             ))}
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
               </span>
               <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-200">{p.title}</p>
               <p className="hidden text-xs text-zinc-500 sm:block">{p.reach} reach</p>
-              <p className="text-xs font-semibold text-lime-400">{p.engagement}</p>
+              <p className="text-xs font-semibold text-amber-400">{p.engagement}</p>
             </div>
           ))}
         </div>

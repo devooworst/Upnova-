@@ -9,7 +9,7 @@ export default function BookmarksPage() {
       <header className="px-1">
         <h1 className="flex items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-zinc-50">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
-            <Bookmark className="h-5 w-5 text-lime-400" />
+            <Bookmark className="h-5 w-5 text-amber-400" />
           </span>
           Bookmarks
         </h1>
@@ -25,7 +25,7 @@ export default function BookmarksPage() {
               {b.emoji}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-lime-400">{b.kind}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">{b.kind}</p>
               <h3 className="mt-0.5 truncate text-sm font-semibold text-zinc-100">{b.title}</h3>
               <p className="mt-0.5 truncate text-xs text-zinc-500">{b.detail}</p>
             </div>

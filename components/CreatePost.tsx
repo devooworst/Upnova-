@@ -6,10 +6,10 @@ import { currentUser } from "@/lib/data";
 import { openCreateModal } from "./CreateModalTrigger";
 
 const actions = [
-  { label: "Photo / Video", kind: "Post", icon: Image, color: "text-sky-400" },
+  { label: "Photo / Video", kind: "Post", icon: Image, color: "text-violet-400" },
   { label: "Opportunity", kind: "Opportunity", icon: Briefcase, color: "text-lime-400" },
   { label: "Service", kind: "Service", icon: Sparkles, color: "text-amber-400" },
-  { label: "Poll", kind: "Poll", icon: BarChart2, color: "text-violet-400" },
+  { label: "Poll", kind: "Poll", icon: BarChart2, color: "text-amber-400" },
   { label: "Live", kind: "Live", icon: Radio, color: "text-red-400" },
   { label: "Event", kind: "Event", icon: Calendar, color: "text-emerald-400" },
 ];

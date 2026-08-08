@@ -40,13 +40,13 @@ export default function BottomStats({
         <button
           onClick={toggleLike}
           className={`group flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm transition hover:bg-card-raised ${
-            isLiked ? "text-lime-400" : "text-zinc-400 hover:text-zinc-200"
+            isLiked ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
           }`}
           aria-pressed={isLiked}
         >
           <Heart
             className={`h-[18px] w-[18px] transition-transform group-active:scale-90 ${
-              isLiked ? "fill-lime-400" : ""
+              isLiked ? "fill-violet-400" : ""
             }`}
           />
           {baseLikes}
@@ -63,12 +63,12 @@ export default function BottomStats({
       <button
         onClick={() => setSaved(!saved)}
         className={`rounded-full p-2 transition hover:bg-card-raised ${
-          saved ? "text-lime-400" : "text-zinc-400 hover:text-zinc-200"
+          saved ? "text-amber-400" : "text-zinc-400 hover:text-zinc-200"
         }`}
         aria-pressed={saved}
         aria-label={saved ? "Remove bookmark" : "Save to bookmarks"}
       >
-        <Bookmark className={`h-[18px] w-[18px] ${saved ? "fill-lime-400" : ""}`} />
+        <Bookmark className={`h-[18px] w-[18px] ${saved ? "fill-amber-400" : ""}`} />
       </button>
     </div>
   );

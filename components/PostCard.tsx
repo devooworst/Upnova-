@@ -40,6 +40,11 @@ export default function PostCard({ post }: { post: Post }) {
               <MapPin className="h-3 w-3" />
               {c.location}
             </span>
+            {post.distanceMi !== undefined && (
+              <span className="font-mono text-[10px] tracking-tight text-zinc-400">
+                • {post.distanceMi} mi
+              </span>
+            )}
           </p>
         </div>
       </div>

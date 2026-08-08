@@ -23,7 +23,7 @@ export default function ProfileHeader() {
       <div className="px-5 pb-5 sm:px-6">
         {/* avatar + actions */}
         <div className="flex items-end justify-between">
-          <span className="story-ring -mt-12 inline-block rounded-full p-[3px] sm:-mt-14">
+          <span className="-mt-12 inline-block rounded-full bg-gradient-to-tr from-white/70 via-white/20 to-white/40 p-[2px] sm:-mt-14">
             <span className="block rounded-full bg-card p-1">
               <Avatar src={currentUser.avatar} initials={currentUser.initials} size="xl" />
             </span>

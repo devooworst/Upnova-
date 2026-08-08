@@ -62,7 +62,7 @@ export default function DiscoverClient() {
             onClick={() => setCategory(c)}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
               category === c
-                ? "bg-lime-400 text-zinc-950"
+                ? "bg-white text-zinc-950"
                 : "border border-line text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
             }`}
           >
@@ -253,9 +253,9 @@ function FilterGroup({
               key={o}
               onClick={() => onSelect(o)}
               aria-pressed={active}
-              className={`chip ${active ? "chip-active" : "hover:border-zinc-600"}`}
+              className={`chip ${active ? "border-white/50 bg-white/10 text-zinc-100" : "hover:border-zinc-600"}`}
             >
-              {active && <span className="h-1.5 w-1.5 rounded-full bg-lime-400" />}
+              {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
               {o}
             </button>
           );

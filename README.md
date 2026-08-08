@@ -53,9 +53,17 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 
 ## Visual identity
 
-- Background `#0A0A0F`, cards `#111111`, borders zinc/dark, accent **lime-400**.
-- Lime = action, opportunity, availability, verified, active navigation. An accent, not the whole site.
-- Rounded cards, modern + premium + creator-focused + energetic + professional.
+- Background `#0A0A0F`, cards `#111111`, zinc borders. Display face: **Syne** (headings/logo). Body: Inter. Distances & budgets set in monospace.
+- Accent colors have **jobs**, so the eye learns the language:
+  - **lime** = money & opportunity (budgets, Apply, Hire, Open to Work, revenue)
+  - **violet** = people & community (follow, join, messages, online, likes)
+  - **amber** = events & energy (tickets, deadlines, trending, ratings)
+  - **white/neutral** = navigation, active states, verified trust marks, locality
+- Locality is spatial, not labeled: the "Near You" header is a radar (you at center,
+  rings at 5 mi / 25 mi / city) with a radius selector; the feed is grouped into
+  distance rings ("Within 5 mi", "5–25 mi", "Beyond — collapsed") and every card
+  carries a mono distance chip. The story-circle row is replaced by a rectangular
+  "Live near you" activity strip.
 
 ## Run it
 

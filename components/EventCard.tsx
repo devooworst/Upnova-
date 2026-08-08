@@ -27,16 +27,16 @@ export default function EventCard({ id }: { id: string }) {
 
         <ul className="mt-3 space-y-1.5 text-sm text-zinc-300">
           <li className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-lime-400" /> {event.location}
+            <MapPin className="h-4 w-4 text-zinc-300" /> {event.location}
           </li>
           <li className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-lime-400" /> {event.date}
+            <CalendarDays className="h-4 w-4 text-amber-400" /> {event.date}
           </li>
           <li className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-lime-400" /> {event.time}
+            <Clock className="h-4 w-4 text-amber-400" /> {event.time}
           </li>
           <li className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-lime-400" /> {event.attending + (going ? 1 : 0)} attending
+            <Users className="h-4 w-4 text-violet-400" /> {event.attending + (going ? 1 : 0)} attending
           </li>
         </ul>
 
@@ -47,7 +47,11 @@ export default function EventCard({ id }: { id: string }) {
         <div className="mt-4 flex items-center gap-3 border-t border-line-soft pt-4">
           <button
             onClick={() => setGoing(!going)}
-            className={going ? "btn-ghost border-lime-400/40 text-lime-300" : "btn-lime"}
+            className={
+              going
+                ? "btn-ghost border-amber-400/40 text-amber-300"
+                : "inline-flex items-center justify-center gap-1.5 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 active:scale-[0.98]"
+            }
           >
             {going ? (
               <>

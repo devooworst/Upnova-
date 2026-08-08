@@ -148,7 +148,7 @@ export default function CreateModal() {
                     key={r.value}
                     onClick={() => setReach(r.value)}
                     title={r.hint}
-                    className={`chip ${reach === r.value ? "chip-active" : "hover:border-zinc-600"}`}
+                    className={`chip ${reach === r.value ? "border-white/50 bg-white/10 text-zinc-100" : "hover:border-zinc-600"}`}
                   >
                     {r.label}
                     <span className="hidden text-[10px] text-zinc-500 sm:inline">

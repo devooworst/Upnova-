@@ -8,9 +8,9 @@ import type { Creator } from "@/lib/data";
 
 const availabilityStyle: Record<Creator["availability"], string> = {
   "Available Now": "bg-lime-400/10 text-lime-300 border-lime-400/30",
-  "Available This Week": "bg-sky-400/10 text-sky-300 border-sky-400/30",
+  "Available This Week": "bg-amber-400/10 text-amber-300 border-amber-400/30",
   "Open to Work": "bg-lime-400/10 text-lime-300 border-lime-400/30",
-  "Accepting Clients": "bg-amber-400/10 text-amber-300 border-amber-400/30",
+  "Accepting Clients": "bg-lime-400/10 text-lime-300 border-lime-400/30",
 };
 
 export default function CreatorCard({ creator }: { creator: Creator }) {
@@ -31,7 +31,7 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
           </p>
         </div>
         <span className="flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-1 text-xs font-bold text-zinc-100">
-          <Star className="h-3 w-3 fill-lime-400 text-lime-400" />
+          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
           {creator.rating.toFixed(1)}
         </span>
       </div>
@@ -58,7 +58,10 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
         <Link href="/profile" className="btn-ghost px-2 py-2 text-xs">
           View Profile
         </Link>
-        <Link href="/messages" className="btn-ghost px-2 py-2 text-xs">
+        <Link
+          href="/messages"
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-violet-400/40 px-2 py-2 text-xs font-medium text-violet-300 transition hover:bg-violet-400/10"
+        >
           <MessageSquare className="h-3.5 w-3.5" />
           Message
         </Link>

@@ -27,13 +27,13 @@ export default function ProfileTabs() {
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={`relative flex flex-1 items-center justify-center gap-2 px-3 py-3.5 text-sm font-semibold transition ${
-              tab === t.id ? "text-lime-300" : "text-zinc-500 hover:text-zinc-300"
+              tab === t.id ? "text-zinc-50" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             <t.icon className="h-4 w-4" />
             {t.label}
             {tab === t.id && (
-              <span className="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-lime-400" />
+              <span className="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-white" />
             )}
           </button>
         ))}
