@@ -17,7 +17,8 @@ import Avatar from "@/components/Avatar";
 interface Applicant {
   id: string;
   message: string;
-  availability: "yes" | "need_check";
+  availability: "yes" | "no" | "need_check";
+  answers?: { question?: string; answer?: string; extra?: string };
   status: "submitted" | "shortlisted" | "selected" | "declined";
   createdAt: string;
   applicant: {
@@ -150,6 +151,10 @@ export default function ApplicantsPage() {
                     <span className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[10px] font-bold text-lime-300">
                       <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Available on date
                     </span>
+                  ) : a.availability === "no" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[10px] font-bold text-rose-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> Not available on date
+                    </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Needs to check schedule
@@ -174,6 +179,15 @@ export default function ApplicantsPage() {
                   {a.applicant.locationLabel ? ` · ${a.applicant.locationLabel}` : ""}
                 </p>
                 {a.message && <p className="mt-2 text-xs leading-relaxed text-zinc-300">{a.message}</p>}
+                {a.answers?.question && (
+                  <p className="mt-1.5 text-xs leading-relaxed">
+                    <span className="text-zinc-500">{a.answers.question}</span>{" "}
+                    <span className="text-zinc-300">— {a.answers.answer}</span>
+                  </p>
+                )}
+                {a.answers?.extra && (
+                  <p className="mt-1.5 text-xs italic leading-relaxed text-zinc-400">&ldquo;{a.answers.extra}&rdquo;</p>
+                )}
               </div>
             </div>
 

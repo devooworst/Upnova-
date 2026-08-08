@@ -225,29 +225,98 @@ export default function ServicesPage() {
 }
 
 /* ------------------------------ hire wizard ------------------------------ */
-/* Hire Me is never a dead end: service → project details → a real project
-   (draft) attached to the real conversation with the provider.            */
+/* Adaptive intake — the form matches the job, not a universal template:
+     · simple   — most services: what you need, when, anything else
+     · detailed — bigger builds (>= $500): scope, materials, deadline, budget
+     · care     — trust services: date, duration, who's being cared for
+   Profile info is never re-asked. Deeper details come AFTER the provider
+   responds (progressive disclosure) — the project brief starts the talk. */
+
+type IntakePreset = "simple" | "detailed" | "care";
+
+function presetFor(s: ServiceItem): IntakePreset {
+  if (["care", "beauty"].includes(s.category)) return "care";
+  if (s.price >= 500) return "detailed";
+  return "simple";
+}
+
+const TIMING = [
+  { l: "This week", days: 7 },
+  { l: "Within 2 weeks", days: 14 },
+  { l: "This month", days: 30 },
+  { l: "Flexible", days: 0 },
+] as const;
 
 function HireWizard({ service, onClose }: { service: ServiceItem; onClose: () => void }) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
+  const preset = presetFor(service);
+  const firstName = service.owner.displayName.split(" ")[0];
+
   const [needs, setNeeds] = useState("");
-  const [requirements, setRequirements] = useState("");
-  const [deadline, setDeadline] = useState("");
+  const [timing, setTiming] = useState<string | null>(null);
+  const [deadlineDate, setDeadlineDate] = useState("");
+  const [extra, setExtra] = useState("");
+  const [showExtra, setShowExtra] = useState(false);
   const [budget, setBudget] = useState(String(service.price));
+  const [editBudget, setEditBudget] = useState(false);
+  const [references, setReferences] = useState("");
+  // detailed preset
+  const [scope, setScope] = useState<string[]>([]);
+  const [materials, setMaterials] = useState<string[]>([]);
+  // care preset
+  const [duration, setDuration] = useState<string | null>(null);
+  const [careInfo, setCareInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
+    set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
+  const scopeOptions = ["design", "web", "development"].some((k) => service.category.includes(k) || service.title.toLowerCase().includes(k))
+    ? ["Design", "Development", "Both", "Not sure"]
+    : ["Full project", "Part of a project", "Consultation", "Not sure"];
+  const materialOptions = ["Logo", "Brand guidelines", "Content", "Domain", "Nothing yet"];
+  const budgetRanges = [
+    { l: `$${service.price} (listed)`, v: service.price },
+    { l: `$${service.price}–${service.price * 2}`, v: Math.round(service.price * 1.5) },
+    { l: `$${service.price * 2}–${Math.round(service.price * 3.5)}`, v: Math.round(service.price * 2.5) },
+    { l: `$${Math.round(service.price * 3.5)}+`, v: Math.round(service.price * 4) },
+  ];
+
   const send = async () => {
+    if (!needs.trim()) {
+      setError(preset === "care" ? `Tell ${firstName} who they'll be caring for` : "Describe what you're looking for");
+      return;
+    }
+    if (preset === "care" && !deadlineDate) {
+      setError("Pick the date you need");
+      return;
+    }
     setBusy(true);
     setError(null);
-    // 1) the real conversation with this provider
+
+    const timingDays = TIMING.find((t) => t.l === timing)?.days ?? 0;
+    const deadline =
+      deadlineDate ||
+      (timingDays > 0 ? new Date(Date.now() + timingDays * 86400_000).toISOString().slice(0, 10) : "");
+
+    const briefParts = [
+      needs.trim(),
+      scope.length ? `Looking for: ${scope.join(", ")}` : "",
+      materials.length ? `Existing materials: ${materials.join(", ")}` : "",
+      duration ? `Duration: ${duration}` : "",
+      careInfo.trim() ? `Details: ${careInfo.trim()}` : "",
+      timing && !deadlineDate ? `Timing: ${timing}` : "",
+      references.trim() ? `References: ${references.trim()}` : "",
+      extra.trim() ? `Notes: ${extra.trim()}` : "",
+    ].filter(Boolean);
+
     const convRes = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         toHandle: service.owner.handle,
-        firstMessage: `Hi ${service.owner.displayName.split(" ")[0]}! I'd like to hire you for ${service.title}. ${needs.trim()}`,
+        firstMessage: `Hi ${firstName}! I'd like to hire you for ${service.title}. ${needs.trim()}`,
       }),
     });
     const conv = await convRes.json();
@@ -256,7 +325,6 @@ function HireWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
       setError(conv.error || "Could not open the conversation");
       return;
     }
-    // 2) the real project (draft) — the provider responds with the offer
     const projRes = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -266,34 +334,33 @@ function HireWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
         conversationId: conv.conversationId,
         title: service.title,
         amount: Number(budget) || service.price,
-        brief: [needs.trim(), requirements.trim() && `Requirements: ${requirements.trim()}`]
-          .filter(Boolean)
-          .join("\n"),
+        brief: briefParts.join("\n"),
         deadline: deadline || undefined,
       }),
     });
     const proj = await projRes.json();
     setBusy(false);
     if (!projRes.ok) {
-      setError(proj.error || "Could not create the project");
+      setError(proj.error || "Could not create the request");
       return;
     }
     router.push(`/messages?c=${conv.conversationId}`);
   };
 
+  const chip = (active: boolean) =>
+    `rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+      active ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
+    }`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-              Hire · step {step} of 2
-            </p>
-            <h3 className="mt-1 text-sm font-bold text-zinc-100">
-              {service.owner.displayName} — {service.title}
-            </h3>
-            <p className="font-mono text-xs font-medium tracking-[0.08em] text-lime-300">
-              Starting at ${service.price}
+            <h3 className="text-sm font-bold text-zinc-100">Hire {service.owner.displayName}</h3>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              {service.title} · starting at{" "}
+              <span className="font-mono font-medium tracking-[0.08em] text-lime-300">${service.price}</span>
             </p>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200">
@@ -301,77 +368,190 @@ function HireWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
           </button>
         </div>
 
-        {step === 1 ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-xs leading-relaxed text-zinc-400">{service.description}</p>
-            <div className="rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2.5 text-xs text-zinc-400">
-              How it works: you describe the project, {service.owner.displayName.split(" ")[0]} reviews it and
-              sends an offer, you accept and secure payment, work begins. Funds release only when you approve
-              the delivery.
-            </div>
-            <button onClick={() => setStep(2)} className="btn-lime w-full justify-center py-2 text-sm">
-              Continue — project details
-            </button>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-2.5">
+        {/* trust banner for care services — verification is the provider's, shown as a badge only */}
+        {preset === "care" && (
+          <p className="mt-3 flex items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-400/5 px-3.5 py-2 text-xs text-zinc-400">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+            {service.trustRequired === "high-trust"
+              ? `${firstName} is identity-verified for trust services.`
+              : `Trust service — extra details help ${firstName} say yes faster.`}
+          </p>
+        )}
+
+        <div className="mt-4 space-y-3">
+          {/* 1 · what you need — every preset */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+              {preset === "care" ? `Who or what needs care?` : "What are you looking for?"}
+            </p>
             <textarea
               value={needs}
               onChange={(e) => setNeeds(e.target.value)}
               rows={3}
-              placeholder="What do you need? Be specific — this becomes the project brief."
-              className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+              placeholder={
+                preset === "care"
+                  ? `e.g. "Two dogs — a calm lab and an energetic corgi. Midday walks near Towson."`
+                  : `Tell ${firstName} what you need and what you're trying to accomplish.`
+              }
+              className="mt-1.5 w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
             />
-            <input
-              value={requirements}
-              onChange={(e) => setRequirements(e.target.value)}
-              placeholder="Requirements or references (optional)"
-              className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
-            />
-            <div className="flex gap-2.5">
-              <div className="flex-1">
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Deadline</p>
-                <input
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
-                />
-              </div>
-              <div className="w-32">
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Budget</p>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
-                  <input
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value.replace(/[^0-9]/g, ""))}
-                    className="w-full rounded-xl border border-line bg-card-raised py-2 pl-7 pr-3 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
-                  />
+          </div>
+
+          {/* detailed: scope + materials */}
+          {preset === "detailed" && (
+            <>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">What do you need?</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {scopeOptions.map((o) => (
+                    <button key={o} onClick={() => toggle(scope, setScope, o)} className={chip(scope.includes(o))}>
+                      {o}
+                    </button>
+                  ))}
                 </div>
               </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Do you have existing materials?</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {materialOptions.map((o) => (
+                    <button key={o} onClick={() => toggle(materials, setMaterials, o)} className={chip(materials.includes(o))}>
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* care: duration */}
+          {preset === "care" && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Approximate duration</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {["30 min", "1 hour", "2+ hours", "Overnight", "Recurring"].map((o) => (
+                  <button key={o} onClick={() => setDuration(duration === o ? null : o)} className={chip(duration === o)}>
+                    {o}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="font-mono text-[11px] tracking-[0.08em] text-zinc-500">
-              PAYOUT ${budget || 0} · YOU PAY ${(Number(budget || 0) * 1.05).toFixed(2)} INCL. 5% FEE
-            </p>
-            {error && (
-              <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> {error}
+          )}
+
+          {/* 2 · timing */}
+          {preset === "simple" ? (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">When do you need it?</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {TIMING.map((t) => (
+                  <button key={t.l} onClick={() => setTiming(timing === t.l ? null : t.l)} className={chip(timing === t.l)}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+                {preset === "care" ? "What date?" : "Target deadline"}
               </p>
-            )}
-            <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="btn-ghost px-4 py-2 text-xs">
-                Back
-              </button>
-              <button
-                onClick={send}
-                disabled={busy || !needs.trim() || !budget}
-                className="btn-lime flex-1 justify-center py-2 text-sm disabled:opacity-40"
-              >
-                {busy ? "Sending…" : "Send project"}
-              </button>
+              <input
+                type="date"
+                value={deadlineDate}
+                onChange={(e) => setDeadlineDate(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
+              />
             </div>
+          )}
+
+          {/* detailed: budget ranges */}
+          {preset === "detailed" && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Budget</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {budgetRanges.map((b) => (
+                  <button key={b.l} onClick={() => setBudget(String(b.v))} className={chip(Number(budget) === b.v)}>
+                    {b.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* care: special requirements */}
+          {preset === "care" && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+                Special requirements <span className="font-normal normal-case text-zinc-600">(optional)</span>
+              </p>
+              <input
+                value={careInfo}
+                onChange={(e) => setCareInfo(e.target.value)}
+                placeholder="Medication, gate codes to share later, quirks…"
+                className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+              />
+            </div>
+          )}
+
+          {/* references — optional, one line */}
+          <input
+            value={references}
+            onChange={(e) => setReferences(e.target.value)}
+            placeholder="Link to references or examples (optional)"
+            className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+          />
+
+          {/* anything else — progressive */}
+          {!showExtra ? (
+            <button onClick={() => setShowExtra(true)} className="text-xs font-medium text-zinc-500 hover:text-zinc-300">
+              + Anything else? (optional)
+            </button>
+          ) : (
+            <textarea
+              value={extra}
+              onChange={(e) => setExtra(e.target.value)}
+              rows={2}
+              autoFocus
+              placeholder="Anything else…"
+              className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+            />
+          )}
+
+          {/* budget line — visible, editable, never a surprise */}
+          <div className="flex items-center justify-between rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2">
+            <p className="text-xs text-zinc-500">
+              Budget{" "}
+              <span className="font-mono font-medium tracking-[0.08em] text-lime-300">${budget || 0}</span>
+              <span className="text-zinc-600"> · you pay ${(Number(budget || 0) * 1.05).toFixed(2)} incl. 5% fee</span>
+            </p>
+            {!editBudget ? (
+              <button onClick={() => setEditBudget(true)} className="text-[11px] font-semibold text-violet-300 hover:underline">
+                Change
+              </button>
+            ) : (
+              <input
+                value={budget}
+                onChange={(e) => setBudget(e.target.value.replace(/[^0-9]/g, ""))}
+                autoFocus
+                className="w-20 rounded-lg border border-line bg-card px-2 py-1 text-right font-mono text-xs text-zinc-100 outline-none"
+              />
+            )}
           </div>
-        )}
+
+          <p className="text-[10px] leading-relaxed text-zinc-600">
+            {firstName} reviews your request and sends the offer — you only pay after you accept it.
+            Finer details get worked out in the conversation.
+          </p>
+
+          {error && (
+            <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+            </p>
+          )}
+
+          <button onClick={send} disabled={busy || !needs.trim()} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+            {busy ? "Sending…" : "Send Request"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ export interface OpportunityItem {
   trustRequired: string;
   applyBy: string | null;
   eventDate: string | null;
+  applyConfig?: { requireMessage?: boolean; question?: string };
   poster: { id: string; handle: string; displayName: string; avatarUrl: string | null };
   isMine: boolean;
   applied: boolean;
@@ -165,21 +166,60 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
 }
 
 function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: () => void; onDone: () => void }) {
+  /* Short by design: "I want to be considered for this." Profile, skills,
+     and portfolio attach automatically — never re-typed. The poster's
+     applyConfig decides what's required beyond that. */
   const [message, setMessage] = useState("");
-  const [availability, setAvailability] = useState<"yes" | "need_check" | null>(opp.eventDate ? null : "yes");
+  const [availability, setAvailability] = useState<"yes" | "no" | "need_check" | null>(
+    opp.eventDate ? null : "yes"
+  );
+  const [questionAnswer, setQuestionAnswer] = useState("");
+  const [extra, setExtra] = useState("");
+  const [showExtra, setShowExtra] = useState(false);
+  const [profileMeta, setProfileMeta] = useState<{ skills: number; portfolio: number; rating: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const requireMessage = opp.applyConfig?.requireMessage !== false;
+  const question = opp.applyConfig?.question;
+
+  useEffect(() => {
+    // what's auto-attached — shown, not re-asked
+    Promise.all([
+      fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()),
+      fetch("/api/me/portfolio", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { items: [] })),
+    ]).then(([me, pf]) => {
+      if (!me.user) return;
+      fetch(`/api/users/${me.user.handle}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) =>
+          setProfileMeta({
+            skills: me.user.profile.skills.length,
+            portfolio: (pf.items ?? []).length,
+            rating: d.stats?.rating ?? null,
+          })
+        );
+    });
+  }, []);
+
   const submit = async () => {
+    if (requireMessage && !message.trim()) {
+      setError("Tell them why you're a good fit");
+      return;
+    }
     if (opp.eventDate && !availability) {
-      setError("Confirm your availability for the project date");
+      setError("Confirm your availability for the date");
+      return;
+    }
+    if (question && !questionAnswer.trim()) {
+      setError("Answer the poster's question");
       return;
     }
     setBusy(true);
     const res = await fetch(`/api/opportunities/${opp.id}/applications`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, availability }),
+      body: JSON.stringify({ message, availability, questionAnswer, extra }),
     });
     const data = await res.json();
     setBusy(false);
@@ -192,7 +232,7 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-sm font-bold text-zinc-100">Apply — {opp.title}</h3>
@@ -207,38 +247,90 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
           </button>
         </div>
 
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={3}
-          placeholder="Why you? Keep it short — your profile and portfolio are attached automatically."
-          className="mt-4 w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
-        />
+        {/* 1 · why you */}
+        <div className="mt-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+            Why are you a good fit?{!requireMessage && <span className="ml-1 font-normal normal-case text-zinc-600">(optional)</span>}
+          </p>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            placeholder="Keep it short — your profile does the heavy lifting."
+            className="mt-1.5 w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+          />
+        </div>
 
+        {/* 2 · availability, only when the gig has a date */}
         {opp.eventDate && (
           <div className="mt-3">
             <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
               Are you available on {fmtDate(opp.eventDate)}?
             </p>
-            <div className="mt-1.5 flex gap-2">
-              <button
-                onClick={() => setAvailability("yes")}
-                className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
-                  availability === "yes" ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400"
-                }`}
-              >
-                Yes, I&apos;m available
-              </button>
-              <button
-                onClick={() => setAvailability("need_check")}
-                className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
-                  availability === "need_check" ? "border-amber-400/50 bg-amber-400/10 text-amber-300" : "border-line text-zinc-400"
-                }`}
-              >
-                Need to check my schedule
-              </button>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {(
+                [
+                  { v: "yes", l: "Yes", cls: "border-lime-400/50 bg-lime-400/10 text-lime-300" },
+                  { v: "no", l: "No", cls: "border-rose-400/50 bg-rose-400/10 text-rose-300" },
+                  { v: "need_check", l: "Need to confirm", cls: "border-amber-400/50 bg-amber-400/10 text-amber-300" },
+                ] as const
+              ).map((o) => (
+                <button
+                  key={o.v}
+                  onClick={() => setAvailability(o.v)}
+                  className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+                    availability === o.v ? o.cls : "border-line text-zinc-400"
+                  }`}
+                >
+                  {o.l}
+                </button>
+              ))}
             </div>
           </div>
+        )}
+
+        {/* 3 · the poster's one question, if they set one */}
+        {question && (
+          <div className="mt-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">{question}</p>
+            <input
+              value={questionAnswer}
+              onChange={(e) => setQuestionAnswer(e.target.value)}
+              placeholder="Short answer"
+              className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+            />
+          </div>
+        )}
+
+        {/* 4 · portfolio & profile — attached, never re-typed */}
+        <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-violet-400/25 bg-violet-400/5 px-3.5 py-2.5">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+          <p className="text-xs text-zinc-400">
+            <span className="font-semibold text-violet-300">Attached automatically:</span> your profile
+            {profileMeta && (
+              <>
+                {" "}· {profileMeta.skills} skills · {profileMeta.portfolio} portfolio piece
+                {profileMeta.portfolio === 1 ? "" : "s"}
+                {profileMeta.rating != null && ` · ${profileMeta.rating.toFixed(1)}★`}
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* anything else — hidden until wanted */}
+        {!showExtra ? (
+          <button onClick={() => setShowExtra(true)} className="mt-2 text-xs font-medium text-zinc-500 hover:text-zinc-300">
+            + Anything else? (optional)
+          </button>
+        ) : (
+          <textarea
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            rows={2}
+            autoFocus
+            placeholder="Anything else they should know…"
+            className="mt-2 w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+          />
         )}
 
         {error && (
@@ -250,7 +342,7 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
         <div className="mt-4 flex justify-end gap-2">
           <button onClick={onClose} className="btn-ghost px-4 py-1.5 text-xs">Cancel</button>
           <button onClick={submit} disabled={busy} className="btn-lime px-4 py-1.5 text-xs disabled:opacity-40">
-            Submit application
+            Submit Application
           </button>
         </div>
       </div>

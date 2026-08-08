@@ -8,7 +8,8 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useState } from "react";
-import { Briefcase } from "lucide-react";
+import Link from "next/link";
+import { Briefcase, Plus } from "lucide-react";
 import OpportunityList from "@/components/db/OpportunityList";
 
 interface MyApplication {
@@ -71,14 +72,17 @@ export default function OpportunitiesPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
-          <Briefcase className="h-4.5 w-4.5 h-5 w-5 text-lime-400" />
+          <Briefcase className="h-5 w-5 text-lime-400" />
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Opportunities</h1>
           <p className="text-sm text-zinc-400">Paid work and collaborations from real posters. Apply Now — never pitch.</p>
         </div>
+        <Link href="/opportunities/new" className="btn-lime shrink-0 px-4 py-1.5 text-xs sm:text-sm">
+          <Plus className="h-4 w-4" /> Post opportunity
+        </Link>
       </div>
 
       {/* browse vs my applications */}

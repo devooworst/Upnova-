@@ -29,7 +29,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       applications: rows.map((r) => ({
         id: r.app.id,
         message: r.app.message,
-        availability: r.app.availability, // "need_check" surfaces as a flag in review
+        availability: r.app.availability, // yes | no | need_check — flags in review
+        answers: (() => {
+          try {
+            return JSON.parse(r.app.answers);
+          } catch {
+            return {};
+          }
+        })(),
         status: r.app.status,
         createdAt: r.app.createdAt.toISOString(),
         applicant: publicUser(r.user, r.profile),
@@ -57,10 +64,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .get();
     if (existing) throw new ApiError(409, "You already applied to this opportunity");
 
-    // gig-date availability is required when the opportunity has a date
-    const availability = body.availability === "need_check" ? "need_check" : "yes";
+    // adaptive requirements — the POSTER decided what's required
+    let config: { requireMessage?: boolean; question?: string } = {};
+    try {
+      config = JSON.parse(opp.applyConfig);
+    } catch {}
+
+    const message = String(body.message || "").trim().slice(0, 1000);
+    if (config.requireMessage !== false && !message)
+      throw new ApiError(400, "Tell them why you're a good fit — it's required for this listing");
+
+    // availability is asked ONLY when the opportunity has a date
+    const availability = ["yes", "no", "need_check"].includes(body.availability) ? body.availability : "yes";
     if (opp.eventDate && !body.availability)
       throw new ApiError(400, "Confirm your availability for the project date");
+
+    const questionAnswer = String(body.questionAnswer || "").trim().slice(0, 500);
+    if (config.question && !questionAnswer)
+      throw new ApiError(400, "The poster asked one extra question — answer it to apply");
 
     const id = randomBytes(12).toString("hex");
     db.insert(tables.applications)
@@ -68,8 +89,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         id,
         opportunityId: opp.id,
         applicantId: user.id,
-        message: String(body.message || "").slice(0, 1000),
+        message,
         availability,
+        answers: JSON.stringify({
+          ...(config.question ? { question: config.question, answer: questionAnswer } : {}),
+          ...(body.extra ? { extra: String(body.extra).trim().slice(0, 500) } : {}),
+        }),
       })
       .run();
 
@@ -78,7 +103,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       actorId: user.id,
       type: "application",
       title: `${user.profile.displayName} applied to ${opp.title}`,
-      body: availability === "need_check" ? "Availability: needs to check their schedule" : "Available on your date",
+      body: opp.eventDate
+        ? availability === "yes"
+          ? "Available on your date"
+          : availability === "no"
+            ? "Not available on your date"
+            : "Availability: needs to check their schedule"
+        : message.slice(0, 80),
       href: `/opportunities/${opp.id}/applicants`,
     });
 

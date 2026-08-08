@@ -355,6 +355,11 @@ export const opportunities = sqliteTable("opportunities", {
   trustRequired: text("trust_required").notNull().default("standard"),
   applyBy: integer("apply_by", { mode: "timestamp_ms" }),
   eventDate: integer("event_date", { mode: "timestamp_ms" }),
+  // poster-defined application requirements:
+  // { requireMessage?: boolean, question?: string } — availability is added
+  // automatically when the opportunity has a date; portfolio/profile are
+  // always auto-attached, never re-typed.
+  applyConfig: text("apply_config").notNull().default("{}"),
   status: text("status").notNull().default("open"), // open | closed | filled
   isSeed: seed(),
   createdAt: ts("created_at"),
@@ -371,7 +376,9 @@ export const applications = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     message: text("message").notNull().default(""),
-    availability: text("availability").notNull().default("yes"), // yes | need_check
+    availability: text("availability").notNull().default("yes"), // yes | no | need_check
+    // answers to poster-defined questions + the optional "anything else"
+    answers: text("answers").notNull().default("{}"),
     status: text("status").notNull().default("submitted"), // submitted | shortlisted | selected | declined
     createdAt: ts("created_at"),
   },

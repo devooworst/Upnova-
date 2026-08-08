@@ -56,6 +56,13 @@ export async function GET(req: NextRequest) {
         trustRequired: r.opp.trustRequired,
         applyBy: r.opp.applyBy?.toISOString() ?? null,
         eventDate: r.opp.eventDate?.toISOString() ?? null,
+        applyConfig: (() => {
+          try {
+            return JSON.parse(r.opp.applyConfig);
+          } catch {
+            return {};
+          }
+        })(),
         poster: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.opp.posterId,
         applied: myApplications.has(r.opp.id),
@@ -86,6 +93,10 @@ export async function POST(req: NextRequest) {
         studentFriendly: !!body.studentFriendly,
         applyBy: body.applyBy ? new Date(body.applyBy) : null,
         eventDate: body.eventDate ? new Date(body.eventDate) : null,
+        applyConfig: JSON.stringify({
+          requireMessage: body.requireMessage !== false,
+          question: String(body.question || "").slice(0, 160) || undefined,
+        }),
         lat: user.profile.lat,
         lng: user.profile.lng,
       })

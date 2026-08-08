@@ -279,6 +279,18 @@ never "escrow", which is a specific legal service UpNova does not claim to provi
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
+**Adaptive intake** — no universal application form. Opportunities are a short application
+("I want to be considered"): why-you (poster can waive it), availability Yes/No/Need-to-confirm
+(added automatically only when the gig has a date), at most ONE poster-defined question, and an
+optional anything-else — while profile, skills, portfolio, ratings, and verification attach
+automatically and are never re-typed. Posters set these requirements when creating the listing
+(`/opportunities/new` → applyConfig, enforced server-side). Services are a project request
+("I want this person to do work for me") with presets matched to the job: simple (what/when/
+anything else, budget prefilled from the listed price), detailed for bigger builds (scope,
+existing materials, deadline, budget ranges), and care for trust services (date, duration,
+who's being cared for, special requirements, provider verification banner). Progressive
+disclosure throughout: minimum first, details after the provider responds.
+
 **Location privacy** — users pick the most precise level shown publicly: City · County · State ·
 Country · Don't show. `locationLabel` is computed server-side (`lib/server/serialize.ts`) and is
 the only location string public surfaces render; exact addresses and coordinates are never public
