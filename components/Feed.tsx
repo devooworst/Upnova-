@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import type { Post, RadiusId } from "@/lib/data";
+import Link from "next/link";
+import { GraduationCap } from "lucide-react";
+import type { Post } from "@/lib/data";
+import { creators, opportunities, events } from "@/lib/data";
 import { useFollow } from "@/lib/follow";
 import PostCard from "./PostCard";
 import AudioPost from "./AudioPost";
@@ -10,21 +12,33 @@ import PollCard from "./PollCard";
 import OpportunityCard from "./OpportunityCard";
 import EventCard from "./EventCard";
 
-export type FeedTab = "For You" | "Near You" | "Following" | "Opportunities" | "Trending";
-const tabs: FeedTab[] = ["For You", "Near You", "Following", "Opportunities", "Trending"];
+/* ------------------------------------------------------------------ */
+/* Feed Type (what kind of content) × Feed Scope (how far it reaches). */
+/* Orthogonal by design: Following + 5 miles, Trending + City, etc.    */
+/* Every piece of content has a reach; the feed respects it.           */
+/* ------------------------------------------------------------------ */
 
-function ringOf(post: Post): 0 | 1 | 2 {
-  const d = post.distanceMi;
-  if (d !== undefined && d <= 5) return 0;
-  if (d !== undefined && d <= 25) return 1;
-  return 2;
-}
+export type FeedTab = "For You" | "Following" | "Opportunities" | "Trending";
+const tabs: FeedTab[] = ["For You", "Following", "Opportunities", "Trending"];
 
-const ringLabels: Record<RadiusId, [string, string, string]> = {
-  "5": ["Within 5 mi", "5 – 25 mi", "Beyond 5 mi"],
-  "25": ["Within 5 mi", "5 – 25 mi", "Beyond 25 mi"],
-  city: ["Within 5 mi", "5 – 25 mi", "City, remote & global"],
+export type FeedScope =
+  | "foryou" | "5" | "25" | "city" | "county" | "state" | "country" | "global" | "school";
+
+/** max distance per scope; Infinity = include remote/global content */
+const scopeMaxMi: Record<FeedScope, number> = {
+  foryou: Infinity,
+  "5": 5,
+  "25": 25,
+  city: 40,
+  county: 60,
+  state: 150,
+  country: Infinity,
+  global: Infinity,
+  school: 5,
 };
+
+/** local scopes exclude remote content (posts without a distance) */
+const localScopes: FeedScope[] = ["5", "25", "city", "county", "state", "school"];
 
 function renderItem(post: Post) {
   switch (post.type) {
@@ -62,48 +76,46 @@ function Skeleton() {
 }
 
 interface FeedProps {
-  radius: RadiusId;
+  scope: FeedScope;
   tab: FeedTab;
   onTabChange: (tab: FeedTab) => void;
+  isStudent: boolean;
 }
 
-export default function Feed({ radius, tab, onTabChange }: FeedProps) {
+export default function Feed({ scope, tab, onTabChange, isStudent }: FeedProps) {
   const { isFollowing } = useFollow();
-  const [farOpen, setFarOpen] = useState(false);
   const [forYou, setForYou] = useState<Post[] | null>(null);
   const [nearYou, setNearYou] = useState<Post[] | null>(null);
 
-  /* two separate data sources: global vs. location-based */
+  /* two data sources: global ranking + distance-sorted local */
   useEffect(() => {
     let live = true;
     fetch("/api/feed/for-you")
       .then((r) => r.json())
       .then((d) => live && setForYou(d.items))
       .catch(() => live && setForYou([]));
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let live = true;
-    setNearYou(null); // radius changed → refetch the local feed
-    fetch(`/api/feed/near-you?radius=${radius}`)
+    fetch("/api/feed/near-you?radius=25")
       .then((r) => r.json())
       .then((d) => live && setNearYou(d.items))
       .catch(() => live && setNearYou([]));
     return () => {
       live = false;
     };
-  }, [radius]);
+  }, []);
 
-  const groups = useMemo(() => {
-    const g: [Post[], Post[], Post[]] = [[], [], []];
-    (nearYou ?? []).forEach((p) => g[ringOf(p)].push(p));
-    return g;
-  }, [nearYou]);
+  const scoped = useMemo(() => {
+    const isLocal = localScopes.includes(scope);
+    const source = isLocal ? nearYou : forYou;
+    if (!source) return null;
+    const max = scopeMaxMi[scope];
+    return source.filter((p) => {
+      if (!isLocal) return true; // for-you / country / global: everything
+      if (p.distanceMi === undefined) return false; // remote content is out of local scopes
+      return p.distanceMi <= max;
+    });
+  }, [scope, forYou, nearYou]);
 
-  const flat = (forYou ?? []).filter((p) =>
+  const items = (scoped ?? []).filter((p) =>
     tab === "For You"
       ? true
       : tab === "Following"
@@ -113,25 +125,24 @@ export default function Feed({ radius, tab, onTabChange }: FeedProps) {
       : p.trending
   );
 
-  const [l0, l1, l2] = ringLabels[radius];
-  const farCollapsed = radius !== "city" && !farOpen;
-  const sections: { label: string; items: Post[]; collapsible: boolean; collapsed: boolean }[] =
-    radius === "5"
-      ? [
-          { label: l0, items: groups[0], collapsible: false, collapsed: false },
-          { label: l2, items: [...groups[1], ...groups[2]], collapsible: true, collapsed: farCollapsed },
-        ]
-      : [
-          { label: l0, items: groups[0], collapsible: false, collapsed: false },
-          { label: l1, items: groups[1], collapsible: false, collapsed: false },
-          { label: l2, items: groups[2], collapsible: true, collapsed: farCollapsed },
-        ];
+  const loading = scoped === null;
+  const isLocal = localScopes.includes(scope);
 
-  const loading = tab === "Near You" ? nearYou === null : forYou === null;
+  /* Near You is a content label inside Home — never a page */
+  const nearCounts = useMemo(() => {
+    if (!isLocal) return null;
+    const max = scopeMaxMi[scope];
+    const inRange = (d?: number) => d !== undefined && d <= max;
+    return {
+      creators: creators.filter((c) => inRange(c.distanceMi)).length,
+      opportunities: opportunities.filter((o) => inRange(o.distanceMi)).length,
+      events: events.filter(() => scope !== "5").length || 1,
+    };
+  }, [scope, isLocal]);
 
   return (
     <>
-      {/* tab row */}
+      {/* feed type — what kind of content */}
       <div className="flex items-center gap-4 overflow-x-auto border-b border-line-soft pb-0 text-sm no-scrollbar">
         {tabs.map((t) => (
           <button
@@ -146,51 +157,49 @@ export default function Feed({ radius, tab, onTabChange }: FeedProps) {
             {t}
           </button>
         ))}
-        {tab === "Near You" && (
+        {isLocal && (
           <span className="ml-auto hidden shrink-0 pb-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600 sm:block">
             sorted by distance
           </span>
         )}
       </div>
 
+      {/* school scope banner */}
+      {scope === "school" && (
+        <div className="flex items-center gap-3 rounded-xl border border-violet-400/30 bg-violet-400/5 px-4 py-2.5">
+          <GraduationCap className="h-4 w-4 shrink-0 text-violet-400" />
+          <p className="min-w-0 flex-1 text-xs text-zinc-400">
+            <span className="font-semibold text-violet-300">Bowie State University</span> · verified
+            campus scope — students, campus creators, orgs, and campus work.
+          </p>
+          <Link href="/campus" className="shrink-0 text-xs font-semibold text-violet-400 hover:text-violet-300">
+            Campus →
+          </Link>
+        </div>
+      )}
+
+      {/* Near You — a section inside Home, not a page */}
+      {isLocal && nearCounts && !loading && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line px-4 py-2.5 font-mono text-[11px] font-medium text-zinc-400">
+          <span className="font-bold uppercase tracking-[0.08em] text-zinc-200">Near You</span>
+          <span><span className="text-violet-400">{nearCounts.creators}</span> creators</span>
+          <span><span className="text-lime-400">{nearCounts.opportunities}</span> opportunities</span>
+          <span><span className="text-amber-400">{nearCounts.events}</span> events</span>
+          <span className="ml-auto text-zinc-600">
+            {items.length} post{items.length === 1 ? "" : "s"} in range
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <Skeleton />
-      ) : tab !== "Near You" ? (
-        <div key={tab} className="animate-fade-up space-y-5">
-          {flat.map(renderItem)}
-          {flat.length === 0 && (
-            <p className="py-10 text-center text-sm text-zinc-500">Nothing here yet.</p>
-          )}
-        </div>
       ) : (
-        <div key={radius} className="animate-fade-up space-y-8">
-          {sections.map(
-            (s) =>
-              s.items.length > 0 && (
-                <section key={s.label}>
-                  <header className="mb-3 flex items-baseline gap-2.5">
-                    <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">
-                      {s.label}
-                    </h2>
-                    <span className="font-mono text-[10px] tabular-nums text-zinc-500">
-                      {s.items.length}
-                    </span>
-                    <span className="h-px flex-1 self-center bg-line-soft" />
-                    {s.collapsible && (
-                      <button
-                        onClick={() => setFarOpen(!farOpen)}
-                        className="flex items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 transition hover:text-zinc-200"
-                      >
-                        {s.collapsed ? `show ${s.items.length}` : "hide"}
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 transition-transform ${s.collapsed ? "" : "rotate-180"}`}
-                        />
-                      </button>
-                    )}
-                  </header>
-                  {!s.collapsed && <div className="space-y-5">{s.items.map(renderItem)}</div>}
-                </section>
-              )
+        <div key={`${tab}-${scope}`} className="animate-fade-up space-y-5">
+          {items.map(renderItem)}
+          {items.length === 0 && (
+            <p className="py-10 text-center text-sm text-zinc-500">
+              Nothing here{isLocal ? " at this range — widen the scope" : " yet"}.
+            </p>
           )}
         </div>
       )}
