@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Briefcase, Check, Clock, Search, ShoppingBag, Star, Zap } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import HireModal from "@/components/HireModal";
+import AiPolicyBadge from "@/components/AiPolicyBadge";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { serviceCatalog, creators, type CatalogService } from "@/lib/data";
 
@@ -115,6 +116,7 @@ export default function ServicesPage() {
                 <span className="chip border-lime-400/25 px-2 py-0.5 text-[11px] text-lime-300">
                   <Check className="h-3 w-3" /> {c.availability}
                 </span>
+                <AiPolicyBadge policy={svc.aiPolicy} />
               </div>
 
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-line-soft pt-3.5">

@@ -142,6 +142,30 @@ export default function ResolutionPage() {
         </div>
       </section>
 
+      {/* creative integrity */}
+      <section className="card p-5">
+        <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">
+          🎨 Creative Integrity Review
+        </h2>
+        <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+          UpNova doesn&apos;t prohibit AI — it prohibits <span className="font-semibold text-zinc-300">misrepresentation</span>.
+          Every project records its agreed AI policy. If a client believes the policy was violated
+          (&ldquo;this hand-painted illustration looks AI-generated&rdquo;), they can open a review.
+          We don&apos;t claim automatic AI detection — reviews rely on the agreement, disclosures,
+          and reasonable evidence of the creative process:
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {["Sketches & drafts", "Source / project files", "Progress screenshots", "Layers", "Time-lapse / process footage", "Original files & metadata"].map((e) => (
+            <span key={e} className="chip px-2 py-0.5 text-[11px]">{e}</span>
+          ))}
+        </div>
+        <p className="mt-3 border-t border-line-soft pt-3 text-[10px] leading-relaxed text-zinc-600">
+          Not every creator has to document every second of their work — evidence is requested
+          where appropriate. While a review is open, the normal payout workflow is paused rather
+          than automatically favoring either side.
+        </p>
+      </section>
+
       {/* protected transactions */}
       <section className="card p-5">
         <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">Protected transactions</h2>

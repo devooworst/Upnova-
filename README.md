@@ -82,6 +82,13 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   designed around Stripe Connect (connected accounts, destination charges with
   application fees, payouts, refunds, disputes). Transactions, projects, payments,
   fees, payouts, and reviews are modeled as separate entities from messaging.
+- **Creative Integrity — AI-transparent, creator-controlled.** UpNova does not
+  prohibit AI universally; it prohibits misrepresentation. Every service carries an
+  AI policy (🔴 No AI / 🟡 with disclosure / 🟠 assisted / 🟢 client decides), clients
+  set AI requirements when hiring, the agreed policy becomes part of the project
+  agreement, and portfolio pieces declare AI involvement. No "AI detector" promises:
+  disputes go through Creative Integrity Review (agreement + disclosures + reasonable
+  process evidence), with payout paused during review.
 - **Flexible Events — the organizer controls the rules.** No mandatory registration
   model: one-click RSVP, registration-required, paid tickets (with ticket types +
   QR check-in), or request-to-attend — the organizer picks admission (free/paid),

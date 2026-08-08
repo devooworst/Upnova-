@@ -828,6 +828,45 @@ export const communities: Community[] = [
 /* Services = clients are looking for a creator. Predefined offerings with
    clear starting prices. CTA is Hire Me. (Opportunities are the inverse.)  */
 
+/* ---- Creative Integrity ----
+   UpNova does not prohibit AI universally. UpNova prohibits
+   misrepresentation. Every service and project carries an AI policy;
+   disclosure is part of the agreement, and violations are disputable. */
+
+export type AiPolicy = "no-ai" | "disclosure" | "assisted" | "client-decides";
+
+export const aiPolicyInfo: Record<AiPolicy, { dot: string; label: string; desc: string }> = {
+  "no-ai": {
+    dot: "🔴",
+    label: "No AI",
+    desc: "Created by the creator without generative AI.",
+  },
+  disclosure: {
+    dot: "🟡",
+    label: "AI with disclosure",
+    desc: "AI may be used; the creator must disclose how.",
+  },
+  assisted: {
+    dot: "🟠",
+    label: "AI-assisted",
+    desc: "Limited AI assistance; the creator owns the creative work.",
+  },
+  "client-decides": {
+    dot: "🟢",
+    label: "Client decides",
+    desc: "AI use is agreed per project before work begins.",
+  },
+};
+
+export type AiInvolvement = "none" | "assisted" | "generative" | "full";
+
+export const aiInvolvementInfo: Record<AiInvolvement, { dot: string; label: string }> = {
+  none: { dot: "🔴", label: "No AI" },
+  assisted: { dot: "🟡", label: "AI-assisted" },
+  generative: { dot: "🟠", label: "Generative elements" },
+  full: { dot: "🟢", label: "Fully AI-generated" },
+};
+
 export interface CatalogService {
   id: string;
   creatorId: string;
@@ -836,11 +875,13 @@ export interface CatalogService {
   startingAt: number;
   description: string;
   delivery: string;
+  aiPolicy: AiPolicy;
 }
 
 export const serviceCatalog: CatalogService[] = [
   {
     id: "svc-jordan-production",
+    aiPolicy: "assisted",
     creatorId: "jordan",
     title: "Music Production",
     category: "Music",
@@ -850,6 +891,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-marcus-editing",
+    aiPolicy: "assisted",
     creatorId: "marcus",
     title: "Video Editing",
     category: "Video",
@@ -859,6 +901,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-ava-photography",
+    aiPolicy: "no-ai",
     creatorId: "ava",
     title: "Photography",
     category: "Photography",
@@ -868,6 +911,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-jordan-songwriting",
+    aiPolicy: "no-ai",
     creatorId: "jordan",
     title: "Songwriting",
     category: "Writing",
@@ -877,6 +921,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-tre-beats",
+    aiPolicy: "disclosure",
     creatorId: "tre",
     title: "Beat Licensing",
     category: "Music",
@@ -886,6 +931,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-lena-brand",
+    aiPolicy: "client-decides",
     creatorId: "lena",
     title: "Brand Identity",
     category: "Design",
@@ -895,6 +941,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-nia-content",
+    aiPolicy: "no-ai",
     creatorId: "nia",
     title: "Fashion Content",
     category: "Fashion",
@@ -1340,11 +1387,14 @@ export interface PortfolioProject {
   thumbnail?: string;
   gradient: string;
   emoji: string;
+  aiInvolvement: AiInvolvement;
+  aiDisclosure?: string;
 }
 
 export const portfolio: PortfolioProject[] = [
   {
     id: "p1",
+    aiInvolvement: "none",
     title: "Nike Fall Campaign",
     client: "Nike",
     role: "Videographer",
@@ -1356,6 +1406,7 @@ export const portfolio: PortfolioProject[] = [
   },
   {
     id: "p2",
+    aiInvolvement: "none",
     title: "Spotify Album Shoot",
     client: "Spotify",
     role: "Photographer",
@@ -1367,6 +1418,8 @@ export const portfolio: PortfolioProject[] = [
   },
   {
     id: "p3",
+    aiInvolvement: "assisted",
+    aiDisclosure: "AI used for reference moodboards; all production, mixing, and artwork done manually.",
     title: "Late Nights Beat",
     client: "Independent Artist",
     role: "Music Producer",

@@ -31,6 +31,14 @@ const groups: { label: string; items: string[] }[] = [
     ],
   },
   {
+    label: "Creative integrity",
+    items: [
+      "AI policy violation",
+      "Work wasn't original",
+      "Creator misrepresented their work",
+    ],
+  },
+  {
     label: "Safety / abuse",
     items: [
       "Scam or fraud",

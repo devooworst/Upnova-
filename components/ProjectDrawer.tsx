@@ -111,6 +111,7 @@ export default function ProjectDrawer({
   const [budget, setBudget] = useState(startingAt);
   const [myStars, setMyStars] = useState(0);
   const [myReview, setMyReview] = useState("Fantastic eye. The gallery was better than the brief.");
+  const [aiPolicy, setAiPolicy] = useState("🔴 Not allowed");
   const [reportOpen, setReportOpen] = useState(false);
 
   const counter = budget + 50;
@@ -221,6 +222,27 @@ export default function ProjectDrawer({
                   <input value={budget || ""} onChange={(e) => setBudget(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="input-dark pl-7 tabular-nums" />
                 </div>
               </div>
+              <div>
+                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+                  AI-generated work
+                </label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {["🔴 Not allowed", "🟡 Allowed with disclosure", "🟢 Allowed"].map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => setAiPolicy(o)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                        aiPolicy === o
+                          ? "border-zinc-400 bg-white/10 text-zinc-100"
+                          : "border-line text-zinc-400 hover:border-zinc-600"
+                      }`}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="rounded-md border border-lime-400/25 bg-lime-400/5 p-3 text-xs leading-relaxed text-zinc-400">
                 <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-lime-400" />
                 <span className="font-semibold text-lime-300">Payment protection.</span> Payment is
@@ -242,6 +264,16 @@ export default function ProjectDrawer({
                 <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">what you&apos;ll receive</span>
                 <br />
                 {scope}
+              </p>
+              <p className="mt-3 rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">
+                <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">ai policy · </span>
+                {aiPolicy}
+                {aiPolicy === "🔴 Not allowed" && (
+                  <span className="block text-[10px] leading-relaxed text-zinc-500">
+                    Work must be created by {creatorName.split(" ")[0]} and must not contain
+                    undisclosed AI-generated material.
+                  </span>
+                )}
               </p>
               <Perforation className="mt-4" />
               <div className="mt-3.5 space-y-1.5 text-sm">
@@ -368,6 +400,9 @@ export default function ProjectDrawer({
               </div>
               <p className="mt-1 text-xs text-zinc-500">📅 {date} · 📍 {location}</p>
 
+              <p className="mt-2 font-mono text-[10px] font-medium text-zinc-500">
+                agreement: {aiPolicy.toLowerCase()} ai-generated work
+              </p>
               <div className="mt-4"><Milestones stage={stage as ProjectStage} /></div>
 
               {["submitted", "reviewing", "done"].includes(stage) && (

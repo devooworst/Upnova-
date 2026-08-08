@@ -10,6 +10,7 @@ import FollowButton from "./FollowButton";
 import FollowListModal from "./FollowListModal";
 import ProfilePreview from "./ProfilePreview";
 import OpportunityCard from "./OpportunityCard";
+import AiPolicyBadge from "./AiPolicyBadge";
 import {
   creators,
   serviceCatalog,
@@ -35,6 +36,7 @@ export default function CreatorProfile({ id }: { id: string }) {
   const [reportOpen, setReportOpen] = useState(false);
 
   const services = serviceCatalog.filter((s) => s.creatorId === id);
+  const originalWork = services.some((s) => s.aiPolicy === "no-ai");
   const posted = opportunities.filter((o) => o.poster === creator.name);
   const memberOf = communities.filter((c) =>
     communityContent[c.id]?.memberIds.includes(id)
@@ -85,8 +87,13 @@ export default function CreatorProfile({ id }: { id: string }) {
               {creator.verified && <VerifiedBadge className="h-5 w-5" />}
             </h1>
             <p className="text-sm text-zinc-500">@{creator.handle}</p>
-            <p className="mt-1.5 text-sm font-medium text-zinc-300">
-              {creator.emoji} {creator.role}
+            <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-300">
+              <span>{creator.emoji} {creator.role}</span>
+              {originalWork && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[10px] font-semibold text-zinc-200">
+                  🎨 Original Work Available
+                </span>
+              )}
             </p>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
               <span className="flex items-center gap-1">
@@ -159,6 +166,7 @@ export default function CreatorProfile({ id }: { id: string }) {
                 <span className="chip border-lime-400/25 px-2 py-0.5 text-[11px] text-lime-300">
                   <Check className="h-3 w-3" /> {creator.availability}
                 </span>
+                <AiPolicyBadge policy={svc.aiPolicy} />
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-line-soft pt-3.5">
                 <p className="text-xs text-zinc-500">

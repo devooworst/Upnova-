@@ -33,6 +33,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
   const [desc, setDesc] = useState("");
   const [deadline, setDeadline] = useState("");
   const [budget, setBudget] = useState(service.startingAt);
+  const [aiReq, setAiReq] = useState("🔴 Not allowed");
 
   const price = Math.max(budget || 0, 0);
 
@@ -131,6 +132,35 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
               />
             </div>
           </div>
+        </div>
+
+        {/* creative requirements — part of the agreement from minute one */}
+        <div className="mt-3">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+            AI-generated work
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {["🔴 Not allowed", "🟡 Allowed with disclosure", "🟢 Allowed"].map((o) => (
+              <button
+                key={o}
+                type="button"
+                onClick={() => setAiReq(o)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                  aiReq === o
+                    ? "border-zinc-400 bg-white/10 text-zinc-100"
+                    : "border-line text-zinc-400 hover:border-zinc-600"
+                }`}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+          {aiReq === "🔴 Not allowed" && (
+            <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+              Work must be created by the hired creator without undisclosed AI-generated material.
+              This becomes part of the project agreement.
+            </p>
+          )}
         </div>
 
         {/* estimated total — the fee is visible before anyone talks */}

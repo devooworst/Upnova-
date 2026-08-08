@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { ExternalLink, PencilLine, Plus } from "lucide-react";
-import { portfolio } from "@/lib/data";
+import { portfolio, aiInvolvementInfo } from "@/lib/data";
 
 export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
   return (
@@ -53,6 +53,12 @@ export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
                 <div className="flex justify-between gap-2">
                   <dt>Type</dt>
                   <dd className="font-medium text-zinc-300">{p.type}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>AI involvement</dt>
+                  <dd className="font-medium text-zinc-300" title={p.aiDisclosure}>
+                    {aiInvolvementInfo[p.aiInvolvement].dot} {aiInvolvementInfo[p.aiInvolvement].label}
+                  </dd>
                 </div>
               </dl>
               {isOwner ? (
