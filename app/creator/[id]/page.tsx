@@ -1,18 +1,14 @@
-import { notFound } from "next/navigation";
-import { creators } from "@/lib/data";
-import CreatorProfile from "@/components/CreatorProfile";
+import DbCreatorProfile from "@/components/db/DbCreatorProfile";
 
-export function generateStaticParams() {
-  return creators.map((c) => ({ id: c.id }));
-}
+/* Every creator URL resolves against the database — any real user's
+   handle works here, nothing is limited to a hardcoded list. */
+
+export const dynamic = "force-dynamic";
 
 export function generateMetadata({ params }: { params: { id: string } }) {
-  const c = creators.find((x) => x.id === params.id);
-  return { title: c ? c.name : "Creator" };
+  return { title: `@${params.id}` };
 }
 
 export default function CreatorPage({ params }: { params: { id: string } }) {
-  const creator = creators.find((c) => c.id === params.id);
-  if (!creator) notFound();
-  return <CreatorProfile id={params.id} />;
+  return <DbCreatorProfile handle={params.id} />;
 }

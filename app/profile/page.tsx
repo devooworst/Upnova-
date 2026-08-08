@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import ProfileView from "@/components/profile/ProfileView";
 
 export const metadata: Metadata = {
-  title: "Devin Carter",
-  description:
-    "Music producer, content creator, and entrepreneur on UpNova — portfolio, services, and opportunities.",
+  title: "Profile",
+  description: "Your UpNova profile — portfolio, services, and opportunities.",
 };
 
 export default function ProfilePage() {

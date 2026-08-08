@@ -6,12 +6,12 @@ import { useState, useEffect } from "react";
 import { PencilLine, MapPin, MessageSquare, Megaphone, Zap, FolderPlus } from "lucide-react";
 import PromoteModal from "../PromoteModal";
 import FollowListModal from "../FollowListModal";
-import { useFollow } from "@/lib/follow";
 import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
-import { profileStats, contact, reliability } from "@/lib/data";
+import { contact, reliability } from "@/lib/data";
 import { useProfile, roleLine, locationLine } from "@/lib/profile";
+import { useSession } from "@/lib/session";
 
 /**
  * The header reads the live profile store (lib/profile) — anything saved in
@@ -21,10 +21,30 @@ import { useProfile, roleLine, locationLine } from "@/lib/profile";
  */
 export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const profile = useProfile();
+  const { user } = useSession();
   const [following, setFollowing] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [listOpen, setListOpen] = useState<"followers" | "following" | null>(null);
-  const { followingCount } = useFollow();
+  const [stats, setStats] = useState<{ followers: number | null; following: number | null }>({
+    followers: null,
+    following: null,
+  });
+  const [projectCounts, setProjectCounts] = useState<{ total: number; completed: number }>({ total: 0, completed: 0 });
+  useEffect(() => {
+    if (!user) return;
+    fetch(`/api/users/${user.handle}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.stats && setStats(d.stats));
+    fetch("/api/projects", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const list = d.projects ?? [];
+        setProjectCounts({
+          total: list.length,
+          completed: list.filter((p: { state: string }) => ["completed", "reviewed"].includes(p.state)).length,
+        });
+      });
+  }, [user]);
   const [isStudent, setIsStudent] = useState(false);
   useEffect(() => {
     const sync = () => setIsStudent(isStudentVerified());
@@ -179,31 +199,34 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
 
         {/* stats */}
         <dl className="mt-5 grid grid-cols-4 gap-2 border-t border-line-soft pt-4">
-          {profileStats.map((s) => {
-            const interactive = s.label === "Followers" || s.label === "Following";
+          {(
+            [
+              { label: "Followers", value: stats.followers, interactive: true },
+              { label: "Following", value: stats.following, interactive: true },
+              { label: "Projects", value: projectCounts.total, interactive: false },
+              { label: "Completed", value: projectCounts.completed, interactive: false },
+            ] as const
+          ).map((s) => {
             const hidden =
               !isOwner &&
               ((s.label === "Followers" && !profile.showFollowers) ||
                 (s.label === "Following" && !profile.showFollowing));
-            const value = hidden
-              ? "—"
-              : s.label === "Following"
-                ? `${345 + followingCount}`
-                : s.value;
             return (
               <button
                 key={s.label}
-                disabled={!interactive || hidden}
+                disabled={!s.interactive || hidden}
                 onClick={() =>
-                  interactive &&
+                  s.interactive &&
                   !hidden &&
                   setListOpen(s.label === "Followers" ? "followers" : "following")
                 }
                 className={`text-center sm:text-left ${
-                  interactive && !hidden ? "transition hover:opacity-80" : "cursor-default"
+                  s.interactive && !hidden ? "transition hover:opacity-80" : "cursor-default"
                 }`}
               >
-                <dd className="text-xl font-bold text-zinc-50">{value}</dd>
+                <dd className="text-xl font-bold text-zinc-50">
+                  {hidden ? "—" : (s.value ?? "—")}
+                </dd>
                 <dt className="text-xs text-zinc-500">{s.label}</dt>
               </button>
             );

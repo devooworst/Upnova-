@@ -1,0 +1,744 @@
+"use client";
+
+/* ------------------------------------------------------------------ */
+/*  Messages — fully database-backed.                                  */
+/*                                                                     */
+/*  · Conversation list = MY conversations from the DB                 */
+/*  · ?to=<handle> opens (or creates) the conversation with THAT user  */
+/*  · ?c=<conversationId> / ?project=<projectId> deep-link precisely   */
+/*  · The project panel drives the real state machine:                 */
+/*      draft → offer_sent → accepted → in_progress →                  */
+/*      extension_requested → submitted → approved → completed →       */
+/*      reviewed                                                       */
+/*  Extension requests are persistent DB rows — reload all you want,   */
+/*  they never recreate themselves.                                    */
+/* ------------------------------------------------------------------ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Send, ChevronLeft, Briefcase, Flag, X, Star, Check } from "lucide-react";
+import Avatar from "@/components/Avatar";
+import ReportModal from "@/components/ReportModal";
+import { useSession } from "@/lib/session";
+
+/* ------------------------------- types ------------------------------- */
+
+interface ConvUser {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  roleLine: string;
+}
+
+interface Conv {
+  id: string;
+  with: ConvUser | null;
+  lastMessage: { body: string; createdAt: string; mine: boolean } | null;
+  unread: number;
+  projectId: string | null;
+  projectState: string | null;
+}
+
+interface Msg {
+  id: string;
+  body: string;
+  mine: boolean;
+  createdAt: string;
+}
+
+interface Extension {
+  id: string;
+  days: number;
+  reason: string;
+  status: "pending" | "approved" | "denied";
+  mine: boolean;
+}
+
+interface ProjectDetail {
+  id: string;
+  title: string;
+  brief: string;
+  amount: number;
+  state: string;
+  deadline: string | null;
+  conversationId: string | null;
+  myRole: "client" | "creator";
+  with: ConvUser;
+  extensions: Extension[];
+  payments: { id: string; amountCents: number; feeCents: number; status: string }[];
+  reviews: { rating: number; body: string; mine: boolean }[];
+}
+
+const STATE_LABEL: Record<string, string> = {
+  draft: "Draft",
+  offer_sent: "Offer sent",
+  accepted: "Accepted",
+  in_progress: "In progress",
+  extension_requested: "Extension requested",
+  submitted: "Submitted",
+  approved: "Approved",
+  completed: "Completed",
+  reviewed: "Reviewed",
+};
+
+const STEPS = ["draft", "offer_sent", "accepted", "in_progress", "submitted", "approved", "completed", "reviewed"];
+const stepIndex = (state: string) => (state === "extension_requested" ? 3 : STEPS.indexOf(state));
+
+function timeAgo(iso: string) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+}
+
+/* =============================== main =============================== */
+
+export default function DbMessages() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const { user } = useSession();
+
+  const [convos, setConvos] = useState<Conv[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messagesById, setMessagesById] = useState<Record<string, Msg[]>>({});
+  const [draft, setDraft] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const deepLinked = useRef(false);
+
+  const loadConvos = useCallback(async () => {
+    const res = await fetch("/api/conversations", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setConvos(data.conversations ?? []);
+    return data.conversations as Conv[];
+  }, []);
+
+  const loadMessages = useCallback(async (convId: string) => {
+    const res = await fetch(`/api/conversations/${convId}/messages`, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setMessagesById((m) => ({ ...m, [convId]: data.messages ?? [] }));
+  }, []);
+
+  const loadProject = useCallback(async (projectId: string) => {
+    const res = await fetch(`/api/projects/${projectId}`, { cache: "no-store" });
+    if (!res.ok) {
+      setProject(null);
+      return;
+    }
+    const data = await res.json();
+    setProject(data.project);
+  }, []);
+
+  /* initial load + deep links */
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const list = (await loadConvos()) ?? [];
+      if (deepLinked.current) return;
+      deepLinked.current = true;
+
+      const to = params.get("to");
+      const c = params.get("c");
+      const proj = params.get("project");
+
+      if (to) {
+        const res = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ toHandle: to }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          await loadConvos();
+          setActiveId(data.conversationId);
+          return;
+        }
+      }
+      if (c) {
+        setActiveId(c);
+        return;
+      }
+      if (proj) {
+        const res = await fetch(`/api/projects/${proj}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.project?.conversationId) {
+            setActiveId(data.project.conversationId);
+            setPanelOpen(true);
+            return;
+          }
+        }
+      }
+      if (list.length > 0) setActiveId(list[0].id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  /* thread + project sync on selection */
+  const active = convos?.find((x) => x.id === activeId) ?? null;
+  useEffect(() => {
+    if (!activeId) return;
+    loadMessages(activeId);
+    const conv = convos?.find((x) => x.id === activeId);
+    if (conv?.projectId) loadProject(conv.projectId);
+    else setProject(null);
+    const iv = setInterval(() => loadMessages(activeId), 6000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, convos?.find((x) => x.id === activeId)?.projectId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messagesById[activeId ?? ""]?.length]);
+
+  const send = async () => {
+    const body = draft.trim();
+    if (!body || !activeId) return;
+    setDraft("");
+    await fetch(`/api/conversations/${activeId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    });
+    loadMessages(activeId);
+    loadConvos();
+  };
+
+  const refreshAll = async () => {
+    await loadConvos();
+    if (active?.projectId) await loadProject(active.projectId);
+    if (activeId) await loadMessages(activeId);
+  };
+
+  const offPlatform = /cash\s?app|venmo|zelle|paypal\.me|wire\s?transfer/i.test(draft);
+  const messages = activeId ? (messagesById[activeId] ?? null) : null;
+
+  if (user === null)
+    return (
+      <div className="card mx-auto max-w-md p-8 text-center">
+        <p className="text-sm font-semibold text-zinc-200">Sign in to open Messages</p>
+        <p className="mt-1 text-xs text-zinc-500">Conversations belong to real accounts.</p>
+        <Link href="/login" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Sign in</Link>
+      </div>
+    );
+
+  return (
+    <div className="flex h-[calc(100vh-8.5rem)] overflow-hidden rounded-2xl border border-line bg-card">
+      {/* ---------------------------- list ---------------------------- */}
+      <aside className={`w-full shrink-0 border-r border-line sm:w-72 ${activeId ? "hidden sm:block" : ""}`}>
+        <div className="border-b border-line px-4 py-3.5">
+          <h2 className="text-sm font-bold text-zinc-100">Messages</h2>
+        </div>
+        <div className="h-full overflow-y-auto pb-16">
+          {convos === null ? (
+            <p className="p-4 text-xs text-zinc-500">Loading…</p>
+          ) : convos.length === 0 ? (
+            <p className="p-4 text-xs leading-relaxed text-zinc-500">
+              No conversations yet. Open one from any profile, service, or opportunity — Message and
+              Hire Me both land here.
+            </p>
+          ) : (
+            convos.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setActiveId(c.id)}
+                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
+                  c.id === activeId ? "bg-card-raised" : "hover:bg-card-raised/50"
+                }`}
+              >
+                <Avatar src={c.with?.avatarUrl} initials={c.with?.displayName.charAt(0) ?? "?"} size="md" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                    <span className="truncate">{c.with?.displayName ?? "Unknown"}</span>
+                    {c.projectState && (
+                      <span className="shrink-0 rounded-full border border-lime-400/40 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-lime-300">
+                        {STATE_LABEL[c.projectState]}
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-zinc-500">
+                    {c.lastMessage ? `${c.lastMessage.mine ? "You: " : ""}${c.lastMessage.body}` : "New conversation"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {c.lastMessage && <span className="text-[10px] text-zinc-600">{timeAgo(c.lastMessage.createdAt)}</span>}
+                  {c.unread > 0 && <span className="h-2 w-2 rounded-full bg-violet-400" />}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </aside>
+
+      {/* ---------------------------- thread ---------------------------- */}
+      <section className={`flex min-w-0 flex-1 flex-col ${!activeId ? "hidden sm:flex" : ""}`}>
+        {!active ? (
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-sm text-zinc-500">Select a conversation.</p>
+          </div>
+        ) : (
+          <>
+            {/* header */}
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <button onClick={() => setActiveId(null)} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200 sm:hidden">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <Link href={`/creator/${active.with?.handle}`}>
+                <Avatar src={active.with?.avatarUrl} initials={active.with?.displayName.charAt(0) ?? "?"} size="sm" />
+              </Link>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-zinc-100">{active.with?.displayName}</p>
+                <p className="truncate text-[11px] text-zinc-500">{active.with?.roleLine || `@${active.with?.handle}`}</p>
+              </div>
+              <button
+                onClick={() => setPanelOpen(!panelOpen)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  project
+                    ? "border-lime-400/40 text-lime-300 hover:bg-lime-400/10"
+                    : "border-line text-zinc-300 hover:border-zinc-600"
+                }`}
+              >
+                <Briefcase className="h-3.5 w-3.5" />
+                {project ? STATE_LABEL[project.state] : "Project"}
+              </button>
+              <button onClick={() => setReportOpen(true)} className="rounded-md p-1.5 text-zinc-500 hover:text-zinc-300" title="Report">
+                <Flag className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* project stepper strip */}
+            {project && (
+              <div className="flex items-center gap-1 border-b border-line-soft px-4 py-2">
+                {STEPS.slice(1).map((s, i) => {
+                  const idx = stepIndex(project.state);
+                  const done = idx >= i + 1;
+                  return (
+                    <div key={s} className="flex min-w-0 flex-1 items-center gap-1">
+                      <span
+                        className={`h-1.5 w-full rounded-full ${
+                          done ? (project.state === "extension_requested" && i + 1 === 3 ? "bg-amber-400" : "bg-lime-400") : "bg-card-raised"
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
+                <span className="ml-2 shrink-0 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+                  {STATE_LABEL[project.state]}
+                </span>
+              </div>
+            )}
+
+            {/* messages */}
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              {messages === null ? (
+                <p className="text-xs text-zinc-500">Loading…</p>
+              ) : (
+                messages.map((m) => (
+                  <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                        m.mine ? "rounded-br-md bg-violet-400 text-zinc-950" : "rounded-bl-md bg-card-raised text-zinc-200"
+                      }`}
+                    >
+                      {m.body}
+                      <span className={`mt-0.5 block text-right text-[9px] ${m.mine ? "text-zinc-800" : "text-zinc-600"}`}>
+                        {timeAgo(m.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* off-platform tripwire */}
+            {offPlatform && (
+              <div className="mx-4 mb-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3.5 py-2 text-xs text-amber-300">
+                Keep payments on UpNova — off-platform payments aren&apos;t protected, and we can&apos;t help
+                if something goes wrong.
+              </div>
+            )}
+
+            {/* composer */}
+            <div className="flex items-center gap-2 border-t border-line px-4 py-3">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && send()}
+                placeholder={`Message ${active.with?.displayName ?? ""}…`}
+                className="min-w-0 flex-1 rounded-full border border-line bg-card-raised px-4 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50"
+              />
+              <button onClick={send} disabled={!draft.trim()} className="rounded-full bg-violet-400 p-2 text-zinc-950 transition hover:bg-violet-300 disabled:opacity-40">
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* ---------------------------- project panel ---------------------------- */}
+      {panelOpen && active && (
+        <ProjectPanel
+          conv={active}
+          project={project}
+          onClose={() => setPanelOpen(false)}
+          onChanged={refreshAll}
+        />
+      )}
+
+      {reportOpen && active && (
+        <ReportModal
+          context={`Conversation with ${active.with?.displayName ?? "user"}`}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* =========================== project panel =========================== */
+
+function ProjectPanel({
+  conv,
+  project,
+  onClose,
+  onChanged,
+}: {
+  conv: Conv;
+  project: ProjectDetail | null;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // create form
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [brief, setBrief] = useState("");
+  const [deadline, setDeadline] = useState("");
+  // extension form
+  const [extDays, setExtDays] = useState("2");
+  const [extReason, setExtReason] = useState("");
+  const [extFormOpen, setExtFormOpen] = useState(false);
+  // review form
+  const [rating, setRating] = useState(5);
+  const [reviewBody, setReviewBody] = useState("");
+
+  const run = async (fn: () => Promise<Response>) => {
+    setBusy(true);
+    setError(null);
+    const res = await fn();
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Something went wrong");
+      return false;
+    }
+    await onChanged();
+    return true;
+  };
+
+  const act = (action: string) => () =>
+    run(() =>
+      fetch(`/api/projects/${project!.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+    );
+
+  const fee = project ? Math.round(project.amount * 0.05 * 100) / 100 : 0;
+  const pendingExt = project?.extensions.find((e) => e.status === "pending") ?? null;
+  const myReview = project?.reviews.find((r) => r.mine) ?? null;
+
+  return (
+    <aside className="absolute inset-y-0 right-0 z-20 w-full max-w-sm overflow-y-auto border-l border-line bg-card p-5 shadow-card sm:relative sm:z-0">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Project</p>
+          <h3 className="mt-1 text-sm font-bold text-zinc-100">
+            {project ? project.title : `Work with ${conv.with?.displayName ?? ""}`}
+          </h3>
+        </div>
+        <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-400/5 px-3 py-2 text-xs font-medium text-rose-300">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+        </p>
+      )}
+
+      {/* ------------------------- no project yet ------------------------- */}
+      {!project && (
+        <div className="mt-4 space-y-2.5">
+          <p className="text-xs leading-relaxed text-zinc-500">
+            Turn this conversation into a real project. You&apos;ll be the client — {conv.with?.displayName}{" "}
+            delivers the work and receives the payout.
+          </p>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project title" className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
+            <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Amount (creator payout)" className="w-full rounded-xl border border-line bg-card-raised py-2.5 pl-7 pr-3.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+          </div>
+          <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3} placeholder="Brief — what exactly needs to happen?" className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none focus:border-lime-400/50" />
+          {amount && (
+            <p className="font-mono text-[11px] tracking-[0.08em] text-zinc-500">
+              PAYOUT ${amount} · YOU PAY ${amount ? (Number(amount) * 1.05).toFixed(2) : "0"} (5% platform fee)
+            </p>
+          )}
+          <button
+            disabled={busy || !title.trim() || !amount}
+            onClick={() =>
+              run(() =>
+                fetch("/api/projects", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    creatorHandle: conv.with?.handle,
+                    title,
+                    amount: Number(amount),
+                    brief,
+                    deadline: deadline || undefined,
+                    conversationId: conv.id,
+                  }),
+                })
+              )
+            }
+            className="btn-lime w-full justify-center py-2 text-sm disabled:opacity-40"
+          >
+            Create project draft
+          </button>
+        </div>
+      )}
+
+      {/* --------------------------- with project --------------------------- */}
+      {project && (
+        <div className="mt-4 space-y-4">
+          <div className="rounded-xl border border-line bg-card-raised p-3.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-zinc-400">Creator payout</span>
+              <span className="font-mono font-medium tracking-[0.08em] text-lime-300">${project.amount}</span>
+            </div>
+            {project.myRole === "client" && (
+              <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
+                <span>You pay (incl. 5% fee)</span>
+                <span className="font-mono tracking-[0.08em]">${(project.amount + fee).toFixed(2)}</span>
+              </div>
+            )}
+            {project.deadline && (
+              <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
+                <span>Deadline</span>
+                <span className="font-mono tracking-[0.08em]">
+                  {new Date(project.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              </div>
+            )}
+            {project.payments.map((p) => (
+              <div key={p.id} className="mt-1 flex items-center justify-between text-xs">
+                <span className="text-zinc-500">Payment</span>
+                <span className={`inline-flex items-center gap-1.5 font-semibold ${p.status === "released" ? "text-lime-300" : "text-amber-300"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${p.status === "released" ? "bg-lime-400" : "bg-amber-400"}`} />
+                  {p.status === "held" ? "Held in escrow" : p.status === "released" ? "Released" : p.status}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {project.brief && <p className="text-xs leading-relaxed text-zinc-400">{project.brief}</p>}
+
+          {/* pending extension — persistent, decided once */}
+          {pendingExt && (
+            <div className="rounded-xl border border-amber-400/40 bg-amber-400/5 p-3.5">
+              <p className="text-xs font-bold text-amber-300">
+                Extension requested · +{pendingExt.days} day{pendingExt.days === 1 ? "" : "s"}
+              </p>
+              {pendingExt.reason && <p className="mt-1 text-xs text-zinc-400">{pendingExt.reason}</p>}
+              {!pendingExt.mine && project.myRole === "client" ? (
+                <div className="mt-2.5 flex gap-2">
+                  <button disabled={busy} onClick={() => run(() => fetch(`/api/extensions/${pendingExt.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve: true }) }))} className="btn-lime px-3.5 py-1.5 text-xs">
+                    Approve · +{pendingExt.days} days
+                  </button>
+                  <button disabled={busy} onClick={() => run(() => fetch(`/api/extensions/${pendingExt.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve: false }) }))} className="rounded-full border border-line px-3.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-rose-300">
+                    Decline
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-zinc-500">Waiting for the client to decide.</p>
+              )}
+            </div>
+          )}
+          {project.extensions
+            .filter((e) => e.status !== "pending")
+            .map((e) => (
+              <p key={e.id} className={`flex items-center gap-1.5 text-[11px] ${e.status === "approved" ? "text-lime-300" : "text-zinc-500"}`}>
+                <Check className="h-3 w-3" /> Extension {e.status} · +{e.days} days
+              </p>
+            ))}
+
+          {/* ------------------- actions by state × role ------------------- */}
+          <div className="space-y-2">
+            {project.state === "draft" && project.myRole === "creator" && (
+              <button disabled={busy} onClick={act("send_offer")} className="btn-lime w-full justify-center py-2 text-sm">
+                Send offer · ${project.amount}
+              </button>
+            )}
+            {project.state === "draft" && project.myRole === "client" && (
+              <p className="text-xs text-zinc-500">
+                Draft created. Waiting for {project.with.displayName} to review and send the offer.
+              </p>
+            )}
+            {project.state === "offer_sent" && project.myRole === "client" && (
+              <button disabled={busy} onClick={act("accept_offer")} className="btn-lime w-full justify-center py-2 text-sm">
+                Accept offer · ${project.amount}
+              </button>
+            )}
+            {project.state === "offer_sent" && project.myRole === "creator" && (
+              <p className="text-xs text-zinc-500">Offer sent — waiting for {project.with.displayName} to accept.</p>
+            )}
+            {project.state === "accepted" && project.myRole === "client" && (
+              <button disabled={busy} onClick={act("start")} className="btn-lime w-full justify-center py-2 text-sm">
+                Secure payment · ${(project.amount + fee).toFixed(2)}
+              </button>
+            )}
+            {project.state === "accepted" && project.myRole === "creator" && (
+              <p className="text-xs text-zinc-500">Accepted — waiting for payment to be secured.</p>
+            )}
+            {project.state === "in_progress" && project.myRole === "creator" && (
+              <>
+                <button disabled={busy} onClick={act("submit")} className="btn-lime w-full justify-center py-2 text-sm">
+                  Submit work for review
+                </button>
+                {!extFormOpen ? (
+                  <button onClick={() => setExtFormOpen(true)} className="w-full rounded-full border border-line py-2 text-xs font-medium text-zinc-400 transition hover:border-amber-400/40 hover:text-amber-300">
+                    Request extension
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-line bg-card-raised p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input value={extDays} onChange={(e) => setExtDays(e.target.value.replace(/[^0-9]/g, ""))} className="w-16 rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm text-zinc-100 outline-none" />
+                      <span className="text-xs text-zinc-500">days</span>
+                    </div>
+                    <input value={extReason} onChange={(e) => setExtReason(e.target.value)} placeholder="Reason (the client sees this)" className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600" />
+                    <div className="flex gap-2">
+                      <button
+                        disabled={busy || !extDays}
+                        onClick={async () => {
+                          const ok = await run(() =>
+                            fetch(`/api/projects/${project.id}/extension`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ days: Number(extDays), reason: extReason }),
+                            })
+                          );
+                          if (ok) setExtFormOpen(false);
+                        }}
+                        className="rounded-full bg-amber-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950"
+                      >
+                        Request
+                      </button>
+                      <button onClick={() => setExtFormOpen(false)} className="text-xs text-zinc-500">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {project.state === "in_progress" && project.myRole === "client" && (
+              <p className="text-xs text-zinc-500">
+                In progress — {project.with.displayName} is working. You&apos;ll review the delivery here.
+              </p>
+            )}
+            {project.state === "submitted" && project.myRole === "client" && (
+              <>
+                <button disabled={busy} onClick={act("approve")} className="btn-lime w-full justify-center py-2 text-sm">
+                  Approve delivery
+                </button>
+                <button disabled={busy} onClick={act("request_changes")} className="w-full rounded-full border border-line py-2 text-xs font-medium text-zinc-400 hover:border-zinc-600">
+                  Request changes
+                </button>
+              </>
+            )}
+            {project.state === "submitted" && project.myRole === "creator" && (
+              <p className="text-xs text-zinc-500">Submitted — waiting for review.</p>
+            )}
+            {project.state === "approved" && project.myRole === "client" && (
+              <button disabled={busy} onClick={act("complete")} className="btn-lime w-full justify-center py-2 text-sm">
+                Release payment · ${project.amount}
+              </button>
+            )}
+            {project.state === "approved" && project.myRole === "creator" && (
+              <p className="text-xs text-zinc-500">Approved — payment release is next.</p>
+            )}
+
+            {(project.state === "completed" || project.state === "reviewed") && (
+              <div className="space-y-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-lime-300">
+                  <Check className="h-3.5 w-3.5" /> Completed — ${project.amount} released
+                </p>
+                {project.reviews.map((r, i) => (
+                  <div key={i} className="rounded-xl border border-line bg-card-raised px-3 py-2 text-xs">
+                    <p className="flex items-center gap-1 font-semibold text-zinc-200">
+                      {r.mine ? "Your review" : `${project.with.displayName}'s review`}
+                      <span className="ml-1 flex items-center gap-0.5 text-amber-300">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
+                      </span>
+                    </p>
+                    {r.body && <p className="mt-1 text-zinc-400">{r.body}</p>}
+                  </div>
+                ))}
+                {!myReview && project.state !== "reviewed" && (
+                  <div className="rounded-xl border border-line bg-card-raised p-3 space-y-2">
+                    <p className="text-xs font-bold text-zinc-200">Review {project.with.displayName}</p>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button key={n} onClick={() => setRating(n)}>
+                          <Star className={`h-5 w-5 ${n <= rating ? "fill-amber-400 text-amber-400" : "text-zinc-600"}`} />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea value={reviewBody} onChange={(e) => setReviewBody(e.target.value)} rows={2} placeholder="How did it go?" className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600" />
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        run(() =>
+                          fetch(`/api/projects/${project.id}/review`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ rating, body: reviewBody }),
+                          })
+                        )
+                      }
+                      className="btn-lime px-3.5 py-1.5 text-xs"
+                    >
+                      Post review
+                    </button>
+                  </div>
+                )}
+                {project.state === "reviewed" && (
+                  <p className="text-[11px] text-zinc-500">Both sides reviewed — project closed.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <p className="border-t border-line-soft pt-3 text-[10px] leading-relaxed text-zinc-600">
+            Money flows through UpNova&apos;s escrow: secured when work starts, released when you approve.
+            The 5% platform fee is paid by the buyer on top — the creator&apos;s listed price is their payout.
+            Stripe Connect handles the card details in production; UpNova never stores them.
+          </p>
+        </div>
+      )}
+    </aside>
+  );
+}

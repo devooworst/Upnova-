@@ -48,7 +48,7 @@ import VerifiedBadge from "../VerifiedBadge";
 import {
   ProfileData,
   DEFAULT_PROFILE,
-  getProfile,
+  loadProfile,
   saveProfile,
   checkUsername,
   roleLine,
@@ -58,7 +58,7 @@ import {
   EducationEntry,
   SocialLink,
 } from "@/lib/profile";
-import { services as baseServices, reliability, workRecords, contact } from "@/lib/data";
+import { reliability, workRecords, contact } from "@/lib/data";
 import {
   isStudentVerified,
   getTrustStatus,
@@ -256,9 +256,14 @@ export default function EditProfile() {
   const [trust, setTrust] = useState<TrustStatus>("identity");
 
   useEffect(() => {
-    const p = getProfile();
-    setSaved(p);
-    setDraft(p);
+    loadProfile().then((p) => {
+      if (!p) {
+        router.push("/login");
+        return;
+      }
+      setSaved(p);
+      setDraft(p);
+    });
     const sync = () => {
       setStudentVerified(isStudentVerified());
       setTrust(getTrustStatus());
@@ -266,6 +271,7 @@ export default function EditProfile() {
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
@@ -276,10 +282,11 @@ export default function EditProfile() {
   const usernameBlocked = usernameStatus === "unavailable" || usernameStatus === "invalid";
   const canSave = dirty && !usernameBlocked && draft.displayName.trim().length > 0;
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!canSave) return;
     const clean = { ...draft, username: draft.username.trim().replace(/^@/, "").toLowerCase() };
-    saveProfile(clean);
+    const ok = await saveProfile(clean);
+    if (!ok) return;
     setSaved(clean);
     setToast(true);
     setTimeout(() => router.push("/profile"), 900);
@@ -303,13 +310,43 @@ export default function EditProfile() {
   const [editingService, setEditingService] = useState<string | null>(null);
   const [servicePrice, setServicePrice] = useState("");
 
-  const visibleServices = baseServices.filter((s) => !draft.serviceOverrides[s.id]?.removed);
-
-  const setOverride = (id: string, patch: Partial<{ paused: boolean; removed: boolean; startingAt: number }>) =>
-    set("serviceOverrides", {
-      ...draft.serviceOverrides,
-      [id]: { ...draft.serviceOverrides[id], ...patch },
+  /* my real DB service listings — changes here apply immediately */
+  interface MyService {
+    id: string;
+    title: string;
+    price: number;
+    paused: boolean;
+  }
+  const [myServices, setMyServices] = useState<MyService[]>([]);
+  const loadServices = async () => {
+    const res = await fetch("/api/services", { cache: "no-store" });
+    const data = await res.json();
+    setMyServices(
+      (data.services ?? [])
+        .filter((s: { isMine: boolean }) => s.isMine)
+        .map((s: { id: string; title: string; price: number; paused?: boolean }) => ({
+          id: s.id,
+          title: s.title,
+          price: s.price,
+          paused: !!s.paused,
+        }))
+    );
+  };
+  useEffect(() => {
+    loadServices();
+  }, []);
+  const svcPatch = async (id: string, patch: Record<string, unknown>) => {
+    await fetch(`/api/services/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
     });
+    loadServices();
+  };
+  const svcRemove = async (id: string) => {
+    await fetch(`/api/services/${id}`, { method: "DELETE" });
+    loadServices();
+  };
 
   return (
     <div className="mx-auto max-w-5xl pb-28">
@@ -467,9 +504,10 @@ export default function EditProfile() {
                   </span>
                   <input
                     value={draft.username}
-                    onChange={(e) => set("username", e.target.value.replace(/^@/, ""))}
-                    className={`${inputCls} pl-8`}
+                    readOnly
+                    className={`${inputCls} pl-8 opacity-60`}
                     maxLength={20}
+                    title="Username changes are an account-level operation — coming to Settings"
                   />
                 </div>
                 {usernameStatus === "available" && (
@@ -961,98 +999,80 @@ export default function EditProfile() {
               Your Services
             </FieldLabel>
             <ul className="space-y-2">
-              {visibleServices.map((s) => {
-                const ov = draft.serviceOverrides[s.id] || {};
-                const price = ov.startingAt ?? s.startingAt;
-                const paused = !!ov.paused;
-                return (
-                  <li
-                    key={s.id}
-                    className={`rounded-xl border px-3.5 py-2.5 transition ${
-                      paused ? "border-line-soft bg-card-raised/40 opacity-70" : "border-line bg-card-raised"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-                          {s.title}
-                          {paused && (
-                            <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-                              Paused
-                            </span>
-                          )}
-                        </p>
-                        <p className="font-mono text-[11px] tracking-[0.08em] text-lime-300">
-                          Starting at ${price}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          onClick={() => {
-                            setEditingService(editingService === s.id ? null : s.id);
-                            setServicePrice(String(price));
-                          }}
-                          className="btn-ghost px-2.5 py-1 text-[11px]"
-                        >
-                          <PencilLine className="h-3 w-3" /> Edit
-                        </button>
-                        <button
-                          onClick={() => setOverride(s.id, { paused: !paused })}
-                          className="btn-ghost px-2.5 py-1 text-[11px]"
-                        >
-                          {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
-                          {paused ? "Resume" : "Pause"}
-                        </button>
-                        <button
-                          onClick={() => setOverride(s.id, { removed: true })}
-                          className="rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300"
-                        >
-                          Remove
-                        </button>
-                      </div>
+              {myServices.map((s) => (
+                <li
+                  key={s.id}
+                  className={`rounded-xl border px-3.5 py-2.5 transition ${
+                    s.paused ? "border-line-soft bg-card-raised/40 opacity-70" : "border-line bg-card-raised"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                        {s.title}
+                        {s.paused && (
+                          <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                            Paused
+                          </span>
+                        )}
+                      </p>
+                      <p className="font-mono text-[11px] tracking-[0.08em] text-lime-300">
+                        Starting at ${s.price}
+                      </p>
                     </div>
-                    {editingService === s.id && (
-                      <div className="mt-2.5 flex items-center gap-2 border-t border-line-soft pt-2.5">
-                        <span className="text-xs text-zinc-500">Starting at $</span>
-                        <input
-                          value={servicePrice}
-                          onChange={(e) => setServicePrice(e.target.value.replace(/[^0-9]/g, ""))}
-                          className={`${inputCls} w-24 py-1.5`}
-                        />
-                        <button
-                          onClick={() => {
-                            const n = Number(servicePrice);
-                            if (n > 0) setOverride(s.id, { startingAt: n });
-                            setEditingService(null);
-                          }}
-                          className="btn-lime px-3 py-1.5 text-xs"
-                        >
-                          Update
-                        </button>
-                        <span className="text-[11px] text-zinc-500">
-                          Your listed price is your payout — the buyer pays the 5% platform fee on top.
-                        </span>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-              {Object.entries(draft.serviceOverrides).filter(([, o]) => o.removed).length > 0 && (
-                <li className="flex items-center justify-between rounded-xl border border-dashed border-line px-3.5 py-2 text-xs text-zinc-500">
-                  {Object.entries(draft.serviceOverrides).filter(([, o]) => o.removed).length} service(s) removed
-                  <button
-                    onClick={() =>
-                      set(
-                        "serviceOverrides",
-                        Object.fromEntries(
-                          Object.entries(draft.serviceOverrides).map(([k, o]) => [k, { ...o, removed: false }])
-                        )
-                      )
-                    }
-                    className="text-violet-300 hover:underline"
-                  >
-                    Undo
-                  </button>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setEditingService(editingService === s.id ? null : s.id);
+                          setServicePrice(String(s.price));
+                        }}
+                        className="btn-ghost px-2.5 py-1 text-[11px]"
+                      >
+                        <PencilLine className="h-3 w-3" /> Edit
+                      </button>
+                      <button
+                        onClick={() => svcPatch(s.id, { paused: !s.paused })}
+                        className="btn-ghost px-2.5 py-1 text-[11px]"
+                      >
+                        {s.paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+                        {s.paused ? "Resume" : "Pause"}
+                      </button>
+                      <button
+                        onClick={() => svcRemove(s.id)}
+                        className="rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                  {editingService === s.id && (
+                    <div className="mt-2.5 flex items-center gap-2 border-t border-line-soft pt-2.5">
+                      <span className="text-xs text-zinc-500">Starting at $</span>
+                      <input
+                        value={servicePrice}
+                        onChange={(e) => setServicePrice(e.target.value.replace(/[^0-9]/g, ""))}
+                        className={`${inputCls} w-24 py-1.5`}
+                      />
+                      <button
+                        onClick={() => {
+                          const n = Number(servicePrice);
+                          if (n > 0) svcPatch(s.id, { price: n });
+                          setEditingService(null);
+                        }}
+                        className="btn-lime px-3 py-1.5 text-xs"
+                      >
+                        Update
+                      </button>
+                      <span className="text-[11px] text-zinc-500">
+                        Your listed price is your payout — the buyer pays the 5% platform fee on top.
+                      </span>
+                    </div>
+                  )}
+                </li>
+              ))}
+              {myServices.length === 0 && (
+                <li className="rounded-xl border border-dashed border-line px-3.5 py-3 text-xs text-zinc-500">
+                  No active services. Create one and it appears on your profile and in the marketplace.
                 </li>
               )}
             </ul>

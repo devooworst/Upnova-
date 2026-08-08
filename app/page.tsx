@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, MapPin } from "lucide-react";
-import NearbyNow from "@/components/NearbyNow";
-import CreatePost from "@/components/CreatePost";
-import Feed, { type FeedTab, type FeedScope } from "@/components/Feed";
+import DbComposer from "@/components/db/DbComposer";
+import DbFeed, { type FeedTab } from "@/components/db/DbFeed";
+import type { FeedScope } from "@/components/Feed";
 import RightSidebar from "@/components/RightSidebar";
-import { currentUser } from "@/lib/data";
+import { useSession } from "@/lib/session";
 import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 
 /* ------------------------------------------------------------------ */
@@ -28,24 +28,28 @@ const scopes: { id: FeedScope; label: string; studentOnly?: boolean }[] = [
   { id: "school", label: "My School", studentOnly: true },
 ];
 
-const scopePlace: Record<FeedScope, string> = {
-  foryou: "",
-  "5": "Baltimore, MD",
-  "25": "Baltimore, MD",
-  city: "Baltimore, MD",
-  county: "Baltimore County",
-  state: "Maryland",
-  country: "United States",
-  global: "Everywhere",
-  school: "Bowie State University",
-};
 
 export default function Home() {
+  const { user } = useSession();
   const [scope, setScope] = useState<FeedScope>("foryou");
   const [tab, setTab] = useState<FeedTab>("For You");
   const [menuOpen, setMenuOpen] = useState(false);
   const [isStudent, setIsStudent] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  /* scope place labels come from the signed-in user's real location */
+  const cityLabel = user?.profile.city ? `${user.profile.city}, ${user.profile.state}` : "your area";
+  const scopePlace: Record<FeedScope, string> = {
+    foryou: "",
+    "5": cityLabel,
+    "25": cityLabel,
+    city: cityLabel,
+    county: user?.profile.county || "your county",
+    state: user?.profile.state || "your state",
+    country: user?.profile.country || "your country",
+    global: "Everywhere",
+    school: "your verified school",
+  };
 
   useEffect(() => {
     const sync = () => setIsStudent(isStudentVerified());
@@ -76,7 +80,10 @@ export default function Home() {
         {/* masthead — Home, always */}
         <header className="pt-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-            {currentUser.location} · Thu Aug 7
+            {user?.profile.city
+              ? `${user.profile.city}, ${user.profile.state}`
+              : "UpNova"}{" "}
+            · {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
           </p>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Home</h1>
@@ -146,9 +153,8 @@ export default function Home() {
           </div>
         </header>
 
-        <NearbyNow />
-        <CreatePost />
-        <Feed scope={scope} tab={tab} onTabChange={setTab} isStudent={isStudent} />
+        <DbComposer />
+        <DbFeed scope={scope} tab={tab} onTabChange={setTab} isStudent={isStudent} />
       </div>
 
       <RightSidebar scope={scope} />

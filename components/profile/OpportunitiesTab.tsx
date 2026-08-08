@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Briefcase, ArrowRight, BadgeCheck, Star } from "lucide-react";
 import { profileOpportunities, workRecords } from "@/lib/data";
-import { useProfile, getProfile, saveProfile } from "@/lib/profile";
+import { useProfile } from "@/lib/profile";
 
 const statusStyle: Record<string, string> = {
   "Applied • Under Review": "border-amber-400/40 bg-amber-400/10 text-amber-300",
@@ -12,19 +13,14 @@ const statusStyle: Record<string, string> = {
 };
 
 export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
-  // portfolio toggles live in the shared profile store — the same record
-  // Edit Profile → Professional → Portfolio writes to
   const profile = useProfile();
-  const inPortfolio = (id: string) => profile.workInPortfolio.includes(id);
-  const togglePortfolio = (id: string) => {
-    const p = getProfile();
-    saveProfile({
-      ...p,
-      workInPortfolio: p.workInPortfolio.includes(id)
-        ? p.workInPortfolio.filter((x) => x !== id)
-        : [...p.workInPortfolio, id],
-    });
-  };
+  // demo work-history records — real portfolio persistence lands with the
+  // portfolio_items API wiring (see README audit)
+  const [portfolioIds, setPortfolioIds] = useState<Record<string, boolean>>(
+    Object.fromEntries(workRecords.map((w) => [w.id, w.inPortfolio]))
+  );
+  const inPortfolio = (id: string) => !!portfolioIds[id];
+  const togglePortfolio = (id: string) => setPortfolioIds((m) => ({ ...m, [id]: !m[id] }));
   const applications = profileOpportunities.filter((o) => o.kind === "application");
   const listings = profileOpportunities.filter((o) => o.kind === "listing");
 

@@ -1,208 +1,194 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { Briefcase, Check, Clock, Search, ShoppingBag, Star, Zap } from "lucide-react";
-import Avatar from "@/components/Avatar";
-import HireModal from "@/components/HireModal";
-import AiPolicyBadge from "@/components/AiPolicyBadge";
-import TrustBadge from "@/components/TrustBadge";
-import VerifiedBadge from "@/components/VerifiedBadge";
-import { serviceCatalog, creators, type CatalogService } from "@/lib/data";
+/* ------------------------------------------------------------------ */
+/*  Services — "I'm available → Hire Me".                              */
+/*  Real listings owned by real accounts. Hire Me opens the actual     */
+/*  conversation with that owner (never a hardcoded user) with a       */
+/*  service-specific intro, where the project lifecycle begins.        */
+/* ------------------------------------------------------------------ */
 
-const categories = ["All", "Music", "Video", "Photography", "Design", "Fashion", "Writing", "Care"] as const;
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Search, ShoppingBag, Zap } from "lucide-react";
+import Avatar from "@/components/Avatar";
+import VerifiedBadge from "@/components/VerifiedBadge";
+
+interface ServiceItem {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  aiPolicy: string;
+  trustRequired: string;
+  reach: string;
+  owner: {
+    id: string;
+    handle: string;
+    displayName: string;
+    avatarUrl: string | null;
+    verified: boolean;
+    roleLine: string;
+    city: string | null;
+    state: string | null;
+    trustLevel: string;
+  };
+  isMine: boolean;
+}
+
+const AI_LABEL: Record<string, string> = {
+  "no-ai": "No AI — fully original",
+  disclosure: "AI disclosed when used",
+  assisted: "AI-assisted workflow",
+  "client-decides": "AI policy: client decides",
+};
 
 export default function ServicesPage() {
-  const [category, setCategory] = useState<(typeof categories)[number]>("All");
+  const router = useRouter();
+  const [items, setItems] = useState<ServiceItem[] | null>(null);
   const [query, setQuery] = useState("");
-  const [hiring, setHiring] = useState<CatalogService | null>(null);
-  const [safetyFor, setSafetyFor] = useState<CatalogService | null>(null);
+  const [category, setCategory] = useState("All");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const items = serviceCatalog.filter((svc) => {
-    const creator = creators.find((c) => c.id === svc.creatorId);
-    const matchesCat = category === "All" || svc.category === category;
+  useEffect(() => {
+    fetch("/api/services", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setItems(d.services ?? []));
+  }, []);
+
+  const categories = ["All", ...Array.from(new Set((items ?? []).map((s) => s.category)))];
+
+  const filtered = (items ?? []).filter((s) => {
     const q = query.trim().toLowerCase();
-    const matchesQuery =
+    const matchesQ =
       !q ||
-      svc.title.toLowerCase().includes(q) ||
-      svc.description.toLowerCase().includes(q) ||
-      (creator?.name.toLowerCase().includes(q) ?? false);
-    return matchesCat && matchesQuery;
+      s.title.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q) ||
+      s.owner.displayName.toLowerCase().includes(q);
+    return (category === "All" || s.category === category) && matchesQ;
   });
 
+  const hire = async (s: ServiceItem) => {
+    setBusyId(s.id);
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        toHandle: s.owner.handle,
+        firstMessage: `Hi ${s.owner.displayName.split(" ")[0]}! I'm interested in your ${s.title} service ($${s.price}).`,
+      }),
+    });
+    const data = await res.json();
+    setBusyId(null);
+    if (res.ok) router.push(`/messages?c=${data.conversationId}`);
+    else if (res.status === 401) router.push("/login");
+  };
+
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <header className="px-1">
-        <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-zinc-50">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
-            <ShoppingBag className="h-5 w-5 text-lime-400" />
-          </span>
-          Services
-        </h1>
-        <p className="mt-1.5 text-sm text-zinc-500">
-          <span className="font-semibold text-zinc-300">You need something made?</span> Hire a
-          creator directly — set services, clear starting prices, protected payment.
-        </p>
-      </header>
-
-      {/* the inverse door */}
-      <Link
-        href="/opportunities"
-        className="flex items-center gap-3 rounded-xl border border-line px-4 py-2.5 text-xs text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
-      >
-        <Briefcase className="h-4 w-4 shrink-0 text-zinc-500" />
-        Looking to get hired instead? Browse Opportunities — projects looking for people →
-      </Link>
-
-      {/* search */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search services or creators…"
-          className="w-full rounded-2xl border border-line bg-card py-3 pl-11 pr-4 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/40 focus:ring-2 focus:ring-lime-400/15"
-        />
+    <div className="mx-auto max-w-3xl">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
+          <ShoppingBag className="h-5 w-5 text-lime-400" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Services</h1>
+          <p className="text-sm text-zinc-400">
+            Creators who are available now. Their listed price is their payout — the 5% platform fee is
+            added at checkout.
+          </p>
+        </div>
       </div>
 
-      {/* category chips */}
-      <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-        {categories.map((c) => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-              category === c
-                ? "bg-white text-zinc-950"
-                : "border border-line text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
-            }`}
-          >
-            {c}
-          </button>
-        ))}
+      {/* search + categories */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search services or creators…"
+            className="w-full rounded-full border border-line bg-card py-2 pl-10 pr-4 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-lime-400/40"
+          />
+        </div>
+        <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+          {categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategory(c)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition ${
+                category === c
+                  ? "border-lime-400/50 bg-lime-400/10 font-semibold text-lime-300"
+                  : "border-line text-zinc-400 hover:border-zinc-600"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* creator catalog */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {items.map((svc) => {
-          const c = creators.find((cr) => cr.id === svc.creatorId);
-          if (!c) return null;
-          return (
-            <article key={svc.id} className="card-people card-lift flex flex-col p-4 hover:border-zinc-600">
-              {/* creator-forward: the person is the product */}
-              <div className="flex items-center gap-3">
-                <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" className="ring-1 ring-line" />
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
-                    {c.name} {c.verified && <VerifiedBadge />}
-                  </p>
-                  <p className="flex items-center gap-1 text-xs text-zinc-500">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    {c.rating} ({c.reviews}) · {c.location.split(",")[0]}
-                    {c.distanceMi !== undefined && c.distanceMi <= 40 && (
-                      <span className="font-mono font-medium text-zinc-400">· {c.distanceMi} mi</span>
-                    )}
+      {/* listings — money cards, receipt DNA */}
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {items === null ? (
+          [0, 1, 2, 3].map((i) => <div key={i} className="card-money h-44 animate-pulse" aria-hidden />)
+        ) : (
+          filtered.map((s) => (
+            <article key={s.id} className="card-money flex flex-col p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-zinc-100">{s.title}</h3>
+                  <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">
+                    From ${s.price}
                   </p>
                 </div>
-              </div>
-
-              <h2 className="mt-2.5 text-base font-bold tracking-tight text-zinc-50">{svc.title}</h2>
-              <p className="mt-1 flex-1 text-sm leading-relaxed text-zinc-400">{svc.description}</p>
-
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                <span className="chip px-2 py-0.5 text-[11px]">{svc.category}</span>
-                <span className="chip px-2 py-0.5 text-[11px]">
-                  <Clock className="h-3 w-3" /> {svc.delivery}
-                </span>
-                <span className="chip border-lime-400/25 px-2 py-0.5 text-[11px] text-lime-300">
-                  <Check className="h-3 w-3" /> {c.availability}
-                </span>
-                <AiPolicyBadge policy={svc.aiPolicy} />
-                <TrustBadge level={svc.trustLevel} />
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line-soft pt-3">
-                <p className="text-xs text-zinc-500">
-                  Starting at{" "}
-                  <span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">
-                    ${svc.startingAt}
+                {s.trustRequired === "high-trust" && (
+                  <span className="shrink-0 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300">
+                    High-Trust
                   </span>
-                </p>
-                <button
-                  onClick={() => (svc.trustLevel === "high-trust" ? setSafetyFor(svc) : setHiring(svc))}
-                  className="btn-lime px-4 py-1.5 text-xs"
-                >
-                  <Zap className="h-3.5 w-3.5" /> {svc.trustLevel === "high-trust" ? "Book" : "Hire Me"}
-                </button>
+                )}
+              </div>
+              <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
+              <p className="mt-2 flex items-center gap-1.5 text-[10px] text-zinc-500">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> {AI_LABEL[s.aiPolicy]}
+                <span aria-hidden>·</span> {s.reach}
+              </p>
+
+              <div className="mt-3 flex items-center gap-2 border-t border-dashed border-line pt-3">
+                <Link href={`/creator/${s.owner.handle}`} className="flex min-w-0 flex-1 items-center gap-2">
+                  <Avatar src={s.owner.avatarUrl} initials={s.owner.displayName.charAt(0)} size="xs" />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1 truncate text-xs font-semibold text-zinc-200">
+                      {s.owner.displayName}
+                      {s.owner.verified && <VerifiedBadge className="h-3 w-3" />}
+                    </span>
+                    <span className="block truncate text-[10px] text-zinc-500">
+                      {s.owner.city ? `${s.owner.city}${s.owner.state ? `, ${s.owner.state}` : ""}` : s.owner.roleLine}
+                    </span>
+                  </span>
+                </Link>
+                {s.isMine ? (
+                  <Link href="/profile/edit" className="btn-ghost shrink-0 px-3 py-1.5 text-[11px]">
+                    Manage
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => hire(s)}
+                    disabled={busyId === s.id}
+                    className="btn-lime shrink-0 px-3.5 py-1.5 text-xs disabled:opacity-50"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Hire Me
+                  </button>
+                )}
               </div>
             </article>
-          );
-        })}
-        {items.length === 0 && (
-          <p className="col-span-full py-10 text-center text-sm text-zinc-500">
-            No services match. Try another category — or post it as an opportunity and let creators
-            apply.
-          </p>
+          ))
+        )}
+        {items !== null && filtered.length === 0 && (
+          <p className="col-span-full py-10 text-center text-sm text-zinc-500">No services match.</p>
         )}
       </div>
-
-      <p className="border-t border-line-soft pt-4 text-center text-xs text-zinc-600">
-        Every hire runs through the protected UpNova flow: agree on scope in Messages, pay securely,
-        approve the work, then both sides review.
-      </p>
-
-      {/* safety interstitial — verification shown BEFORE the customer pays */}
-      {safetyFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setSafetyFor(null)}>
-          <div className="card w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
-safety verification required
-            </p>
-            <h2 className="mt-1.5 text-[15px] font-bold tracking-tight text-zinc-50">
-              {safetyFor.title}
-            </h2>
-            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-              This service involves unsupervised access to your pet or property.{" "}
-              <span className="font-semibold text-zinc-200">
-                {creators.find((c) => c.id === safetyFor.creatorId)?.name}
-              </span>{" "}
-              has completed the required UpNova verification for this service:
-            </p>
-            <ul className="mt-3 space-y-1.5 text-xs text-zinc-300">
-              <li>✓ Identity verification</li>
-              <li>✓ Age verification</li>
-              <li>✓ Background screening (where legally permitted)</li>
-              <li>✓ UpNova payment protection</li>
-            </ul>
-            <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
-              Verification is performed by an identity-verification provider — UpNova never
-              stores IDs, and status never exposes legal name, ID number, DOB, or address.
-              Verified means checks passed, not a guarantee.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button onClick={() => setSafetyFor(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
-              <button
-                onClick={() => {
-                  setHiring(safetyFor);
-                  setSafetyFor(null);
-                }}
-                className="btn-lime flex-1 rounded-md py-2 text-xs"
-              >
-                Continue to booking
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {hiring && (
-        <HireModal
-          creator={creators.find((c) => c.id === hiring.creatorId)!}
-          service={hiring}
-          onClose={() => setHiring(null)}
-        />
-      )}
     </div>
   );
 }

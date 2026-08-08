@@ -228,15 +228,84 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 
 ```bash
 npm install
-npm run dev    # http://localhost:3000
+npm run db:push          # create the SQLite schema (db/upnova.dev.db)
+npm run db:seed          # load development seed data (see below)
+npm run dev              # http://localhost:3000
 ```
+
+## Backend (production transition)
+
+The app is now a real multi-user application. localStorage mock state has been replaced by a
+database + authenticated APIs for every core system.
+
+**Stack** — Drizzle ORM on SQLite in dev (`db/upnova.dev.db`, gitignored); the schema
+(`db/schema.ts`) is written to port straight to Postgres. Auth is email/password (bcrypt) with
+DB-backed sessions in an httpOnly cookie — no tokens in JS.
+
+**Models** — users, sessions, profiles, posts, comments, likes, follows, conversations,
+conversation_members, messages, notifications, communities, community_members, campuses,
+campus_verifications, services, opportunities, applications, projects, project_milestones,
+extension_requests, bookings, portfolio_items, experiences, reviews, payments, reports.
+
+**Project lifecycle** — `lib/server/projects.ts` is the single transition authority:
+`draft → offer_sent → accepted → in_progress → (extension_requested ⇄ in_progress) → submitted →
+approved → completed → reviewed`. Each transition names who may perform it (client vs creator).
+Extension requests are persistent rows — one pending per project, decided exactly once, never
+recreated on reload. `start` holds payment in escrow; `complete` releases it; mutual reviews close
+the project.
+
+**Authorization** — `lib/server/authz.ts` enforces ownership on every mutation (conversation
+membership, project parties, service/opportunity ownership, message permissions). `db/rls.sql`
+documents the equivalent Postgres Row Level Security policies for production, where the database
+becomes the second line of defense.
+
+**Feed & recommendations** — `/api/feed?tab=&scope=` queries the DB. Scope (5 mi / 25 mi / City /
+County / State / Country / Global / My School) filters by the author's real location or verified
+campus; tab picks the ranking. For You uses deterministic scoring (documented weights in
+`lib/server/feed.ts`): follows +50, shared skills/interests +8 each (cap 24), shared community +12,
+same city +15, recency decay to −30 over 48 h, engagement +6·ln(likes + 2·comments + 1).
+
+**Payments** — no card data is ever stored. The `payments` table records payout + 5 % buyer-side
+fee in cents with `provider="stripe_connect"` and a `providerRef` seam where the PaymentIntent /
+Transfer id and webhooks slot in. Verification evidence (`campus_verifications.evidenceRef`) is a
+private reference, never returned by any API.
+
+**Seed vs production data** — every seeded record carries `isSeed=true`.
+`npm run db:seed` (idempotent) · `npm run db:seed -- --fresh` (reset demo world) ·
+`npm run db:seed -- --wipe` (remove ALL seed data, keep real users).
+Seed accounts: `devin@upnova.dev` (admin), `ava@`, `jordanmiles@`, `marcusj@`, `nia@`, `lena@`
+— all `upnova123`.
+
+**Admin** — `/admin` (role-gated): platform stats, user management (suspend/reactivate kills
+sessions immediately), and report moderation with an emergency lane.
+
+### Connected to the database (this pass)
+
+Auth (login/signup/logout, navbar session), Home feed + composer + likes + comments, feed scopes,
+Messages (dynamic conversations, `?to=handle` / `?c=id` / `?project=id` deep links), the full
+project panel + extensions + reviews, notification bell + notification center, Services
+marketplace + Hire Me, Opportunities + Apply + poster-side applicant review (select →
+auto-created project), public creator profiles (`/creator/[handle]` resolves any real user),
+own profile header/About tab, Edit Profile (loads and saves the DB record, manages real service
+listings), Admin.
+
+### Audit — still on static demo data (next passes)
+
+- Right sidebar widgets (Open Opportunities / People near you / This week), `components/Feed.tsx`
+  (legacy, unused by Home), NearbyNow, old `api/feed/for-you` + `near-you` routes.
+- Communities, Campus, Events pages and their create flows — models and APIs are ready
+  (`communities`, `community_members`, `campuses`), UI still reads `lib/data`.
+- Bookings calendar page, Analytics, Bookmarks, Discover, Resolution Center demo case, Settings.
+- Portfolio tab items + work-history records (reliability metrics) — `portfolio_items` table
+  exists; the profile still shows demo records with the real toggles kept local.
+- `lib/follow.tsx` (localStorage) still powers FollowButton on legacy static cards; DB follows are
+  live on posts, creator pages, and the API.
+- Username/handle change, notification delivery channels, community feeds.
 
 ## Data & the road ahead
 
-All content lives in `lib/data.ts` as typed mock data that mirrors the future database model
-(`User`, `Service`, `Post`, `Opportunity`, `Application`, `Community`, `Event`, `Message`,
-`Payment`, `Review`, `Location/Reach`). Swapping the mock layer for Supabase is the next step:
-the components already consume the exact shapes the business needs.
+Legacy demo content lives in `lib/data.ts` and is being retired screen by screen (see audit above).
+The database schema in `db/schema.ts` mirrors it 1:1 where the shapes matter.
 
 The money flow this UI already describes: view service → contact creator → discuss → agree price →
 payment processed → creator delivers → client approves → creator gets paid → both review → reputation grows.

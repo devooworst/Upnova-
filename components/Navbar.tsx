@@ -21,16 +21,16 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getTheme, setTheme } from "@/lib/theme";
-import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
-import NotificationBell from "./NotificationBell";
+import DbNotificationBell from "./db/DbNotificationBell";
 import Avatar from "./Avatar";
-import { currentUser } from "@/lib/data";
+import { useSession, logout } from "@/lib/session";
 import { openCreateModal } from "./CreateModalTrigger";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const router = useRouter();
+  const { user } = useSession();
   const [lightMode, setLightMode] = useState(false);
   useEffect(() => {
     setLightMode(document.documentElement.classList.contains("light"));
@@ -40,13 +40,7 @@ export default function Navbar() {
     setTheme(next);
     setLightMode(!lightMode);
   };
-  const [plan, setPlanState] = useState<Plan>("free");
-  useEffect(() => {
-    const sync = () => setPlanState(getPlan());
-    sync();
-    window.addEventListener(PRO_EVENT, sync);
-    return () => window.removeEventListener(PRO_EVENT, sync);
-  }, []);
+  const plan = user?.plan ?? "free";
   const planLabel = plan === "pro" ? "Pro" : plan === "college" ? "College+" : "Free";
 
   return (
@@ -84,7 +78,6 @@ export default function Navbar() {
 
           <Link href="/messages" className="icon-btn relative hidden sm:inline-flex" aria-label="Messages">
             <MessageSquare className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-400" />
           </Link>
 
           <button
@@ -96,9 +89,14 @@ export default function Navbar() {
             {lightMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </button>
 
-          <NotificationBell />
+          <DbNotificationBell />
 
-          {/* Profile dropdown */}
+          {/* Profile dropdown — the real authenticated user, or Sign in */}
+          {!user ? (
+            <Link href="/login" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
+              Sign in
+            </Link>
+          ) : (
           <div className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
@@ -106,7 +104,7 @@ export default function Navbar() {
               aria-expanded={menuOpen}
               aria-label="Profile menu"
             >
-              <Avatar src={currentUser.avatar} initials={currentUser.initials} size="sm" />
+              <Avatar src={user.profile.avatarUrl} initials={user.profile.displayName.charAt(0)} size="sm" />
               <ChevronDown
                 className={`hidden h-4 w-4 text-zinc-500 transition-transform sm:block ${
                   menuOpen ? "rotate-180" : ""
@@ -119,12 +117,12 @@ export default function Navbar() {
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-line bg-card shadow-card animate-fade-up">
                   <div className="flex items-center gap-3 border-b border-line-soft p-4">
-                    <Avatar src={currentUser.avatar} initials={currentUser.initials} size="md" />
+                    <Avatar src={user.profile.avatarUrl} initials={user.profile.displayName.charAt(0)} size="md" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-zinc-100">
-                        {currentUser.name}
+                        {user.profile.displayName}
                       </p>
-                      <p className="truncate text-xs text-zinc-500">@{currentUser.handle}</p>
+                      <p className="truncate text-xs text-zinc-500">@{user.handle}</p>
                       <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[9px] font-bold ${
                         plan === "pro"
                           ? "border-lime-400/40 bg-lime-400/10 text-lime-300"
@@ -144,6 +142,9 @@ export default function Navbar() {
                       { href: "/pro", icon: Sparkles, label: "Your Plan" },
                       { href: "/resolution", icon: ShieldCheck, label: "Resolution Center" },
                       { href: "/settings", icon: Settings, label: "Settings" },
+                      ...(user.role === "admin"
+                        ? [{ href: "/admin", icon: ShieldCheck, label: "Admin Dashboard" }]
+                        : []),
                     ].map((item) => (
                       <Link
                         key={item.label}
@@ -171,6 +172,7 @@ export default function Navbar() {
               </>
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -191,8 +193,9 @@ export default function Navbar() {
                 Cancel
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setLogoutOpen(false);
+                  await logout();
                   router.push("/welcome");
                 }}
                 className="flex-1 rounded-full bg-red-500 py-2 text-xs font-bold text-white transition hover:bg-red-400"

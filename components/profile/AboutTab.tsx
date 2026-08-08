@@ -1,27 +1,41 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Mail, MapPin, Clock, Zap, Globe2, Check, Settings2, PencilLine, GraduationCap, Link2 } from "lucide-react";
-import { services as baseServices, contact } from "@/lib/data";
+import { contact } from "@/lib/data";
 import { useProfile } from "@/lib/profile";
+
+interface OwnService {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  reach: string;
+  paused: boolean;
+}
 
 /**
  * Everything user-controlled here comes from the live profile store — bio,
- * experience, education, links, and service overrides all reflect whatever
- * was last saved in Edit Profile. Visitor view respects privacy toggles.
+ * experience, education, links all reflect the database record. Services
+ * are the user's real marketplace listings.
  */
 export default function AboutTab({ isOwner }: { isOwner: boolean }) {
   const profile = useProfile();
+  const [services, setServices] = useState<OwnService[]>([]);
 
-  // apply Edit Profile service overrides: removed → gone, paused → owner-only
-  const services = baseServices
-    .filter((s) => !profile.serviceOverrides[s.id]?.removed)
-    .filter((s) => isOwner || !profile.serviceOverrides[s.id]?.paused)
-    .map((s) => ({
-      ...s,
-      startingAt: profile.serviceOverrides[s.id]?.startingAt ?? s.startingAt,
-      paused: !!profile.serviceOverrides[s.id]?.paused,
-    }));
+  useEffect(() => {
+    fetch("/api/services", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) =>
+        setServices(
+          (d.services ?? [])
+            .filter((s: { isMine: boolean }) => s.isMine)
+            .filter((s: { paused?: boolean }) => isOwner || !s.paused)
+            .map((s: OwnService & { paused?: boolean }) => ({ ...s, paused: !!s.paused }))
+        )
+      );
+  }, [isOwner]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-5">
@@ -100,7 +114,7 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
               <li className="flex items-center gap-2.5">
                 <MapPin className="h-4 w-4 text-lime-400" /> {profile.city}
                 {profile.state ? `, ${profile.state}` : ""} · Serves{" "}
-                {profile.serviceArea === "Custom" ? profile.serviceAreaCustom || "custom area" : profile.serviceArea}
+                {profile.serviceArea}
               </li>
             )}
             <li className="flex items-center gap-2.5">
@@ -141,8 +155,8 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400/10 text-lg">
-                    {s.emoji}
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400/10">
+                    <Zap className="h-4 w-4 text-lime-400" />
                   </span>
                   <div>
                     <h4 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
@@ -155,14 +169,14 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
                     </h4>
                     <p className="text-xs text-zinc-500">
                       Starting at{" "}
-                      <span className="font-bold text-lime-400">${s.startingAt}</span>
+                      <span className="font-bold text-lime-400">${s.price}</span>
                     </p>
                   </div>
                 </div>
                 <p className="mt-2.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
                   <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-1 text-zinc-400">
-                    <Check className="h-3 w-3 text-lime-400" /> {s.availability}
+                    <Check className="h-3 w-3 text-lime-400" /> {s.paused ? "Paused" : "Accepting clients"}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-1 text-zinc-400">
                     <Globe2 className="h-3 w-3 text-lime-400" /> {s.reach}
