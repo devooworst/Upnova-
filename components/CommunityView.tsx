@@ -16,6 +16,8 @@ import {
   Zap,
 } from "lucide-react";
 import Avatar from "./Avatar";
+import FollowButton from "./FollowButton";
+import ProfilePreview from "./ProfilePreview";
 import OpportunityCard from "./OpportunityCard";
 import EventCard from "./EventCard";
 import {
@@ -42,6 +44,7 @@ export default function CommunityView({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>("Home");
   const [joined, setJoined] = useState(!!community.joined);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
+  const [preview, setPreview] = useState<(typeof creators)[number] | null>(null);
 
   const members = (content?.memberIds ?? [])
     .map((mid) => creators.find((c) => c.id === mid))
@@ -134,13 +137,31 @@ export default function CommunityView({ id }: { id: string }) {
           {(content?.posts ?? []).map((post) => (
             <article key={post.id} className="card-people p-4 sm:p-5">
               <div className="flex items-start gap-3">
-                <Avatar src={post.authorAvatar} initials={post.initials} gradient={post.gradient} size="md" />
+                <button
+                  onClick={() => {
+                    const author = creators.find((cr) => cr.id === post.authorId);
+                    if (author) setPreview(author);
+                  }}
+                  className="shrink-0"
+                  aria-label={`Preview ${post.author}`}
+                >
+                  <Avatar src={post.authorAvatar} initials={post.initials} gradient={post.gradient} size="md" />
+                </button>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-zinc-100">{post.author}</p>
-                  <p className="text-xs text-zinc-500">
-                    {post.role} · {post.time}
-                  </p>
+                  <button
+                    onClick={() => {
+                      const author = creators.find((cr) => cr.id === post.authorId);
+                      if (author) setPreview(author);
+                    }}
+                    className="block text-left"
+                  >
+                    <p className="text-sm font-semibold text-zinc-100 transition hover:text-violet-300">{post.author}</p>
+                    <p className="text-xs text-zinc-500">
+                      {post.role} · {post.time}
+                    </p>
+                  </button>
                 </div>
+                {post.authorId && <FollowButton id={post.authorId} size="xs" />}
               </div>
               <p className="mt-3 text-[15px] leading-relaxed text-zinc-200">{post.text}</p>
               <div className="mt-3 flex items-center gap-5 text-xs text-zinc-500">
@@ -250,15 +271,16 @@ export default function CommunityView({ id }: { id: string }) {
                   )}
                 </p>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <Link href="/profile" className="btn-ghost px-3 py-1.5 text-xs">
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <FollowButton id={m.id} size="xs" />
+                <Link href={`/creator/${m.id}`} className="btn-ghost px-3 py-1.5 text-xs">
                   View Profile
                 </Link>
                 <Link href="/messages" className="btn-ghost hidden px-3 py-1.5 text-xs sm:flex">
                   <MessageSquare className="h-3.5 w-3.5" />
                 </Link>
                 {m.startingAt && (
-                  <Link href="/messages" className="btn-lime px-3.5 py-1.5 text-xs">
+                  <Link href="/services" className="btn-lime px-3.5 py-1.5 text-xs">
                     <Zap className="h-3.5 w-3.5" /> Hire
                   </Link>
                 )}
@@ -269,6 +291,8 @@ export default function CommunityView({ id }: { id: string }) {
       )}
 
       {/* ---------------- About ---------------- */}
+      {preview && <ProfilePreview creator={preview} onClose={() => setPreview(null)} />}
+
       {tab === "About" && (
         <div className="animate-fade-up space-y-4">
           <section className="card-people p-5">

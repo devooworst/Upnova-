@@ -3,6 +3,7 @@
 import { Star, MapPin, MessageSquare, Zap } from "lucide-react";
 import Link from "next/link";
 import Avatar from "./Avatar";
+import FollowButton from "./FollowButton";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Creator } from "@/lib/data";
 
@@ -54,8 +55,11 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line-soft pt-4">
-        <Link href="/profile" className="btn-ghost px-2 py-2 text-xs">
+      <div className="mt-4 border-t border-line-soft pt-3.5">
+        <FollowButton id={creator.id} size="xs" className="w-full !py-1.5" />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <Link href={`/creator/${creator.id}`} className="btn-ghost px-2 py-2 text-xs">
           View Profile
         </Link>
         <Link
@@ -65,10 +69,10 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
           <MessageSquare className="h-3.5 w-3.5" />
           Message
         </Link>
-        <button className="btn-lime px-2 py-2 text-xs">
+        <Link href="/services" className="btn-lime px-2 py-2 text-xs">
           <Zap className="h-3.5 w-3.5" />
           Hire
-        </button>
+        </Link>
       </div>
     </article>
   );

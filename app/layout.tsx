@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import CreateModal from "@/components/CreateModal";
+import { FollowProvider } from "@/lib/follow";
 
 export const metadata: Metadata = {
   title: {
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen font-sans">
+        <FollowProvider>
         <Navbar />
         <div className="mx-auto flex w-full max-w-[1440px] gap-6 px-3 pb-24 pt-[8rem] sm:px-4 md:pb-10 md:pt-20 lg:px-6">
           <Sidebar />
@@ -31,6 +33,7 @@ export default function RootLayout({
         </div>
         <MobileNav />
         <CreateModal />
+        </FollowProvider>
       </body>
     </html>
   );

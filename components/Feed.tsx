@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { Post, RadiusId } from "@/lib/data";
+import { useFollow } from "@/lib/follow";
 import PostCard from "./PostCard";
 import AudioPost from "./AudioPost";
 import PollCard from "./PollCard";
@@ -67,6 +68,7 @@ interface FeedProps {
 }
 
 export default function Feed({ radius, tab, onTabChange }: FeedProps) {
+  const { isFollowing } = useFollow();
   const [farOpen, setFarOpen] = useState(false);
   const [forYou, setForYou] = useState<Post[] | null>(null);
   const [nearYou, setNearYou] = useState<Post[] | null>(null);
@@ -105,7 +107,7 @@ export default function Feed({ radius, tab, onTabChange }: FeedProps) {
     tab === "For You"
       ? true
       : tab === "Following"
-      ? p.following
+      ? isFollowing(p.creator.id)
       : tab === "Opportunities"
       ? p.type === "opportunity"
       : p.trending

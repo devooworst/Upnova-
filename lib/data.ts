@@ -42,12 +42,15 @@ export interface Creator {
   /** live activity line for the "Live near you" strip */
   activity?: string;
   online?: boolean;
+  /** follower count baseline (includes your follow if you already follow them) */
+  followers: number;
 }
 
 /* ------------------------------ current user ------------------------------ */
 
 export const currentUser: Creator = {
   id: "devin",
+    followers: 1200,
   name: "Devin Carter",
   handle: "devin",
   role: "Music Producer • Content Creator • Entrepreneur",
@@ -99,6 +102,7 @@ export const stories: Story[] = [
 export const creators: Creator[] = [
   {
     id: "jordan",
+    followers: 12400,
     name: "Jordan Miles",
     handle: "jordanmiles",
     role: "Music Producer",
@@ -119,6 +123,7 @@ export const creators: Creator[] = [
   },
   {
     id: "ava",
+    followers: 3260,
     name: "Ava Chen",
     handle: "avashoots",
     role: "Photographer",
@@ -140,6 +145,7 @@ export const creators: Creator[] = [
   },
   {
     id: "marcus",
+    followers: 1840,
     name: "Marcus Reed",
     handle: "marcusfilms",
     role: "Videographer",
@@ -160,6 +166,7 @@ export const creators: Creator[] = [
   },
   {
     id: "nia",
+    followers: 2610,
     name: "Nia Carter",
     handle: "niastyled",
     role: "Fashion & Beauty Creator",
@@ -181,6 +188,7 @@ export const creators: Creator[] = [
   },
   {
     id: "tre",
+    followers: 940,
     name: "Trell Watson",
     handle: "trellbeats",
     role: "Beat Maker",
@@ -201,6 +209,7 @@ export const creators: Creator[] = [
   },
   {
     id: "lena",
+    followers: 4120,
     name: "Lena Ortiz",
     handle: "lenadesigns",
     role: "Graphic Designer",
@@ -774,6 +783,8 @@ export const serviceCatalog: CatalogService[] = [
 export interface CommunityPost {
   id: string;
   author: string;
+  /** creator id when the author is a known creator — powers profile previews */
+  authorId?: string;
   authorAvatar?: string | null;
   initials: string;
   gradient: string;
@@ -813,6 +824,7 @@ export const communityContent: Record<string, CommunityContent> = {
     posts: [
       {
         id: "dmv-p1",
+        authorId: "jordan",
         author: "Jordan Miles",
         authorAvatar: "/images/jordan.jpg",
         initials: "J",
@@ -825,6 +837,7 @@ export const communityContent: Record<string, CommunityContent> = {
       },
       {
         id: "dmv-p2",
+        authorId: "ava",
         author: "Ava Chen",
         authorAvatar: "/images/ava.jpg",
         initials: "A",
@@ -837,6 +850,7 @@ export const communityContent: Record<string, CommunityContent> = {
       },
       {
         id: "dmv-p3",
+        authorId: "nia",
         author: "Nia Carter",
         initials: "N",
         gradient: "from-rose-500 to-pink-600",
@@ -863,6 +877,7 @@ export const communityContent: Record<string, CommunityContent> = {
     posts: [
       {
         id: "mp-p1",
+        authorId: "tre",
         author: "Tre Watkins",
         initials: "T",
         gradient: "from-emerald-500 to-teal-600",
@@ -874,6 +889,7 @@ export const communityContent: Record<string, CommunityContent> = {
       },
       {
         id: "mp-p2",
+        authorId: "jordan",
         author: "Jordan Miles",
         authorAvatar: "/images/jordan.jpg",
         initials: "J",
@@ -900,6 +916,7 @@ export const communityContent: Record<string, CommunityContent> = {
     posts: [
       {
         id: "fm-p1",
+        authorId: "marcus",
         author: "Marcus Reed",
         authorAvatar: "/images/marcus.jpg",
         initials: "M",
@@ -912,6 +929,7 @@ export const communityContent: Record<string, CommunityContent> = {
       },
       {
         id: "fm-p2",
+        authorId: "ava",
         author: "Ava Chen",
         authorAvatar: "/images/ava.jpg",
         initials: "A",
@@ -938,6 +956,7 @@ export const communityContent: Record<string, CommunityContent> = {
     posts: [
       {
         id: "ph-p1",
+        authorId: "ava",
         author: "Ava Chen",
         authorAvatar: "/images/ava.jpg",
         initials: "A",
@@ -963,6 +982,7 @@ export const communityContent: Record<string, CommunityContent> = {
     posts: [
       {
         id: "sw-p1",
+        authorId: "nia",
         author: "Nia Carter",
         initials: "N",
         gradient: "from-rose-500 to-pink-600",
@@ -974,6 +994,7 @@ export const communityContent: Record<string, CommunityContent> = {
       },
       {
         id: "sw-p2",
+        authorId: "lena",
         author: "Lena Ortiz",
         initials: "L",
         gradient: "from-cyan-500 to-blue-600",

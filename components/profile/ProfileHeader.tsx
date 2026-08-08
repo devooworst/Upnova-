@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useState } from "react";
 import { PencilLine, MapPin, MessageSquare, Megaphone, Zap } from "lucide-react";
 import PromoteModal from "../PromoteModal";
+import FollowListModal from "../FollowListModal";
+import { useFollow, formatCount } from "@/lib/follow";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { currentUser, profileStats, contact } from "@/lib/data";
@@ -11,6 +13,8 @@ import { currentUser, profileStats, contact } from "@/lib/data";
 export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const [following, setFollowing] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [listOpen, setListOpen] = useState<"followers" | "following" | null>(null);
+  const { followingCount } = useFollow();
   return (
     <header className="card overflow-hidden">
       {/* banner */}
@@ -94,12 +98,27 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
 
         {/* stats */}
         <dl className="mt-5 grid grid-cols-4 gap-2 border-t border-line-soft pt-4">
-          {profileStats.map((s) => (
-            <div key={s.label} className="text-center sm:text-left">
-              <dd className="text-xl font-bold text-zinc-50">{s.value}</dd>
-              <dt className="text-xs text-zinc-500">{s.label}</dt>
-            </div>
-          ))}
+          {profileStats.map((s) => {
+            const interactive = s.label === "Followers" || s.label === "Following";
+            const value =
+              s.label === "Following" ? `${345 + followingCount}` : s.value;
+            return (
+              <button
+                key={s.label}
+                disabled={!interactive}
+                onClick={() =>
+                  interactive &&
+                  setListOpen(s.label === "Followers" ? "followers" : "following")
+                }
+                className={`text-center sm:text-left ${
+                  interactive ? "transition hover:opacity-80" : "cursor-default"
+                }`}
+              >
+                <dd className="text-xl font-bold text-zinc-50">{value}</dd>
+                <dt className="text-xs text-zinc-500">{s.label}</dt>
+              </button>
+            );
+          })}
         </dl>
 
         {/* skills */}
@@ -112,6 +131,7 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
         </div>
       </div>
       {promoteOpen && <PromoteModal onClose={() => setPromoteOpen(false)} />}
+      {listOpen && <FollowListModal mode={listOpen} onClose={() => setListOpen(null)} />}
     </header>
   );
 }

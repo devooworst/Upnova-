@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Briefcase, ChevronDown, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
-import { opportunities, creators, events, type RadiusId } from "@/lib/data";
+import FollowButton from "./FollowButton";
+import ProfilePreview from "./ProfilePreview";
+import { opportunities, creators, events, type Creator, type RadiusId } from "@/lib/data";
 
 const MONTHS: Record<string, string> = {
   January: "JAN", February: "FEB", March: "MAR", April: "APR",
@@ -18,7 +20,7 @@ function monthDay(date: string): [string, string] {
 }
 
 export default function RightSidebar({ radius }: { radius: RadiusId }) {
-  const [followed, setFollowed] = useState<Record<string, boolean>>({});
+  const [preview, setPreview] = useState<Creator | null>(null);
   const [open, setOpen] = useState({ money: true, people: true, week: true });
   const toggle = (k: keyof typeof open) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
@@ -141,28 +143,19 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
         <ul className="mt-3 space-y-1">
           {nearPeople.map((c) => (
             <li key={c.id} className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-1.5 transition hover:bg-card-raised">
-              <span className="relative shrink-0">
+              <button onClick={() => setPreview(c)} className="relative shrink-0" aria-label={`Preview ${c.name}`}>
                 <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" className="ring-1 ring-line" />
                 {c.online && (
                   <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-violet-400" />
                 )}
-              </span>
-              <div className="min-w-0 flex-1">
+              </button>
+              <button onClick={() => setPreview(c)} className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-semibold text-zinc-100">{c.name}</p>
                 <p className="truncate text-xs text-zinc-500">
                   {c.role} · {c.distanceMi} mi
                 </p>
-              </div>
-              <button
-                onClick={() => setFollowed((f) => ({ ...f, [c.id]: !f[c.id] }))}
-                className={
-                  followed[c.id]
-                    ? "rounded-full border border-violet-400/40 px-3.5 py-1.5 text-xs font-semibold text-violet-300"
-                    : "rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
-                }
-              >
-                {followed[c.id] ? "Following" : "Follow"}
               </button>
+              <FollowButton id={c.id} />
             </li>
           ))}
         </ul>
@@ -216,6 +209,8 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
         </ul>
         )}
       </section>
+
+      {preview && <ProfilePreview creator={preview} onClose={() => setPreview(null)} />}
 
       <p className="px-2 font-mono text-[10px] leading-relaxed text-zinc-600">
         about · help · privacy · terms

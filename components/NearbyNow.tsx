@@ -2,6 +2,8 @@
 
 import { Plus } from "lucide-react";
 import Avatar from "./Avatar";
+import ProfilePreview from "./ProfilePreview";
+import { useState } from "react";
 import { creators, currentUser, type Creator } from "@/lib/data";
 
 interface Tile {
@@ -33,6 +35,7 @@ const roleDot: Record<Tile["role"], string> = {
 };
 
 export default function NearbyNow() {
+  const [preview, setPreview] = useState<Creator | null>(null);
   const near = creators.filter((c) => c.distanceMi !== undefined && c.distanceMi <= 40);
 
   const tiles: Tile[] = [
@@ -83,6 +86,12 @@ export default function NearbyNow() {
         {tiles.map((t) => (
           <button
             key={t.id}
+            onClick={() => {
+              if (t.role === "person") {
+                const c = creators.find((cr) => cr.id === t.id);
+                if (c) setPreview(c);
+              }
+            }}
             className={`group card-lift w-56 shrink-0 border p-3 text-left ${roleShape[t.role]}`}
           >
             <span className="flex items-center gap-2.5">
@@ -122,6 +131,7 @@ export default function NearbyNow() {
           </button>
         ))}
       </div>
+      {preview && <ProfilePreview creator={preview} onClose={() => setPreview(null)} />}
       {/* edge fade — partial tiles read as "scroll for more", not clipped */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-ink to-transparent" />
     </section>

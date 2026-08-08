@@ -4,6 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { Heart, X, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
+import FollowButton from "./FollowButton";
+import ProfilePreview from "./ProfilePreview";
+import { currentUser } from "@/lib/data";
 import BottomStats from "./BottomStats";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Post } from "@/lib/data";
@@ -12,6 +15,7 @@ export default function PostCard({ post }: { post: Post }) {
   const [fullscreen, setFullscreen] = useState(false);
   const [burst, setBurst] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const c = post.creator;
 
@@ -25,10 +29,14 @@ export default function PostCard({ post }: { post: Post }) {
     <article className="card-people p-4 sm:p-5">
       {/* header */}
       <div className="flex items-start gap-3">
-        <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" />
+        <button onClick={() => setPreviewOpen(true)} aria-label={`Preview ${c.name}`} className="shrink-0">
+          <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" />
+        </button>
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-zinc-100">
-            {c.name}
+            <button onClick={() => setPreviewOpen(true)} className="transition hover:text-violet-300">
+              {c.name}
+            </button>
             {c.verified && <VerifiedBadge />}
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500">
@@ -47,7 +55,9 @@ export default function PostCard({ post }: { post: Post }) {
             )}
           </p>
         </div>
+        {c.id !== currentUser.id && <FollowButton id={c.id} size="xs" />}
       </div>
+      {previewOpen && <ProfilePreview creator={c} onClose={() => setPreviewOpen(false)} />}
 
       {/* body */}
       <p className="mt-3 text-[15px] leading-relaxed text-zinc-200">{post.text}</p>
