@@ -30,8 +30,12 @@ export function money(n: number): string {
   return n % 1 === 0 ? `$${n.toLocaleString()}` : `$${n.toFixed(2)}`;
 }
 
-/* ---- Pro subscription ---- */
-export const PRO_PRICE = 7.99; // per month — core earning ability is never paywalled
+/* ---- Subscriptions (test prices — not final) ----
+   Free = get discovered. College = build while you study ($4.99, verified
+   students, ends at graduation -> natural Pro pipeline). Pro = grow your
+   professional career. Core earning ability is never paywalled. */
+export const PRO_PRICE = 12.99;
+export const COLLEGE_PRICE = 4.99;
 
 /* ---- Promotion products (clearly labeled, never override relevance) ---- */
 export const promoProducts = [

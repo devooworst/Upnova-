@@ -82,6 +82,16 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   designed around Stripe Connect (connected accounts, destination charges with
   application fees, payouts, refunds, disputes). Transactions, projects, payments,
   fees, payouts, and reviews are modeled as separate entities from messaging.
+- **UpNova College — the campus-to-career pipeline.** Three plans with three jobs:
+  Free ($0, get discovered — earning is never paywalled), College ($4.99/mo test
+  price, verified students only: 🎓 badge, Student Boost, Student Opportunities,
+  campus discovery, student earnings dashboard, Spotlight eligibility), Pro
+  ($12.99/mo test price, professional growth). Boost is relevance-first — students
+  get extra exposure only when they're a qualified match, never pay-to-win.
+  Verification runs through an education-verification provider (school email alone
+  isn't the source of truth; the email is never public). College ends at the
+  verified graduation date; everything the student built stays theirs, with a
+  natural transition to Pro.
 - **Creative Integrity — AI-transparent, creator-controlled.** UpNova does not
   prohibit AI universally; it prohibits misrepresentation. Every service carries an
   AI policy (🔴 No AI / 🟡 with disclosure / 🟠 assisted / 🟢 client decides), clients

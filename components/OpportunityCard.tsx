@@ -34,6 +34,11 @@ export default function OpportunityCard({ id }: { id: string }) {
               {opp.featured && <Flame className="h-3.5 w-3.5" />}
               {opp.featured ? "Featured · " : ""}
               {opp.category}
+              {opp.studentFriendly && (
+                <span className="rounded-full border border-violet-400/40 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.08em] text-violet-300">
+                  🎓 STUDENT-FRIENDLY
+                </span>
+              )}
             </p>
             <h3 className="mt-2 text-xl font-bold tracking-tight text-zinc-50">{opp.title}</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">

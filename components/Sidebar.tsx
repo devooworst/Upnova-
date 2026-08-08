@@ -19,7 +19,7 @@ import {
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
 import { currentUser, communities } from "@/lib/data";
-import { isPro, PRO_EVENT } from "@/lib/pro";
+import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
 
 /* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
 const navGroups: {
@@ -59,14 +59,15 @@ const navGroups: {
 export default function Sidebar() {
   const pathname = usePathname();
   const myCommunities = communities.filter((c) => c.joined);
-  const [pro, setProState] = useState(false);
+  const [plan, setPlanState] = useState<Plan>("free");
 
   useEffect(() => {
-    const sync = () => setProState(isPro());
+    const sync = () => setPlanState(getPlan());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
   }, []);
+  const pro = plan === "pro";
 
   return (
     <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-60 shrink-0 flex-col gap-6 self-start overflow-y-auto pb-6 lg:flex">
@@ -149,26 +150,43 @@ export default function Sidebar() {
         </ul>
       </div>
 
-      {/* UpNova Pro — account upgrade, not a community */}
-      <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-gradient-to-b from-lime-400/10 to-card p-4">
-        <Sparkles className="absolute -right-3 -top-3 h-16 w-16 text-lime-400/10" />
-        <p className="text-sm font-bold text-lime-300">UpNova Pro {pro && "✓"}</p>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-          {pro
-            ? "Your Pro membership is active."
-            : "Advanced analytics, priority applications, and a bigger reach for your work."}
-        </p>
-        <Link
-          href="/pro"
-          className={
-            pro
-              ? "btn-ghost mt-3 flex w-full border-lime-400/40 py-1.5 text-xs text-lime-300"
-              : "btn-lime mt-3 flex w-full py-1.5 text-xs"
-          }
-        >
-          {pro ? "Manage Plan" : "Upgrade"}
-        </Link>
-      </div>
+      {/* plan card — account upgrade, not a community */}
+      {plan === "college" ? (
+        <div className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-400/10 to-card p-4">
+          <p className="text-sm font-bold text-violet-300">🎓 UpNova College ✓</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            Verified Student · Student Boost active.
+          </p>
+          <Link href="/pro" className="btn-ghost mt-3 flex w-full border-violet-400/40 py-1.5 text-xs text-violet-300">
+            Manage Plan
+          </Link>
+        </div>
+      ) : (
+        <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-gradient-to-b from-lime-400/10 to-card p-4">
+          <Sparkles className="absolute -right-3 -top-3 h-16 w-16 text-lime-400/10" />
+          <p className="text-sm font-bold text-lime-300">UpNova Pro {pro && "✓"}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            {pro
+              ? "Your Pro membership is active."
+              : "Advanced analytics, priority applications, and a bigger reach for your work."}
+          </p>
+          <Link
+            href="/pro"
+            className={
+              pro
+                ? "btn-ghost mt-3 flex w-full border-lime-400/40 py-1.5 text-xs text-lime-300"
+                : "btn-lime mt-3 flex w-full py-1.5 text-xs"
+            }
+          >
+            {pro ? "Manage Plan" : "Upgrade"}
+          </Link>
+          {!pro && (
+            <Link href="/pro" className="mt-2 block text-center text-[10px] font-semibold text-violet-400 hover:text-violet-300">
+              🎓 Student? College is $4.99/mo →
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Profile */}
       <Link

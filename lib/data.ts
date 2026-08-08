@@ -257,6 +257,8 @@ export interface Opportunity {
   tags: string[];
   reach: ReachInfo;
   distanceMi?: number;
+  /** fits around student life: weekend/evening/flexible/no-experience */
+  studentFriendly?: boolean;
 }
 
 export const opportunities: Opportunity[] = [
@@ -282,6 +284,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "photo-gig",
+    studentFriendly: true,
     title: "Product Shoot Photography",
     poster: "Harbor & Oak",
     posterInitials: "H",
@@ -300,7 +303,28 @@ export const opportunities: Opportunity[] = [
     distanceMi: 2.1,
   },
   {
+    id: "social-video",
+    title: "Social Media Videographer",
+    poster: "Charm City Threads",
+    posterInitials: "C",
+    posterGradient: "from-rose-600 to-pink-800",
+    verifiedPoster: false,
+    category: "Gig",
+    description:
+      "Local clothing brand needs 3 short-form videos for our fall drop. One weekend shoot, we provide the fits and the location.",
+    budget: "$250",
+    deadline: "Aug 23",
+    roles: "Videographer",
+    applicants: 11,
+    paid: true,
+    tags: ["Paid", "Weekend"],
+    reach: { location: "Baltimore, MD", reach: "Local", radius: "25 mi" },
+    distanceMi: 4.2,
+    studentFriendly: true,
+  },
+  {
     id: "crew-call",
+    studentFriendly: true,
     title: "Short Film Crew Call",
     poster: "Marcus Reed",
     posterAvatar: "/images/marcus.jpg",
@@ -378,6 +402,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "event-staff",
+    studentFriendly: true,
     title: "Creator Meetup — Photo & Video Team",
     poster: "UpNova Events",
     posterInitials: "U",

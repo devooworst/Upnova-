@@ -6,6 +6,8 @@ import { PencilLine, MapPin, MessageSquare, Megaphone, Zap } from "lucide-react"
 import PromoteModal from "../PromoteModal";
 import FollowListModal from "../FollowListModal";
 import { useFollow, formatCount } from "@/lib/follow";
+import { getPlan, PRO_EVENT } from "@/lib/pro";
+import { useEffect } from "react";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { currentUser, profileStats, contact } from "@/lib/data";
@@ -15,6 +17,13 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [listOpen, setListOpen] = useState<"followers" | "following" | null>(null);
   const { followingCount } = useFollow();
+  const [isStudent, setIsStudent] = useState(false);
+  useEffect(() => {
+    const sync = () => setIsStudent(getPlan() === "college");
+    sync();
+    window.addEventListener(PRO_EVENT, sync);
+    return () => window.removeEventListener(PRO_EVENT, sync);
+  }, []);
   return (
     <header className="card overflow-hidden">
       {/* banner */}
@@ -87,6 +96,11 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
               <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse-dot" />
               Open to Work
             </span>
+            {isStudent && (
+              <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300">
+                🎓 Verified Student
+              </span>
+            )}
           </h1>
           <p className="mt-1 text-sm font-medium text-zinc-400">{currentUser.role}</p>
           <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-zinc-300">{currentUser.bio}</p>

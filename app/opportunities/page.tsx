@@ -47,6 +47,25 @@ export default function OpportunitiesPage() {
         </p>
       </header>
 
+      {/* student opportunities — work that fits around student life */}
+      <section className="rounded-xl border border-violet-400/30 bg-violet-400/[0.04] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold tracking-tight text-violet-300">🎓 Student Opportunities</h2>
+          <span className="font-mono text-[10px] font-medium text-zinc-500">
+            {opportunities.filter((o) => o.studentFriendly).length} open
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-zinc-500">Work that fits around student life.</p>
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {["$100+", "Remote", "Weekend", "Evening", "Flexible", "Campus", "No experience required"].map((f) => (
+            <span key={f} className="chip px-2 py-0.5 text-[11px]">{f}</span>
+          ))}
+        </div>
+        <p className="mt-2.5 border-t border-violet-400/10 pt-2 text-[10px] leading-relaxed text-zinc-600">
+          College members get Student Boost on relevant matches — relevance first, never pay-to-win.
+        </p>
+      </section>
+
       <a
         href="/services"
         className="flex items-center gap-3 rounded-xl border border-line px-4 py-2.5 text-xs text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
