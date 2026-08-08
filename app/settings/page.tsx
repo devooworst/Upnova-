@@ -451,7 +451,7 @@ export default function SettingsPage() {
                   {(
                     [
                       ["free", "UpNova Free", "$0", "Everyone. The full core platform."],
-                      ["college", "🎓 UpNova College", "$4.99/mo", "Verified students — campus perks & Student Boost."],
+                      ["college", "🎓 UpNova College+", "$4.99/mo", "Optional student exposure boost. Verification & campus access are free."],
                       ["pro", "⭐ UpNova Pro", "$12.99/mo", "Serious creators — analytics, discovery, pro tools."],
                     ] as [Plan, string, string, string][]
                   ).map(([id, name, price, desc]) => (

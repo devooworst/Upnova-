@@ -122,7 +122,7 @@ export default function Home() {
                       ))}
                     {!isStudent && (
                       <li className="px-3 py-2 text-[10px] text-zinc-600">
-                        🎓 My School unlocks with student verification
+                        🎓 My School unlocks with free student verification
                       </li>
                     )}
                   </ul>

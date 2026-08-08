@@ -172,7 +172,7 @@ export default function Sidebar() {
       {/* plan card — account upgrade, not a community */}
       {plan === "college" ? (
         <div className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-400/10 to-card p-4">
-          <p className="text-sm font-bold text-violet-300">🎓 UpNova College ✓</p>
+          <p className="text-sm font-bold text-violet-300">🎓 UpNova College+ ✓</p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
             Verified Student · Student Boost active.
           </p>
@@ -201,7 +201,7 @@ export default function Sidebar() {
           </Link>
           {!pro && (
             <Link href="/pro" className="mt-2 block text-center text-[10px] font-semibold text-violet-400 hover:text-violet-300">
-              🎓 Student? College is $4.99/mo →
+              🎓 Student? Verification is free →
             </Link>
           )}
         </div>

@@ -101,9 +101,14 @@ export default function ProPage() {
                 students
               </span>
               <h2 className="flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-violet-300">
-                <GraduationCap className="h-4 w-4" /> College
+                <GraduationCap className="h-4 w-4" /> College+
               </h2>
               <p className="text-xs text-zinc-500">Build while you study.</p>
+              <p className="mt-1.5 rounded-md border border-violet-400/25 bg-violet-400/5 px-2.5 py-1.5 text-[10px] leading-relaxed text-zinc-400">
+                🎓 <span className="font-semibold text-violet-300">Verification is free.</span>{" "}
+                School community, campus chat, networking, applying — all $0. College+ is the
+                optional exposure upgrade.
+              </p>
               <p className="mt-1 text-xl font-extrabold tracking-tight text-zinc-50">
                 ${COLLEGE_PRICE}
                 <span className="text-sm font-medium text-zinc-500">/mo</span>
@@ -123,10 +128,11 @@ export default function ProPage() {
                 onClick={() => setView("verify")}
                 className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
               >
-                Verify Student Status
+                Verify Student Status — Free
               </button>
               <p className="mt-2 text-center text-[10px] text-zinc-600">
-                Ends at your verified graduation — everything you built stays yours.
+                College+ ends at graduation; your alumni community and everything you built stay
+                free, forever.
               </p>
             </section>
 
@@ -166,6 +172,9 @@ export default function ProPage() {
           <div className="flex items-center justify-between">
             <h1 className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-zinc-50">
               <GraduationCap className="h-4 w-4 text-violet-400" /> Verify Student Status
+              <span className="rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[10px] font-bold text-lime-300">
+                Free
+              </span>
             </h1>
             <button onClick={() => setView("plans")} className="icon-btn h-8 w-8" aria-label="Back">
               <X className="h-4 w-4" />
@@ -198,19 +207,19 @@ export default function ProPage() {
             email alone isn&apos;t the permanent source of truth, and your student email is never
             shown publicly. You get a simple status: 🎓 Verified Student.
           </p>
-          <div className="mt-4 space-y-1.5 text-sm">
-            <p className="flex justify-between text-zinc-400"><span>UpNova College</span><span className="font-bold tabular-nums text-zinc-100">{money(COLLEGE_PRICE)}/mo</span></p>
-          </div>
           <button
             onClick={() => {
-              setStudentVerified(true); // identity — survives plan changes
-              setPlan("college"); // subscription — perks only
+              setStudentVerified(true); // free identity — the network is never paywalled
               setView("college");
             }}
             className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
           >
-            Verify &amp; Subscribe · {money(COLLEGE_PRICE)}/mo
+            Verify — Free
           </button>
+          <p className="mt-2.5 text-center text-[10px] leading-relaxed text-zinc-600">
+            Verification unlocks your school community, campus chat, networking, and applying —
+            all $0. You can add College+ ({money(COLLEGE_PRICE)}/mo) for extra exposure anytime.
+          </p>
         </div>
       )}
 
@@ -219,13 +228,15 @@ export default function ProPage() {
         <>
           <header className="pt-2">
             <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-400">
-              <GraduationCap className="h-3.5 w-3.5" /> upnova college · verified student
+              <GraduationCap className="h-3.5 w-3.5" />
+              verified student · {getPlan() === "college" ? "college+ active" : "free"}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-50">
               Your campus-to-career network
             </h1>
             <p className="mt-1 text-sm text-zinc-500">
-              Membership runs until {gradDate}. Everything you build stays yours.
+              School community, campus chat, networking, and applying are free until {gradDate} —
+              and your alumni community after that.
             </p>
           </header>
 
@@ -282,7 +293,8 @@ export default function ProPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-zinc-100">
-                  <Rocket className="h-4 w-4 text-violet-400" /> Student Boost — active
+                  <Rocket className="h-4 w-4 text-violet-400" />
+                  {getPlan() === "college" ? "Student Boost — active" : "Student Boost — College+"}
                 </h2>
                 <p className="mt-1 max-w-md text-xs leading-relaxed text-zinc-500">
                   Relevance first, always: location, skills, availability, reputation, activity —
@@ -295,6 +307,14 @@ export default function ProPage() {
                 <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">boosted matches this month</p>
               </div>
             </div>
+            {getPlan() !== "college" && (
+              <button
+                onClick={() => setPlan("college")}
+                className="mt-3 w-full rounded-md bg-violet-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+              >
+                Add College+ · {money(COLLEGE_PRICE)}/mo — extra exposure, featured portfolio, analytics
+              </button>
+            )}
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3.5 text-xs">
               <span className="chip px-2 py-0.5 text-[11px]">⭐ Student Spotlight — eligible</span>
               <span className="chip px-2 py-0.5 text-[11px]">🏆 Campus Challenge: 30s commercial · $500 prize</span>
@@ -308,9 +328,11 @@ export default function ProPage() {
           <section className="rounded-xl border border-line p-4">
             <p className="text-sm font-semibold text-zinc-200">🎓 When you graduate ({gradDate})</p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-              Your College membership ends on your verified graduation date. Your account,
-              portfolio, projects, followers, reviews, and earnings history remain yours — and you
-              can continue with Pro.
+              Your status changes from <span className="font-semibold text-zinc-300">Bowie State Student</span> to{" "}
+              <span className="font-semibold text-zinc-300">Bowie State Alumni</span> — the alumni
+              community is free, and your account, portfolio, projects, followers, reviews, and
+              earnings history remain yours. Want to keep College+ benefits? Continue with Pro.
+              No pressure.
             </p>
             <div className="mt-3 flex gap-2">
               <button onClick={() => { setPlan("pro"); setView("manage"); }} className="btn-lime rounded-md px-4 py-1.5 text-xs">

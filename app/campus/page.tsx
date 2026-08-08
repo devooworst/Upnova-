@@ -161,10 +161,11 @@ export default function CampusPage() {
           href="/pro"
           className="mt-5 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
         >
-          <GraduationCap className="h-4 w-4" /> Verify Student Status · $4.99/mo
+          <GraduationCap className="h-4 w-4" /> Verify Student Status — Free
         </Link>
         <p className="mt-3 text-[10px] text-zinc-600">
-          Alumni keep their campus community after graduation — you never lose what you built.
+          The network is never paywalled: verification, campus chat, and applying cost $0.
+          College+ is an optional exposure upgrade. Alumni keep their community after graduation.
         </p>
       </div>
     );

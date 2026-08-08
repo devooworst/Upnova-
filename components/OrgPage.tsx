@@ -49,7 +49,7 @@ export default function OrgPage({ id }: { id: string }) {
           href="/pro"
           className="mt-5 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
         >
-          <GraduationCap className="h-4 w-4" /> Verify Student Status
+          <GraduationCap className="h-4 w-4" /> Verify Student Status — Free
         </Link>
       </div>
     );

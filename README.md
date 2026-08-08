@@ -95,6 +95,14 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   subscription indicator — never the same thing. Switching College → Pro drops
   College perks but keeps verified school identity and campus access. College never
   takes over the interface: a College subscriber browses global UpNova normally.
+- **College verification is free; College+ is the optional upgrade.** The paywall
+  never sits between people and the network — verification, school community,
+  campus chat, networking, following, DMs, applying, and basic portfolio are all $0
+  for verified students (and alumni communities stay free after graduation).
+  College+ ($4.99/mo test price) sells enhanced exposure: Student Boost, featured
+  portfolio, analytics, priority placement — "pay to get seen," never "pay for
+  permission to talk to your school." Account matrix: Free / Verified Student ($0,
+  campus access) / College+ (exposure) / Pro (professional) / Alumni ($0).
 - **UpNova College — the campus-to-career pipeline.** Three plans with three jobs:
   Free ($0, get discovered — earning is never paywalled), College ($4.99/mo test
   price, verified students only: 🎓 badge, Student Boost, Student Opportunities,
