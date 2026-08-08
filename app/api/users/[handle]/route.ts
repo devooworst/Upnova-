@@ -37,6 +37,28 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
       .filter((s) => isOwner || !s.paused);
 
     const experience = db.select().from(tables.experiences).where(eq(tables.experiences.userId, user.id)).all();
+
+    // real professional history — computed, never self-reported
+    const reviewsReceived = db
+      .select()
+      .from(tables.reviews)
+      .where(eq(tables.reviews.subjectId, user.id))
+      .all();
+    const rating = reviewsReceived.length
+      ? Math.round((reviewsReceived.reduce((s, r) => s + r.rating, 0) / reviewsReceived.length) * 10) / 10
+      : null;
+    const completedProjects = db
+      .select()
+      .from(tables.projects)
+      .where(eq(tables.projects.creatorId, user.id))
+      .all()
+      .filter((p) => ["completed", "reviewed"].includes(p.state)).length;
+    const approvedExtensions = db
+      .select()
+      .from(tables.extensionRequests)
+      .where(eq(tables.extensionRequests.requestedById, user.id))
+      .all()
+      .filter((e) => e.status === "approved").length;
     const portfolio =
       isOwner || profile.showPortfolio
         ? db.select().from(tables.portfolioItems).where(eq(tables.portfolioItems.userId, user.id)).all()
@@ -48,7 +70,13 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
       stats: {
         followers: isOwner || profile.showFollowers ? followers : null,
         following: isOwner || profile.showFollowing ? following : null,
+        rating,
+        reviewsCount: reviewsReceived.length,
+        completedProjects: isOwner || profile.showCompletedProjects ? completedProjects : null,
+        // approved extensions never count against anyone — shown only as history
+        approvedExtensions,
       },
+      reviews: reviewsReceived.slice(0, 6).map((r) => ({ rating: r.rating, body: r.body, createdAt: r.createdAt.toISOString() })),
       followedByMe,
       services: services.map((s) => ({
         id: s.id,

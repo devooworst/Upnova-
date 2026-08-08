@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, MessageCircle, MapPin, Send } from "lucide-react";
+import { Heart, MessageCircle, MapPin, Send, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
@@ -46,7 +46,8 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
-export default function DbPostCard({ post }: { post: FeedPost }) {
+export default function DbPostCard({ post, savedInitial = false }: { post: FeedPost; savedInitial?: boolean }) {
+  const [saved, setSaved] = useState(savedInitial);
   const [liked, setLiked] = useState(post.likedByMe);
   const [likes, setLikes] = useState(post.likes);
   const [commentCount, setCommentCount] = useState(post.comments);
@@ -63,6 +64,15 @@ export default function DbPostCard({ post }: { post: FeedPost }) {
       setLiked(liked);
       setLikes(post.likes);
     }
+  };
+
+  const toggleSave = async () => {
+    const res = await fetch("/api/bookmarks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetType: "post", targetId: post.id }),
+    });
+    if (res.ok) setSaved((await res.json()).saved);
   };
 
   const openComments = async () => {
@@ -144,6 +154,14 @@ export default function DbPostCard({ post }: { post: FeedPost }) {
         <button onClick={openComments} className="flex items-center gap-1.5 transition hover:text-zinc-300">
           <MessageCircle className="h-4 w-4" />
           {commentCount}
+        </button>
+        <button
+          onClick={toggleSave}
+          title={saved ? "Remove bookmark" : "Save"}
+          className={`ml-auto flex items-center gap-1.5 transition ${saved ? "text-violet-300" : "hover:text-zinc-300"}`}
+        >
+          <Bookmark className={`h-4 w-4 ${saved ? "fill-violet-300" : ""}`} />
+          {saved ? "Saved" : "Save"}
         </button>
       </div>
 

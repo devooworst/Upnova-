@@ -95,7 +95,7 @@ function seed() {
     role: string;
     extraRoles?: string[];
     bio: string;
-    avatar: string;
+    avatar: string | null;
     city: string;
     state: string;
     county: string;
@@ -159,6 +159,74 @@ function seed() {
       skills: ["Brand Identity", "Logo Design", "Cover Art", "Typography"],
       interests: ["Art & Design", "Fashion", "Brands"], verified: true,
     },
+    {
+      handle: "maya", name: "Maya Reyes", role: "Vocalist",
+      extraRoles: ["Songwriter"],
+      bio: "Session vocals, hooks, and toplines. R&B and pop. Two-day turnarounds.",
+      avatar: null, city: "Baltimore", state: "MD", county: "Baltimore City",
+      lat: 39.2812, lng: -76.594,
+      skills: ["Vocals", "Topline", "Harmonies", "Songwriting"],
+      interests: ["Music", "Fashion"], verified: true,
+    },
+    {
+      handle: "kofi", name: "Kofi Boateng", role: "Beat Maker",
+      bio: "Drill, trap, and afrobeats. Exclusive licenses only — you own what you buy.",
+      avatar: null, city: "Washington", state: "DC", county: "District of Columbia",
+      lat: 38.92, lng: -77.02,
+      skills: ["Beat Production", "Drill", "Afrobeats", "Sound Design"],
+      interests: ["Music", "Gaming"],
+    },
+    {
+      handle: "sofia", name: "Sofia Grant", role: "Stylist",
+      extraRoles: ["Fashion Designer"],
+      bio: "Editorial styling and custom pieces. Shoots, videos, and artists' looks.",
+      avatar: null, city: "Baltimore", state: "MD", county: "Baltimore City",
+      lat: 39.31, lng: -76.62,
+      skills: ["Styling", "Fashion Design", "Wardrobe", "Editorial"],
+      interests: ["Fashion", "Photography", "Art & Design"],
+    },
+    {
+      handle: "tj", name: "TJ Rivers", role: "DJ",
+      bio: "Open-format DJ for events, parties, and brand activations. Own full rig.",
+      avatar: null, city: "Towson", state: "MD", county: "Baltimore County",
+      lat: 39.39, lng: -76.6,
+      skills: ["DJ Sets", "Event Audio", "Curation"],
+      interests: ["Music", "Events"],
+    },
+    {
+      handle: "imani", name: "Imani Cole", role: "Nail Artist",
+      bio: "Bowie State senior. Nail sets on and around campus, book by DM.",
+      avatar: null, city: "Bowie", state: "MD", county: "Prince George's",
+      lat: 38.9784, lng: -76.7745,
+      skills: ["Nail Art", "Gel Sets", "Design"],
+      interests: ["Fashion", "Art & Design"], trust: "identity",
+    },
+    {
+      handle: "darius", name: "Darius Webb", role: "Web Designer",
+      extraRoles: ["Developer"],
+      bio: "Sites for creators and small brands. Design + build, two-week delivery.",
+      avatar: null, city: "Philadelphia", state: "PA", county: "Philadelphia",
+      lat: 39.9526, lng: -75.1652,
+      skills: ["Web Design", "Webflow", "Branding", "Development"],
+      interests: ["Technology", "Brands"],
+    },
+    {
+      handle: "rachel", name: "Rachel Kim", role: "Videographer",
+      bio: "Fashion films and lookbooks. NYC, travel open for the right project.",
+      avatar: null, city: "New York", state: "NY", county: "Kings",
+      lat: 40.7128, lng: -74.006,
+      skills: ["Videography", "Fashion Film", "Editing"],
+      interests: ["Film", "Fashion"], verified: true,
+    },
+    {
+      handle: "omar", name: "Omar Diallo", role: "Photographer",
+      extraRoles: ["Tutor"],
+      bio: "Bowie State junior — portraits, grad shoots, and calculus tutoring.",
+      avatar: null, city: "Bowie", state: "MD", county: "Prince George's",
+      lat: 38.98, lng: -76.77,
+      skills: ["Photography", "Portraits", "Tutoring", "Math"],
+      interests: ["Photography", "Education"],
+    },
   ];
 
   const uid: Record<string, string> = {};
@@ -204,7 +272,7 @@ function seed() {
   db.insert(t.campuses)
     .values({ id: campusId, slug: "bowie-state", name: "Bowie State University", city: "Bowie", state: "MD", isSeed: true })
     .run();
-  for (const [handle, program] of [["devin", "Cybersecurity"], ["nia", "Communications"]] as const) {
+  for (const [handle, program] of [["devin", "Cybersecurity"], ["nia", "Communications"], ["imani", "Business"], ["omar", "Mathematics"]] as const) {
     db.insert(t.campusVerifications)
       .values({ id: id(), userId: uid[handle], campusId, status: "verified", program, gradYear: "2027", verifiedAt: new Date() })
       .run();
@@ -215,6 +283,9 @@ function seed() {
     ["devin", "jordanmiles"], ["devin", "ava"], ["devin", "marcusj"],
     ["ava", "devin"], ["jordanmiles", "devin"], ["nia", "devin"],
     ["marcusj", "devin"], ["lena", "devin"], ["ava", "lena"], ["nia", "ava"],
+    ["devin", "lena"], ["devin", "maya"], ["maya", "devin"], ["kofi", "jordanmiles"],
+    ["sofia", "ava"], ["tj", "devin"], ["imani", "nia"], ["omar", "nia"],
+    ["rachel", "sofia"], ["darius", "lena"], ["ava", "sofia"], ["jordanmiles", "maya"],
   ];
   for (const [a, b] of followPairs)
     db.insert(t.follows).values({ followerId: uid[a], followingId: uid[b] }).run();
@@ -251,6 +322,20 @@ function seed() {
     { owner: "lena", title: "Brand Identity", price: 180, desc: "Logo, palette, and brand guide for creators and small brands.", reach: "Remote", ai: "client-decides" },
     { owner: "marcusj", title: "Music Video Production", price: 450, desc: "Concept-to-delivery music videos in the DMV.", reach: "DMV · 40 mi", ai: "no-ai" },
     { owner: "nia", title: "Dog Walking", price: 25, desc: "Weekday walks in Towson and North Baltimore.", reach: "Towson · 5 mi", ai: "no-ai", category: "care", trust: "high-trust" },
+    { owner: "nia", title: "Weekend Dog Sitter", price: 120, desc: "Overnight sitting at your place, daily photo updates.", reach: "Towson · 10 mi", ai: "no-ai", category: "care", trust: "high-trust" },
+    { owner: "maya", title: "Session Vocals", price: 200, desc: "Lead vocals for your record — hook and one verse, comped and tuned.", reach: "Remote", ai: "no-ai", category: "music" },
+    { owner: "maya", title: "Topline Writing", price: 160, desc: "Melody and lyrics written to your beat, demo vocal included.", reach: "Remote", ai: "no-ai", category: "music" },
+    { owner: "kofi", title: "Custom Beat — Exclusive", price: 250, desc: "Made-to-order beat, exclusive license, stems included.", reach: "Remote", ai: "disclosure", category: "music" },
+    { owner: "kofi", title: "Drum Kit — Producer Pack", price: 40, desc: "300 originals: drums, 808s, textures. Royalty-free.", reach: "Remote", ai: "disclosure", category: "music" },
+    { owner: "sofia", title: "Shoot Styling", price: 220, desc: "Full wardrobe styling for your shoot — pull, fit, on-set.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
+    { owner: "sofia", title: "Custom Piece", price: 350, desc: "One-of-one garment designed and made for your event or video.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
+    { owner: "tj", title: "Event DJ — 4 Hours", price: 400, desc: "Open format, full rig, MC-ready. Books 2 weeks out.", reach: "DMV · 40 mi", ai: "no-ai", category: "events" },
+    { owner: "imani", title: "Gel Nail Set", price: 55, desc: "Full gel set with custom design. On campus or nearby.", reach: "Bowie · 5 mi", ai: "no-ai", category: "beauty" },
+    { owner: "darius", title: "Creator Website", price: 300, desc: "One-page site: portfolio, booking link, socials. Live in 10 days.", reach: "Remote", ai: "assisted", category: "design" },
+    { owner: "darius", title: "Full Brand Site", price: 750, desc: "Multi-page site with CMS, SEO basics, and analytics.", reach: "Remote", ai: "assisted", category: "design" },
+    { owner: "rachel", title: "Fashion Film", price: 600, desc: "60–90s fashion film: concept, shoot, edit, color.", reach: "NYC · travel open", ai: "no-ai", category: "video" },
+    { owner: "omar", title: "Portrait Session", price: 90, desc: "45-minute portrait or grad session, 15 edited photos.", reach: "Bowie · 15 mi", ai: "no-ai", category: "photography" },
+    { owner: "omar", title: "Calculus Tutoring", price: 30, desc: "1-hour session, Calc I & II. Campus library or online.", reach: "Bowie / Remote", ai: "no-ai", category: "education" },
   ];
   const sid: Record<string, string> = {};
   for (const s of serviceDefs) {
@@ -274,6 +359,16 @@ function seed() {
     { poster: "marcusj", title: "BTS Videographer — Brand Shoot", budget: 400, loc: "Washington, DC", type: "gig", event: 9, apply: 5, desc: "Full-day brand shoot needs behind-the-scenes coverage and a 60-second recap." },
     { poster: "lena", title: "Collab: Zine Design + Photography", budget: null, loc: "Remote", type: "collab", remote: true, desc: "Designing a 24-page creator zine — looking for a photographer to co-create. Split ownership." },
     { poster: "nia", title: "Campus Event Photographer", budget: 120, loc: "Bowie, MD", type: "campus", event: 6, apply: 4, student: true, desc: "Homecoming week event needs a photographer for 3 hours. Student-friendly, flexible with class schedules." },
+    { poster: "sofia", title: "Lookbook Photographer", budget: 350, loc: "Baltimore, MD", type: "gig", event: 14, apply: 8, desc: "12-piece capsule needs a clean lookbook. Studio booked, need the eye." },
+    { poster: "tj", title: "Party Photographer + Recap", budget: 200, loc: "Towson, MD", type: "gig", event: 8, apply: 5, student: true, desc: "Photos during the set + a 30-second recap reel within 48 hours." },
+    { poster: "maya", title: "Producer for EP — 3 Tracks", budget: 700, loc: "Remote", type: "gig", remote: true, desc: "R&B EP, three tracks. Send your strongest similar work when you apply." },
+    { poster: "kofi", title: "Collab: Loop Pack Vol. 2", budget: null, loc: "Remote", type: "collab", remote: true, desc: "Splitting a 40-loop pack with one melodic producer. 50/50 on revenue." },
+    { poster: "darius", title: "Logo Animation", budget: 150, loc: "Remote", type: "gig", remote: true, desc: "Animate a client's finished logo — 5s sting, After Effects or similar." },
+    { poster: "rachel", title: "Fashion Film BTS Photographer", budget: 280, loc: "New York, NY", type: "gig", event: 11, apply: 6, desc: "Stills on set of a two-day fashion film shoot in Brooklyn." },
+    { poster: "imani", title: "Campus Brand Ambassadors", budget: 80, loc: "Bowie, MD", type: "campus", student: true, apply: 6, desc: "Rep a student beauty brand at three campus events this month." },
+    { poster: "omar", title: "Collab: Grad Season Mini-Sessions", budget: null, loc: "Bowie, MD", type: "collab", student: true, desc: "Pairing with a second photographer to run grad mini-sessions — split bookings." },
+    { poster: "lena", title: "Icon Set — 24 Icons", budget: 240, loc: "Remote", type: "gig", remote: true, apply: 9, desc: "Custom icon set for a client dashboard, consistent 2px stroke style." },
+    { poster: "marcusj", title: "Drone Operator — Music Video", budget: 300, loc: "Washington, DC", type: "gig", event: 10, apply: 6, desc: "Licensed drone op for three exterior shots. Half-day." },
   ];
   const oid: Record<string, string> = {};
   for (const o of oppDefs) {
@@ -308,15 +403,30 @@ function seed() {
 
   /* -------------------------------- posts -------------------------------- */
   const postDefs: { author: string; body: string; hours: number; image?: string; likes: string[]; comments: [string, string][] }[] = [
-    { author: "ava", body: "Golden hour session from Saturday's rooftop shoot. Baltimore skies never miss. 📸", hours: 5, image: "/images/post-photo.jpg", likes: ["devin", "nia", "lena", "marcusj"], comments: [["devin", "These are unreal. That third frame 🔥"], ["lena", "The color grading on this set >>>"]] },
+    { author: "ava", body: "Golden hour session from Saturday's rooftop shoot. Baltimore skies never miss. 📸", hours: 5, image: "/images/studio-post.jpg", likes: ["devin", "nia", "lena", "marcusj", "sofia"], comments: [["devin", "These are unreal. That third frame 🔥"], ["lena", "The color grading on this set >>>"]] },
     { author: "jordanmiles", body: "New loop pack drops Friday. 40 originals, all clearable. Producers — tags off, stems included.", hours: 9, likes: ["devin", "marcusj"], comments: [["devin", "Need that. Sending you something Monday."]] },
     { author: "devin", body: "Wrapped mixing on an EP for an artist I found ON this app. From DM to delivered masters in 12 days. This is what the platform is for.", hours: 14, likes: ["ava", "jordanmiles", "nia", "lena"], comments: [["ava", "This is the way it should work."], ["jordanmiles", "12 days is crazy turnaround 🔥"]] },
     { author: "nia", body: "Anyone on campus need event coverage during homecoming week? Booking now, student rates. DM me.", hours: 22, likes: ["devin", "ava"], comments: [] },
     { author: "marcusj", body: "Color graded 4 music videos this week. If your footage looks flat, it's not your camera — it's your grade. Happy to consult.", hours: 30, likes: ["devin"], comments: [["jordanmiles", "Facts. Grade makes the video."]] },
-    { author: "lena", body: "Brand identity delivered for a Baltimore coffee brand today. Logo, palette, menus, cups. Small brands deserve big design.", hours: 44, image: "/images/post-design.jpg", likes: ["ava", "devin", "nia"], comments: [["ava", "The cup design is so clean"]] },
+    { author: "lena", body: "Brand identity delivered for a Baltimore coffee brand today. Logo, palette, menus, cups. Small brands deserve big design.", hours: 44, image: "/images/portfolio-spotify.jpg", likes: ["ava", "devin", "nia", "darius"], comments: [["ava", "The cup design is so clean"]] },
+    { author: "maya", body: "Cut vocals for three records this week. If your hook feels empty, it's not the melody — it's the stacks. Layer, then layer again.", hours: 3, likes: ["devin", "jordanmiles", "kofi"], comments: [["jordanmiles", "Stacks are everything 💯"]] },
+    { author: "kofi", body: "Sold my first exclusive through UpNova today. Buyer found me through the 25-mile feed. Local-first actually works.", hours: 7, likes: ["devin", "jordanmiles", "maya", "tj"], comments: [["devin", "This is exactly the point. Congrats!"]] },
+    { author: "sofia", body: "Styled a 12-look editorial in one day. Pull list, steamer, three racks, zero panic. Ask me about shoot styling.", hours: 11, image: "/images/community-streetwear.jpg", likes: ["ava", "rachel", "lena"], comments: [["rachel", "The silhouettes in look 7 😍"]] },
+    { author: "tj", body: "Rooftop set this Friday. Bringing the full rig. If you're a photographer who wants event shots for your portfolio, pull up — trade content.", hours: 16, likes: ["devin", "nia", "omar"], comments: [["omar", "I might pull up with the 35mm"]] },
+    { author: "imani", body: "Booked out for homecoming week already 💅 Waitlist is open — campus people get priority.", hours: 20, likes: ["nia", "omar"], comments: [] },
+    { author: "darius", body: "Shipped a creator site in 9 days. Portfolio, booking, and a merch page. Your link-in-bio deserves better than a list of links.", hours: 27, likes: ["lena", "devin", "kofi"], comments: [["lena", "The type choices on this one are great"]] },
+    { author: "rachel", body: "Fashion film premiere next month. Two years of learning color inside one 90-second cut.", hours: 33, image: "/images/community-film.jpg", likes: ["sofia", "marcusj", "ava"], comments: [["marcusj", "Can't wait to see the grade"]] },
+    { author: "omar", body: "Grad season is coming. Booking portrait slots for April now — campus rate stays $90.", hours: 38, likes: ["nia", "imani", "devin"], comments: [["imani", "Booking for my sister 🙌"]] },
+    { author: "jordanmiles", body: "Placement news I can finally share: two records on a major project this fall. Everything routed through verified UpNova work. Keep your history clean.", hours: 50, image: "/images/beat-cover.jpg", likes: ["devin", "kofi", "maya", "marcusj", "ava"], comments: [["kofi", "Inspiring fr"], ["maya", "Huge!! 🎉"]] },
+    { author: "ava", body: "PSA for new photographers: your rate is not just the shoot. It's the edit, the gear, the years. Price the whole thing.", hours: 55, likes: ["omar", "sofia", "devin", "rachel"], comments: [["omar", "Needed this today"]] },
+    { author: "nia", body: "Dog sitting this weekend booked through my UpNova listing. Verified profile made the difference — the client said so directly.", hours: 60, likes: ["devin", "ava"], comments: [] },
+    { author: "marcusj", body: "Three-camera live session edit delivered. Multicam is a cheat code for artists who hate reshoots.", hours: 70, image: "/images/event-afterdark.jpg", likes: ["jordanmiles", "devin", "rachel"], comments: [] },
+    { author: "devin", body: "Studio day. Two mixes, one master, and a rough for something special. The 'Open to Work' badge stays on for a reason.", hours: 80, likes: ["ava", "maya", "jordanmiles", "tj", "kofi"], comments: [["maya", "That rough better be ours 👀"]] },
   ];
+  const postIds: string[] = [];
   for (const p of postDefs) {
     const postId = id();
+    postIds.push(postId);
     db.insert(t.posts)
       .values({ id: postId, authorId: uid[p.author], body: p.body, imageUrl: p.image ?? null, isSeed: true, createdAt: hoursAgo(p.hours) })
       .run();
@@ -351,6 +461,14 @@ function seed() {
     ["jordanmiles", "Yo — got a single that needs your mix. R&B, 34 tracks, stems are clean.", 26],
     ["devin", "Send the reference and I'm in. My mixing runs through my Music Production listing.", 25],
     ["jordanmiles", "Reference sent. Offer me the usual.", 24],
+  ]);
+  makeConversation("lena", "devin", [
+    ["devin", "Hi Lena! I'm interested in your Brand Identity service.", 5],
+    ["lena", "Hey! Absolutely. What kind of brand are you building?", 5],
+    ["devin", "I'm working on a creator platform called UpNova.", 4],
+    ["lena", "That sounds interesting. I can definitely help with the visual identity.", 4],
+    ["devin", "What would you need from me to get started?", 3],
+    ["lena", "I'll send over a project proposal with the scope and price — or you can open a project right from this chat whenever you're ready.", 3],
   ]);
   const convNia = makeConversation("nia", "devin", [
     ["nia", "Hi! Saw you verified for Bowie State too — I'm covering homecoming and could use a hype track for the recap. Budget is small but real: $150.", 8],
@@ -401,6 +519,73 @@ function seed() {
     id: id(), projectId: projNia, authorId: uid["devin"], subjectId: uid["nia"],
     rating: 5, body: "Clear brief, instant feedback, instant payment. Ideal client.",
   }).run();
+
+  // 4. Ava (client) × Lena (creator) — completed & reviewed
+  const projAvaLena = id();
+  db.insert(t.projects).values({
+    id: projAvaLena, clientId: uid["ava"], creatorId: uid["lena"],
+    serviceId: sid["lena:Brand Identity"], title: "Photography Brand Refresh",
+    brief: "Logo refinement + palette for Ava's photo brand.",
+    amount: 180, state: "reviewed", isSeed: true, createdAt: hoursAgo(24 * 40),
+  }).run();
+  db.insert(t.payments).values({
+    id: id(), projectId: projAvaLena, payerId: uid["ava"], payeeId: uid["lena"],
+    amountCents: 18000, feeCents: 900, status: "released",
+  }).run();
+  db.insert(t.reviews).values({
+    id: id(), projectId: projAvaLena, authorId: uid["ava"], subjectId: uid["lena"],
+    rating: 5, body: "Lena understood the brand in one call. The refresh doubled my inquiry rate.",
+  }).run();
+  db.insert(t.reviews).values({
+    id: id(), projectId: projAvaLena, authorId: uid["lena"], subjectId: uid["ava"],
+    rating: 5, body: "Dream client — decisive and fast with feedback.",
+  }).run();
+
+  // 5. Marcus (client) × Jordan (creator) — completed & reviewed
+  const projMJ = id();
+  db.insert(t.projects).values({
+    id: projMJ, clientId: uid["marcusj"], creatorId: uid["jordanmiles"],
+    serviceId: sid["jordanmiles:Mixing & Mastering"], title: "Session Video Audio Mix",
+    brief: "Mix and master the audio for a three-camera live session.",
+    amount: 180, state: "reviewed", isSeed: true, createdAt: hoursAgo(24 * 25),
+  }).run();
+  db.insert(t.payments).values({
+    id: id(), projectId: projMJ, payerId: uid["marcusj"], payeeId: uid["jordanmiles"],
+    amountCents: 18000, feeCents: 900, status: "released",
+  }).run();
+  db.insert(t.reviews).values({
+    id: id(), projectId: projMJ, authorId: uid["marcusj"], subjectId: uid["jordanmiles"],
+    rating: 4.8, body: "Clean mix, one revision, delivered a day early.",
+  }).run();
+  db.insert(t.reviews).values({
+    id: id(), projectId: projMJ, authorId: uid["jordanmiles"], subjectId: uid["marcusj"],
+    rating: 5, body: "Stems were organized perfectly. Easy work.",
+  }).run();
+
+  // 6. Devin as CLIENT × Marcus (creator) — in progress, payment held
+  const convMarcus = makeConversation("marcusj", "devin", [
+    ["devin", "Marcus — need a 60-second recap video from the meetup footage. Same style as your last one.", 30],
+    ["marcusj", "Got the drives already. Offer's up — once it's funded I'll start the cut.", 29],
+    ["devin", "Funded. Take it away.", 28],
+  ]);
+  const projMarcus = id();
+  db.insert(t.projects).values({
+    id: projMarcus, clientId: uid["devin"], creatorId: uid["marcusj"],
+    conversationId: convMarcus, title: "Meetup Recap Video — 60s",
+    brief: "One-minute recap from the creator meetup, color graded, licensed music.",
+    amount: 250, state: "in_progress", deadline: daysFromNow(6), isSeed: true,
+  }).run();
+  db.insert(t.payments).values({
+    id: id(), projectId: projMarcus, payerId: uid["devin"], payeeId: uid["marcusj"],
+    amountCents: 25000, feeCents: 1250, status: "held",
+  }).run();
+
+  /* ------------------------------ bookmarks ------------------------------ */
+  db.insert(t.bookmarks).values([
+    { userId: uid["devin"], targetType: "post", targetId: postIds[0] },
+    { userId: uid["devin"], targetType: "opportunity", targetId: oid["Lookbook Photographer"] },
+    { userId: uid["devin"], targetType: "service", targetId: sid["lena:Brand Identity"] },
+  ]).run();
 
   /* ------------------------------ bookings ------------------------------ */
   db.insert(t.bookings).values({

@@ -418,6 +418,8 @@ function ProjectPanel({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [paid, setPaid] = useState(false);
 
   // create form
   const [title, setTitle] = useState("");
@@ -467,6 +469,11 @@ function ProjectPanel({
           <h3 className="mt-1 text-sm font-bold text-zinc-100">
             {project ? project.title : `Work with ${conv.with?.displayName ?? ""}`}
           </h3>
+          {project && (
+            <Link href={`/projects/${project.id}`} className="mt-0.5 inline-block text-[11px] font-semibold text-violet-300 hover:underline">
+              View full project →
+            </Link>
+          )}
         </div>
         <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200">
           <X className="h-4 w-4" />
@@ -566,9 +573,16 @@ function ProjectPanel({
               </p>
               {pendingExt.reason && <p className="mt-1 text-xs text-zinc-400">{pendingExt.reason}</p>}
               {!pendingExt.mine && project.myRole === "client" ? (
-                <div className="mt-2.5 flex gap-2">
+                <div className="mt-2.5 flex flex-wrap gap-2">
                   <button disabled={busy} onClick={() => run(() => fetch(`/api/extensions/${pendingExt.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve: true }) }))} className="btn-lime px-3.5 py-1.5 text-xs">
-                    Approve · +{pendingExt.days} days
+                    Approve Extension · +{pendingExt.days} days
+                  </button>
+                  <button
+                    onClick={onClose}
+                    title="Talk it over in the conversation — the request stays pending until you decide"
+                    className="rounded-full border border-line px-3.5 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-violet-400/40 hover:text-violet-300"
+                  >
+                    Discuss
                   </button>
                   <button disabled={busy} onClick={() => run(() => fetch(`/api/extensions/${pendingExt.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve: false }) }))} className="rounded-full border border-line px-3.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-rose-300">
                     Decline
@@ -608,8 +622,8 @@ function ProjectPanel({
               <p className="text-xs text-zinc-500">Offer sent — waiting for {project.with.displayName} to accept.</p>
             )}
             {project.state === "accepted" && project.myRole === "client" && (
-              <button disabled={busy} onClick={act("start")} className="btn-lime w-full justify-center py-2 text-sm">
-                Secure payment · ${(project.amount + fee).toFixed(2)}
+              <button disabled={busy} onClick={() => setPayOpen(true)} className="btn-lime w-full justify-center py-2 text-sm">
+                Pay ${(project.amount + fee).toFixed(2)}
               </button>
             )}
             {project.state === "accepted" && project.myRole === "creator" && (
@@ -737,6 +751,77 @@ function ProjectPanel({
             The 5% platform fee is paid by the buyer on top — the creator&apos;s listed price is their payout.
             Stripe Connect handles the card details in production; UpNova never stores them.
           </p>
+        </div>
+      )}
+
+      {/* ------------------------- mock payment screen ------------------------- */}
+      {payOpen && project && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => !busy && setPayOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+            {!paid ? (
+              <>
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Checkout</p>
+                <h3 className="mt-1 text-sm font-bold text-zinc-100">{project.title}</h3>
+                <div className="mt-4 space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
+                  <div className="flex justify-between text-zinc-300">
+                    <span>Creator payout</span>
+                    <span className="font-mono tracking-[0.08em]">${project.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-zinc-500">
+                    <span>Platform fee (5%)</span>
+                    <span className="font-mono tracking-[0.08em]">${fee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold text-zinc-50">
+                    <span>Total</span>
+                    <span className="font-mono tracking-[0.08em]">${(project.amount + fee).toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="mt-3 rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Payment method</p>
+                  <p className="mt-1 font-mono text-sm tracking-[0.08em] text-zinc-300">Demo card ···· 4242</p>
+                  <p className="mt-1 text-[10px] text-zinc-600">
+                    Demo payment — no real money moves. In production this screen is Stripe Connect.
+                  </p>
+                </div>
+                <button
+                  disabled={busy}
+                  onClick={async () => {
+                    const ok = await run(() =>
+                      fetch(`/api/projects/${project.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "start" }),
+                      })
+                    );
+                    if (ok) setPaid(true);
+                  }}
+                  className="btn-lime mt-4 w-full justify-center py-2.5 text-sm disabled:opacity-40"
+                >
+                  {busy ? "Processing…" : `Pay $${(project.amount + fee).toFixed(2)}`}
+                </button>
+              </>
+            ) : (
+              <div className="py-2 text-center">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-lime-400/40 bg-lime-400/10">
+                  <Check className="h-6 w-6 text-lime-300" />
+                </span>
+                <h3 className="mt-3 text-sm font-bold text-lime-300">Payment secured</h3>
+                <p className="mx-auto mt-1 max-w-[240px] text-xs leading-relaxed text-zinc-400">
+                  ${(project.amount + fee).toFixed(2)} charged. ${project.amount.toFixed(2)} is held in escrow
+                  until you approve the delivery.
+                </p>
+                <button
+                  onClick={() => {
+                    setPayOpen(false);
+                    setPaid(false);
+                  }}
+                  className="btn-ghost mt-4 px-5 py-2 text-xs"
+                >
+                  Back to project
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </aside>

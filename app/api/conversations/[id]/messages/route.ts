@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { requireConversationMember } from "@/lib/server/authz";
 import { notify } from "@/lib/server/notify";
+import { maybeAutoReply } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         href: `/messages?c=${params.id}`,
       });
     }
+
+    // dev demo: seed users reply so conversations feel alive
+    maybeAutoReply(params.id, user.id);
 
     return { id };
   });

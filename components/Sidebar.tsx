@@ -19,8 +19,9 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
-import { currentUser, communities } from "@/lib/data";
-import { getPlan, isStudentVerified, PRO_EVENT, type Plan } from "@/lib/pro";
+import { communities } from "@/lib/data";
+import { useSession } from "@/lib/session";
+import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
 
 /* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
 const navGroups: {
@@ -59,20 +60,19 @@ const navGroups: {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useSession();
   const myCommunities = communities.filter((c) => c.joined);
   const [plan, setPlanState] = useState<Plan>("free");
-  const [studentVerified, setStudentVerifiedState] = useState(false);
 
   useEffect(() => {
-    const sync = () => {
-      setPlanState(getPlan());
-      setStudentVerifiedState(isStudentVerified());
-    };
+    const sync = () => setPlanState(getPlan());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
   }, []);
   const pro = plan === "pro";
+  // campus access is a database fact (verified school), never a local flag
+  const campus = user?.campus ?? null;
 
   return (
     <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-60 shrink-0 flex-col gap-4 self-start overflow-y-auto pb-6 lg:flex">
@@ -123,18 +123,22 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
-        {studentVerified && (
+        {user && (
           <div className="mt-1">
             <Link
               href="/campus"
               className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
                 pathname.startsWith("/campus")
                   ? "bg-violet-400/15 text-violet-200"
-                  : "text-violet-300 hover:bg-violet-400/10"
+                  : campus
+                    ? "text-violet-300 hover:bg-violet-400/10"
+                    : "text-zinc-500 hover:bg-card-raised"
               }`}
             >
               <GraduationCap className="h-[18px] w-[18px]" /> Your Campus
-              <span className="ml-auto truncate font-mono text-[9px] text-zinc-500">Bowie State</span>
+              <span className="ml-auto truncate font-mono text-[9px] text-zinc-500">
+                {campus ? campus.name.replace(" University", "") : "Verify to unlock"}
+              </span>
             </Link>
           </div>
         )}
@@ -184,20 +188,26 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Profile */}
-      <Link
-        href="/profile"
-        className="card flex items-center gap-3 p-3 transition hover:border-zinc-600"
-      >
-        <Avatar src={currentUser.avatar} initials={currentUser.initials} size="sm" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-zinc-100">
-            {currentUser.name}
+      {/* Profile — the authenticated user, never a hardcoded person */}
+      {user ? (
+        <Link
+          href="/profile"
+          className="card flex items-center gap-3 p-3 transition hover:border-zinc-600"
+        >
+          <Avatar src={user.profile.avatarUrl} initials={user.profile.displayName.charAt(0)} size="sm" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-zinc-100">
+              {user.profile.displayName}
+            </span>
+            <span className="block truncate text-xs text-zinc-500">@{user.handle}</span>
           </span>
-          <span className="block truncate text-xs text-zinc-500">@{currentUser.handle}</span>
-        </span>
-        <span className="ml-auto h-2 w-2 rounded-full bg-violet-400" title="Online" />
-      </Link>
+          <span className="ml-auto h-2 w-2 rounded-full bg-lime-400" title="Online" />
+        </Link>
+      ) : (
+        <Link href="/login" className="card flex items-center justify-center gap-2 p-3 text-sm font-semibold text-zinc-200 transition hover:border-zinc-600">
+          Sign in to UpNova
+        </Link>
+      )}
     </aside>
   );
 }

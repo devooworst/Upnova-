@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MapPin, MessageSquare, Zap, Lock } from "lucide-react";
+import { MapPin, MessageSquare, Zap, Lock, Star } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useSession } from "@/lib/session";
@@ -30,10 +30,18 @@ interface PublicProfile {
     hiringEnabled: boolean;
     trustLevel: string;
   };
-  stats: { followers: number | null; following: number | null };
+  stats: {
+    followers: number | null;
+    following: number | null;
+    rating: number | null;
+    reviewsCount: number;
+    completedProjects: number | null;
+    approvedExtensions: number;
+  };
   followedByMe: boolean;
   services: { id: string; title: string; description: string; price: number; reach: string }[];
   experience: { id: string; position: string; organization: string; start: string; end: string; description: string }[];
+  reviews?: { rating: number; body: string; createdAt: string }[];
 }
 
 export default function DbCreatorProfile({ handle }: { handle: string }) {
@@ -161,6 +169,25 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
               <dt className="text-xs text-zinc-500">Following</dt>
             </div>
           )}
+          {stats.completedProjects != null && (
+            <div>
+              <dd className="text-xl font-bold text-zinc-50">{stats.completedProjects}</dd>
+              <dt className="text-xs text-zinc-500" title="Calculated from completed UpNova projects — never self-reported">
+                Completed
+              </dt>
+            </div>
+          )}
+          {stats.rating != null && (
+            <div>
+              <dd className="flex items-center gap-1 text-xl font-bold text-zinc-50">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                {stats.rating.toFixed(1)}
+              </dd>
+              <dt className="text-xs text-zinc-500">
+                {stats.reviewsCount} review{stats.reviewsCount === 1 ? "" : "s"}
+              </dt>
+            </div>
+          )}
           <div>
             <dd className="text-xl font-bold text-zinc-50">{services.length}</dd>
             <dt className="text-xs text-zinc-500">Services</dt>
@@ -194,6 +221,28 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
                   </button>
                 )}
               </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {(data.reviews ?? []).length > 0 && (
+        <section className="card p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+            Reviews
+            <span className="font-normal text-zinc-500">from verified projects only</span>
+          </h2>
+          <div className="mt-3 space-y-2.5">
+            {(data.reviews ?? []).map((r, i) => (
+              <div key={i} className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+                <p className="flex items-center gap-1 text-xs font-semibold text-amber-300">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
+                  <span className="ml-1 font-normal text-zinc-600">
+                    {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                  </span>
+                </p>
+                {r.body && <p className="mt-1 text-xs leading-relaxed text-zinc-300">{r.body}</p>}
+              </div>
             ))}
           </div>
         </section>

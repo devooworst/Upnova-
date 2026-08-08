@@ -68,7 +68,16 @@ interface Props {
 export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
   const { user } = useSession();
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/bookmarks", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) =>
+        setSavedPosts(new Set((d.items ?? []).filter((i: { type: string }) => i.type === "post").map((i: { id: string }) => i.id)))
+      );
+  }, []);
 
   const load = useCallback(async () => {
     if (tab === "Opportunities") return; // handled by OpportunityList
@@ -147,7 +156,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       ) : (
         <div key={`${tab}-${scope}`} className="animate-fade-up space-y-4">
           {posts.map((p) => (
-            <DbPostCard key={p.id} post={p} />
+            <DbPostCard key={p.id} post={p} savedInitial={savedPosts.has(p.id)} />
           ))}
           {posts.length === 0 && (
             <p className="py-10 text-center text-sm text-zinc-500">

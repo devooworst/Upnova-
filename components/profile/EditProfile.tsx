@@ -59,12 +59,8 @@ import {
   SocialLink,
 } from "@/lib/profile";
 import { reliability, workRecords, contact } from "@/lib/data";
-import {
-  isStudentVerified,
-  getTrustStatus,
-  TrustStatus,
-  PRO_EVENT,
-} from "@/lib/pro";
+import { getTrustStatus, TrustStatus, PRO_EVENT } from "@/lib/pro";
+import { useSession, invalidateSession } from "@/lib/session";
 
 /* ------------------------------ constants ------------------------------ */
 
@@ -252,8 +248,21 @@ export default function EditProfile() {
   const [toast, setToast] = useState(false);
 
   /* platform-verified state — read-only here */
-  const [studentVerified, setStudentVerified] = useState(false);
+  const { user: sessionUser } = useSession();
+  const campus = sessionUser?.campus ?? null;
+  const studentVerified = !!campus;
   const [trust, setTrust] = useState<TrustStatus>("identity");
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const verifySchool = async () => {
+    setVerifyBusy(true);
+    await fetch("/api/campus/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    invalidateSession();
+    setVerifyBusy(false);
+  };
 
   useEffect(() => {
     loadProfile().then((p) => {
@@ -264,10 +273,7 @@ export default function EditProfile() {
       setSaved(p);
       setDraft(p);
     });
-    const sync = () => {
-      setStudentVerified(isStudentVerified());
-      setTrust(getTrustStatus());
-    };
+    const sync = () => setTrust(getTrustStatus());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
@@ -1331,7 +1337,7 @@ export default function EditProfile() {
                   <p className="text-sm font-semibold text-zinc-100">Student status</p>
                   {studentVerified ? (
                     <p className="mt-0.5 text-xs text-zinc-400">
-                      Bowie State University — <span className="text-violet-300">Verified Student</span> · Verified
+                      {campus?.name} — <span className="text-violet-300">Verified Student</span> · Verified
                       through UpNova
                     </p>
                   ) : (
@@ -1346,12 +1352,13 @@ export default function EditProfile() {
                     <Check className="h-3.5 w-3.5" /> Verified
                   </span>
                 ) : (
-                  <Link
-                    href="/pro"
-                    className="shrink-0 rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300"
+                  <button
+                    onClick={verifySchool}
+                    disabled={verifyBusy}
+                    className="shrink-0 rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300 disabled:opacity-50"
                   >
-                    Verify school
-                  </Link>
+                    {verifyBusy ? "Verifying…" : "Verify school"}
+                  </button>
                 )}
               </div>
               <p className="mt-2.5 border-t border-line-soft pt-2.5 text-[11px] text-zinc-500">

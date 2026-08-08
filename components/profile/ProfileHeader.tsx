@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import { PencilLine, MapPin, MessageSquare, Megaphone, Zap, FolderPlus } from "lucide-react";
 import PromoteModal from "../PromoteModal";
 import FollowListModal from "../FollowListModal";
-import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { contact, reliability } from "@/lib/data";
@@ -45,13 +44,7 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
         });
       });
   }, [user]);
-  const [isStudent, setIsStudent] = useState(false);
-  useEffect(() => {
-    const sync = () => setIsStudent(isStudentVerified());
-    sync();
-    window.addEventListener(PRO_EVENT, sync);
-    return () => window.removeEventListener(PRO_EVENT, sync);
-  }, []);
+  const isStudent = !!user?.campus;
 
   const canMessage = profile.whoCanMessage !== "nobody";
   const canHire = profile.hiringEnabled && profile.acceptBookings && profile.allowServiceRequests;

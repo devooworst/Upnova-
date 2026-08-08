@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin, Users, X } from "lucide-react";
+import { MapPin, Users, X, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
 
 export interface OpportunityItem {
@@ -36,6 +36,33 @@ function fmtDate(iso: string | null) {
 export default function OpportunityList({ scope = "for-you", compact = false }: { scope?: string; compact?: boolean }) {
   const [items, setItems] = useState<OpportunityItem[] | null>(null);
   const [applying, setApplying] = useState<OpportunityItem | null>(null);
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetch("/api/bookmarks", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) =>
+        setSaved(
+          new Set((d.items ?? []).filter((i: { type: string }) => i.type === "opportunity").map((i: { id: string }) => i.id))
+        )
+      );
+  }, []);
+
+  const toggleSave = async (id: string) => {
+    const res = await fetch("/api/bookmarks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetType: "opportunity", targetId: id }),
+    });
+    if (!res.ok) return;
+    const d = await res.json();
+    setSaved((s) => {
+      const next = new Set(s);
+      if (d.saved) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/opportunities?scope=${scope}`, { cache: "no-store" });
@@ -88,6 +115,17 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => toggleSave(o.id)}
+                title={saved.has(o.id) ? "Remove bookmark" : "Save"}
+                className={`rounded-full border p-1.5 transition ${
+                  saved.has(o.id)
+                    ? "border-violet-400/50 text-violet-300"
+                    : "border-line text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                }`}
+              >
+                <Bookmark className={`h-3.5 w-3.5 ${saved.has(o.id) ? "fill-violet-300" : ""}`} />
+              </button>
               {o.isMine ? (
                 <Link
                   href={`/opportunities/${o.id}/applicants`}

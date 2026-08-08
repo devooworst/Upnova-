@@ -4,6 +4,7 @@ import { desc, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
+import { seedRespondsToDraft } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,10 @@ export async function POST(req: NextRequest) {
         state: "draft",
       })
       .run();
+
+    // dev demo: seed creators review the brief and send the offer right away
+    seedRespondsToDraft(id);
+
     return { id };
   });
 }

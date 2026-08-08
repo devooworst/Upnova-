@@ -7,7 +7,6 @@ import DbFeed, { type FeedTab } from "@/components/db/DbFeed";
 import type { FeedScope } from "@/components/Feed";
 import RightSidebar from "@/components/RightSidebar";
 import { useSession } from "@/lib/session";
-import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 
 /* ------------------------------------------------------------------ */
 /* Home always stays Home. Two orthogonal controls:                    */
@@ -34,7 +33,7 @@ export default function Home() {
   const [scope, setScope] = useState<FeedScope>("foryou");
   const [tab, setTab] = useState<FeedTab>("For You");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isStudent, setIsStudent] = useState(false);
+  const isStudent = !!user?.campus;
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* scope place labels come from the signed-in user's real location */
@@ -48,15 +47,8 @@ export default function Home() {
     state: user?.profile.state || "your state",
     country: user?.profile.country || "your country",
     global: "Everywhere",
-    school: "your verified school",
+    school: user?.campus?.name || "your verified school",
   };
-
-  useEffect(() => {
-    const sync = () => setIsStudent(isStudentVerified());
-    sync();
-    window.addEventListener(PRO_EVENT, sync);
-    return () => window.removeEventListener(PRO_EVENT, sync);
-  }, []);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {

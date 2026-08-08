@@ -90,3 +90,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return { status: "selected", projectId, conversationId: convId };
   });
 }
+
+/** DELETE — the applicant withdraws their own application. */
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  return guarded(() => {
+    const user = requireUser();
+    const app = db.select().from(tables.applications).where(eq(tables.applications.id, params.id)).get();
+    if (!app) throw new ApiError(404, "Application not found");
+    if (app.applicantId !== user.id) throw new ApiError(403, "Not your application");
+    if (app.status === "selected") throw new ApiError(409, "You were already selected — talk to the poster instead");
+    db.delete(tables.applications).where(eq(tables.applications.id, params.id)).run();
+    return { withdrawn: true };
+  });
+}

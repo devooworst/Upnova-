@@ -533,3 +533,19 @@ export const reports = sqliteTable("reports", {
   status: text("status").notNull().default("open"), // open | reviewing | resolved | dismissed
   createdAt: ts("created_at"),
 });
+
+/* -------------------------------- bookmarks -------------------------------- */
+/* One shared save system: any record type, referenced by id — never a copy. */
+
+export const bookmarks = sqliteTable(
+  "bookmarks",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetType: text("target_type").notNull(), // post | opportunity | service | event | community
+    targetId: text("target_id").notNull(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.targetType, t.targetId] })]
+);

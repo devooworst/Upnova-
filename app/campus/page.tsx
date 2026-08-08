@@ -18,7 +18,7 @@ import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
 import OpportunityCard from "@/components/OpportunityCard";
 import EventCard from "@/components/EventCard";
-import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
+import { useSession, invalidateSession } from "@/lib/session";
 import { creators, campusOrgs } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -108,20 +108,27 @@ const campusQuestions = [
 ];
 
 export default function CampusPage() {
-  const [verified, setVerified] = useState(false);
+  // campus access is a database fact: a verified campus_verifications row
+  const { user } = useSession();
+  const verified = !!user?.campus;
   const [section, setSection] = useState<SectionId>("communities");
   const [community, setCommunity] = useState("general");
   const [svcFilter, setSvcFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
-
-  useEffect(() => {
-    const sync = () => setVerified(isStudentVerified());
-    sync();
-    window.addEventListener(PRO_EVENT, sync);
-    return () => window.removeEventListener(PRO_EVENT, sync);
-  }, []);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const verifyCollege = async () => {
+    setVerifyBusy(true);
+    const res = await fetch("/api/campus/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (res.status === 401) window.location.href = "/login";
+    invalidateSession();
+    setVerifyBusy(false);
+  };
 
   const ava = creators.find((c) => c.id === "ava")!;
   const services = campusServices.filter((s) => !svcFilter || s.category === svcFilter);
@@ -142,12 +149,13 @@ export default function CampusPage() {
           Communities, campus services, opportunities, organizations, and events — verified
           students only.
         </p>
-        <Link
-          href="/pro"
-          className="mt-5 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+        <button
+          onClick={verifyCollege}
+          disabled={verifyBusy}
+          className="mt-5 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
         >
-          <GraduationCap className="h-4 w-4" /> Verify Student Status — Free
-        </Link>
+          <GraduationCap className="h-4 w-4" /> {verifyBusy ? "Verifying…" : "Verify College — Free"}
+        </button>
         <p className="mt-3 text-[10px] text-zinc-600">
           The network is never paywalled: verification, campus chat, and applying cost $0.
           College+ is an optional exposure upgrade. Alumni keep their community after graduation.
@@ -165,7 +173,7 @@ export default function CampusPage() {
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Bowie State University</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user?.campus?.name ?? "Your Campus"}</h1>
             <p className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
               <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> 2,841 verified students</span>
               <span className="flex items-center gap-1 text-violet-400">

@@ -1,257 +1,206 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, MapPin, Plus } from "lucide-react";
+/* ------------------------------------------------------------------ */
+/*  Bookings — a live view over the SAME records the rest of the app   */
+/*  uses. Engagements are projects (one shared project id — View       */
+/*  Project opens the exact same record Messages drives), sessions     */
+/*  are booking rows. States update automatically as projects move.    */
+/* ------------------------------------------------------------------ */
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { CalendarDays, Clock, MapPin, ArrowRight } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import { bookings, reliability } from "@/lib/data";
 
-/* August 2026: starts on a Saturday, 31 days. Today is Fri Aug 7. */
-const FIRST_WEEKDAY = 6; // 0 = Sunday
-const DAYS = 31;
-const TODAY = 7;
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+interface ProjectRow {
+  id: string;
+  title: string;
+  amount: number;
+  state: string;
+  deadline: string | null;
+  conversationId: string | null;
+  myRole: "client" | "creator";
+  with: { handle: string; displayName: string; avatarUrl: string | null };
+  updatedAt: string;
+}
 
-export default function CalendarPage() {
-  const [selected, setSelected] = useState<number | null>(null);
+interface BookingRow {
+  id: string;
+  title: string;
+  startsAt: string;
+  durationMin: number;
+  price: number;
+  location: string;
+  status: string;
+  myRole: "client" | "provider";
+  with: { handle: string; displayName: string; avatarUrl: string | null };
+}
 
-  const byDay = new Map<number, (typeof bookings)[number][]>();
-  bookings.forEach((b) => byDay.set(b.day, [...(byDay.get(b.day) ?? []), b]));
+/* project state → booking language */
+const BOOKING_STATE: Record<string, { label: string; cls: string }> = {
+  draft: { label: "Pending", cls: "border-line text-zinc-400" },
+  offer_sent: { label: "Awaiting acceptance", cls: "border-amber-400/40 bg-amber-400/10 text-amber-300" },
+  accepted: { label: "Payment required", cls: "border-amber-400/40 bg-amber-400/10 text-amber-300" },
+  in_progress: { label: "Confirmed · In progress", cls: "border-violet-400/40 bg-violet-400/10 text-violet-300" },
+  extension_requested: { label: "In progress · Extension pending", cls: "border-amber-400/40 bg-amber-400/10 text-amber-300" },
+  submitted: { label: "Delivered", cls: "border-violet-400/40 bg-violet-400/10 text-violet-300" },
+  approved: { label: "Approved", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  completed: { label: "Completed", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  reviewed: { label: "Completed · Reviewed", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+};
 
-  const shown = selected === null ? bookings : bookings.filter((b) => b.day === selected);
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-  const confirmed = bookings
-    .filter((b) => b.status === "confirmed")
-    .reduce((n, b) => n + (Number(b.price.replace(/[^0-9.]/g, "")) || 0), 0);
-  const pending = bookings
-    .filter((b) => b.status === "pending")
-    .reduce((n, b) => n + (Number(b.price.replace(/[^0-9.]/g, "")) || 0), 0);
+export default function BookingsPage() {
+  const [projects, setProjects] = useState<ProjectRow[] | null>(null);
+  const [bookings, setBookings] = useState<BookingRow[] | null>(null);
+
+  const load = useCallback(async () => {
+    const [p, b] = await Promise.all([
+      fetch("/api/projects", { cache: "no-store" }),
+      fetch("/api/bookings", { cache: "no-store" }),
+    ]);
+    if (p.status === 401) {
+      setProjects([]);
+      setBookings([]);
+      return;
+    }
+    setProjects((await p.json()).projects ?? []);
+    setBookings((await b.json()).bookings ?? []);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const active = (projects ?? []).filter((p) => !["completed", "reviewed"].includes(p.state));
+  const done = (projects ?? []).filter((p) => ["completed", "reviewed"].includes(p.state));
+  const heldTotal = active
+    .filter((p) => ["in_progress", "extension_requested", "submitted", "approved"].includes(p.state))
+    .reduce((n, p) => n + p.amount, 0);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <header>
-        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-500">
-          August 2026 · {bookings.length} booked
-        </p>
-        <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
+          <CalendarDays className="h-5 w-5 text-lime-400" />
+        </span>
+        <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Bookings</h1>
-          <button className="btn-lime px-4 py-1.5 text-xs">
-            <Plus className="h-3.5 w-3.5" /> Open a slot
-          </button>
-        </div>
-        <p className="mt-1.5 text-sm text-zinc-500">
-          Your service calendar: what&apos;s booked, what&apos;s pending, and what it pays.
-        </p>
-      </header>
-
-      {/* work performance — the private professional dashboard */}
-      <section className="card-money p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Work Performance</h2>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-0.5 text-[11px] font-bold text-lime-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Reliable Creator
-          </span>
-        </div>
-        <div className="mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {[
-            [`${reliability.onTimeRate}%`, "on-time"],
-            [`${reliability.completed}`, "completed"],
-            [`${reliability.onTime}`, "on time"],
-            [`${reliability.extensions}`, "extension"],
-            [`${reliability.rating}★`, "client rating"],
-            [`${reliability.responseRate}%`, "response rate"],
-          ].map(([v, k]) => (
-            <div key={k as string}>
-              <p className="text-lg font-extrabold tabular-nums tracking-tight text-zinc-50">{v}</p>
-              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">{k}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-2.5 border-t border-line-soft pt-2.5">
-          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-            how deadlines are recorded — communication protects your record
+          <p className="text-sm text-zinc-400">
+            Your engagements and sessions — every card references the same project record as Messages.
           </p>
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
-            {([
-              ["bg-lime-400", "On time"],
-              ["bg-amber-400", "Extension approved — no penalty"],
-              ["bg-orange-400", "Late, communicated"],
-              ["bg-red-400", "Late, silent — affects standing"],
-            ] as [string, string][]).map(([c, t]) => (
-              <span key={t} className="flex items-center gap-1.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${c}`} /> {t}
-              </span>
-            ))}
-          </div>
         </div>
-        <p className="mt-2.5 border-t border-line-soft pt-2 text-[10px] leading-relaxed text-zinc-600">
-          This record is private to you. Publicly, clients only see the summary: Reliable
-          Creator · {reliability.onTimeRate}% on time. Reliability adjusts visibility and access
-          to higher-value work — it never brands anyone. Clients build reliability too: repeated
-          cancellations, scope changes, or refused deliveries affect their standing the same way.
-        </p>
-      </section>
+      </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_1fr]">
-        {/* ------- month grid: money DNA, this is where income lives ------- */}
-        <section className="card-money self-start p-5">
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {WEEKDAYS.map((d, i) => (
-              <span
-                key={`${d}-${i}`}
-                className="pb-1 font-mono text-[10px] font-medium uppercase text-zinc-500"
-              >
-                {d}
-              </span>
-            ))}
-            {Array.from({ length: FIRST_WEEKDAY }).map((_, i) => (
-              <span key={`pad-${i}`} />
-            ))}
-            {Array.from({ length: DAYS }, (_, i) => i + 1).map((day) => {
-              const dayBookings = byDay.get(day);
-              const isToday = day === TODAY;
-              const isSelected = day === selected;
-              return (
-                <button
-                  key={day}
-                  onClick={() => setSelected(isSelected ? null : day)}
-                  aria-pressed={isSelected}
-                  className={`relative flex h-9 flex-col items-center justify-center rounded-md text-sm transition ${
-                    isSelected
-                      ? "bg-white font-semibold text-zinc-950"
-                      : isToday
-                      ? "border border-white/40 font-semibold text-zinc-50"
-                      : day < TODAY
-                      ? "text-zinc-600 hover:bg-card-raised"
-                      : "text-zinc-300 hover:bg-card-raised"
-                  }`}
-                >
-                  {day}
-                  {dayBookings && (
-                    <span className="absolute bottom-1 flex gap-0.5">
-                      {dayBookings.map((b) => (
-                        <span
-                          key={b.id}
-                          className={`h-1 w-1 rounded-full ${
-                            isSelected
-                              ? "bg-zinc-950"
-                              : b.status === "confirmed"
-                              ? "bg-lime-400"
-                              : "bg-amber-400"
-                          }`}
-                        />
-                      ))}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+      {/* summary strip */}
+      {projects !== null && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-line px-4 py-2.5 font-mono text-[11px] font-medium text-zinc-400">
+          <span><span className="text-violet-400">{active.length}</span> active</span>
+          <span><span className="text-lime-400">${heldTotal}</span> in escrow</span>
+          <span><span className="text-zinc-200">{done.length}</span> completed</span>
+          <span className="ml-auto text-zinc-600">{(bookings ?? []).length} scheduled session{(bookings ?? []).length === 1 ? "" : "s"}</span>
+        </div>
+      )}
 
-          {/* receipt total */}
-          <div className="mt-4">
-            <div className="border-t border-zinc-600" />
-            <div className="mt-[3px] border-t border-zinc-600" />
-            <p className="mt-2.5 flex items-baseline justify-between">
-              <span className="text-base font-extrabold tracking-tight tabular-nums text-lime-400">
-                ${confirmed.toLocaleString()}
-              </span>
-              <span className="text-xs text-zinc-400">
-                booked this month
-                {pending > 0 && (
-                  <span className="text-amber-400"> · ${pending} pending</span>
-                )}
-              </span>
+      {/* engagements = projects */}
+      <section>
+        <h2 className="mb-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          Engagements
+        </h2>
+        {projects === null ? (
+          <div className="card h-24 animate-pulse" aria-hidden />
+        ) : projects.length === 0 ? (
+          <div className="card p-8 text-center">
+            <p className="text-sm font-semibold text-zinc-200">No engagements yet</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Hire someone from{" "}
+              <Link href="/services" className="text-lime-300 hover:underline">Services</Link>{" "}
+              — the project lands here automatically.
             </p>
           </div>
-
-          <div className="mt-3 flex items-center gap-4 font-mono text-[10px] font-medium text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> confirmed
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> pending
-            </span>
-          </div>
-        </section>
-
-        {/* ------- booking list: ticket rows ------- */}
-        <section className="space-y-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">
-              {selected === null ? "Upcoming" : `August ${selected}`}
-            </h2>
-            {selected !== null && (
-              <button
-                onClick={() => setSelected(null)}
-                className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 transition hover:text-zinc-200"
-              >
-                show all
-              </button>
-            )}
-          </div>
-
-          {shown.length === 0 && (
-            <p className="card-money p-5 text-sm text-zinc-500">
-              Nothing booked on August {selected}. Open a slot and let clients grab it.
-            </p>
-          )}
-
-          {shown.map((b) => (
-            <article key={b.id} className="card-money overflow-hidden">
-              <div className="flex items-stretch">
-                {/* date stub */}
-                <div className="flex w-16 shrink-0 flex-col items-center justify-center border-r border-dashed border-zinc-700/60 bg-lime-400/[0.05] py-4">
-                  <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-lime-400">
-                    Aug
-                  </span>
-                  <span className="text-2xl font-extrabold leading-tight text-zinc-50">
-                    {b.day}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <Avatar
-                        src={b.clientAvatar}
-                        initials={b.initials}
-                        gradient={b.gradient}
-                        size="sm"
-                        className="ring-1 ring-line"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-zinc-100">{b.client}</p>
-                        <p className="truncate text-xs text-zinc-500">{b.service}</p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-[15px] font-bold tracking-tight tabular-nums text-lime-400">
-                        {b.price}
-                      </p>
-                      <p
-                        className={`mt-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.08em] ${
-                          b.status === "confirmed" ? "text-lime-400/80" : "text-amber-400"
-                        }`}
-                      >
-                        {b.status}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                      {b.time} · {b.duration}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5 text-zinc-500" />
-                      {b.location}
-                    </span>
+        ) : (
+          <div className="space-y-2.5">
+            {[...active, ...done].map((p) => (
+              <article key={p.id} className="card-money flex flex-wrap items-center gap-3 p-4">
+                <Link href={`/creator/${p.with.handle}`}>
+                  <Avatar src={p.with.avatarUrl} initials={p.with.displayName.charAt(0)} size="md" />
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-100">
+                    {p.title}
+                    <span className="font-mono text-xs font-medium tracking-[0.08em] text-lime-300">${p.amount}</span>
+                  </h3>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+                    {p.myRole === "client" ? "Hired" : "Client"}: {p.with.displayName}
+                    {p.deadline && (
+                      <span className="font-mono text-[10px] tracking-[0.08em]">
+                        · DUE {fmtDate(p.deadline).toUpperCase()}
+                      </span>
+                    )}
                   </p>
                 </div>
-              </div>
-            </article>
-          ))}
-        </section>
-      </div>
+                <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${BOOKING_STATE[p.state]?.cls ?? "border-line text-zinc-400"}`}>
+                  {BOOKING_STATE[p.state]?.label ?? p.state}
+                </span>
+                <Link href={`/projects/${p.id}`} className="btn-ghost shrink-0 px-3 py-1.5 text-[11px]">
+                  View Project <ArrowRight className="h-3 w-3" />
+                </Link>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* scheduled sessions = bookings */}
+      <section>
+        <h2 className="mb-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          Scheduled sessions
+        </h2>
+        {bookings === null ? (
+          <div className="card h-20 animate-pulse" aria-hidden />
+        ) : bookings.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line px-4 py-4 text-center text-xs text-zinc-500">
+            No sessions on the calendar.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {bookings.map((b) => (
+              <article key={b.id} className="card flex flex-wrap items-center gap-3 p-4">
+                <Avatar src={b.with.avatarUrl} initials={b.with.displayName.charAt(0)} size="md" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-100">
+                    {b.title}
+                    <span className="font-mono text-xs font-medium tracking-[0.08em] text-lime-300">${b.price}</span>
+                  </h3>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-zinc-500">
+                    <span>{b.myRole === "provider" ? "Client" : "With"}: {b.with.displayName}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {fmtDate(b.startsAt)} ·{" "}
+                      {new Date(b.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    </span>
+                    {b.location && (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {b.location}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                    b.status === "confirmed"
+                      ? "border-lime-400/40 bg-lime-400/10 text-lime-300"
+                      : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                  }`}
+                >
+                  {b.status}
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

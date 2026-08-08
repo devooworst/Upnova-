@@ -15,7 +15,20 @@ export async function GET() {
     .where(eq(tables.experiences.userId, session.id))
     .orderBy(asc(tables.experiences.order))
     .all();
+  const verification = db
+    .select({ v: tables.campusVerifications, c: tables.campuses })
+    .from(tables.campusVerifications)
+    .innerJoin(tables.campuses, eq(tables.campusVerifications.campusId, tables.campuses.id))
+    .where(eq(tables.campusVerifications.userId, session.id))
+    .all()
+    .find((r) => r.v.status === "verified");
   return Response.json({
-    user: { ...ownProfile(user, session.profile), experience },
+    user: {
+      ...ownProfile(user, session.profile),
+      experience,
+      campus: verification
+        ? { name: verification.c.name, slug: verification.c.slug, program: verification.v.program }
+        : null,
+    },
   });
 }

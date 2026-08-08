@@ -289,18 +289,25 @@ auto-created project), public creator profiles (`/creator/[handle]` resolves any
 own profile header/About tab, Edit Profile (loads and saves the DB record, manages real service
 listings), Admin.
 
+### Demo provider behavior (dev only)
+
+Seed accounts behave like responsive counterparts (`lib/server/demo.ts`) so the whole loop can be
+demonstrated by one person: they reply to messages, review your brief and send the offer, start
+work when you pay, request one honest extension, deliver after you decide it, and review you back
+after completion. Everything goes through the same state machine and notification paths a real
+user would use; none of it runs for non-seed accounts. Delete that module for production.
+
 ### Audit — still on static demo data (next passes)
 
-- Right sidebar widgets (Open Opportunities / People near you / This week), `components/Feed.tsx`
-  (legacy, unused by Home), NearbyNow, old `api/feed/for-you` + `near-you` routes.
-- Communities, Campus, Events pages and their create flows — models and APIs are ready
-  (`communities`, `community_members`, `campuses`), UI still reads `lib/data`.
-- Bookings calendar page, Analytics, Bookmarks, Discover, Resolution Center demo case, Settings.
-- Portfolio tab items + work-history records (reliability metrics) — `portfolio_items` table
-  exists; the profile still shows demo records with the real toggles kept local.
-- `lib/follow.tsx` (localStorage) still powers FollowButton on legacy static cards; DB follows are
-  live on posts, creator pages, and the API.
-- Username/handle change, notification delivery channels, community feeds.
+- Events, Communities, Campus page CONTENT (the campus gate + verification are real; the sections
+  inside are demo data) — models and APIs are ready, UI still reads `lib/data`.
+- "This week" events widget in the right sidebar; Analytics; Discover; Resolution Center demo
+  case; Settings; the profile's Portfolio-tab items and work-history records (reliability
+  breakdown numbers). Public creator ratings/completed counts ARE computed from real projects.
+- Legacy components no longer mounted anywhere but kept in the tree: `components/Feed.tsx`,
+  `MessagesClient`, `NotificationBell`, `NearbyNow`, `CreatePost`, `HireModal`, `lib/follow.tsx`,
+  `lib/notifications.ts`, old `api/feed/for-you` + `near-you` routes.
+- Username/handle change, notification delivery channels, community feeds, event bookmarks.
 
 ## Data & the road ahead
 

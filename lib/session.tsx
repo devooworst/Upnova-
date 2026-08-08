@@ -56,6 +56,7 @@ export interface SessionUser {
   role: string;
   plan: string;
   profile: SessionProfile;
+  campus?: { name: string; slug: string; program: string } | null;
 }
 
 export const SESSION_EVENT = "upnova:session-changed";
