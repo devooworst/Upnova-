@@ -27,6 +27,7 @@ export interface OpportunityItem {
   applyBy: string | null;
   eventDate: string | null;
   applyConfig?: { requireMessage?: boolean; question?: string };
+  roles?: { id: string; title: string; count: number; pay: number | null; description?: string; open: number }[];
   posterType?: PosterType;
   poster: { id: string; handle: string; displayName: string; avatarUrl: string | null; locationLabel?: string | null };
   isMine: boolean;
@@ -126,6 +127,20 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
                 )}
               </div>
               {!compact && <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{o.description}</p>}
+              {(o.roles?.length ?? 0) > 0 && (
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {o.roles!.map((r) => (
+                    <span
+                      key={r.id}
+                      className={`rounded-full border px-2 py-0.5 font-mono text-[10px] tracking-[0.05em] ${
+                        r.open < 1 ? "border-line-soft text-zinc-600 line-through" : "border-amber-400/30 bg-amber-400/5 text-amber-300"
+                      }`}
+                    >
+                      {r.title} ×{r.count}{r.pay != null ? ` · $${r.pay}` : ""}
+                    </span>
+                  ))}
+                </p>
+              )}
               <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
                 <span className="inline-flex items-center gap-1.5">
                   <Avatar src={o.poster.avatarUrl} initials={o.poster.displayName.charAt(0)} size="xs" />
@@ -207,6 +222,8 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
      and portfolio attach automatically — never re-typed. The poster's
      applyConfig decides what's required beyond that. */
   const [message, setMessage] = useState("");
+  const roles = opp.roles ?? [];
+  const [roleId, setRoleId] = useState<string | null>(roles.length === 1 ? roles[0].id : null);
   const [availability, setAvailability] = useState<"yes" | "no" | "need_check" | null>(
     opp.eventDate ? null : "yes"
   );
@@ -240,6 +257,10 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
   }, []);
 
   const submit = async () => {
+    if (roles.length > 0 && !roleId) {
+      setError("Pick the role you're applying for");
+      return;
+    }
     if (requireMessage && !message.trim()) {
       setError("Tell them why you're a good fit");
       return;
@@ -256,7 +277,7 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
     const res = await fetch(`/api/opportunities/${opp.id}/applications`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, availability, questionAnswer, extra }),
+      body: JSON.stringify({ message, availability, questionAnswer, extra, roleId }),
     });
     const data = await res.json();
     setBusy(false);
@@ -285,6 +306,45 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* 0 · which role — the applicant chooses; capacity shown live */}
+        {roles.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Which role are you applying for?</p>
+            <div className="mt-1.5 space-y-1.5">
+              {roles.map((r) => {
+                const full = r.open < 1;
+                return (
+                  <button
+                    key={r.id}
+                    disabled={full}
+                    onClick={() => setRoleId(r.id)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${
+                      full
+                        ? "cursor-not-allowed border-line-soft opacity-50"
+                        : roleId === r.id
+                          ? "border-lime-400/50 bg-lime-400/5"
+                          : "border-line hover:border-zinc-600"
+                    }`}
+                  >
+                    <span>
+                      <span className={`block text-sm font-semibold ${roleId === r.id ? "text-lime-300" : "text-zinc-200"}`}>
+                        {r.title}
+                      </span>
+                      <span className="block text-[11px] text-zinc-500">
+                        {full ? "Filled" : `${r.open} of ${r.count} opening${r.count > 1 ? "s" : ""} left`}
+                        {r.description ? ` · ${r.description}` : ""}
+                      </span>
+                    </span>
+                    {r.pay != null && (
+                      <span className="shrink-0 font-mono text-sm font-medium tracking-[0.08em] text-lime-300">${r.pay}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 1 · why you */}
         <div className="mt-4">

@@ -32,6 +32,8 @@ interface Opp {
   eventDate: string | null;
   createdAt: string;
   applicants: number;
+  roles: { id: string; title: string; count: number; pay: number | null; description?: string; open: number }[];
+  myStatus: string | null;
   poster: {
     id: string;
     handle: string;
@@ -138,6 +140,41 @@ export default function OpportunityPage() {
         </div>
 
         <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-300">{opp.description}</p>
+
+        {/* TEAM & OPENINGS — applicants choose their role; capacity is live */}
+        {opp.roles.length > 0 && (
+          <div className="mt-5 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Roles</p>
+            {opp.roles.map((r) => (
+              <div
+                key={r.id}
+                className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 ${
+                  r.open < 1 ? "border-line-soft opacity-60" : "border-line"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-zinc-100">
+                    {r.title}
+                    <span className="ml-2 text-xs font-normal text-zinc-500">
+                      {r.open < 1 ? "Filled" : `${r.open} opening${r.open > 1 ? "s" : ""}`}
+                    </span>
+                  </p>
+                  {r.description && <p className="text-[11px] text-zinc-500">{r.description}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-2.5">
+                  {r.pay != null && (
+                    <span className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">${r.pay}</span>
+                  )}
+                  {!opp.isMine && !opp.applied && opp.status === "open" && r.open > 0 && (
+                    <button onClick={apply} className="btn-ghost px-3 py-1.5 text-[11px]">
+                      Apply for {r.title}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* about the poster — identity and verification, not perceived quality */}
         <div className="mt-5 rounded-xl border border-line bg-card-raised/50 p-3.5">

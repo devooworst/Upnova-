@@ -507,6 +507,42 @@ function seed() {
       .run();
   }
 
+  /* -------- role opportunity: TEAM & OPENINGS, the flagship demo -------- */
+  // Sofia's clothing-brand shoot: one opportunity, four roles. Marcus is
+  // CONFIRMED as photographer (accepted -> booking on both calendars),
+  // Imani's MUA offer is out (awaiting acceptance), the rest are in review.
+  const shootId = id();
+  const shootRoles = [
+    { id: "photo", title: "Photographer", count: 1, pay: 500, description: "Shoot the campaign — 4 hours on set." },
+    { id: "model", title: "Model", count: 3, pay: 200, description: "Three looks each, all sizes welcome." },
+    { id: "mua", title: "Makeup Artist", count: 1, pay: 200 },
+    { id: "stylist", title: "Stylist", count: 1, pay: 300, description: "Pull list handled — you run the racks." },
+  ];
+  db.insert(t.opportunities).values({
+    id: shootId, posterId: uid["sofia"],
+    title: "Clothing Brand Photoshoot — Models, Photographer & MUA",
+    description: "Small creative team for an upcoming clothing brand photoshoot. Experienced models, one photographer, a makeup artist, and a stylist. Paid shoot — details and references go to selected applicants.",
+    budget: 1500, type: "gig", location: "Baltimore, MD",
+    applyBy: daysFromNow(7), eventDate: daysFromNow(14),
+    roles: JSON.stringify(shootRoles),
+    applyConfig: JSON.stringify({ requireMessage: true, selection: "manual", notifyUnselected: true }),
+    lat: defs.find((d) => d.handle === "sofia")!.lat, lng: defs.find((d) => d.handle === "sofia")!.lng,
+    isSeed: true,
+  }).run();
+  const shootApp = (handle: string, roleId: string, status: string, message: string) => {
+    db.insert(t.applications).values({
+      id: id(), opportunityId: shootId, applicantId: uid[handle], roleId,
+      message, availability: "yes", status, createdAt: hoursAgo(30),
+    }).run();
+  };
+  shootApp("marcusj", "photo", "confirmed", "Campaign work is my bread and butter — recent brand shoots on my profile.");
+  shootApp("omar", "photo", "submitted", "Portfolio has two lookbooks from campus brands. Would love the shot.");
+  shootApp("maya", "model", "submitted", "Runway and print experience — comp card on request.");
+  shootApp("nia", "model", "shortlisted", "Modeled for two local brands last season — flexible on time.");
+  shootApp("tj", "model", "submitted", "New to modeling but very comfortable on camera.");
+  shootApp("imani", "mua", "selected", "Beauty is my whole business — bridal and editorial kits ready.");
+  shootApp("lena", "stylist", "submitted", "I art-direct brand identities — styling the racks would be fun.");
+
   // applications to Ava's opportunity → powers the applicant-review screen
   db.insert(t.applications).values({
     id: id(), opportunityId: oid["Second Shooter — Creator Meetup"], applicantId: uid["marcusj"],
@@ -769,6 +805,19 @@ function seed() {
   mkBooking({ service: "devin:Songwriting", client: "tj", provider: "devin", title: "Songwriting", starts: at(-9, 13), dur: 120, price: 150, loc: "Remote session", status: "completed" });
   // devin as CLIENT
   mkBooking({ service: "ava:Event Photography", client: "devin", provider: "ava", title: "Event Photography", starts: at(3, 17), dur: 180, price: 250, loc: "Rooftop — Fells Point", status: "confirmed" });
+
+  // Marcus's confirmed shoot role — the Team-view engagement: a REAL
+  // booking (payment pending; Sofia pays through the normal flow)
+  const shootConv = makeConversation("sofia", "marcusj", [
+    ["marcusj", "Locked in for the shoot — send the shot list whenever it's ready.", 26],
+  ]);
+  db.insert(t.bookings).values({
+    id: id(), serviceId: null, clientId: uid["sofia"], providerId: uid["marcusj"],
+    title: "Photographer — Clothing Brand Photoshoot",
+    startsAt: at(14, 14), durationMin: 240, price: 500,
+    items: JSON.stringify([{ label: "Photographer · Clothing Brand Photoshoot", amount: 500 }]),
+    location: "Baltimore, MD", status: "accepted", conversationId: shootConv, isSeed: true,
+  }).run();
   mkBooking({ service: "imani:Gel Nail Set", client: "devin", provider: "imani", title: "Gel Nail Set (gift booking)", starts: at(6, 10), dur: 90, price: 55, loc: "Bowie campus", status: "reschedule_requested", proposed: at(7, 10) });
   mkBooking({ service: "tj:Event DJ — 4 Hours", client: "devin", provider: "tj", title: "Event DJ — 4 Hours", starts: at(-2, 20), dur: 240, price: 400, loc: "The Assembly Room", status: "cancelled" });
 

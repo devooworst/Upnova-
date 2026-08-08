@@ -405,6 +405,12 @@ export const opportunities = sqliteTable("opportunities", {
   // automatically when the opportunity has a date; portfolio/profile are
   // always auto-attached, never re-typed.
   applyConfig: text("apply_config").notNull().default("{}"),
+  // configurable TEAM & OPENINGS (JSON, lib/opportunityRoles.ts):
+  // [{id,title,count,pay,description}] — one opportunity can need
+  // "Photographer ×1 $500, Model ×3 $200, MUA ×1 $200". Empty = simple
+  // single-role opportunity. Roles are CONFIGURATION of the universal
+  // system — never a separate casting/hiring/fashion system.
+  roles: text("roles").notNull().default("[]"),
   status: text("status").notNull().default("open"), // open | closed | filled
   isSeed: seed(),
   createdAt: ts("created_at"),
@@ -421,10 +427,15 @@ export const applications = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     message: text("message").notNull().default(""),
+    // which role this person applied for (role opportunities only)
+    roleId: text("role_id"),
     availability: text("availability").notNull().default("yes"), // yes | no | need_check
     // answers to poster-defined questions + the optional "anything else"
     answers: text("answers").notNull().default("{}"),
-    status: text("status").notNull().default("submitted"), // submitted | shortlisted | selected | declined
+    // submitted → shortlisted → selected (offer out, awaiting acceptance)
+    // → confirmed (accepted; booking exists) · declined (by poster) ·
+    // offer_declined (by applicant)
+    status: text("status").notNull().default("submitted"),
     createdAt: ts("created_at"),
   },
   (t) => [uniqueIndex("app_opp_applicant").on(t.opportunityId, t.applicantId)]

@@ -196,3 +196,69 @@ export function seedReviewsBack(projectId: string, realUserId: string) {
     /* reviews closed — fine */
   }
 }
+
+/* ------------------- role opportunities (Team & Openings) ------------------- */
+
+/** Seed applicant accepts a role offer instantly — the team view fills in. */
+export function seedAcceptsRoleOffer(applicationId: string) {
+  const app = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+  if (!app || app.status !== "selected" || !isSeedUser(app.applicantId)) return;
+  // the protagonist demo account (admin) never auto-acts — accepting an
+  // offer is THEIR moment when a human is driving that account
+  const applicant = db.select().from(tables.users).where(eq(tables.users.id, app.applicantId)).get();
+  if (applicant?.role === "admin") return;
+  // lazy import avoids a cycle (oppFlow → notify only)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("./oppFlow").acceptRoleOffer(applicationId);
+}
+
+/**
+ * When a REAL user posts a role opportunity, a few seed locals apply to
+ * each role right away so the poster can demo review → select → team →
+ * payment without waiting for anyone.
+ */
+export function seedApplicantsApplyToRoles(opportunityId: string) {
+  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, opportunityId)).get();
+  if (!opp) return;
+  let roles: { id: string; title: string }[] = [];
+  try { roles = JSON.parse(opp.roles); } catch { return; }
+  if (!roles.length) return;
+  const seeds = db.select().from(tables.users).all().filter((u) => u.isSeed && u.id !== opp.posterId && u.status === "active");
+  const MESSAGES = [
+    "This is exactly my lane — portfolio's on my profile, happy to share more.",
+    "Available that day and local. Would love to be part of this.",
+    "Been doing this for years — refs and recent work on my profile.",
+  ];
+  let cursor = 0;
+  for (const role of roles) {
+    // two applicants per role, cycling through seed users (one app per user)
+    for (let k = 0; k < 2 && cursor < seeds.length; k++, cursor++) {
+      const u = seeds[cursor];
+      const already = db
+        .select()
+        .from(tables.applications)
+        .where(and(eq(tables.applications.opportunityId, opp.id), eq(tables.applications.applicantId, u.id)))
+        .get();
+      if (already) continue;
+      db.insert(tables.applications)
+        .values({
+          id: randomBytes(12).toString("hex"),
+          opportunityId: opp.id,
+          applicantId: u.id,
+          roleId: role.id,
+          message: MESSAGES[cursor % MESSAGES.length],
+          availability: "yes",
+        })
+        .run();
+      notify({
+        userId: opp.posterId,
+        actorId: u.id,
+        type: "application",
+        title: `New applicant — ${role.title}`,
+        body: opp.title,
+        href: `/opportunities/${opp.id}/applicants`,
+        priority: "normal",
+      });
+    }
+  }
+}

@@ -7,6 +7,7 @@ import { requireOpportunityPoster } from "@/lib/server/authz";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { recordInteraction } from "@/lib/server/recsys";
+import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,17 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       .orderBy(desc(tables.applications.createdAt))
       .all();
 
+    const roleList = parseRoles(opp.roles);
     return {
-      opportunity: { id: opp.id, title: opp.title, budget: opp.budget, status: opp.status },
+      opportunity: {
+        id: opp.id,
+        title: opp.title,
+        budget: opp.budget,
+        status: opp.status,
+        eventDate: opp.eventDate?.toISOString() ?? null,
+        location: opp.remote ? "Remote" : opp.location,
+        roles: roleList.map((r) => ({ ...r, open: openingsLeft(r, rows.map((x) => x.app)) })),
+      },
       applications: rows.map((r) => ({
         id: r.app.id,
         message: r.app.message,
@@ -39,6 +49,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           }
         })(),
         status: r.app.status,
+        roleId: r.app.roleId,
         createdAt: r.app.createdAt.toISOString(),
         applicant: publicUser(r.user, r.profile),
       })),
@@ -84,12 +95,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (config.question && !questionAnswer)
       throw new ApiError(400, "The poster asked one extra question — answer it to apply");
 
+    // role opportunities: the applicant chooses WHICH role, the server
+    // checks it exists and still has openings
+    const roles = parseRoles(opp.roles);
+    let roleId: string | null = null;
+    if (roles.length > 0) {
+      const role = roles.find((r) => r.id === String(body.roleId || ""));
+      if (!role) throw new ApiError(400, "Pick the role you're applying for");
+      const apps = db
+        .select()
+        .from(tables.applications)
+        .where(eq(tables.applications.opportunityId, opp.id))
+        .all();
+      if (openingsLeft(role, apps) < 1) throw new ApiError(409, `${role.title} is filled — pick another role`);
+      roleId = role.id;
+    }
+
     const id = randomBytes(12).toString("hex");
     db.insert(tables.applications)
       .values({
         id,
         opportunityId: opp.id,
         applicantId: user.id,
+        roleId,
         message,
         availability,
         answers: JSON.stringify({
@@ -105,7 +133,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       userId: opp.posterId,
       actorId: user.id,
       type: "application",
-      title: `${user.profile.displayName} applied to ${opp.title}`,
+      title: roleId
+        ? `${user.profile.displayName} applied — ${roles.find((r) => r.id === roleId)!.title}`
+        : `${user.profile.displayName} applied to ${opp.title}`,
       body: opp.eventDate
         ? availability === "yes"
           ? "Available on your date"

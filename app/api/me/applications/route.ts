@@ -18,21 +18,33 @@ export async function GET() {
       .all();
 
     return {
-      applications: rows.map((r) => ({
-        id: r.app.id,
-        status: r.app.status, // submitted | shortlisted | selected | declined
-        availability: r.app.availability,
-        message: r.app.message,
-        createdAt: r.app.createdAt.toISOString(),
-        opportunity: {
-          id: r.opp.id,
-          title: r.opp.title,
-          budget: r.opp.budget,
-          location: r.opp.remote ? "Remote" : r.opp.location,
-          status: r.opp.status,
-          poster: r.poster.displayName,
-        },
-      })),
+      applications: rows.map((r) => {
+        const role = (() => {
+          try {
+            const roles = JSON.parse(r.opp.roles) as { id: string; title: string; pay: number | null }[];
+            return roles.find((x) => x.id === r.app.roleId) ?? null;
+          } catch {
+            return null;
+          }
+        })();
+        return {
+          id: r.app.id,
+          status: r.app.status, // submitted | shortlisted | selected | confirmed | declined | offer_declined
+          availability: r.app.availability,
+          message: r.app.message,
+          createdAt: r.app.createdAt.toISOString(),
+          role: role ? { title: role.title, pay: role.pay } : null,
+          opportunity: {
+            id: r.opp.id,
+            title: r.opp.title,
+            budget: r.opp.budget,
+            location: r.opp.remote ? "Remote" : r.opp.location,
+            eventDate: r.opp.eventDate?.toISOString() ?? null,
+            status: r.opp.status,
+            poster: r.poster.displayName,
+          },
+        };
+      }),
     };
   });
 }

@@ -374,6 +374,27 @@ its share page still resolves ("no longer offered"), and one click reactivates i
 Sofia's "Custom Crochet Pieces" (custom category) and Imani's retired "Acrylic Full Set"
 (deactivated, in history).
 
+**Team & Openings — configurable roles on the universal Opportunity system.** One opportunity can
+need Photographer ×1 $500 + Model ×3 $200 + MUA ×1 $200 + Stylist ×1 $300 — or Security ×6 +
+Stagehands ×4, or Actor ×3 + Cinematographer ×1. Roles (`opportunities.roles`,
+`lib/opportunityRoles.ts`) are configuration of the same architecture: Opportunity → Roles →
+Capacity → Applications → Selection → Acceptance → Booking → Payment → Completion → History —
+never a separate casting/hiring/fashion/job system. Applicants pick WHICH role they're applying
+for (role cards with live "2 of 3 openings left"; full roles reject with 409 server-side). The
+poster reviews applicants GROUPED by role with Shortlist / Select / Message / Decline; selecting
+sends an OFFER ("You've been selected — Role · $pay · date · location · via UpNova payment"),
+the applicant Accepts (→ a real booking lands on BOTH calendars in payment-pending state, wired
+to the shared conversation) or declines (the opening frees up). The poster's page becomes a
+**Team board**: every selected member with Awaiting response / Confirmed status, secured through
+the normal booking payment flow (secured → completed → released; verified live: Sofia paid
+Marcus's $500 + $25 fee). Declines and closing applications send the professional update ("the
+creator has decided to move forward with other applicants"), per the poster's notification
+setting — never a harsh "declined". Selection modes: manual (default) or shortlist-first. Demo
+Mode: post a role opportunity and seed locals apply to every role instantly; seed applicants
+accept offers instantly (the protagonist admin account never auto-acts). Seed world: Sofia's
+"Clothing Brand Photoshoot" with four roles, Marcus confirmed (booking + conversation live),
+Imani's offer awaiting acceptance, and a full review queue.
+
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
 gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /

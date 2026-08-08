@@ -4,6 +4,8 @@ import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
+import { normalizeRoles, parseRoles, openingsLeft } from "@/lib/opportunityRoles";
+import { seedApplicantsApplyToRoles } from "@/lib/server/demo";
 import { FeedScope, inScope, viewerContext, verifiedCampusMap } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
@@ -77,6 +79,17 @@ export async function GET(req: NextRequest) {
       filtered = ranker.rank(mapped, taste).map((x) => x.item);
     }
 
+    // roles + remaining openings, one query for all listings
+    const allApps = db
+      .select({ opportunityId: tables.applications.opportunityId, roleId: tables.applications.roleId, status: tables.applications.status })
+      .from(tables.applications)
+      .all();
+    const rolesFor = (oppId: string, raw: string) => {
+      const roles = parseRoles(raw);
+      const apps = allApps.filter((a) => a.opportunityId === oppId);
+      return roles.map((r) => ({ ...r, open: openingsLeft(r, apps) }));
+    };
+
     const myApplications = viewer
       ? new Set(
           db
@@ -108,6 +121,7 @@ export async function GET(req: NextRequest) {
             return {};
           }
         })(),
+        roles: rolesFor(r.opp.id, r.opp.roles),
         poster: publicUser(r.user, r.profile),
         posterType: posterTypeFor(r.user),
         isMine: viewer?.id === r.opp.posterId,
@@ -142,11 +156,21 @@ export async function POST(req: NextRequest) {
         applyConfig: JSON.stringify({
           requireMessage: body.requireMessage !== false,
           question: String(body.question || "").slice(0, 160) || undefined,
+          // manual selection is the default; unselected applicants get the
+          // professional update on close unless the poster opts out
+          selection: ["manual", "shortlist"].includes(body.selection) ? body.selection : "manual",
+          notifyUnselected: body.notifyUnselected !== false,
         }),
+        // TEAM & OPENINGS — roles are configuration of the universal
+        // system, never a separate casting/job board
+        roles: JSON.stringify(normalizeRoles(body.roles)),
         lat: user.profile.lat,
         lng: user.profile.lng,
       })
       .run();
+    // demo mode: seed locals apply to each role right away so the poster
+    // can walk review → select → team → payment immediately
+    seedApplicantsApplyToRoles(id);
     return { id };
   });
 }

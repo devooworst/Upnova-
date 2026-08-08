@@ -14,22 +14,28 @@ import OpportunityList from "@/components/db/OpportunityList";
 
 interface MyApplication {
   id: string;
-  status: "submitted" | "shortlisted" | "selected" | "declined";
+  status: "submitted" | "shortlisted" | "selected" | "confirmed" | "declined" | "offer_declined";
   availability: string;
   message: string;
   createdAt: string;
-  opportunity: { id: string; title: string; budget: number | null; location: string; status: string; poster: string };
+  role: { title: string; pay: number | null } | null;
+  opportunity: { id: string; title: string; budget: number | null; location: string; eventDate: string | null; status: string; poster: string };
 }
 
 const APP_STATUS: Record<string, { label: string; cls: string }> = {
   submitted: { label: "Under Review", cls: "border-amber-400/40 bg-amber-400/10 text-amber-300" },
   shortlisted: { label: "Shortlisted", cls: "border-violet-400/40 bg-violet-400/10 text-violet-300" },
-  selected: { label: "Accepted", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
-  declined: { label: "Declined", cls: "border-line text-zinc-500" },
+  selected: { label: "Selected — respond", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  confirmed: { label: "Confirmed", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  declined: { label: "Not selected", cls: "border-line text-zinc-500" },
+  offer_declined: { label: "You declined", cls: "border-line text-zinc-500" },
 };
 
 export default function OpportunitiesPage() {
   const [scope, setScope] = useState("for-you");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("apps")) setView("applications");
+  }, []);
   const [view, setView] = useState<"browse" | "applications">("browse");
   const [apps, setApps] = useState<MyApplication[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -46,6 +52,15 @@ export default function OpportunitiesPage() {
   useEffect(() => {
     if (view === "applications") loadApps();
   }, [view, loadApps]);
+
+  const respond = async (id: string, action: "accept" | "decline_offer") => {
+    await fetch(`/api/applications/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    loadApps();
+  };
 
   const withdraw = async (id: string) => {
     await fetch(`/api/applications/${id}`, { method: "DELETE" });
@@ -139,7 +154,12 @@ export default function OpportunitiesPage() {
                   <div className="min-w-0 flex-1">
                     <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-100">
                       {a.opportunity.title}
-                      {a.opportunity.budget != null && (
+                      {a.role && (
+                        <span className="rounded-full border border-amber-400/30 bg-amber-400/5 px-2 py-0.5 font-mono text-[10px] tracking-[0.05em] text-amber-300">
+                          {a.role.title}{a.role.pay != null ? ` · $${a.role.pay}` : ""}
+                        </span>
+                      )}
+                      {!a.role && a.opportunity.budget != null && (
                         <span className="font-mono text-xs font-medium tracking-[0.08em] text-lime-300">
                           ${a.opportunity.budget}
                         </span>
@@ -154,13 +174,43 @@ export default function OpportunitiesPage() {
                     {APP_STATUS[a.status].label}
                   </span>
                 </button>
+                {/* the offer moment — role, date, place, pay, and the choice */}
+                {a.status === "selected" && a.role && (
+                  <div className="mt-3 rounded-xl border border-lime-400/40 bg-lime-400/5 p-3.5">
+                    <p className="text-sm font-bold text-lime-300">You&apos;ve been selected!</p>
+                    <p className="mt-1 text-xs leading-relaxed text-zinc-300">
+                      <span className="font-semibold text-zinc-100">{a.opportunity.title}</span>
+                      <br />Role: {a.role.title}
+                      {a.opportunity.eventDate && (
+                        <> · {new Date(a.opportunity.eventDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</>
+                      )}
+                      {" "}· {a.opportunity.location}
+                      {a.role.pay != null && <> · <span className="font-mono tracking-[0.05em] text-lime-300">${a.role.pay}</span> via UpNova payment (secured, released after completion)</>}
+                    </p>
+                    <div className="mt-2.5 flex gap-2">
+                      <button onClick={() => respond(a.id, "accept")} className="btn-lime px-4 py-1.5 text-xs">
+                        Accept — add to Bookings
+                      </button>
+                      <button onClick={() => respond(a.id, "decline_offer")} className="btn-ghost px-3.5 py-1.5 text-xs">
+                        Decline offer
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {a.status === "confirmed" && (
+                  <p className="mt-3 rounded-xl border border-lime-400/30 bg-lime-400/5 px-3.5 py-2.5 text-xs text-zinc-300">
+                    Confirmed — it&apos;s on your{" "}
+                    <Link href="/calendar" className="font-semibold text-lime-300 underline-offset-2 hover:underline">calendar</Link>.
+                    {a.role?.pay != null && ` The poster's payment secures your $${a.role.pay}.`}
+                  </p>
+                )}
                 {expanded === a.id && (
                   <div className="mt-3 border-t border-line-soft pt-3">
                     {a.message && <p className="text-xs leading-relaxed text-zinc-400">&ldquo;{a.message}&rdquo;</p>}
                     <p className="mt-1.5 text-[11px] text-zinc-500">
                       Availability: {a.availability === "yes" ? "confirmed for the date" : "needs to check schedule"}
                     </p>
-                    {a.status !== "selected" && a.status !== "declined" && (
+                    {!["selected", "confirmed", "declined"].includes(a.status) && (
                       <button
                         onClick={() => withdraw(a.id)}
                         className="mt-2.5 rounded-full border border-line px-3.5 py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300"

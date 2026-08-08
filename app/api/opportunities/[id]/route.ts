@@ -3,6 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
+import { notify } from "@/lib/server/notify";
+import { requireOpportunityPoster } from "@/lib/server/authz";
+import { requireUser } from "@/lib/server/auth";
+import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +53,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           .where(and(eq(tables.applications.opportunityId, opp.id), eq(tables.applications.applicantId, viewer.id)))
           .get()
       : false;
-    const applicants = db
+    const apps = db
       .select()
       .from(tables.applications)
       .where(eq(tables.applications.opportunityId, opp.id))
-      .all().length;
+      .all();
+    const applicants = apps.length;
+    // roles with live remaining openings — capacity is public information
+    const roles = parseRoles(opp.roles).map((r) => ({ ...r, open: openingsLeft(r, apps) }));
+    const myApp = viewer ? apps.find((a) => a.applicantId === viewer.id) : undefined;
 
     return {
       opportunity: {
@@ -71,11 +79,60 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         eventDate: opp.eventDate?.toISOString() ?? null,
         createdAt: opp.createdAt.toISOString(),
         applicants,
+        roles,
+        myRoleId: myApp?.roleId ?? null,
+        myStatus: myApp?.status ?? null,
         poster: publicUser(user, profile),
         posterType,
         isMine: viewer?.id === opp.posterId,
-        applied,
+        applied: !!myApp || applied,
       },
     };
+  });
+}
+
+/**
+ * PATCH /api/opportunities/[id] { action: "close" | "reopen" } — poster only.
+ * Closing sends the professional update to everyone still un-selected,
+ * according to the poster's notification setting (never a harsh decline).
+ */
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+  return guarded(() => {
+    const user = requireUser();
+    const opp = requireOpportunityPoster(params.id, user.id);
+    const action = String(body.action);
+    if (action === "reopen") {
+      db.update(tables.opportunities).set({ status: "open" }).where(eq(tables.opportunities.id, opp.id)).run();
+      return { status: "open" };
+    }
+    if (action !== "close") throw new ApiError(400, "Unknown action");
+    db.update(tables.opportunities).set({ status: "closed" }).where(eq(tables.opportunities.id, opp.id)).run();
+
+    let cfg: { notifyUnselected?: boolean } = {};
+    try { cfg = JSON.parse(opp.applyConfig); } catch {}
+    let notified = 0;
+    if (cfg.notifyUnselected !== false) {
+      const pending = db
+        .select()
+        .from(tables.applications)
+        .where(eq(tables.applications.opportunityId, opp.id))
+        .all()
+        .filter((a) => ["submitted", "shortlisted"].includes(a.status));
+      for (const a of pending) {
+        db.update(tables.applications).set({ status: "declined" }).where(eq(tables.applications.id, a.id)).run();
+        notify({
+          userId: a.applicantId,
+          actorId: user.id,
+          type: "application",
+          title: "Update on your application",
+          body: `Thank you for applying to ${opp.title}. The creator has decided to move forward with other applicants for this opportunity. We appreciate your interest.`,
+          href: "/opportunities",
+          priority: "low",
+        });
+        notified++;
+      }
+    }
+    return { status: "closed", notified };
   });
 }
