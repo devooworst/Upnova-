@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Check, Plus } from "lucide-react";
+import { Users, Check, Plus, ArrowRight } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import ReachBadge from "./ReachBadge";
 import type { Community } from "@/lib/data";
 
@@ -11,6 +12,7 @@ export default function CommunityCard({ community }: { community: Community }) {
 
   return (
     <article id={community.id} className="card-people card-lift flex flex-col overflow-hidden hover:border-zinc-600">
+      <Link href={`/communities/${community.id}`} aria-label={`Open ${community.name}`}>
       <div
         className={`relative h-24 overflow-hidden ${
           community.image
@@ -33,9 +35,10 @@ export default function CommunityCard({ community }: { community: Community }) {
           {community.online} online
         </span>
       </div>
+      </Link>
 
       <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <h3 className="text-base font-bold text-zinc-50">{community.name}</h3>
+        <Link href={`/communities/${community.id}`} className="text-base font-bold text-zinc-50 transition hover:text-violet-300">{community.name}</Link>
         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
           <Users className="h-3.5 w-3.5" />
           {community.members} members
@@ -51,24 +54,32 @@ export default function CommunityCard({ community }: { community: Community }) {
           ))}
         </div>
 
-        <button
-          onClick={() => setJoined(!joined)}
-          className={`mt-4 w-full ${
-            joined
-              ? "btn-ghost border-violet-400/40 text-violet-300"
-              : "inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-violet-300 active:scale-[0.98]"
-          }`}
-        >
-          {joined ? (
-            <>
-              <Check className="h-4 w-4" /> Joined
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4" /> Join Community
-            </>
-          )}
-        </button>
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => setJoined(!joined)}
+            className={`flex-1 ${
+              joined
+                ? "btn-ghost border-violet-400/40 text-violet-300"
+                : "inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet active:scale-[0.98]"
+            }`}
+          >
+            {joined ? (
+              <>
+                <Check className="h-4 w-4" /> Joined
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> Join
+              </>
+            )}
+          </button>
+          <Link
+            href={`/communities/${community.id}`}
+            className="btn-ghost flex-1 px-3 py-2 text-sm"
+          >
+            Open <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
     </article>
   );

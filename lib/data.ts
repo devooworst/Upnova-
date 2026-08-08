@@ -291,6 +291,26 @@ export const opportunities: Opportunity[] = [
     distanceMi: 2.1,
   },
   {
+    id: "crew-call",
+    title: "Short Film Crew Call",
+    poster: "Marcus Reed",
+    posterAvatar: "/images/marcus.jpg",
+    posterInitials: "M",
+    posterGradient: "from-amber-500 to-orange-600",
+    verifiedPoster: true,
+    category: "Gig",
+    description:
+      "Camera operator needed for a one-day short film shoot in Baltimore on August 18. Meals covered, credit + footage for your reel.",
+    budget: "$400",
+    deadline: "Aug 16",
+    roles: "Camera Operator",
+    applicants: 6,
+    paid: true,
+    tags: ["Paid", "Film"],
+    reach: { location: "Baltimore, MD", reach: "Local", radius: "25 mi" },
+    distanceMi: 6.5,
+  },
+  {
     id: "music-video",
     title: "Music Video Shoot",
     poster: "Jordan Miles",
@@ -667,6 +687,230 @@ export const communities: Community[] = [
     joined: true,
   },
 ];
+
+/* --------------------------- community content ----------------------------- */
+/* Same framework for every community — the purpose determines the content. */
+
+export interface CommunityPost {
+  id: string;
+  author: string;
+  authorAvatar?: string | null;
+  initials: string;
+  gradient: string;
+  role: string;
+  time: string;
+  text: string;
+  likes: number;
+  comments: number;
+}
+
+export interface Discussion {
+  id: string;
+  title: string;
+  author: string;
+  replies: number;
+  lastActive: string;
+  pinned?: boolean;
+}
+
+export interface CommunityContent {
+  posts: CommunityPost[];
+  discussions: Discussion[];
+  opportunityIds: string[];
+  eventIds: string[];
+  memberIds: string[];
+  created: string;
+  createdBy: string;
+}
+
+export const communityContent: Record<string, CommunityContent> = {
+  dmv: {
+    created: "March 2026",
+    createdBy: "Devin Carter",
+    memberIds: ["ava", "marcus", "nia", "jordan", "tre"],
+    opportunityIds: ["photo-gig", "event-staff"],
+    eventIds: ["meetup", "networking"],
+    posts: [
+      {
+        id: "dmv-p1",
+        author: "Jordan Miles",
+        authorAvatar: "/images/jordan.jpg",
+        initials: "J",
+        gradient: "from-violet-500 to-fuchsia-600",
+        role: "Music Producer",
+        time: "2h",
+        text: "Looking for a photographer in Baltimore this Saturday for a music video. Paid, half-day. Drop your portfolio below 👇",
+        likes: 34,
+        comments: 12,
+      },
+      {
+        id: "dmv-p2",
+        author: "Ava Chen",
+        authorAvatar: "/images/ava.jpg",
+        initials: "A",
+        gradient: "from-sky-500 to-indigo-600",
+        role: "Photographer",
+        time: "5h",
+        text: "Shot three creators from this community last month. This is what UpNova is supposed to feel like. Book your slots for September now — August is gone.",
+        likes: 87,
+        comments: 21,
+      },
+      {
+        id: "dmv-p3",
+        author: "Nia Carter",
+        initials: "N",
+        gradient: "from-rose-500 to-pink-600",
+        role: "Fashion Creator",
+        time: "1d",
+        text: "Who's going to the meetup on the 22nd? Trying to organize a fit-pic wall 📸",
+        likes: 45,
+        comments: 18,
+      },
+    ],
+    discussions: [
+      { id: "dmv-d1", title: "DMV Creator Meetup — August 22", author: "Devin Carter", replies: 48, lastActive: "1h", pinned: true },
+      { id: "dmv-d2", title: "Anybody know a good studio in Baltimore?", author: "Tre Watkins", replies: 15, lastActive: "3h" },
+      { id: "dmv-d3", title: "Looking for videographers in PG County", author: "Maya Reyes", replies: 9, lastActive: "6h" },
+      { id: "dmv-d4", title: "Who's going to the creator meetup?", author: "Nia Carter", replies: 31, lastActive: "1d" },
+    ],
+  },
+  "music-producers": {
+    created: "January 2026",
+    createdBy: "Jordan Miles",
+    memberIds: ["jordan", "tre", "lena"],
+    opportunityIds: ["music-video"],
+    eventIds: ["networking"],
+    posts: [
+      {
+        id: "mp-p1",
+        author: "Tre Watkins",
+        initials: "T",
+        gradient: "from-emerald-500 to-teal-600",
+        role: "Beat Maker",
+        time: "3h",
+        text: "Beat feedback thread 🎧 Drop your latest loop, give the person above you honest notes. No cap, no clout.",
+        likes: 62,
+        comments: 40,
+      },
+      {
+        id: "mp-p2",
+        author: "Jordan Miles",
+        authorAvatar: "/images/jordan.jpg",
+        initials: "J",
+        gradient: "from-violet-500 to-fuchsia-600",
+        role: "Music Producer",
+        time: "8h",
+        text: "Mixing tip that changed my low end forever: mono your bass below 120Hz and stop fighting your kick. That's it. That's the post.",
+        likes: 143,
+        comments: 27,
+      },
+    ],
+    discussions: [
+      { id: "mp-d1", title: "Weekly collab challenge #31 — flip this sample", author: "Jordan Miles", replies: 56, lastActive: "2h", pinned: true },
+      { id: "mp-d2", title: "Artists looking for producers — intro thread", author: "Lena Ortiz", replies: 88, lastActive: "4h" },
+      { id: "mp-d3", title: "How do you price mixing vs mastering?", author: "Tre Watkins", replies: 22, lastActive: "1d" },
+    ],
+  },
+  "film-makers": {
+    created: "February 2026",
+    createdBy: "Marcus Reed",
+    memberIds: ["marcus", "ava", "jordan"],
+    opportunityIds: ["crew-call"],
+    eventIds: ["photo-walk"],
+    posts: [
+      {
+        id: "fm-p1",
+        author: "Marcus Reed",
+        authorAvatar: "/images/marcus.jpg",
+        initials: "M",
+        gradient: "from-amber-500 to-orange-600",
+        role: "Videographer",
+        time: "4h",
+        text: "CREW NEEDED — camera operator for a short film in Baltimore, August 18. $400 for the day, meals covered. Apply on the opportunities tab.",
+        likes: 51,
+        comments: 16,
+      },
+      {
+        id: "fm-p2",
+        author: "Ava Chen",
+        authorAvatar: "/images/ava.jpg",
+        initials: "A",
+        gradient: "from-sky-500 to-indigo-600",
+        role: "Photographer",
+        time: "1d",
+        text: "Premiere night for 'Harbor Lines' went off. Full BTS gallery coming to my portfolio this week. Thanks to the six community members who crewed it 🎬",
+        likes: 94,
+        comments: 23,
+      },
+    ],
+    discussions: [
+      { id: "fm-d1", title: "Casting call board — post your roles here", author: "Marcus Reed", replies: 34, lastActive: "5h", pinned: true },
+      { id: "fm-d2", title: "Best budget cinema lens for Sony?", author: "Devin Carter", replies: 19, lastActive: "9h" },
+      { id: "fm-d3", title: "Local shoots this month — who needs hands?", author: "Ava Chen", replies: 27, lastActive: "1d" },
+    ],
+  },
+  photographers: {
+    created: "April 2026",
+    createdBy: "Ava Chen",
+    memberIds: ["ava", "nia", "marcus"],
+    opportunityIds: ["photo-gig"],
+    eventIds: ["photo-walk"],
+    posts: [
+      {
+        id: "ph-p1",
+        author: "Ava Chen",
+        authorAvatar: "/images/ava.jpg",
+        initials: "A",
+        gradient: "from-sky-500 to-indigo-600",
+        role: "Photographer",
+        time: "6h",
+        text: "Golden hour photo walk this Sunday at Federal Hill — all skill levels, all cameras. 22 going so far. Bring one lens only, that's the challenge.",
+        likes: 66,
+        comments: 14,
+      },
+    ],
+    discussions: [
+      { id: "ph-d1", title: "Critique thread — post one shot, get one note", author: "Ava Chen", replies: 73, lastActive: "2h", pinned: true },
+      { id: "ph-d2", title: "Second-shooter exchange board", author: "Nia Carter", replies: 41, lastActive: "7h" },
+    ],
+  },
+  streetwear: {
+    created: "December 2025",
+    createdBy: "Nia Carter",
+    memberIds: ["nia", "lena", "ava"],
+    opportunityIds: ["brand-collab"],
+    eventIds: ["networking"],
+    posts: [
+      {
+        id: "sw-p1",
+        author: "Nia Carter",
+        initials: "N",
+        gradient: "from-rose-500 to-pink-600",
+        role: "Fashion Creator",
+        time: "1h",
+        text: "Independent streetwear brand looking for a photographer for our next drop. $600, Baltimore, 5 miles. Check the opportunities tab — legit budget, real brief.",
+        likes: 58,
+        comments: 19,
+      },
+      {
+        id: "sw-p2",
+        author: "Lena Ortiz",
+        initials: "L",
+        gradient: "from-cyan-500 to-blue-600",
+        role: "Graphic Designer",
+        time: "10h",
+        text: "Design breakdown: how we took the Vaulted capsule from moodboard to tech pack in 12 days. Full thread in discussions.",
+        likes: 112,
+        comments: 31,
+      },
+    ],
+    discussions: [
+      { id: "sw-d1", title: "Drop calendar — what's releasing this month", author: "Nia Carter", replies: 29, lastActive: "3h", pinned: true },
+      { id: "sw-d2", title: "Manufacturer recs for small runs (50-200 pieces)?", author: "Lena Ortiz", replies: 44, lastActive: "8h" },
+      { id: "sw-d3", title: "Models available for lookbooks — intro thread", author: "Maya Reyes", replies: 17, lastActive: "2d" },
+    ],
+  },
+};
 
 /* -------------------------------- bookings --------------------------------- */
 /* Service providers live off their calendar: who booked, when, for how much. */
