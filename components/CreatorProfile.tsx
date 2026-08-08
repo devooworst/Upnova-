@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Clock, MapPin, MessageSquare, Star, Users, Zap } from "lucide-react";
+import { Check, Clock, Flag, MapPin, MessageSquare, Star, Users, Zap } from "lucide-react";
+import ReportModal from "./ReportModal";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import FollowButton from "./FollowButton";
@@ -31,6 +32,7 @@ export default function CreatorProfile({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>("Portfolio");
   const [listOpen, setListOpen] = useState<"followers" | "following" | null>(null);
   const [preview, setPreview] = useState<Creator | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const services = serviceCatalog.filter((s) => s.creatorId === id);
   const posted = opportunities.filter((o) => o.poster === creator.name);
@@ -66,6 +68,14 @@ export default function CreatorProfile({ id }: { id: string }) {
                   <Zap className="h-4 w-4" /> Hire Me
                 </Link>
               )}
+              <button
+                onClick={() => setReportOpen(true)}
+                className="icon-btn h-8 w-8"
+                aria-label={`Report ${creator.name}`}
+                title="Report / Get Help"
+              >
+                <Flag className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
@@ -225,6 +235,9 @@ export default function CreatorProfile({ id }: { id: string }) {
         </div>
       )}
 
+      {reportOpen && (
+        <ReportModal context={`Profile · ${creator.name}`} onClose={() => setReportOpen(false)} />
+      )}
       {listOpen && (
         <FollowListModal mode={listOpen} ownerName={creator.name.split(" ")[0]} onClose={() => setListOpen(null)} />
       )}

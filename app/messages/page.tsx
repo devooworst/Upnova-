@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Send, ChevronLeft, Briefcase, Paperclip } from "lucide-react";
+import { Send, ChevronLeft, Briefcase, Flag, Paperclip } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import ProjectFlow from "@/components/ProjectFlow";
+import ReportModal from "@/components/ReportModal";
 import { conversations, creators } from "@/lib/data";
 
 export default function MessagesPage() {
   const [activeId, setActiveId] = useState<string>(conversations[0].id);
   const [draft, setDraft] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const offPlatform = /cash\s?app|venmo|zelle|paypal\.me|wire\s?transfer/i.test(draft);
   const ava = creators.find((c) => c.id === "ava")!;
   const active = conversations.find((c) => c.id === activeId);
 
@@ -75,6 +78,14 @@ export default function MessagesPage() {
             </p>
           </div>
           <button
+            onClick={() => setReportOpen(true)}
+            className="icon-btn h-9 w-9"
+            aria-label="Report or get help"
+            title="Report / Get Help"
+          >
+            <Flag className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => active.id === "ava" && setCreateOpen(true)}
             className="btn-ghost px-3 py-1.5 text-xs"
             title="Turn this conversation into a project"
@@ -119,6 +130,14 @@ export default function MessagesPage() {
           )}
         </div>
 
+        {offPlatform && (
+          <div className="border-t border-amber-400/30 bg-amber-400/5 px-4 py-2.5">
+            <p className="text-xs leading-relaxed text-amber-300">
+              ⚠️ <span className="font-bold">Stay protected.</span> Never send payment outside
+              UpNova — outside payments may not be covered by transaction protections.
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2 border-t border-line-soft p-3">
           <button className="icon-btn h-9 w-9" aria-label="Attach">
             <Paperclip className="h-4 w-4" />
@@ -139,6 +158,9 @@ export default function MessagesPage() {
           </button>
         </div>
       </div>
+      )}
+      {reportOpen && active && (
+        <ReportModal context={`Conversation · ${active.name}`} onClose={() => setReportOpen(false)} />
       )}
     </div>
   );

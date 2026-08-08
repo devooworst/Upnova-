@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import Avatar from "./Avatar";
+import ReportModal from "./ReportModal";
 import Perforation from "./Perforation";
 import QrCode from "./QrCode";
 import { events, creators, currentUser, type UpEvent, type TicketType } from "@/lib/data";
@@ -49,6 +50,7 @@ export default function EventDetail({ id }: { id: string }) {
   const [dob, setDob] = useState("");
   const [ageError, setAgeError] = useState(false);
   const [rulesAck, setRulesAck] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({
     "Full name": currentUser.name,
     Email: "devin@upnova.app",
@@ -314,8 +316,19 @@ export default function EventDetail({ id }: { id: string }) {
               )}
             </div>
           </section>
+
+          <button
+            onClick={() => setReportOpen(true)}
+            className="w-full rounded-xl border border-line py-2 text-xs text-zinc-500 transition hover:border-red-500/40 hover:text-red-300"
+          >
+            Report / Get Help
+          </button>
         </div>
       </div>
+
+      {reportOpen && (
+        <ReportModal context={`Event · ${event.title}`} onClose={() => setReportOpen(false)} />
+      )}
 
       {/* ---------------- registration / ticket modal ---------------- */}
       {modalOpen && (

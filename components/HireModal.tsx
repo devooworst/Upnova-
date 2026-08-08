@@ -154,6 +154,11 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
         <p className="mt-2 flex items-center gap-1.5 font-mono text-[10px] font-medium text-zinc-500">
           <Lock className="h-3 w-3" /> secure payment · nothing is charged until you both agree
         </p>
+        <p className="mt-2 rounded-md border border-lime-400/25 bg-lime-400/5 p-2.5 text-[10px] leading-relaxed text-zinc-400">
+          🛡️ <span className="font-semibold text-lime-300">UpNova Protected.</span> The agreement,
+          payment, and delivery are recorded — if anything goes wrong, the Resolution Center has
+          the full record. Never pay outside UpNova.
+        </p>
 
         <button onClick={() => router.push("/messages")} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm">
           <Zap className="h-4 w-4" /> Continue to Message

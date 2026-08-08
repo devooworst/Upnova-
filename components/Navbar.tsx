@@ -12,6 +12,7 @@ import {
   Bookmark,
   BarChart3,
   Settings,
+  ShieldCheck,
   LogOut,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -101,6 +102,7 @@ export default function Navbar() {
                       { href: "/profile", icon: User, label: "View Profile" },
                       { href: "/bookmarks", icon: Bookmark, label: "Bookmarks" },
                       { href: "/analytics", icon: BarChart3, label: "Analytics" },
+                      { href: "/resolution", icon: ShieldCheck, label: "Resolution Center" },
                       { href: "/settings", icon: Settings, label: "Settings" },
                     ].map((item) => (
                       <Link

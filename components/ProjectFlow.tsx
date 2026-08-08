@@ -14,6 +14,8 @@ import {
 import Avatar from "./Avatar";
 import Perforation from "./Perforation";
 import { feeFor, totalFor, money, PLATFORM_FEE_RATE } from "@/lib/fees";
+import ReportModal from "./ReportModal";
+import { ShieldCheck, Flag } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /* The UpNova money loop, as UI state:                                 */
@@ -119,6 +121,7 @@ export default function ProjectFlow({
   const [custom, setCustom] = useState(false);
   const [customAmount, setCustomAmount] = useState(startingAt);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [myStars, setMyStars] = useState(0);
   const [myReview, setMyReview] = useState("Fantastic eye. The gallery was better than the brief.");
 
@@ -274,6 +277,17 @@ export default function ProjectFlow({
                 <p className="mt-1 text-sm font-semibold text-zinc-100">
                   {creatorName} <span className="font-normal text-zinc-500">×</span> You
                 </p>
+                <p className="mt-1.5 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300">
+                    <ShieldCheck className="h-3 w-3" /> UpNova Protected
+                  </span>
+                  <button
+                    onClick={() => setReportOpen(true)}
+                    className="inline-flex items-center gap-1 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500 transition hover:text-red-300"
+                  >
+                    <Flag className="h-3 w-3" /> get help
+                  </button>
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-xl font-extrabold tracking-tight tabular-nums text-lime-400">${counter}</p>
@@ -411,6 +425,10 @@ export default function ProjectFlow({
         </div>
       )}
 
+      {reportOpen && (
+        <ReportModal context={`Project · ${service} · ${creatorName}`} onClose={() => setReportOpen(false)} />
+      )}
+
       {/* ================= modals ================= */}
 
       {/* create project form */}
@@ -534,7 +552,13 @@ export default function ProjectFlow({
             </button>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-center font-mono text-[10px] font-medium text-zinc-500">
               <Lock className="h-3 w-3" />
-              held by UpNova until you approve the work
+              held by the payment processor until you approve the work
+            </p>
+            <p className="mt-2 rounded-md border border-lime-400/25 bg-lime-400/5 p-2.5 text-center text-[10px] leading-relaxed text-zinc-400">
+              <ShieldCheck className="mr-1 inline h-3 w-3 text-lime-400" />
+              <span className="font-semibold text-lime-300">You&apos;re paying through UpNova.</span>{" "}
+              Your payment and project agreement are recorded. Keep communication and payment on
+              the platform to maintain transaction protections.
             </p>
           </div>
         </div>

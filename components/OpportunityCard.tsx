@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Flame, ArrowRight, Check, FolderOpen, X } from "lucide-react";
+import { Flame, ArrowRight, Check, Flag, FolderOpen, X } from "lucide-react";
+import ReportModal from "./ReportModal";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import Perforation from "./Perforation";
@@ -13,6 +14,7 @@ import { opportunities, currentUser } from "@/lib/data";
 export default function OpportunityCard({ id }: { id: string }) {
   const [pitched, setPitched] = useState(false);
   const [pitchOpen, setPitchOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const opp = opportunities.find((o) => o.id === id);
   const [rate, setRate] = useState(opp?.budget.replace(/[^0-9]/g, "") ?? "");
   const [message, setMessage] = useState(
@@ -113,8 +115,20 @@ export default function OpportunityCard({ id }: { id: string }) {
           <p className="hidden text-xs text-zinc-500 sm:block">
             {opp.applicants + (pitched ? 1 : 0)} creators have pitched
           </p>
+          <button
+            onClick={() => setReportOpen(true)}
+            className="ml-auto text-zinc-600 transition hover:text-red-300"
+            aria-label="Report this opportunity"
+            title="Report / Get Help"
+          >
+            <Flag className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
+
+      {reportOpen && (
+        <ReportModal context={`Opportunity · ${opp.title}`} onClose={() => setReportOpen(false)} />
+      )}
 
       {/* -------- pitch composer -------- */}
       {pitchOpen && (
