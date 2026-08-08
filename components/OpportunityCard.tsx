@@ -18,7 +18,7 @@ export default function OpportunityCard({ id }: { id: string }) {
   const [pitchOpen, setPitchOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const opp = opportunities.find((o) => o.id === id);
-  const [rate, setRate] = useState(opp?.budget.replace(/[^0-9]/g, "") ?? "");
+  const [available, setAvailable] = useState<"yes" | "check" | null>(null);
   const [message, setMessage] = useState(
     "I've shot this kind of work before, portfolio attached. I'm free on your dates."
   );
@@ -72,9 +72,15 @@ export default function OpportunityCard({ id }: { id: string }) {
         {/* receipt line */}
         <dl className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2">
           <div>
-            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">deadline</dt>
+            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">apply by</dt>
             <dd className="mt-0.5 text-xs font-semibold tracking-tight text-amber-400">{opp.deadline}</dd>
           </div>
+          {opp.projectDates && (
+            <div>
+              <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">when</dt>
+              <dd className="mt-0.5 text-xs font-semibold tracking-tight text-zinc-200">{opp.projectDates}</dd>
+            </div>
+          )}
           <div>
             <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">applicants</dt>
             <dd className="mt-0.5 text-xs font-semibold tabular-nums tracking-tight text-zinc-200">
@@ -165,32 +171,36 @@ export default function OpportunityCard({ id }: { id: string }) {
               <Check className="h-4 w-4 shrink-0 text-lime-400" />
             </div>
 
-            <div className="mt-3 flex gap-3">
-              <div className="flex-1">
-                <label htmlFor="pitch-rate" className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-                  proposed rate
-                </label>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
-                  <input
-                    id="pitch-rate"
-                    value={rate}
-                    onChange={(e) => setRate(e.target.value.replace(/[^0-9]/g, ""))}
-                    className="input-dark pl-7 tabular-nums"
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-              <div className="flex-1">
-                <label htmlFor="pitch-avail" className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-                  availability
-                </label>
-                <select id="pitch-avail" className="input-dark mt-1.5 appearance-none">
-                  <option>Available now</option>
-                  <option>This week</option>
-                  <option>From next week</option>
-                  <option>Flexible</option>
-                </select>
+            {/* availability — tied to the actual gig, not a vague status */}
+            <div className="mt-3">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+                {opp.projectDates
+                  ? `Are you available ${opp.projectDates}?`
+                  : "Can you make this deadline?"}
+              </p>
+              <div className="mt-1.5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAvailable("yes")}
+                  className={`flex-1 rounded-md border px-3 py-2 text-xs font-semibold transition ${
+                    available === "yes"
+                      ? "border-lime-400/60 bg-lime-400/10 text-lime-300"
+                      : "border-line text-zinc-400 hover:border-zinc-600"
+                  }`}
+                >
+                  ✓ Yes, I&apos;m available
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvailable("check")}
+                  className={`flex-1 rounded-md border px-3 py-2 text-xs font-medium transition ${
+                    available === "check"
+                      ? "border-amber-400/60 bg-amber-400/10 text-amber-300"
+                      : "border-line text-zinc-400 hover:border-zinc-600"
+                  }`}
+                >
+                  Need to check my schedule
+                </button>
               </div>
             </div>
 
@@ -209,15 +219,22 @@ export default function OpportunityCard({ id }: { id: string }) {
 
             <button
               onClick={() => {
+                if (!available) return;
                 setPitched(true);
                 setPitchOpen(false);
               }}
-              className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm"
+              disabled={!available}
+              className={`mt-4 w-full rounded-md py-2.5 text-sm font-bold transition ${
+                available
+                  ? "bg-lime-400 text-zinc-950 hover:bg-lime-300 hover:shadow-glow"
+                  : "cursor-not-allowed bg-card-raised text-zinc-600"
+              }`}
             >
               Send Application
             </button>
             <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
-              {opp.poster} reviews applicants and picks who to start a project with
+              applying accepts the listed budget ({opp.budget}) · {opp.poster} reviews applicants
+              and picks who to start a project with
             </p>
           </div>
         </div>

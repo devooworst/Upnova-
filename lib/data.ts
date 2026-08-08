@@ -265,11 +265,14 @@ export interface Opportunity {
   distanceMi?: number;
   /** fits around student life: weekend/evening/flexible/no-experience */
   studentFriendly?: boolean;
+  /** when the work actually happens — availability questions reference this */
+  projectDates?: string;
 }
 
 export const opportunities: Opportunity[] = [
   {
     id: "nike-fall",
+    projectDates: "Sep 5–7 (two-day shoot)",
     title: "Nike Fall Campaign",
     poster: "Nike",
     posterInitials: "N",
@@ -290,6 +293,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "photo-gig",
+    projectDates: "Aug 24 (half-day)",
     studentFriendly: true,
     title: "Product Shoot Photography",
     poster: "Harbor & Oak",
@@ -310,6 +314,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "org-promo",
+    projectDates: "one afternoon, week of Sep 1",
     title: "Org Promo Videographer",
     poster: "BSU Photography Club",
     posterInitials: "P",
@@ -330,6 +335,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "social-video",
+    projectDates: "weekend of Aug 22–23",
     title: "Social Media Videographer",
     poster: "Charm City Threads",
     posterInitials: "C",
@@ -350,6 +356,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "crew-call",
+    projectDates: "Aug 18 (full day)",
     studentFriendly: true,
     title: "Short Film Crew Call",
     poster: "Marcus Reed",
@@ -371,6 +378,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "music-video",
+    projectDates: "flexible — editing is remote",
     title: "Music Video Shoot",
     poster: "Jordan Miles",
     posterAvatar: "/images/jordan.jpg",
