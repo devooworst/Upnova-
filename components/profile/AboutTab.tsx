@@ -1,37 +1,94 @@
 "use client";
 
-import { Mail, MapPin, Clock, Zap, Globe2, Check, Settings2, PencilLine } from "lucide-react";
-import { currentUser, experience, services, contact } from "@/lib/data";
+import Link from "next/link";
+import { Mail, MapPin, Clock, Zap, Globe2, Check, Settings2, PencilLine, GraduationCap, Link2 } from "lucide-react";
+import { services as baseServices, contact } from "@/lib/data";
+import { useProfile } from "@/lib/profile";
 
+/**
+ * Everything user-controlled here comes from the live profile store — bio,
+ * experience, education, links, and service overrides all reflect whatever
+ * was last saved in Edit Profile. Visitor view respects privacy toggles.
+ */
 export default function AboutTab({ isOwner }: { isOwner: boolean }) {
+  const profile = useProfile();
+
+  // apply Edit Profile service overrides: removed → gone, paused → owner-only
+  const services = baseServices
+    .filter((s) => !profile.serviceOverrides[s.id]?.removed)
+    .filter((s) => isOwner || !profile.serviceOverrides[s.id]?.paused)
+    .map((s) => ({
+      ...s,
+      startingAt: profile.serviceOverrides[s.id]?.startingAt ?? s.startingAt,
+      paused: !!profile.serviceOverrides[s.id]?.paused,
+    }));
+
   return (
     <div className="grid gap-4 lg:grid-cols-5">
-      {/* left column: bio + experience + contact */}
+      {/* left column: bio + experience + education + links + contact */}
       <div className="space-y-4 lg:col-span-2">
         <section className="card p-5">
           <h3 className="text-sm font-bold text-zinc-100">About Me</h3>
-          <p className="mt-2.5 text-sm leading-relaxed text-zinc-300">{currentUser.bio}</p>
-          <p className="mt-2.5 text-sm leading-relaxed text-zinc-400">
-            I&apos;m a music producer, content creator, and entrepreneur focused on helping creators
-            grow through opportunities, collaborations, and networking.
-          </p>
+          <p className="mt-2.5 text-sm leading-relaxed text-zinc-300">{profile.bio}</p>
         </section>
 
         <section className="card p-5">
           <h3 className="text-sm font-bold text-zinc-100">Experience</h3>
           <ol className="mt-4 space-y-4 border-l border-line pl-4">
-            {experience.map((e) => (
-              <li key={e.title} className="relative">
+            {profile.experience.map((e) => (
+              <li key={e.id} className="relative">
                 <span className="absolute -left-[23px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-card bg-lime-400" />
                 <p className="text-sm font-semibold text-zinc-100">
-                  {e.emoji} {e.title}
+                  {e.position} <span className="font-normal text-zinc-400">— {e.organization}</span>
                 </p>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{e.years}</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">{e.detail}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                  {e.start} — {e.end || "Now"}
+                  {e.location ? ` · ${e.location}` : ""}
+                </p>
+                {e.description && (
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-400">{e.description}</p>
+                )}
               </li>
             ))}
           </ol>
         </section>
+
+        {(isOwner || profile.showEducation) && profile.education.length > 0 && (
+          <section className="card p-5">
+            <h3 className="text-sm font-bold text-zinc-100">Education</h3>
+            <ul className="mt-3 space-y-2.5">
+              {profile.education.map((e) => (
+                <li key={e.id} className="flex items-start gap-2.5">
+                  <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" />
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-100">{e.school}</p>
+                    <p className="text-xs text-zinc-500">
+                      {e.program}
+                      {e.gradYear ? ` · Expected ${e.gradYear}` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {profile.links.length > 0 && (
+          <section className="card p-5">
+            <h3 className="text-sm font-bold text-zinc-100">Links</h3>
+            <ul className="mt-3 space-y-2 text-sm">
+              {profile.links.map((l) => (
+                <li key={l.id} className="flex items-center gap-2.5">
+                  <Link2 className="h-4 w-4 shrink-0 text-violet-300" />
+                  <span className="w-20 shrink-0 text-xs font-bold uppercase tracking-wide text-zinc-500">
+                    {l.platform}
+                  </span>
+                  <span className="truncate text-zinc-300">{l.url}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="card p-5">
           <h3 className="text-sm font-bold text-zinc-100">Contact</h3>
@@ -39,9 +96,13 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
             <li className="flex items-center gap-2.5">
               <Mail className="h-4 w-4 text-lime-400" /> {contact.email}
             </li>
-            <li className="flex items-center gap-2.5">
-              <MapPin className="h-4 w-4 text-lime-400" /> {contact.location}
-            </li>
+            {(isOwner || profile.showLocation) && (
+              <li className="flex items-center gap-2.5">
+                <MapPin className="h-4 w-4 text-lime-400" /> {profile.city}
+                {profile.state ? `, ${profile.state}` : ""} · Serves{" "}
+                {profile.serviceArea === "Custom" ? profile.serviceAreaCustom || "custom area" : profile.serviceArea}
+              </li>
+            )}
             <li className="flex items-center gap-2.5">
               <Clock className="h-4 w-4 text-lime-400" /> {contact.responseTime}
             </li>
@@ -59,15 +120,15 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
                 <Check className="h-3 w-3" /> Accepting Clients
               </span>
               {isOwner && (
-                <button className="btn-ghost px-3 py-1 text-[11px]">
+                <Link href="/profile/edit" className="btn-ghost px-3 py-1 text-[11px]">
                   <Settings2 className="h-3.5 w-3.5" /> Manage Services
-                </button>
+                </Link>
               )}
             </span>
           </div>
           <p className="mt-1.5 text-xs text-zinc-500">
             {isOwner
-              ? "This is what visitors can book. Prices, scope, and availability are yours to change."
+              ? "This is what visitors can book. Prices, scope, and availability are yours to change in Edit Profile."
               : "Hire me directly: agree on scope in messages, pay securely on UpNova."}
           </p>
 
@@ -75,14 +136,23 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
             {services.map((s) => (
               <article
                 key={s.id}
-                className="flex flex-col rounded-2xl border border-line bg-card-raised p-4 transition hover:border-lime-400/40"
+                className={`flex flex-col rounded-2xl border border-line bg-card-raised p-4 transition hover:border-lime-400/40 ${
+                  s.paused ? "opacity-60" : ""
+                }`}
               >
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400/10 text-lg">
                     {s.emoji}
                   </span>
                   <div>
-                    <h4 className="text-sm font-bold text-zinc-100">{s.title}</h4>
+                    <h4 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+                      {s.title}
+                      {s.paused && (
+                        <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">
+                          Paused
+                        </span>
+                      )}
+                    </h4>
                     <p className="text-xs text-zinc-500">
                       Starting at{" "}
                       <span className="font-bold text-lime-400">${s.startingAt}</span>
@@ -99,10 +169,10 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
                   </span>
                 </div>
                 {isOwner ? (
-                  <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
+                  <Link href="/profile/edit" className="btn-ghost mt-3 w-full py-1.5 text-xs">
                     <PencilLine className="h-3.5 w-3.5" />
                     Edit Service
-                  </button>
+                  </Link>
                 ) : (
                   <a href="/messages" className="btn-lime mt-3 w-full py-1.5 text-xs">
                     <Zap className="h-3.5 w-3.5" />

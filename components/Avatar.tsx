@@ -30,9 +30,16 @@ export default function Avatar({
   } relative flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold text-zinc-950`;
 
   if (src) {
+    // uploaded photos arrive as data URLs → plain <img>; bundled photos go
+    // through next/image as before
     return (
       <span className={`${base} ${className}`}>
-        <Image src={src} alt="" fill sizes="80px" className="object-cover" />
+        {src.startsWith("data:") ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <Image src={src} alt="" fill sizes="80px" className="object-cover" />
+        )}
       </span>
     );
   }

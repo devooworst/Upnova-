@@ -1,8 +1,22 @@
 import Image from "next/image";
-import { ExternalLink, PencilLine, Plus } from "lucide-react";
+import { ExternalLink, PencilLine, Plus, EyeOff } from "lucide-react";
 import { portfolio, aiInvolvementInfo } from "@/lib/data";
+import { useProfile } from "@/lib/profile";
 
 export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
+  const profile = useProfile();
+
+  // privacy: owner can hide the portfolio from visitors in Edit Profile
+  if (!isOwner && !profile.showPortfolio) {
+    return (
+      <div className="rounded-xl border border-line bg-card-raised p-8 text-center">
+        <EyeOff className="mx-auto h-5 w-5 text-zinc-500" />
+        <p className="mt-2 text-sm font-semibold text-zinc-300">Portfolio is private</p>
+        <p className="mt-1 text-xs text-zinc-500">The owner has chosen not to show their portfolio publicly.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">

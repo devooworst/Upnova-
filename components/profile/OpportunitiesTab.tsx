@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Briefcase, ArrowRight, BadgeCheck, Star } from "lucide-react";
 import { profileOpportunities, workRecords } from "@/lib/data";
+import { useProfile, getProfile, saveProfile } from "@/lib/profile";
 
 const statusStyle: Record<string, string> = {
   "Applied • Under Review": "border-amber-400/40 bg-amber-400/10 text-amber-300",
@@ -12,9 +12,19 @@ const statusStyle: Record<string, string> = {
 };
 
 export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
-  const [inPortfolio, setInPortfolio] = useState<Record<string, boolean>>(
-    Object.fromEntries(workRecords.map((w) => [w.id, w.inPortfolio]))
-  );
+  // portfolio toggles live in the shared profile store — the same record
+  // Edit Profile → Professional → Portfolio writes to
+  const profile = useProfile();
+  const inPortfolio = (id: string) => profile.workInPortfolio.includes(id);
+  const togglePortfolio = (id: string) => {
+    const p = getProfile();
+    saveProfile({
+      ...p,
+      workInPortfolio: p.workInPortfolio.includes(id)
+        ? p.workInPortfolio.filter((x) => x !== id)
+        : [...p.workInPortfolio, id],
+    });
+  };
   const applications = profileOpportunities.filter((o) => o.kind === "application");
   const listings = profileOpportunities.filter((o) => o.kind === "listing");
 
@@ -36,7 +46,9 @@ export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
         )}
       </p>
 
-      {/* Experience — "look what I've actually done", verified through UpNova */}
+      {/* Experience — "look what I've actually done", verified through UpNova.
+          Visitors only see this when the owner shows completed projects. */}
+      {(isOwner || profile.showCompletedProjects) && (
       <section>
         <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
           Experience · Verified UpNova Projects
@@ -60,17 +72,17 @@ export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
               </div>
               {isOwner ? (
                 <button
-                  onClick={() => setInPortfolio((m) => ({ ...m, [w.id]: !m[w.id] }))}
+                  onClick={() => togglePortfolio(w.id)}
                   className={
-                    inPortfolio[w.id]
+                    inPortfolio(w.id)
                       ? "rounded-full border border-lime-400/40 px-3 py-1.5 text-[11px] font-semibold text-lime-300"
                       : "rounded-full border border-line px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-zinc-600"
                   }
                 >
-                  {inPortfolio[w.id] ? "✓ In portfolio" : "Add to portfolio"}
+                  {inPortfolio(w.id) ? "✓ In portfolio" : "Add to portfolio"}
                 </button>
               ) : (
-                inPortfolio[w.id] && <span className="text-[11px] text-zinc-500">Shown in portfolio</span>
+                inPortfolio(w.id) && <span className="text-[11px] text-zinc-500">Shown in portfolio</span>
               )}
             </article>
           ))}
@@ -82,6 +94,7 @@ export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
           </p>
         )}
       </section>
+      )}
 
       <section>
         <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
