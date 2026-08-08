@@ -16,16 +16,16 @@ import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 /* Scope filters the feed; it never renames the page.                  */
 /* ------------------------------------------------------------------ */
 
-const scopes: { id: FeedScope; icon: string; label: string; studentOnly?: boolean }[] = [
-  { id: "foryou", icon: "✨", label: "For You" },
-  { id: "5", icon: "📍", label: "5 miles" },
-  { id: "25", icon: "📍", label: "25 miles" },
-  { id: "city", icon: "🏙️", label: "City" },
-  { id: "county", icon: "🗺️", label: "County" },
-  { id: "state", icon: "📍", label: "State" },
-  { id: "country", icon: "🇺🇸", label: "Country" },
-  { id: "global", icon: "🌎", label: "Global" },
-  { id: "school", icon: "🎓", label: "My School", studentOnly: true },
+const scopes: { id: FeedScope; label: string; studentOnly?: boolean }[] = [
+  { id: "foryou", label: "For You" },
+  { id: "5", label: "5 miles" },
+  { id: "25", label: "25 miles" },
+  { id: "city", label: "City" },
+  { id: "county", label: "County" },
+  { id: "state", label: "State" },
+  { id: "country", label: "Country" },
+  { id: "global", label: "Global" },
+  { id: "school", label: "My School", studentOnly: true },
 ];
 
 const scopePlace: Record<FeedScope, string> = {
@@ -89,18 +89,16 @@ export default function Home() {
                 className="flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-sm transition hover:border-zinc-600"
               >
                 <span className="text-xs text-zinc-500">Showing:</span>
-                <span className="font-semibold text-zinc-100">
-                  {active.icon} {active.label}
-                </span>
+                <span className="font-semibold text-zinc-100">{active.label}</span>
                 <ChevronDown className={`h-4 w-4 text-zinc-500 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-card shadow-card animate-fade-up">
-                  <p className="border-b border-line-soft px-4 pb-2 pt-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-line bg-card shadow-card animate-fade-up">
+                  <p className="border-b border-line-soft px-3.5 pb-2 pt-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                     feed scope
                   </p>
-                  <ul className="p-1.5">
+                  <ul className="p-1">
                     {scopes
                       .filter((s) => !s.studentOnly || isStudent)
                       .map((s, i) => (
@@ -108,23 +106,17 @@ export default function Home() {
                           {i === 1 && <div className="mx-2 my-1 h-px bg-line-soft" />}
                           <button
                             onClick={() => pick(s.id)}
-                            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${
+                            className={`flex w-full items-center rounded-lg px-3 py-1.5 text-sm transition ${
                               scope === s.id
                                 ? "bg-white/10 font-semibold text-zinc-50"
                                 : "text-zinc-300 hover:bg-card-raised"
                             }`}
                           >
-                            <span aria-hidden>{s.icon}</span>
                             {s.label}
-                            {scope === s.id && <Check className="ml-auto h-4 w-4 text-lime-400" />}
+                            {scope === s.id && <Check className="ml-auto h-3.5 w-3.5 text-lime-400" />}
                           </button>
                         </li>
                       ))}
-                    {!isStudent && (
-                      <li className="px-3 py-2 text-[10px] text-zinc-600">
-                        🎓 My School unlocks with free student verification
-                      </li>
-                    )}
                   </ul>
                 </div>
               )}
