@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
 import { getProjectForParty } from "@/lib/server/authz";
-import { transition } from "@/lib/server/projects";
+import { transition, updateTerms } from "@/lib/server/projects";
 import { seedStartsWork } from "@/lib/server/demo";
 import { publicUser } from "@/lib/server/serialize";
 
@@ -70,10 +70,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
-    const p = transition(params.id, String(body.action), user.id);
+    if (body.action === "update_terms") {
+      const p = updateTerms(params.id, user.id, { amount: body.amount, deadline: body.deadline });
+      return { state: p.state, amount: p.amount };
+    }
+    transition(params.id, String(body.action), user.id, {
+      expectedAmount: body.expectedAmount != null ? Number(body.expectedAmount) : null,
+      note: body.note != null ? String(body.note) : undefined,
+    });
     // dev demo: after funding, the seed creator starts (and asks for +2 days once)
     if (body.action === "start") seedStartsWork(params.id);
     const fresh = db.select().from(tables.projects).where(eq(tables.projects.id, params.id)).get()!;
-    return { state: fresh.state };
+    return { state: fresh.state, amount: fresh.amount };
   });
 }

@@ -36,6 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       messages: msgs.map((m) => ({
         id: m.id,
         body: m.body,
+        kind: m.kind,
         mine: m.senderId === user.id,
         createdAt: m.createdAt.toISOString(),
       })),

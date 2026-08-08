@@ -28,6 +28,7 @@ interface Applicant {
     roleLine: string;
     city: string | null;
     state: string | null;
+    locationLabel?: string | null;
     trustLevel: string;
   };
 }
@@ -170,7 +171,7 @@ export default function ApplicantsPage() {
                 </p>
                 <p className="mt-0.5 text-xs text-zinc-500">
                   {a.applicant.roleLine}
-                  {a.applicant.city ? ` · ${a.applicant.city}${a.applicant.state ? `, ${a.applicant.state}` : ""}` : ""}
+                  {a.applicant.locationLabel ? ` · ${a.applicant.locationLabel}` : ""}
                 </p>
                 {a.message && <p className="mt-2 text-xs leading-relaxed text-zinc-300">{a.message}</p>}
               </div>

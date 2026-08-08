@@ -18,8 +18,25 @@ const parse = (s: string): string[] => {
   }
 };
 
+/** The most precise location the owner chose to share — never more. */
+export function locationLabel(profile: Profile): string | null {
+  switch (profile.locationVisibility) {
+    case "hidden":
+      return null;
+    case "country":
+      return profile.country || null;
+    case "state":
+      return profile.state || null;
+    case "county":
+      return profile.county ? `${profile.county}${profile.state ? `, ${profile.state}` : ""}` : profile.state || null;
+    default: // city
+      return profile.city ? `${profile.city}${profile.state ? `, ${profile.state}` : ""}` : null;
+  }
+}
+
 export function publicUser(user: Pick<User, "id" | "handle">, profile: Profile, opts?: { viewerIsOwner?: boolean }) {
   const owner = !!opts?.viewerIsOwner;
+  const showLoc = owner || (profile.showLocation && profile.locationVisibility !== "hidden");
   return {
     id: user.id,
     handle: user.handle,
@@ -31,8 +48,12 @@ export function publicUser(user: Pick<User, "id" | "handle">, profile: Profile, 
     roleLine: [profile.primaryRole, ...parse(profile.additionalRoles)].filter(Boolean).join(" · "),
     bio: profile.bio,
     skills: parse(profile.skills),
-    city: owner || profile.showLocation ? profile.city : null,
-    state: owner || profile.showLocation ? profile.state : null,
+    // city/state respect the visibility level; locationLabel is the
+    // preferred display string for public surfaces
+    city: showLoc && profile.locationVisibility === "city" ? profile.city : null,
+    state: showLoc && ["city", "county", "state"].includes(profile.locationVisibility) ? profile.state : null,
+    locationLabel: showLoc ? locationLabel(profile) : null,
+    serviceArea: profile.serviceArea,
     openToWork: profile.openToWork && (owner || profile.showAvailability),
     hiringEnabled: profile.hiringEnabled,
     trustLevel: profile.trustLevel,
@@ -59,6 +80,7 @@ export function ownProfile(user: User, profile: Profile) {
       state: profile.state,
       county: profile.county,
       country: profile.country,
+      locationVisibility: profile.locationVisibility,
       primaryRole: profile.primaryRole,
       additionalRoles: parse(profile.additionalRoles),
       skills: parse(profile.skills),

@@ -83,7 +83,10 @@ export const profiles = sqliteTable("profiles", {
   verified: bool("verified"),
 
   // location — lat/lng are used server-side for distance scoping and are
-  // never returned by the public API
+  // never returned by the public API. locationVisibility controls the
+  // most precise level shown publicly: city | county | state | country | hidden.
+  // Exact addresses/coordinates are NEVER public regardless of setting.
+  locationVisibility: text("location_visibility").notNull().default("city"),
   city: text("city").notNull().default(""),
   state: text("state").notNull().default(""),
   county: text("county").notNull().default(""),
@@ -222,6 +225,7 @@ export const messages = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
+    kind: text("kind").notNull().default("text"), // text | system (project events)
     createdAt: ts("created_at"),
   },
   (t) => [index("messages_conv_created").on(t.conversationId, t.createdAt)]

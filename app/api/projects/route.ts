@@ -54,21 +54,26 @@ export async function GET() {
 }
 
 /**
- * POST /api/projects — create a draft project.
- * { creatorHandle, title, brief, amount, serviceId?, conversationId?, deadline? }
- * The authenticated user becomes the client; the creator must allow offers.
+ * POST /api/projects — create a draft project from either side.
+ * Client-side (default): { creatorHandle, … } — I'm hiring them.
+ * Provider-side: { clientHandle, asCreator: true, … } — I'm offering to
+ * do the work; the draft becomes my offer to them.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
-    const handle = String(body.creatorHandle || "").trim().toLowerCase();
-    const creator = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
-    if (!creator || creator.status !== "active") throw new ApiError(404, "Creator not found");
-    if (creator.id === user.id) throw new ApiError(400, "You can't open a project with yourself");
-    const creatorProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, creator.id)).get()!;
-    if (!creatorProfile.hiringEnabled || !creatorProfile.acceptOffers)
-      throw new ApiError(403, "This creator isn't accepting project offers");
+    const asCreator = !!body.asCreator;
+    const handle = String((asCreator ? body.clientHandle : body.creatorHandle) || "").trim().toLowerCase();
+    const other = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+    if (!other || other.status !== "active") throw new ApiError(404, "User not found");
+    if (other.id === user.id) throw new ApiError(400, "You can't open a project with yourself");
+    const creator = asCreator ? { id: user.id } : other;
+    if (!asCreator) {
+      const creatorProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, other.id)).get()!;
+      if (!creatorProfile.hiringEnabled || !creatorProfile.acceptOffers)
+        throw new ApiError(403, "This creator isn't accepting project offers");
+    }
 
     const amount = Math.round(Number(body.amount));
     if (!Number.isFinite(amount) || amount < 1) throw new ApiError(400, "Amount must be at least $1");
@@ -79,7 +84,7 @@ export async function POST(req: NextRequest) {
     db.insert(tables.projects)
       .values({
         id,
-        clientId: user.id,
+        clientId: asCreator ? other.id : user.id,
         creatorId: creator.id,
         serviceId: body.serviceId ? String(body.serviceId) : null,
         conversationId: body.conversationId ? String(body.conversationId) : null,

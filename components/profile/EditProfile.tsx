@@ -599,11 +599,17 @@ export default function EditProfile() {
               <FieldLabel hint="Your exact address is never shown publicly — city, state, and country only.">
                 Location
               </FieldLabel>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <input
                   value={draft.city}
                   onChange={(e) => set("city", e.target.value)}
                   placeholder="City"
+                  className={inputCls}
+                />
+                <input
+                  value={draft.county}
+                  onChange={(e) => set("county", e.target.value)}
+                  placeholder="County"
                   className={inputCls}
                 />
                 <input
@@ -618,6 +624,53 @@ export default function EditProfile() {
                   placeholder="Country"
                   className={inputCls}
                 />
+              </div>
+
+              {/* location visibility — the user decides the precision */}
+              <div className="mt-3">
+                <FieldLabel hint="The most precise level anyone can see. Your exact address and coordinates are always private, no matter what you pick.">
+                  Location visibility
+                </FieldLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { v: "city", l: "City" },
+                      { v: "county", l: "County" },
+                      { v: "state", l: "State" },
+                      { v: "country", l: "Country" },
+                      { v: "hidden", l: "Don't show my location" },
+                    ] as const
+                  ).map((o) => (
+                    <button
+                      key={o.v}
+                      onClick={() => set("locationVisibility", o.v)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                        draft.locationVisibility === o.v
+                          ? "border-violet-400/50 bg-violet-400/10 text-violet-300"
+                          : "border-line text-zinc-400 hover:border-zinc-600"
+                      }`}
+                    >
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2 text-xs text-zinc-500">
+                  Publicly shown as:{" "}
+                  <span className="font-medium text-zinc-300">
+                    {draft.locationVisibility === "hidden"
+                      ? "nothing — location hidden"
+                      : draft.locationVisibility === "country"
+                        ? draft.country || "—"
+                        : draft.locationVisibility === "state"
+                          ? draft.state || "—"
+                          : draft.locationVisibility === "county"
+                            ? [draft.county, draft.state].filter(Boolean).join(", ") || "—"
+                            : [draft.city, draft.state].filter(Boolean).join(", ") || "—"}
+                  </span>
+                  {draft.serviceArea !== "Remote" && (
+                    <> · clients see your service area (&ldquo;{draft.serviceArea}&rdquo;), never an address</>
+                  )}
+                </p>
               </div>
               <div className="mt-3">
                 <FieldLabel hint="How far you'll travel for in-person work. Connects to Services and Opportunities.">

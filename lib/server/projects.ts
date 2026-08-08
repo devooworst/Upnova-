@@ -26,16 +26,19 @@ export const PROJECT_STATES = [
   "approved",
   "completed",
   "reviewed",
+  "cancelled",
 ] as const;
 
 export type ProjectState = (typeof PROJECT_STATES)[number];
 type Party = "client" | "creator" | "either";
 
-/** action → { from, to, by } */
+/** action → { from, to, by }. The server enforces the sequence — the UI
+    only ever renders what the current state permits (OWASP business-logic
+    protection: no skipping accepted → payment → work → delivery). */
 const TRANSITIONS: Record<string, { from: ProjectState[]; to: ProjectState; by: Party }> = {
   send_offer: { from: ["draft"], to: "offer_sent", by: "creator" },
   accept_offer: { from: ["offer_sent"], to: "accepted", by: "client" },
-  // client funds the project (payment held) — work begins
+  // client authorizes payment (secured) — work begins
   start: { from: ["accepted"], to: "in_progress", by: "client" },
   submit: { from: ["in_progress"], to: "submitted", by: "creator" },
   request_changes: { from: ["submitted"], to: "in_progress", by: "client" },
@@ -43,6 +46,10 @@ const TRANSITIONS: Record<string, { from: ProjectState[]; to: ProjectState; by: 
   // approval releases payment → completed
   complete: { from: ["approved"], to: "completed", by: "client" },
   cancel_offer: { from: ["offer_sent"], to: "draft", by: "creator" },
+  // the client can send an offer back for changes before anything is paid
+  decline_offer: { from: ["offer_sent"], to: "draft", by: "client" },
+  // either side can cancel before payment is secured — never after
+  cancel: { from: ["draft", "offer_sent", "accepted"], to: "cancelled", by: "either" },
 };
 
 type Proj = typeof tables.projects.$inferSelect;
@@ -62,7 +69,80 @@ function displayName(userId: string): string {
   return p?.displayName ?? "Someone";
 }
 
-export function transition(projectId: string, action: string, userId: string): Proj {
+/** Project events appear inside the conversation as system messages —
+    the thread literally shows the transaction progressing. */
+function systemMessage(project: Proj, senderId: string, body: string) {
+  if (!project.conversationId) return;
+  db.insert(tables.messages)
+    .values({
+      id: randomBytes(12).toString("hex"),
+      conversationId: project.conversationId,
+      senderId,
+      body,
+      kind: "system",
+    })
+    .run();
+  db.update(tables.conversations)
+    .set({ updatedAt: new Date() })
+    .where(eq(tables.conversations.id, project.conversationId))
+    .run();
+}
+
+const money = (n: number) => `$${n}`;
+
+/**
+ * Creator updates the terms BEFORE payment (draft / offer_sent only).
+ * The change is announced in the thread and the client is notified —
+ * terms can never change silently (see expectedAmount in transition()).
+ */
+export function updateTerms(
+  projectId: string,
+  userId: string,
+  patch: { amount?: number; deadline?: string | null }
+) {
+  const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+  if (!project) throw new ApiError(404, "Project not found");
+  if (partyOf(project, userId) !== "creator") throw new ApiError(403, "Only the creator can update terms");
+  if (!["draft", "offer_sent"].includes(project.state))
+    throw new ApiError(409, "Terms are locked once the offer is accepted — cancel and re-offer instead");
+
+  const changes: string[] = [];
+  const set: Partial<typeof tables.projects.$inferInsert> = { updatedAt: new Date() };
+  if (patch.amount != null) {
+    const amount = Math.round(Number(patch.amount));
+    if (!Number.isFinite(amount) || amount < 1) throw new ApiError(400, "Amount must be at least $1");
+    if (amount !== project.amount) {
+      changes.push(`price ${money(project.amount)} → ${money(amount)}`);
+      set.amount = amount;
+    }
+  }
+  if (patch.deadline !== undefined) {
+    const d = patch.deadline ? new Date(patch.deadline) : null;
+    changes.push(`deadline → ${d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "none"}`);
+    set.deadline = d;
+  }
+  if (changes.length === 0) return project;
+
+  db.update(tables.projects).set(set).where(eq(tables.projects.id, projectId)).run();
+  systemMessage(project, userId, `Project updated — ${changes.join(", ")}. Review the terms before continuing.`);
+  notify({
+    userId: counterpart(project, userId),
+    actorId: userId,
+    type: "project_offer",
+    title: `Project terms updated — ${project.title}`,
+    body: changes.join(", "),
+    href: `/messages?project=${project.id}`,
+    priority: "high",
+  });
+  return db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get()!;
+}
+
+export function transition(
+  projectId: string,
+  action: string,
+  userId: string,
+  opts: { expectedAmount?: number | null; note?: string } = {}
+): Proj {
   const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!project) throw new ApiError(404, "Project not found");
   const role = partyOf(project, userId);
@@ -74,6 +154,14 @@ export function transition(projectId: string, action: string, userId: string): P
   if (t.by !== "either" && t.by !== role)
     throw new ApiError(403, `Only the ${t.by} can ${action}`);
 
+  // Transaction-authorization integrity (OWASP): what the client saw is
+  // what gets authorized. If the terms changed since they loaded the
+  // screen, the action is refused and they must review the update.
+  if (["accept_offer", "start"].includes(action) && opts.expectedAmount != null) {
+    if (Math.round(opts.expectedAmount) !== project.amount)
+      throw new ApiError(409, "The project terms changed since you viewed them — review the updated offer before continuing.");
+  }
+
   db.update(tables.projects)
     .set({ state: t.to, updatedAt: new Date() })
     .where(eq(tables.projects.id, projectId))
@@ -82,14 +170,22 @@ export function transition(projectId: string, action: string, userId: string): P
   const other = counterpart(project, userId);
   const actor = displayName(userId);
   const href = `/messages?project=${project.id}`;
+  const note = (opts.note ?? "").trim().slice(0, 300);
 
-  // side effects per transition
+  // side effects per transition — notification + a system message in the
+  // thread, so the conversation shows the transaction progressing
   if (action === "send_offer") {
-    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} sent you a project offer`, body: `${project.title} · $${project.amount}`, href });
+    systemMessage(project, userId, `${actor} sent the project offer — ${project.title} · ${money(project.amount)}. Review it in the project panel.`);
+    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} sent you a project offer`, body: `${project.title} · ${money(project.amount)}`, href });
   } else if (action === "accept_offer") {
+    systemMessage(project, userId, `${actor} accepted the offer — ${money(project.amount)}. Next step: secure the payment.`);
     notify({ userId: other, actorId: userId, type: "project_accepted", title: `${actor} accepted your offer`, body: project.title, href });
+  } else if (action === "decline_offer") {
+    systemMessage(project, userId, `${actor} sent the offer back for changes.${note ? ` "${note}"` : ""}`);
+    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} asked for changes to the offer`, body: note || project.title, href });
   } else if (action === "start") {
-    // payment held in escrow — the Stripe Connect PaymentIntent slots in here
+    // payment secured — the Stripe Connect PaymentIntent slots in here.
+    // (Deliberately not called "escrow": that's a specific legal service.)
     const amountCents = project.amount * 100;
     db.insert(tables.payments)
       .values({
@@ -102,19 +198,27 @@ export function transition(projectId: string, action: string, userId: string): P
         status: "held",
       })
       .run();
-    notify({ userId: other, actorId: userId, type: "payment", title: `Payment secured for ${project.title}`, body: `$${project.amount} held — you're clear to start`, href, category: "payments" });
+    systemMessage(project, userId, `Payment secured — ${money(project.amount)}. ${displayName(project.creatorId)} can begin work. Funds release when the delivery is approved.`);
+    notify({ userId: other, actorId: userId, type: "payment", title: `Payment confirmed for ${project.title}`, body: `${money(project.amount)} secured — you can begin working`, href, category: "payments" });
   } else if (action === "submit") {
-    notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} submitted work for review`, body: project.title, href });
+    systemMessage(project, userId, `${actor} delivered work for review.${note ? ` ${note}` : ""}`);
+    notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} delivered — review it`, body: note || project.title, href });
   } else if (action === "approve") {
+    systemMessage(project, userId, `${actor} approved the delivery.`);
     notify({ userId: other, actorId: userId, type: "project_approved", title: `${actor} approved your delivery`, body: project.title, href });
   } else if (action === "complete") {
     db.update(tables.payments)
       .set({ status: "released" })
       .where(and(eq(tables.payments.projectId, project.id), eq(tables.payments.status, "held")))
       .run();
-    notify({ userId: other, actorId: userId, type: "payment", title: `Payment released — $${project.amount}`, body: project.title, href, category: "payments" });
+    systemMessage(project, userId, `Project complete — ${money(project.amount)} released to ${displayName(project.creatorId)}.`);
+    notify({ userId: other, actorId: userId, type: "payment", title: `Payment released — ${money(project.amount)}`, body: project.title, href, category: "payments" });
   } else if (action === "request_changes") {
-    notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} requested changes`, body: project.title, href });
+    systemMessage(project, userId, `${actor} requested a revision.${note ? ` "${note}"` : ""} The project stays active.`);
+    notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} requested a revision`, body: note || project.title, href });
+  } else if (action === "cancel") {
+    systemMessage(project, userId, `${actor} cancelled the project before payment. No money moved.`);
+    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} cancelled ${project.title}`, body: "Cancelled before payment — nothing was charged", href, priority: "normal" });
   }
 
   return db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get()!;
@@ -144,6 +248,15 @@ export function requestExtension(projectId: string, userId: string, days: number
     .where(eq(tables.projects.id, projectId))
     .run();
 
+  systemMessage(
+    project,
+    userId,
+    `${displayName(userId)} requested a ${days}-day extension.${reason ? ` "${reason}"` : ""}${
+      project.deadline
+        ? ` Current deadline ${project.deadline.toLocaleDateString("en-US", { month: "short", day: "numeric" })} → new deadline ${new Date(project.deadline.getTime() + days * 86400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`
+        : ""
+    }`
+  );
   notify({
     userId: counterpart(project, userId),
     actorId: userId,
@@ -174,6 +287,14 @@ export function decideExtension(extensionId: string, userId: string, approve: bo
     patch.deadline = new Date(project.deadline.getTime() + ext.days * 86400_000);
   db.update(tables.projects).set(patch).where(eq(tables.projects.id, project.id)).run();
 
+  const updated = db.select().from(tables.projects).where(eq(tables.projects.id, project.id)).get()!;
+  systemMessage(
+    updated,
+    userId,
+    approve
+      ? `Extension approved · +${ext.days} days.${updated.deadline ? ` New deadline: ${updated.deadline.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.` : ""}`
+      : "Extension declined — the original deadline stands."
+  );
   notify({
     userId: ext.requestedById,
     actorId: userId,

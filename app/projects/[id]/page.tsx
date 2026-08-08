@@ -39,6 +39,7 @@ const STATE_LABEL: Record<string, string> = {
   approved: "Approved — release pending",
   completed: "Completed",
   reviewed: "Completed · Reviewed",
+  cancelled: "Cancelled",
 };
 
 const STATE_TONE: Record<string, string> = {
@@ -51,6 +52,7 @@ const STATE_TONE: Record<string, string> = {
   approved: "border-lime-400/40 bg-lime-400/10 text-lime-300",
   completed: "border-lime-400/40 bg-lime-400/10 text-lime-300",
   reviewed: "border-lime-400/40 bg-lime-400/10 text-lime-300",
+  cancelled: "border-line text-zinc-500",
 };
 
 const fmt = (iso: string) =>
@@ -107,7 +109,7 @@ export default function ProjectPage() {
             label:
               payment.status === "released"
                 ? `Payment released — $${(payment.amountCents / 100).toFixed(2)}`
-                : `Payment secured — $${(payment.amountCents / 100).toFixed(2)} held in escrow`,
+                : `Payment secured — $${(payment.amountCents / 100).toFixed(2)}, releases on approval`,
             tone: "lime",
           },
         ]
@@ -178,7 +180,7 @@ export default function ProjectPage() {
                 <span className="text-zinc-500">Payment</span>
                 <span className={`inline-flex items-center gap-1.5 font-semibold ${payment.status === "released" ? "text-lime-300" : "text-amber-300"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${payment.status === "released" ? "bg-lime-400" : "bg-amber-400"}`} />
-                  {payment.status === "held" ? "Held in escrow" : payment.status === "released" ? "Released" : payment.status}
+                  {payment.status === "held" ? "Secured" : payment.status === "released" ? "Released" : payment.status}
                 </span>
               </div>
             )}
@@ -202,6 +204,16 @@ export default function ProjectPage() {
             View profile
           </Link>
         </div>
+      </div>
+
+      {/* transaction safety banner — every project carries it */}
+      <div className="rounded-xl border border-line-soft bg-card px-4 py-2.5">
+        <p className="text-[11px] leading-relaxed text-zinc-500">
+          <span className="font-bold uppercase tracking-wide text-zinc-400">UpNova transaction</span> ·
+          Keep communication, agreements, and payments on UpNova to maintain your transaction
+          protections. Transactions completed outside UpNova may not be protected by UpNova&apos;s
+          dispute or payment systems.
+        </p>
       </div>
 
       {/* reviews */}

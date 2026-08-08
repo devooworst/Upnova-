@@ -26,6 +26,8 @@ interface PublicProfile {
     skills: string[];
     city: string | null;
     state: string | null;
+    locationLabel?: string | null;
+    serviceArea?: string;
     openToWork: boolean;
     hiringEnabled: boolean;
     trustLevel: string;
@@ -112,13 +114,23 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
                     <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse-dot" /> Open to Work
                   </span>
                 )}
+                {user.trustLevel !== "standard" && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
+                    title="Verified through UpNova's identity process. Documents are never shown to other users — only this badge."
+                  >
+                    Identity verified
+                  </span>
+                )}
               </h1>
               <p className="mt-0.5 text-sm font-medium text-zinc-400">{user.roleLine || `@${user.handle}`}</p>
-              {user.city && (
+              {user.locationLabel && (
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
                   <MapPin className="h-3.5 w-3.5 text-lime-400" />
-                  {user.city}
-                  {user.state ? `, ${user.state}` : ""}
+                  {user.locationLabel}
+                  {user.serviceArea && user.serviceArea !== "Remote" && (
+                    <span className="text-zinc-600">· serves {user.serviceArea.toLowerCase()}</span>
+                  )}
                 </p>
               )}
             </div>

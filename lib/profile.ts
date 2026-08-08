@@ -47,7 +47,9 @@ export interface ProfileData {
   bio: string;
   city: string;
   state: string;
+  county: string;
   country: string;
+  locationVisibility: string; // city | county | state | country | hidden
   serviceArea: string;
   serviceAreaCustom: string;
   avatar: string | null;
@@ -98,7 +100,9 @@ export const DEFAULT_PROFILE: ProfileData = {
   bio: "",
   city: "",
   state: "",
+  county: "",
   country: "",
+  locationVisibility: "city",
   serviceArea: "25 miles",
   serviceAreaCustom: "",
   avatar: null,
@@ -150,7 +154,9 @@ function fromApi(user: MeResponse): ProfileData {
     bio: p.bio,
     city: p.city,
     state: p.state,
+    county: p.county,
     country: p.country,
+    locationVisibility: p.locationVisibility,
     serviceArea: p.serviceArea,
     serviceAreaCustom: "",
     avatar: p.avatarUrl,
@@ -209,7 +215,9 @@ function toApi(d: ProfileData) {
     coverPos: d.coverPos,
     city: d.city,
     state: d.state,
+    county: d.county,
     country: d.country,
+    locationVisibility: d.locationVisibility,
     serviceArea: d.serviceArea,
     primaryRole: d.primaryRole,
     additionalRoles: d.additionalRoles,

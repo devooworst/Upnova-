@@ -47,6 +47,7 @@ const BOOKING_STATE: Record<string, { label: string; cls: string }> = {
   approved: { label: "Approved", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
   completed: { label: "Completed", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
   reviewed: { label: "Completed · Reviewed", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  cancelled: { label: "Cancelled", cls: "border-line text-zinc-500" },
 };
 
 const fmtDate = (iso: string) =>
@@ -74,8 +75,8 @@ export default function BookingsPage() {
     load();
   }, [load]);
 
-  const active = (projects ?? []).filter((p) => !["completed", "reviewed"].includes(p.state));
-  const done = (projects ?? []).filter((p) => ["completed", "reviewed"].includes(p.state));
+  const active = (projects ?? []).filter((p) => !["completed", "reviewed", "cancelled"].includes(p.state));
+  const done = (projects ?? []).filter((p) => ["completed", "reviewed", "cancelled"].includes(p.state));
   const heldTotal = active
     .filter((p) => ["in_progress", "extension_requested", "submitted", "approved"].includes(p.state))
     .reduce((n, p) => n + p.amount, 0);
@@ -98,7 +99,7 @@ export default function BookingsPage() {
       {projects !== null && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-line px-4 py-2.5 font-mono text-[11px] font-medium text-zinc-400">
           <span><span className="text-violet-400">{active.length}</span> active</span>
-          <span><span className="text-lime-400">${heldTotal}</span> in escrow</span>
+          <span><span className="text-lime-400">${heldTotal}</span> secured</span>
           <span><span className="text-zinc-200">{done.length}</span> completed</span>
           <span className="ml-auto text-zinc-600">{(bookings ?? []).length} scheduled session{(bookings ?? []).length === 1 ? "" : "s"}</span>
         </div>

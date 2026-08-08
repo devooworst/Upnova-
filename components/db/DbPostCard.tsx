@@ -16,6 +16,8 @@ export interface FeedAuthor {
   roleLine: string;
   city: string | null;
   state: string | null;
+  /** the most precise location the author chose to share */
+  locationLabel?: string | null;
 }
 
 export interface FeedPost {
@@ -120,13 +122,12 @@ export default function DbPostCard({ post, savedInitial = false }: { post: FeedP
             {a.roleLine || `@${a.handle}`}
             <span aria-hidden>•</span>
             {timeAgo(post.createdAt)}
-            {a.city && (
+            {a.locationLabel && (
               <>
                 <span aria-hidden>•</span>
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
-                  {a.city}
-                  {a.state ? `, ${a.state}` : ""}
+                  {a.locationLabel}
                 </span>
               </>
             )}

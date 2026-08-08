@@ -24,6 +24,9 @@ export async function PATCH(req: NextRequest) {
         avatarUrl: body.avatarUrl === null ? null : str(body.avatarUrl, 500_000) || p.avatarUrl,
         coverUrl: body.coverUrl === null ? null : str(body.coverUrl, 1_500_000) || p.coverUrl,
         coverPos: Number.isFinite(body.coverPos) ? Math.min(100, Math.max(0, Math.round(body.coverPos))) : p.coverPos,
+        locationVisibility: ["city", "county", "state", "country", "hidden"].includes(body.locationVisibility)
+          ? body.locationVisibility
+          : p.locationVisibility,
         city: str(body.city, 60),
         state: str(body.state, 40),
         county: str(body.county, 60),

@@ -44,6 +44,7 @@ interface Conv {
 interface Msg {
   id: string;
   body: string;
+  kind?: "text" | "system";
   mine: boolean;
   createdAt: string;
 }
@@ -77,10 +78,11 @@ const STATE_LABEL: Record<string, string> = {
   accepted: "Accepted",
   in_progress: "In progress",
   extension_requested: "Extension requested",
-  submitted: "Submitted",
+  submitted: "Delivered",
   approved: "Approved",
   completed: "Completed",
   reviewed: "Reviewed",
+  cancelled: "Cancelled",
 };
 
 const STEPS = ["draft", "offer_sent", "accepted", "in_progress", "submitted", "approved", "completed", "reviewed"];
@@ -340,23 +342,49 @@ export default function DbMessages() {
               {messages === null ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
               ) : (
-                messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                        m.mine ? "rounded-br-md bg-violet-400 text-zinc-950" : "rounded-bl-md bg-card-raised text-zinc-200"
-                      }`}
-                    >
-                      {m.body}
-                      <span className={`mt-0.5 block text-right text-[9px] ${m.mine ? "text-zinc-800" : "text-zinc-600"}`}>
-                        {timeAgo(m.createdAt)}
-                      </span>
+                messages.map((m) =>
+                  m.kind === "system" ? (
+                    /* project events render inline — the thread shows the
+                       transaction progressing */
+                    <div key={m.id} className="flex justify-center">
+                      <p className="max-w-[85%] rounded-full border border-line-soft bg-card-raised/60 px-3.5 py-1.5 text-center text-[11px] leading-relaxed text-zinc-400">
+                        {m.body}
+                        <span className="ml-1.5 text-[9px] text-zinc-600">{timeAgo(m.createdAt)}</span>
+                      </p>
                     </div>
-                  </div>
-                ))
+                  ) : (
+                    <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                          m.mine ? "rounded-br-md bg-violet-400 text-zinc-950" : "rounded-bl-md bg-card-raised text-zinc-200"
+                        }`}
+                      >
+                        {m.body}
+                        <span className={`mt-0.5 block text-right text-[9px] ${m.mine ? "text-zinc-800" : "text-zinc-600"}`}>
+                          {timeAgo(m.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                )
               )}
               <div ref={bottomRef} />
             </div>
+
+            {/* the platform recognizes a deal forming — offer the next step */}
+            {!project &&
+              messages &&
+              messages.slice(-8).some((m) => m.kind !== "system" && /\$\s?\d{2,}/.test(m.body)) && (
+                <div className="mx-4 mb-2 flex items-center justify-between gap-3 rounded-xl border border-lime-400/30 bg-lime-400/5 px-3.5 py-2">
+                  <p className="text-xs text-zinc-300">
+                    <span className="font-semibold text-lime-300">Talking numbers?</span> Turn this into a
+                    project so the payment is protected.
+                  </p>
+                  <button onClick={() => setPanelOpen(true)} className="btn-lime shrink-0 px-3 py-1 text-[11px]">
+                    Create project
+                  </button>
+                </div>
+              )}
 
             {/* off-platform tripwire */}
             {offPlatform && (
@@ -426,6 +454,14 @@ function ProjectPanel({
   const [amount, setAmount] = useState("");
   const [brief, setBrief] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [asCreator, setAsCreator] = useState(false);
+  // notes for deliver / revision / decline
+  const [deliverNote, setDeliverNote] = useState("");
+  const [revisionNote, setRevisionNote] = useState("");
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  // creator-side term editing (draft / offer_sent only)
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [termAmount, setTermAmount] = useState("");
   // extension form
   const [extDays, setExtDays] = useState("2");
   const [extReason, setExtReason] = useState("");
@@ -448,12 +484,12 @@ function ProjectPanel({
     return true;
   };
 
-  const act = (action: string) => () =>
+  const act = (action: string, extra: Record<string, unknown> = {}) => () =>
     run(() =>
       fetch(`/api/projects/${project!.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...extra }),
       })
     );
 
@@ -490,9 +526,26 @@ function ProjectPanel({
       {!project && (
         <div className="mt-4 space-y-2.5">
           <p className="text-xs leading-relaxed text-zinc-500">
-            Turn this conversation into a real project. You&apos;ll be the client — {conv.with?.displayName}{" "}
-            delivers the work and receives the payout.
+            Turn this conversation into a real project — agreed terms, protected payment, clear steps.
           </p>
+          <div className="flex gap-1.5 rounded-xl border border-line bg-card-raised p-1">
+            <button
+              onClick={() => setAsCreator(false)}
+              className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${
+                !asCreator ? "bg-lime-400/15 text-lime-300" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              I&apos;m hiring {conv.with?.displayName.split(" ")[0]}
+            </button>
+            <button
+              onClick={() => setAsCreator(true)}
+              className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${
+                asCreator ? "bg-lime-400/15 text-lime-300" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              I&apos;m doing the work
+            </button>
+          </div>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project title" className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
           <div className="relative">
             <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
@@ -502,7 +555,9 @@ function ProjectPanel({
           <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none focus:border-lime-400/50" />
           {amount && (
             <p className="font-mono text-[11px] tracking-[0.08em] text-zinc-500">
-              PAYOUT ${amount} · YOU PAY ${amount ? (Number(amount) * 1.05).toFixed(2) : "0"} (5% platform fee)
+              {asCreator
+                ? `YOUR PAYOUT $${amount} · THEY PAY $${(Number(amount) * 1.05).toFixed(2)} (5% fee)`
+                : `PAYOUT $${amount} · YOU PAY $${(Number(amount) * 1.05).toFixed(2)} (5% platform fee)`}
             </p>
           )}
           <button
@@ -513,7 +568,9 @@ function ProjectPanel({
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    creatorHandle: conv.with?.handle,
+                    ...(asCreator
+                      ? { clientHandle: conv.with?.handle, asCreator: true }
+                      : { creatorHandle: conv.with?.handle }),
                     title,
                     amount: Number(amount),
                     brief,
@@ -525,7 +582,7 @@ function ProjectPanel({
             }
             className="btn-lime w-full justify-center py-2 text-sm disabled:opacity-40"
           >
-            Create project draft
+            {asCreator ? "Create project — then send the offer" : "Create project draft"}
           </button>
         </div>
       )}
@@ -557,7 +614,7 @@ function ProjectPanel({
                 <span className="text-zinc-500">Payment</span>
                 <span className={`inline-flex items-center gap-1.5 font-semibold ${p.status === "released" ? "text-lime-300" : "text-amber-300"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${p.status === "released" ? "bg-lime-400" : "bg-amber-400"}`} />
-                  {p.status === "held" ? "Held in escrow" : p.status === "released" ? "Released" : p.status}
+                  {p.status === "held" ? "Secured" : p.status === "released" ? "Released" : p.status}
                 </span>
               </div>
             ))}
@@ -604,9 +661,20 @@ function ProjectPanel({
           {/* ------------------- actions by state × role ------------------- */}
           <div className="space-y-2">
             {project.state === "draft" && project.myRole === "creator" && (
-              <button disabled={busy} onClick={act("send_offer")} className="btn-lime w-full justify-center py-2 text-sm">
-                Send offer · ${project.amount}
-              </button>
+              <>
+                <button disabled={busy} onClick={act("send_offer")} className="btn-lime w-full justify-center py-2 text-sm">
+                  Send offer · ${project.amount}
+                </button>
+                <TermsEditor
+                  open={termsOpen}
+                  setOpen={setTermsOpen}
+                  amount={termAmount}
+                  setAmount={setTermAmount}
+                  current={project.amount}
+                  busy={busy}
+                  onSave={(n) => run(() => fetch(`/api/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_terms", amount: n }) }))}
+                />
+              </>
             )}
             {project.state === "draft" && project.myRole === "client" && (
               <p className="text-xs text-zinc-500">
@@ -614,12 +682,54 @@ function ProjectPanel({
               </p>
             )}
             {project.state === "offer_sent" && project.myRole === "client" && (
-              <button disabled={busy} onClick={act("accept_offer")} className="btn-lime w-full justify-center py-2 text-sm">
-                Accept offer · ${project.amount}
-              </button>
+              <div className="rounded-xl border border-lime-400/30 bg-lime-400/5 p-3.5">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-lime-300">
+                  Review project — confirm before you commit
+                </p>
+                <dl className="mt-2.5 space-y-1 text-xs">
+                  <div className="flex justify-between"><dt className="text-zinc-500">Provider</dt><dd className="font-medium text-zinc-200">{project.with.displayName}</dd></div>
+                  <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${project.amount}</dd></div>
+                  {project.deadline && (
+                    <div className="flex justify-between"><dt className="text-zinc-500">Delivery</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">{new Date(project.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</dd></div>
+                  )}
+                  <div className="flex justify-between"><dt className="text-zinc-500">You pay (incl. 5% fee)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${(project.amount + fee).toFixed(2)}</dd></div>
+                </dl>
+                {project.brief && <p className="mt-2 border-t border-line-soft pt-2 text-xs leading-relaxed text-zinc-400">{project.brief}</p>}
+                <div className="mt-3 space-y-1.5">
+                  <button disabled={busy} onClick={act("accept_offer", { expectedAmount: project.amount })} className="btn-lime w-full justify-center py-2 text-sm">
+                    Accept &amp; Continue · ${project.amount}
+                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        const note = window.prompt("What should change about this offer?") ?? "";
+                        run(() => fetch(`/api/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "decline_offer", note }) }));
+                      }}
+                      className="flex-1 rounded-full border border-line py-1.5 text-xs font-medium text-zinc-300 transition hover:border-zinc-600"
+                    >
+                      Request Changes
+                    </button>
+                    <button disabled={busy} onClick={act("cancel")} className="flex-1 rounded-full border border-line py-1.5 text-xs font-medium text-zinc-500 transition hover:border-rose-400/40 hover:text-rose-300">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
             {project.state === "offer_sent" && project.myRole === "creator" && (
-              <p className="text-xs text-zinc-500">Offer sent — waiting for {project.with.displayName} to accept.</p>
+              <>
+                <p className="text-xs text-zinc-500">Offer sent — waiting for {project.with.displayName} to review and accept.</p>
+                <TermsEditor
+                  open={termsOpen}
+                  setOpen={setTermsOpen}
+                  amount={termAmount}
+                  setAmount={setTermAmount}
+                  current={project.amount}
+                  busy={busy}
+                  onSave={(n) => run(() => fetch(`/api/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_terms", amount: n }) }))}
+                />
+              </>
             )}
             {project.state === "accepted" && project.myRole === "client" && (
               <button disabled={busy} onClick={() => setPayOpen(true)} className="btn-lime w-full justify-center py-2 text-sm">
@@ -627,12 +737,23 @@ function ProjectPanel({
               </button>
             )}
             {project.state === "accepted" && project.myRole === "creator" && (
-              <p className="text-xs text-zinc-500">Accepted — waiting for payment to be secured.</p>
+              <p className="text-xs text-zinc-500">Accepted — waiting for the payment to be secured.</p>
+            )}
+            {project.state === "cancelled" && (
+              <p className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-xs text-zinc-500">
+                This project was cancelled before payment. No money moved. Start a new project any time.
+              </p>
             )}
             {project.state === "in_progress" && project.myRole === "creator" && (
               <>
-                <button disabled={busy} onClick={act("submit")} className="btn-lime w-full justify-center py-2 text-sm">
-                  Submit work for review
+                <input
+                  value={deliverNote}
+                  onChange={(e) => setDeliverNote(e.target.value)}
+                  placeholder='What are you delivering? e.g. "BrandGuide.pdf — final logo + palette"'
+                  className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+                />
+                <button disabled={busy} onClick={act("submit", { note: deliverNote })} className="btn-lime w-full justify-center py-2 text-sm">
+                  Deliver for review
                 </button>
                 {!extFormOpen ? (
                   <button onClick={() => setExtFormOpen(true)} className="w-full rounded-full border border-line py-2 text-xs font-medium text-zinc-400 transition hover:border-amber-400/40 hover:text-amber-300">
@@ -678,13 +799,47 @@ function ProjectPanel({
                 <button disabled={busy} onClick={act("approve")} className="btn-lime w-full justify-center py-2 text-sm">
                   Approve delivery
                 </button>
-                <button disabled={busy} onClick={act("request_changes")} className="w-full rounded-full border border-line py-2 text-xs font-medium text-zinc-400 hover:border-zinc-600">
-                  Request changes
-                </button>
+                {!revisionOpen ? (
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setRevisionOpen(true)} className="flex-1 rounded-full border border-line py-2 text-xs font-medium text-zinc-400 hover:border-zinc-600">
+                      Request Revision
+                    </button>
+                    <button onClick={onClose} className="flex-1 rounded-full border border-line py-2 text-xs font-medium text-zinc-400 transition hover:border-violet-400/40 hover:text-violet-300">
+                      Discuss
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3">
+                    <input
+                      value={revisionNote}
+                      onChange={(e) => setRevisionNote(e.target.value)}
+                      placeholder="Tell them what needs to change…"
+                      autoFocus
+                      className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          const ok = await run(() => fetch(`/api/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "request_changes", note: revisionNote }) }));
+                          if (ok) {
+                            setRevisionOpen(false);
+                            setRevisionNote("");
+                          }
+                        }}
+                        className="btn-lime px-3.5 py-1.5 text-xs"
+                      >
+                        Send revision request
+                      </button>
+                      <button onClick={() => setRevisionOpen(false)} className="text-xs text-zinc-500">Cancel</button>
+                    </div>
+                    <p className="text-[10px] text-zinc-600">The project stays active — payment stays secured.</p>
+                  </div>
+                )}
               </>
             )}
             {project.state === "submitted" && project.myRole === "creator" && (
-              <p className="text-xs text-zinc-500">Submitted — waiting for review.</p>
+              <p className="text-xs text-zinc-500">Delivered — waiting for {project.with.displayName} to review.</p>
             )}
             {project.state === "approved" && project.myRole === "client" && (
               <button disabled={busy} onClick={act("complete")} className="btn-lime w-full justify-center py-2 text-sm">
@@ -746,10 +901,12 @@ function ProjectPanel({
             )}
           </div>
 
-          <p className="border-t border-line-soft pt-3 text-[10px] leading-relaxed text-zinc-600">
-            Money flows through UpNova&apos;s escrow: secured when work starts, released when you approve.
-            The 5% platform fee is paid by the buyer on top — the creator&apos;s listed price is their payout.
-            Stripe Connect handles the card details in production; UpNova never stores them.
+          <p className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2.5 text-[10px] leading-relaxed text-zinc-500">
+            <span className="font-bold uppercase tracking-wide text-zinc-400">UpNova transaction</span>
+            <br />
+            Keep communication, agreements, and payments on UpNova to maintain your transaction
+            protections. Payment is secured when work starts and released when you approve the
+            delivery. The 5% fee is paid by the buyer on top — the listed price is the creator&apos;s payout.
           </p>
         </div>
       )}
@@ -790,10 +947,13 @@ function ProjectPanel({
                       fetch(`/api/projects/${project.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "start" }),
+                        // the amount shown IS the amount authorized — the
+                        // server refuses if the terms changed underneath
+                        body: JSON.stringify({ action: "start", expectedAmount: project.amount }),
                       })
                     );
                     if (ok) setPaid(true);
+                    else setPayOpen(false);
                   }}
                   className="btn-lime mt-4 w-full justify-center py-2.5 text-sm disabled:opacity-40"
                 >
@@ -807,8 +967,9 @@ function ProjectPanel({
                 </span>
                 <h3 className="mt-3 text-sm font-bold text-lime-300">Payment secured</h3>
                 <p className="mx-auto mt-1 max-w-[240px] text-xs leading-relaxed text-zinc-400">
-                  ${(project.amount + fee).toFixed(2)} charged. ${project.amount.toFixed(2)} is held in escrow
-                  until you approve the delivery.
+                  Your payment of ${(project.amount + fee).toFixed(2)} has been secured for this project.
+                  ${project.amount.toFixed(2)} releases to {project.with.displayName.split(" ")[0]} when you
+                  approve the delivery.
                 </p>
                 <button
                   onClick={() => {
@@ -825,5 +986,70 @@ function ProjectPanel({
         </div>
       )}
     </aside>
+  );
+}
+
+
+/* ----------------------------- terms editor ----------------------------- */
+/* Creator-side price change BEFORE payment. Changes are announced in the
+   thread and the client must re-review — nothing changes silently. */
+
+function TermsEditor({
+  open,
+  setOpen,
+  amount,
+  setAmount,
+  current,
+  busy,
+  onSave,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  amount: string;
+  setAmount: (v: string) => void;
+  current: number;
+  busy: boolean;
+  onSave: (n: number) => Promise<boolean>;
+}) {
+  if (!open)
+    return (
+      <button
+        onClick={() => {
+          setAmount(String(current));
+          setOpen(true);
+        }}
+        className="w-full rounded-full border border-line py-2 text-xs font-medium text-zinc-400 transition hover:border-zinc-600"
+      >
+        Edit terms
+      </button>
+    );
+  return (
+    <div className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-zinc-500">Price $</span>
+        <input
+          value={amount}
+          onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+          className="w-24 rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm text-zinc-100 outline-none"
+        />
+        <button
+          disabled={busy || !amount}
+          onClick={async () => {
+            const ok = await onSave(Number(amount));
+            if (ok) setOpen(false);
+          }}
+          className="btn-lime px-3 py-1.5 text-xs"
+        >
+          Update
+        </button>
+        <button onClick={() => setOpen(false)} className="text-xs text-zinc-500">
+          Cancel
+        </button>
+      </div>
+      <p className="text-[10px] text-zinc-600">
+        The change posts to the conversation and the client must review the updated terms — prices
+        never change silently. Terms lock once the offer is accepted.
+      </p>
+    </div>
   );
 }

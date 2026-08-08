@@ -265,6 +265,27 @@ campus; tab picks the ranking. For You uses deterministic scoring (documented we
 `lib/server/feed.ts`): follows +50, shared skills/interests +8 each (cap 24), shared community +12,
 same city +15, recency decay to −30 over 48 h, engagement +6·ln(likes + 2·comments + 1).
 
+**The transaction backbone** — Messages is the transaction hub: conversations carry normal chat
+plus system messages for every project event (offer sent, terms updated, accepted, payment
+secured, delivered, revision requested, extension decided, released, cancelled), so the thread
+literally shows the deal progressing. The server is the only sequence authority
+(`lib/server/projects.ts`): discover → contact → discuss → create project (either side) → review
+→ accept → payment secured → work → delivery → approve/revise → complete → review → reputation.
+Transaction-authorization integrity per OWASP: `accept_offer` and `start` carry
+`expectedAmount` — if the creator changed the price since the client loaded the screen, the
+server refuses (409) and the change is announced in-thread; terms lock entirely once accepted.
+Cancellation exists only before payment. Payment language is deliberately "secured/released" —
+never "escrow", which is a specific legal service UpNova does not claim to provide. Every project
+carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
+warning.
+
+**Location privacy** — users pick the most precise level shown publicly: City · County · State ·
+Country · Don't show. `locationLabel` is computed server-side (`lib/server/serialize.ts`) and is
+the only location string public surfaces render; exact addresses and coordinates are never public
+regardless of setting (lat/lng are server-side scoping only). Service providers show a service
+area ("Within 25 miles"), never an address. Identity verification shows only the badge — never
+documents.
+
 **Payments** — no card data is ever stored. The `payments` table records payout + 5 % buyer-side
 fee in cents with `provider="stripe_connect"` and a `providerRef` seam where the PaymentIntent /
 Transfer id and webhooks slot in. Verification evidence (`campus_verifications.evidenceRef`) is a

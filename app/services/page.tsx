@@ -33,6 +33,7 @@ interface ServiceItem {
     roleLine: string;
     city: string | null;
     state: string | null;
+    locationLabel?: string | null;
     trustLevel: string;
   };
   isMine: boolean;
@@ -182,7 +183,7 @@ export default function ServicesPage() {
                       {s.owner.verified && <VerifiedBadge className="h-3 w-3" />}
                     </span>
                     <span className="block truncate text-[10px] text-zinc-500">
-                      {s.owner.city ? `${s.owner.city}${s.owner.state ? `, ${s.owner.state}` : ""}` : s.owner.roleLine}
+                      {s.owner.locationLabel ?? s.owner.roleLine}
                     </span>
                   </span>
                 </Link>
