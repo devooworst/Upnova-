@@ -135,7 +135,7 @@ export const creators: Creator[] = [
     availability: "Available Now",
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
     distanceMi: 2.4,
-    activity: "Booking photo sessions this week",
+    activity: "Booking shoots this week",
     online: true,
   },
   {
@@ -156,7 +156,7 @@ export const creators: Creator[] = [
     availability: "Available This Week",
     reach: { location: "Maryland", reach: "Local", radius: "25 mi" },
     distanceMi: 18,
-    activity: "Color-grading a client film",
+    activity: "Grading a client film",
   },
   {
     id: "nia",
@@ -176,7 +176,7 @@ export const creators: Creator[] = [
     availability: "Accepting Clients",
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "10 mi" },
     distanceMi: 4.8,
-    activity: "Open to collabs this month",
+    activity: "Open to collabs",
     online: true,
   },
   {

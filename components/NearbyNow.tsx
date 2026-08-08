@@ -83,7 +83,7 @@ export default function NearbyNow() {
         {tiles.map((t) => (
           <button
             key={t.id}
-            className={`group w-52 shrink-0 border p-3 text-left transition ${roleShape[t.role]}`}
+            className={`group w-56 shrink-0 border p-3 text-left transition ${roleShape[t.role]}`}
           >
             <span className="flex items-center gap-2.5">
               {t.role === "self" ? (

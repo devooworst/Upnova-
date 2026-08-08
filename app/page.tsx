@@ -19,7 +19,7 @@ export default function Home() {
             {currentUser.location} · Thu Aug 7
           </p>
           <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-            <h1 className="text-4xl font-extrabold leading-none tracking-[-0.03em] text-zinc-50 sm:text-[2.75rem]">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">
               Near You
             </h1>
             {/* radius selector — the one place radius lives */}

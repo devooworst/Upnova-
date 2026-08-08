@@ -36,10 +36,8 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
     <aside className="sticky top-20 hidden w-80 shrink-0 space-y-5 self-start xl:block">
       {/* ---- money: receipt. sharp corners, lime rule, mono, dashed rows ---- */}
       <section className="card-money px-5 pb-5 pt-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-300">
-            Open money
-          </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Open money</h2>
           <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
             {radius === "city" ? "city +" : `≤ ${radius} mi`}
           </span>
@@ -101,9 +99,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
       {/* ---- people: round, avatar-forward, violet ---- */}
       <section className="card-people p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold tracking-tight text-zinc-50">
-            People near you
-          </h2>
+          <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">People near you</h2>
           <Link
             href="/discover"
             className="text-xs font-semibold text-violet-400 transition hover:text-violet-300"
@@ -143,7 +139,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
 
       {/* ---- events: ticket rows with real date blocks, amber ---- */}
       <section className="card-event overflow-hidden">
-        <h2 className="border-b border-line-soft px-5 pb-3 pt-4 text-base font-bold tracking-tight text-zinc-50">
+        <h2 className="border-b border-line-soft px-5 pb-3 pt-4 text-[15px] font-bold tracking-tight text-zinc-50">
           This week
         </h2>
         <ul className="divide-y divide-line-soft">
