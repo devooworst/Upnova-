@@ -84,12 +84,12 @@ export default function ServicesPage() {
       </div>
 
       {/* creator catalog */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {items.map((svc) => {
           const c = creators.find((cr) => cr.id === svc.creatorId);
           if (!c) return null;
           return (
-            <article key={svc.id} className="card-people card-lift flex flex-col p-5 hover:border-zinc-600">
+            <article key={svc.id} className="card-people card-lift flex flex-col p-4 hover:border-zinc-600">
               {/* creator-forward: the person is the product */}
               <div className="flex items-center gap-3">
                 <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="md" className="ring-1 ring-line" />
@@ -107,10 +107,10 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              <h2 className="mt-3.5 text-base font-bold tracking-tight text-zinc-50">{svc.title}</h2>
+              <h2 className="mt-2.5 text-base font-bold tracking-tight text-zinc-50">{svc.title}</h2>
               <p className="mt-1 flex-1 text-sm leading-relaxed text-zinc-400">{svc.description}</p>
 
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <span className="chip px-2 py-0.5 text-[11px]">{svc.category}</span>
                 <span className="chip px-2 py-0.5 text-[11px]">
                   <Clock className="h-3 w-3" /> {svc.delivery}
@@ -122,7 +122,7 @@ export default function ServicesPage() {
                 <TrustBadge level={svc.trustLevel} />
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line-soft pt-3.5">
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line-soft pt-3">
                 <p className="text-xs text-zinc-500">
                   Starting at{" "}
                   <span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">
@@ -157,7 +157,7 @@ export default function ServicesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setSafetyFor(null)}>
           <div className="card w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
-              🛡️ safety verification required
+safety verification required
             </p>
             <h2 className="mt-1.5 text-[15px] font-bold tracking-tight text-zinc-50">
               {safetyFor.title}

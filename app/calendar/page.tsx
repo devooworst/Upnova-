@@ -27,7 +27,7 @@ export default function CalendarPage() {
     .reduce((n, b) => n + (Number(b.price.replace(/[^0-9.]/g, "")) || 0), 0);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-4">
       <header>
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-500">
           August 2026 · {bookings.length} booked
@@ -44,14 +44,14 @@ export default function CalendarPage() {
       </header>
 
       {/* work performance — the private professional dashboard */}
-      <section className="card-money p-5">
+      <section className="card-money p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Work Performance</h2>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-0.5 text-[11px] font-bold text-lime-300">
-            🟢 Reliable Creator
+            <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Reliable Creator
           </span>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+        <div className="mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-6">
           {[
             [`${reliability.onTimeRate}%`, "on-time"],
             [`${reliability.completed}`, "completed"],
@@ -66,19 +66,25 @@ export default function CalendarPage() {
             </div>
           ))}
         </div>
-        <div className="mt-3.5 border-t border-line-soft pt-3">
+        <div className="mt-2.5 border-t border-line-soft pt-2.5">
           <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
             how deadlines are recorded — communication protects your record
           </p>
-          <div className="mt-2 grid gap-1.5 text-[11px] text-zinc-400 sm:grid-cols-2">
-            <span>🟢 On time — no problem</span>
-            <span>🟡 Extension requested &amp; approved — no penalty</span>
-            <span>🟠 Late, communicated — noted, not punished like silence</span>
-            <span>🔴 Late, no communication — affects standing &amp; visibility</span>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
+            {([
+              ["bg-lime-400", "On time"],
+              ["bg-amber-400", "Extension approved — no penalty"],
+              ["bg-orange-400", "Late, communicated"],
+              ["bg-red-400", "Late, silent — affects standing"],
+            ] as [string, string][]).map(([c, t]) => (
+              <span key={t} className="flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${c}`} /> {t}
+              </span>
+            ))}
           </div>
         </div>
-        <p className="mt-3 border-t border-line-soft pt-2.5 text-[10px] leading-relaxed text-zinc-600">
-          This record is private to you. Publicly, clients only see the summary: 🟢 Reliable
+        <p className="mt-2.5 border-t border-line-soft pt-2 text-[10px] leading-relaxed text-zinc-600">
+          This record is private to you. Publicly, clients only see the summary: Reliable
           Creator · {reliability.onTimeRate}% on time. Reliability adjusts visibility and access
           to higher-value work — it never brands anyone. Clients build reliability too: repeated
           cancellations, scope changes, or refused deliveries affect their standing the same way.
@@ -109,7 +115,7 @@ export default function CalendarPage() {
                   key={day}
                   onClick={() => setSelected(isSelected ? null : day)}
                   aria-pressed={isSelected}
-                  className={`relative flex h-10 flex-col items-center justify-center rounded-md text-sm transition ${
+                  className={`relative flex h-9 flex-col items-center justify-center rounded-md text-sm transition ${
                     isSelected
                       ? "bg-white font-semibold text-zinc-950"
                       : isToday

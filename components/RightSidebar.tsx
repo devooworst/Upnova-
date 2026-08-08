@@ -37,7 +37,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
   );
 
   return (
-    <aside className="sticky top-20 hidden w-80 shrink-0 space-y-5 self-start xl:block">
+    <aside className="sticky top-20 hidden w-80 shrink-0 space-y-4 self-start xl:block">
       {/* ---- money: receipt. sharp corners, lime rule, mono, dashed rows ---- */}
       <section className="card-money px-5 pb-5 pt-4">
         <div className="flex items-center justify-between">

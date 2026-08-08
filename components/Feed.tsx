@@ -194,7 +194,7 @@ export default function Feed({ scope, tab, onTabChange, isStudent }: FeedProps) 
       {loading ? (
         <Skeleton />
       ) : (
-        <div key={`${tab}-${scope}`} className="animate-fade-up space-y-5">
+        <div key={`${tab}-${scope}`} className="animate-fade-up space-y-4">
           {items.map(renderItem)}
           {items.length === 0 && (
             <p className="py-10 text-center text-sm text-zinc-500">

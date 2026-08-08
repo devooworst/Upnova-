@@ -1069,19 +1069,19 @@ export type TrustLevel = "standard" | "identity" | "high-trust";
 
 export const trustLevelInfo: Record<TrustLevel, { dot: string; label: string; desc: string; checks: string[] }> = {
   standard: {
-    dot: "🟢",
+    dot: "bg-zinc-500",
     label: "Standard",
     desc: "Normal creative/digital work. Email + phone verification; ID optional.",
     checks: ["Email & phone verified", "Portfolio & reviews"],
   },
   identity: {
-    dot: "🟡",
+    dot: "bg-amber-400",
     label: "Identity Verified",
     desc: "In-person work or handling something valuable.",
     checks: ["Identity verification (via provider)", "Email & phone verified"],
   },
   "high-trust": {
-    dot: "🔴",
+    dot: "bg-red-400",
     label: "High-Trust",
     desc: "Unsupervised access to a person, child, pet, home, or valuable property.",
     checks: [
@@ -1105,22 +1105,22 @@ export type AiPolicy = "no-ai" | "disclosure" | "assisted" | "client-decides";
 
 export const aiPolicyInfo: Record<AiPolicy, { dot: string; label: string; desc: string }> = {
   "no-ai": {
-    dot: "🔴",
+    dot: "bg-red-400",
     label: "No AI",
     desc: "Created by the creator without generative AI.",
   },
   disclosure: {
-    dot: "🟡",
+    dot: "bg-amber-400",
     label: "AI with disclosure",
     desc: "AI may be used; the creator must disclose how.",
   },
   assisted: {
-    dot: "🟠",
+    dot: "bg-orange-400",
     label: "AI-assisted",
     desc: "Limited AI assistance; the creator owns the creative work.",
   },
   "client-decides": {
-    dot: "🟢",
+    dot: "bg-lime-400",
     label: "Client decides",
     desc: "AI use is agreed per project before work begins.",
   },
@@ -1129,10 +1129,10 @@ export const aiPolicyInfo: Record<AiPolicy, { dot: string; label: string; desc: 
 export type AiInvolvement = "none" | "assisted" | "generative" | "full";
 
 export const aiInvolvementInfo: Record<AiInvolvement, { dot: string; label: string }> = {
-  none: { dot: "🔴", label: "No AI" },
-  assisted: { dot: "🟡", label: "AI-assisted" },
-  generative: { dot: "🟠", label: "Generative elements" },
-  full: { dot: "🟢", label: "Fully AI-generated" },
+  none: { dot: "bg-red-400", label: "No AI" },
+  assisted: { dot: "bg-amber-400", label: "AI-assisted" },
+  generative: { dot: "bg-orange-400", label: "Generative elements" },
+  full: { dot: "bg-lime-400", label: "Fully AI-generated" },
 };
 
 export interface CatalogService {

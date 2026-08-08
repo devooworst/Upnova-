@@ -216,7 +216,7 @@ export default function CreateModal() {
               <Check className="h-6 w-6 text-lime-400" />
             </span>
             <p className="mt-3 text-sm font-semibold text-zinc-100">
-              {kind === "Live" ? "🔴 You're live" : `Your ${kind.toLowerCase()} is live`}
+              {kind === "Live" ? "You're live" : `Your ${kind.toLowerCase()} is live`}
             </p>
             {/* what appears on the feed — type DNA preview */}
             <div className="mx-auto mt-4 max-w-sm text-left">
@@ -235,7 +235,7 @@ export default function CreateModal() {
               {kind === "Opportunity" && (
                 <div className="card-money p-4">
                   <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-lime-400">
-                    {payType === "Paid" ? "🟢 paid opportunity" : payType}
+                    {payType === "Paid" ? "paid opportunity" : payType}
                   </p>
                   <p className="mt-1 text-base font-bold text-zinc-50">{oppTitle || "Your opportunity"}</p>
                   <p className="mt-0.5 text-xs text-zinc-500">
@@ -252,7 +252,7 @@ export default function CreateModal() {
                   <p className="text-xs text-zinc-500">by {currentUser.name} ✓ · {svcCategory}</p>
                   <p className="mt-1.5 text-sm text-zinc-400">
                     {priceModel} <span className="text-base font-extrabold tabular-nums text-lime-400">${svcPrice || "—"}</span>
-                    <span className="ml-2 text-[11px] text-lime-300">🟢 {availability}</span>
+                    <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-lime-300"><span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> {availability}</span>
                   </p>
                 </div>
               )}
@@ -510,7 +510,7 @@ export default function CreateModal() {
                     onClick={() => toggleIn(deliverables, setDeliverables, d)}
                     className={`rounded-full border px-2 py-1 text-[11px] transition ${deliverables.includes(d) ? "border-lime-400/60 bg-lime-400/10 text-lime-300" : "border-line text-zinc-500"}`}
                   >
-                    {deliverables.includes(d) ? "☑ " : "☐ "}{d}
+                    {deliverables.includes(d) ? "✓ " : ""}{d}
                   </button>
                 ))}
               </div>
@@ -553,12 +553,12 @@ export default function CreateModal() {
               <Plus className="h-3.5 w-3.5" /> Attach portfolio examples — photos, video, audio, past projects
             </button>
             <label className="flex cursor-pointer items-center justify-between rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-300">
-              <span>🔴 Original work — no undisclosed generative AI</span>
+              <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-red-400" /> Original work — no undisclosed generative AI</span>
               <input type="checkbox" checked={originalWork} onChange={(e) => setOriginalWork(e.target.checked)} className="accent-lime-400" />
             </label>
             {["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType) && !highTrustDone ? (
               <div className="rounded-md border border-red-400/30 bg-red-500/5 p-3.5">
-                <p className="text-sm font-semibold text-zinc-100">❌ Cannot publish yet</p>
+                <p className="text-sm font-semibold text-red-300">Cannot publish yet</p>
                 <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                   {svcType} requires High-Trust Verification — identity, age, and background
                   screening where legally permitted. Complete verification to offer this service.
@@ -698,7 +698,7 @@ export default function CreateModal() {
               disabled={!liveTitle.trim()}
               className={`w-full rounded-full py-2.5 text-sm font-bold transition ${liveTitle.trim() ? "bg-red-500 text-white hover:bg-red-400" : "cursor-not-allowed bg-card-raised text-zinc-600"}`}
             >
-              🔴 Go Live
+Go Live
             </button>
           </div>
         )}

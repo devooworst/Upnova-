@@ -46,8 +46,8 @@ export default function CreatorProfile({ id }: { id: string }) {
 
   const portfolioTiles = [
     { id: "w1", emoji: creator.emoji, label: "Latest work", gradient: creator.gradient },
-    { id: "w2", emoji: "🎬", label: "Client project", gradient: "from-zinc-700 to-zinc-900" },
-    { id: "w3", emoji: "⭐", label: `${creator.reviews} reviews`, gradient: "from-amber-500/60 to-orange-900" },
+    { id: "w2", emoji: creator.emoji, label: "Client project", gradient: "from-zinc-700 to-zinc-900" },
+    { id: "w3", emoji: "★", label: `${creator.reviews} reviews`, gradient: "from-amber-500/60 to-orange-900" },
   ];
 
   return (
@@ -92,7 +92,7 @@ export default function CreatorProfile({ id }: { id: string }) {
               <span>{creator.emoji} {creator.role}</span>
               {originalWork && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[10px] font-semibold text-zinc-200">
-                  🎨 Original Work Available
+Original Work Available
                 </span>
               )}
             </p>
@@ -113,7 +113,7 @@ export default function CreatorProfile({ id }: { id: string }) {
                   className="inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[10px] font-semibold text-zinc-200"
                   title="Share of verified UpNova projects completed on time"
                 >
-                  🟢 {creator.onTimeRate}% on time
+                  <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> {creator.onTimeRate}% on time
                 </span>
               )}
             </p>

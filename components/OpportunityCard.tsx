@@ -28,7 +28,7 @@ export default function OpportunityCard({ id }: { id: string }) {
 
   return (
     <article className="card-money relative overflow-hidden">
-      <div className="p-4 sm:p-5">
+      <div className="p-4">
         {/* stamp row: category + budget stub */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -38,12 +38,12 @@ export default function OpportunityCard({ id }: { id: string }) {
               {opp.category}
               {opp.studentFriendly && (
                 <span className="rounded-full border border-violet-400/40 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.08em] text-violet-300">
-                  🎓 STUDENT-FRIENDLY
+STUDENT-FRIENDLY
                 </span>
               )}
               {opp.trustLevel === "high-trust" && (
                 <span className="rounded-full border border-red-400/40 bg-red-500/10 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.08em] text-red-300">
-                  🔴 HIGH-TRUST
+<span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-red-400 align-middle" />HIGH-TRUST
                 </span>
               )}
             </p>
@@ -72,7 +72,7 @@ export default function OpportunityCard({ id }: { id: string }) {
           </div>
         </div>
 
-        <p className="mt-3 text-[15px] leading-relaxed text-zinc-300">{opp.description}</p>
+        <p className="mt-2.5 text-[15px] leading-relaxed text-zinc-300">{opp.description}</p>
 
         <Perforation className="mt-4" />
 
@@ -174,7 +174,7 @@ export default function OpportunityCard({ id }: { id: string }) {
               <div className="mt-4">
                 <div className="rounded-md border border-red-400/30 bg-red-500/5 p-3.5">
                   <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-red-300">
-                    🔴 high-trust opportunity
+high-trust opportunity
                   </p>
                   <p className="mt-1.5 text-sm text-zinc-200">
                     This job involves unsupervised access to a pet, home, or property. Applicants
@@ -182,8 +182,8 @@ export default function OpportunityCard({ id }: { id: string }) {
                   </p>
                   <ul className="mt-2 space-y-1 text-xs text-zinc-400">
                     <li>✓ Identity verification — you have this</li>
-                    <li>○ Age verification</li>
-                    <li>○ Background screening (where legally permitted)</li>
+                    <li className="text-zinc-600">Age verification — required</li>
+                    <li className="text-zinc-600">Background screening — required (where legally permitted)</li>
                   </ul>
                 </div>
                 <button

@@ -145,7 +145,7 @@ export default function ResolutionPage() {
       {/* creative integrity */}
       <section className="card p-5">
         <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">
-          🎨 Creative Integrity Review
+Creative Integrity Review
         </h2>
         <p className="mt-2 text-xs leading-relaxed text-zinc-500">
           UpNova doesn&apos;t prohibit AI — it prohibits <span className="font-semibold text-zinc-300">misrepresentation</span>.

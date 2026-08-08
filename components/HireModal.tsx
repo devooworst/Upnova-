@@ -33,7 +33,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
   const [desc, setDesc] = useState("");
   const [deadline, setDeadline] = useState("");
   const [budget, setBudget] = useState(service.startingAt);
-  const [aiReq, setAiReq] = useState("🔴 Not allowed");
+  const [aiReq, setAiReq] = useState("Not allowed");
 
   const price = Math.max(budget || 0, 0);
 
@@ -140,7 +140,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
             AI-generated work
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {["🔴 Not allowed", "🟡 Allowed with disclosure", "🟢 Allowed"].map((o) => (
+            {(["Not allowed", "Allowed with disclosure", "Allowed"]).map((o) => (
               <button
                 key={o}
                 type="button"
@@ -155,7 +155,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
               </button>
             ))}
           </div>
-          {aiReq === "🔴 Not allowed" && (
+          {aiReq === "Not allowed" && (
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
               Work must be created by the hired creator without undisclosed AI-generated material.
               This becomes part of the project agreement.
@@ -185,7 +185,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
           <Lock className="h-3 w-3" /> secure payment · nothing is charged until you both agree
         </p>
         <p className="mt-2 rounded-md border border-lime-400/25 bg-lime-400/5 p-2.5 text-[10px] leading-relaxed text-zinc-400">
-          🛡️ <span className="font-semibold text-lime-300">UpNova Protected.</span> The agreement,
+          <span className="font-semibold text-lime-300">UpNova Protected.</span> The agreement,
           payment, and delivery are recorded — if anything goes wrong, the Resolution Center has
           the full record. Never pay outside UpNova.
         </p>

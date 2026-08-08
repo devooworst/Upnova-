@@ -21,7 +21,7 @@ export default function PromoteModal({ onClose }: { onClose: () => void }) {
       <div className="card-money w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         {done ? (
           <div className="py-4 text-center">
-            <p className="text-3xl" aria-hidden>🚀</p>
+            <Megaphone className="mx-auto h-8 w-8 text-amber-400" />
             <h2 className="mt-2 text-[15px] font-bold tracking-tight text-zinc-50">
               {product.name} is live
             </h2>

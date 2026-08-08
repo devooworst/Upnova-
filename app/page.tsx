@@ -72,7 +72,7 @@ export default function Home() {
 
   return (
     <div className="flex gap-6">
-      <div className="min-w-0 flex-1 space-y-6">
+      <div className="min-w-0 flex-1 space-y-4">
         {/* masthead — Home, always */}
         <header className="pt-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
@@ -139,7 +139,7 @@ export default function Home() {
           )}
 
           {/* signature: the ticket perforation, carried at brand level */}
-          <div className="relative mt-5" aria-hidden>
+          <div className="relative mt-4" aria-hidden>
             <div className="border-t border-dashed border-line" />
             <span className="absolute -top-[5px] left-0 h-[9px] w-[9px] rounded-full border border-line bg-ink" />
             <span className="absolute -top-[5px] right-0 h-[9px] w-[9px] rounded-full border border-line bg-ink" />

@@ -36,7 +36,7 @@ const freeFeatures = [
 ];
 
 const collegeFeatures = [
-  { icon: GraduationCap, text: "🎓 Verified Student badge" },
+  { icon: GraduationCap, text: "Verified Student badge" },
   { icon: Rocket, text: "Student Boost — extra discovery when you're a relevant match" },
   { icon: Zap, text: "Student Opportunities — work that fits around student life" },
   { icon: Star, text: "Campus discovery, student-only collabs & Spotlight eligibility" },
@@ -105,7 +105,7 @@ export default function ProPage() {
               </h2>
               <p className="text-xs text-zinc-500">Build while you study.</p>
               <p className="mt-1.5 rounded-md border border-violet-400/25 bg-violet-400/5 px-2.5 py-1.5 text-[10px] leading-relaxed text-zinc-400">
-                🎓 <span className="font-semibold text-violet-300">Verification is free.</span>{" "}
+                <span className="font-semibold text-violet-300">Verification is free.</span>{" "}
                 School community, campus chat, networking, applying — all $0. College+ is the
                 optional exposure upgrade.
               </p>
@@ -205,7 +205,7 @@ export default function ProPage() {
           <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
             Verification runs through an education-verification provider in production — school
             email alone isn&apos;t the permanent source of truth, and your student email is never
-            shown publicly. You get a simple status: 🎓 Verified Student.
+            shown publicly. You get a simple status: Verified Student.
           </p>
           <button
             onClick={() => {
@@ -247,7 +247,7 @@ export default function ProPage() {
               <p className="mt-1 text-sm font-semibold text-violet-300">{school}</p>
               <p className="text-xs text-zinc-500">1,284 UpNova members</p>
               <ul className="mt-3 space-y-1 text-xs text-zinc-400">
-                {["Campus communities & events", "Student creators & businesses", "Campus gigs & study groups", "Student-only collabs (🎓 filter)"].map((i) => (
+                {["Campus communities & events", "Student creators & businesses", "Campus gigs & study groups", "Student-only collabs"].map((i) => (
                   <li key={i} className="flex items-center gap-2">
                     <Check className="h-3.5 w-3.5 text-violet-400" /> {i}
                   </li>
@@ -316,8 +316,8 @@ export default function ProPage() {
               </button>
             )}
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3.5 text-xs">
-              <span className="chip px-2 py-0.5 text-[11px]">⭐ Student Spotlight — eligible</span>
-              <span className="chip px-2 py-0.5 text-[11px]">🏆 Campus Challenge: 30s commercial · $500 prize</span>
+              <span className="chip px-2 py-0.5 text-[11px]">Student Spotlight — eligible</span>
+              <span className="chip px-2 py-0.5 text-[11px]">Campus Challenge: $500 prize</span>
               <Link href="/opportunities" className="ml-auto font-semibold text-violet-400 hover:text-violet-300">
                 Student Opportunities →
               </Link>
@@ -326,7 +326,7 @@ export default function ProPage() {
 
           {/* graduation pipeline */}
           <section className="rounded-xl border border-line p-4">
-            <p className="text-sm font-semibold text-zinc-200">🎓 When you graduate ({gradDate})</p>
+            <p className="text-sm font-semibold text-zinc-200">When you graduate ({gradDate})</p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-500">
               Your status changes from <span className="font-semibold text-zinc-300">Bowie State Student</span> to{" "}
               <span className="font-semibold text-zinc-300">Bowie State Alumni</span> — the alumni
@@ -366,7 +366,7 @@ export default function ProPage() {
           <h1 className="mt-4 text-[15px] font-bold tracking-tight text-zinc-50">Upgrade to UpNova Pro</h1>
           <p className="text-xs text-zinc-500">Pro Monthly</p>
           <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
-            💳 <span className="font-mono font-medium">•••• 4242</span>
+            <span className="font-mono font-medium">•••• 4242</span>
             <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${PRO_PRICE}</span>
           </div>
           <button
@@ -376,7 +376,7 @@ export default function ProPage() {
             Subscribe to UpNova Pro
           </button>
           <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
-            🔒 billing runs on Stripe when we go live
+Billing runs on Stripe when we go live
           </p>
         </div>
       )}
@@ -384,7 +384,7 @@ export default function ProPage() {
       {/* ---------------- pro success ---------------- */}
       {view === "success" && (
         <div className="card-money mx-auto max-w-sm p-6 text-center">
-          <p className="text-4xl" aria-hidden>🎉</p>
+          <Sparkles className="mx-auto h-9 w-9 text-lime-400" />
           <h1 className="mt-3 text-xl font-bold tracking-tight text-zinc-50">Welcome to UpNova Pro</h1>
           <p className="mt-1.5 text-sm text-zinc-500">Your Pro membership is now active.</p>
           <div className="mt-5 flex gap-2">
@@ -416,7 +416,7 @@ export default function ProPage() {
             <p className="mt-1 text-xs text-zinc-500">Next billing date: September 7, 2026</p>
             {isStudentVerified() && (
               <p className="mt-2 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] text-zinc-400">
-                🎓 <span className="font-semibold text-violet-300">Verified Student</span> — your
+                <span className="font-semibold text-violet-300">Verified Student</span> — your
                 school identity and campus access are independent of your plan and remain active.
               </p>
             )}

@@ -128,11 +128,11 @@ export default function EventDetail({ id }: { id: string }) {
           <div className="absolute bottom-3 left-4 flex flex-wrap items-center gap-2">
             {needsAge && (
               <span className="rounded-md bg-red-500/90 px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-white">
-                🔞 {event.age} event
+{event.age} EVENT
               </span>
             )}
             <span className="rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-white backdrop-blur">
-              {event.price === "Free" ? "🟢 Free" : event.price}
+{event.price === "Free" ? "FREE" : event.price}
             </span>
             <span className="rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
               {claimed} / {event.capacity} spots
@@ -197,7 +197,7 @@ export default function EventDetail({ id }: { id: string }) {
                   {soldOut ? (event.waitlist ? "Join Waitlist" : "Sold Out") : ctaLabel[event.registration]}
                 </button>
                 {soldOut ? (
-                  <span className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-red-400">🔴 sold out</span>
+                  <span className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-red-400">SOLD OUT</span>
                 ) : (
                   <span className="text-xs text-zinc-500">
                     {spotsLeft} spots left
@@ -442,7 +442,7 @@ export default function EventDetail({ id }: { id: string }) {
                   </p>
                 </div>
                 <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
-                  💳 <span className="font-mono font-medium">•••• 4242</span>
+                  <span className="font-mono font-medium">•••• 4242</span>
                   <span className="ml-auto text-base font-extrabold tabular-nums tracking-tight text-amber-400">{money(totalFor(ticket.price))}</span>
                 </div>
                 <button

@@ -75,9 +75,9 @@ export default function Sidebar() {
   const pro = plan === "pro";
 
   return (
-    <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-60 shrink-0 flex-col gap-6 self-start overflow-y-auto pb-6 lg:flex">
+    <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-60 shrink-0 flex-col gap-4 self-start overflow-y-auto pb-6 lg:flex">
       {/* Main nav — unboxed; grouping does the work */}
-      <nav className="space-y-5 px-1">
+      <nav className="space-y-4 px-1">
         {navGroups.map((g) => (
           <div key={g.label ?? "base"}>
             {g.label && (
@@ -97,7 +97,7 @@ export default function Sidebar() {
                   <li key={item.label}>
                     <Link
                       href={item.href}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
                         active
                           ? "bg-white/10 text-zinc-50"
                           : "text-zinc-300 hover:bg-card-raised hover:text-zinc-100"

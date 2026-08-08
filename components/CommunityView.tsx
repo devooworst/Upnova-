@@ -147,7 +147,7 @@ export default function CommunityView({ id }: { id: string }) {
         <div className="animate-fade-up space-y-4">
           {broadcast ? (
             <p className="rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-2.5 text-xs text-zinc-400">
-              🎤 <span className="font-semibold text-amber-300">
+              <span className="font-semibold text-amber-300">
                 {communityModeInfo[community.mode].label.replace(/^\S+\s/, "")} community.
               </span>{" "}
               Only admins post here — react and save, no noise.
@@ -205,7 +205,7 @@ export default function CommunityView({ id }: { id: string }) {
                 )}
                 {broadcast && (
                   <button className="flex items-center gap-1.5 transition hover:text-amber-300">
-                    🔖 Save
+                    Save
                   </button>
                 )}
               </div>

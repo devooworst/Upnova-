@@ -56,8 +56,9 @@ export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt>AI involvement</dt>
-                  <dd className="font-medium text-zinc-300" title={p.aiDisclosure}>
-                    {aiInvolvementInfo[p.aiInvolvement].dot} {aiInvolvementInfo[p.aiInvolvement].label}
+                  <dd className="flex items-center gap-1.5 font-medium text-zinc-300" title={p.aiDisclosure}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${aiInvolvementInfo[p.aiInvolvement].dot}`} />
+                    {aiInvolvementInfo[p.aiInvolvement].label}
                   </dd>
                 </div>
               </dl>

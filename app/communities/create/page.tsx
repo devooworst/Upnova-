@@ -17,12 +17,12 @@ import {
 /* ------------------------------------------------------------------ */
 
 const types = [
-  "🌎 General", "🎓 School / Campus", "🏢 Organization", "🎨 Creative", "🎵 Music",
-  "👗 Fashion", "💻 Technology", "🎮 Gaming", "🏀 Sports", "💼 Professional",
-  "🏠 Neighborhood / Local", "🙏 Faith / Inspiration", "❤️ Support / Interest", "🔥 Lifestyle", "Other",
+  "General", "School / Campus", "Organization", "Creative", "Music",
+  "Fashion", "Technology", "Gaming", "Sports", "Professional",
+  "Neighborhood / Local", "Faith / Inspiration", "Support / Interest", "Lifestyle", "Other",
 ];
 
-const reaches = ["5 miles", "25 miles", "City", "State", "Nationwide", "Global", "🎓 School"];
+const reaches = ["5 miles", "25 miles", "City", "State", "Nationwide", "Global", "School"];
 
 const defaultRules = [
   "Respect everyone.",
@@ -65,7 +65,7 @@ export default function CreateCommunityPage() {
   const toggleSetting = (k: keyof typeof settings) =>
     setSettings((s) => ({ ...s, [k]: !s[k] }));
 
-  const isSchool = reach === "🎓 School";
+  const isSchool = reach === "School";
 
   if (published) {
     return (
@@ -148,7 +148,7 @@ export default function CreateCommunityPage() {
         </div>
         {access === "verified" && (
           <p className="mt-2.5 text-xs text-zinc-500">
-            e.g. 🎓 Bowie State students, or verified members of an organization.
+            e.g. Bowie State students, or verified members of an organization.
           </p>
         )}
       </section>

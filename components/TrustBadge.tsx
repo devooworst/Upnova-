@@ -13,7 +13,8 @@ export default function TrustBadge({ level, className = "" }: { level: TrustLeve
           : "border-line bg-card-raised text-zinc-200"
       } ${className}`}
     >
-      {level === "high-trust" ? "🟢 High-Trust Verified" : "🟢 Identity Verified"}
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-lime-400" />
+      {level === "high-trust" ? "High-Trust Verified" : "Identity Verified"}
     </span>
   );
 }

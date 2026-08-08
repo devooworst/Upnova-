@@ -16,7 +16,7 @@ export default function AiPolicyBadge({
       title={info.desc}
       className={`inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[11px] font-medium text-zinc-300 ${className}`}
     >
-      <span aria-hidden>{info.dot}</span>
+      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${info.dot}`} />
       {info.label}
       {detailed && <span className="text-zinc-500"> · {info.desc}</span>}
     </span>

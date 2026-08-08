@@ -182,7 +182,7 @@ export default function CampusPage() {
           <button
             key={s.id}
             onClick={() => setSection(s.id)}
-            className={`rounded-xl border p-3 text-left transition ${
+            className={`rounded-lg border p-2.5 text-left transition ${
               section === s.id
                 ? "border-violet-400/50 bg-violet-400/5"
                 : "border-line hover:border-zinc-600 hover:bg-card-raised"
@@ -194,7 +194,12 @@ export default function CampusPage() {
         ))}
       </nav>
 
-      {/* ================= 💬 COMMUNITIES — for talking ================= */}
+      {/* current module heading — campus → choose → interact */}
+      <h2 className="px-1 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+        Campus {sections.find((s) => s.id === section)?.label.replace("Campus ", "")}
+      </h2>
+
+      {/* ================= COMMUNITIES — for talking ================= */}
       {section === "communities" && (
         <div className="card-people flex h-[480px] overflow-hidden animate-fade-up">
           <nav className="hidden w-56 shrink-0 overflow-y-auto border-r border-line-soft p-2 sm:block" aria-label="Interest communities">
@@ -206,7 +211,6 @@ export default function CampusPage() {
                   community === c.id ? "bg-white/10 font-semibold text-zinc-50" : "text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
                 }`}
               >
-                <span aria-hidden>{c.emoji}</span>
                 <span className="min-w-0 flex-1 truncate">{c.name}</span>
                 <span className="shrink-0 font-mono text-[9px] text-zinc-600">{c.members}</span>
               </button>
@@ -216,12 +220,11 @@ export default function CampusPage() {
             <div className="border-b border-line-soft px-4 py-3 sm:hidden">
               <select value={community} onChange={(e) => setCommunity(e.target.value)} className="input-dark py-2">
                 {interestCommunities.map((c) => (
-                  <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>
             <div className="hidden items-center gap-2 border-b border-line-soft px-4 py-3 sm:flex">
-              <span aria-hidden>{activeCommunity.emoji}</span>
               <p className="text-sm font-semibold text-zinc-100">{activeCommunity.name}</p>
               <span className="ml-auto font-mono text-[10px] text-zinc-600">{activeCommunity.members} members</span>
             </div>
@@ -245,7 +248,7 @@ export default function CampusPage() {
                           <Avatar src={ava.avatar} initials={ava.initials} gradient={ava.gradient} size="sm" className="ring-1 ring-line" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-zinc-100">{ava.name}</p>
-                            <p className="truncate text-xs text-zinc-500">Nails + photography · ⭐ {ava.rating} · on campus</p>
+                            <p className="truncate text-xs text-zinc-500">Nails + photography · ★ {ava.rating} · on campus</p>
                           </div>
                         </div>
                         <div className="mt-2.5 flex gap-1.5">
@@ -316,12 +319,12 @@ export default function CampusPage() {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
                     {s.name}
-                    {s.verified && <span className="text-[9px] text-violet-300">🎓</span>}
+                    {s.verified && <span className="rounded-full border border-violet-400/40 px-1.5 py-px text-[8px] font-bold text-violet-300">STUDENT</span>}
                   </p>
                   <p className="truncate text-xs text-zinc-400">{s.service}</p>
                   <p className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500">
                     <span className="flex items-center gap-0.5"><Star className="h-3 w-3 fill-amber-400 text-amber-400" />{s.rating}</span>
-                    <span>📍 {s.spot}</span>
+                    <span>{s.spot}</span>
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -425,7 +428,7 @@ export default function CampusPage() {
           <div className="card-people divide-y divide-line-soft overflow-hidden">
             {campusQuestions.map((q) => (
               <button key={q.q} className="flex w-full items-start gap-3 p-4 text-left transition hover:bg-card-raised">
-                <span className="mt-0.5 shrink-0 text-violet-400">📚</span>
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-zinc-100">{q.q}</span>
                   <span className="mt-0.5 block text-xs text-zinc-500">{q.by} · {q.answers} answers · {q.time} ago</span>
@@ -438,14 +441,14 @@ export default function CampusPage() {
 
       {/* graduation → alumni */}
       <section className="rounded-xl border border-line p-4">
-        <p className="text-sm font-semibold text-zinc-200">🎓 After graduation</p>
+        <p className="text-sm font-semibold text-zinc-200">After graduation</p>
         <p className="mt-1 text-xs leading-relaxed text-zinc-500">
           This community becomes your <span className="font-semibold text-zinc-300">Alumni Community</span> —
           free, with your relationships, followers, portfolio, projects, and history intact. Grad school? Hold both:
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          <span className="chip px-2.5 py-1 text-[11px]">🎓 Bowie State Alumni</span>
-          <span className="chip border-violet-400/40 px-2.5 py-1 text-[11px] text-violet-300">🎓 Current Graduate Student · Morgan State</span>
+          <span className="chip px-2.5 py-1 text-[11px]">Bowie State Alumni</span>
+          <span className="chip border-violet-400/40 px-2.5 py-1 text-[11px] text-violet-300">Current Graduate Student · Morgan State</span>
         </div>
         <p className="mt-2.5 border-t border-line-soft pt-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600">
           school → community → skills → collabs → paid work → portfolio → alumni network → career

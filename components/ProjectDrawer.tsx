@@ -126,7 +126,7 @@ export default function ProjectDrawer({
   const [budget, setBudget] = useState(startingAt);
   const [myStars, setMyStars] = useState(0);
   const [myReview, setMyReview] = useState("Great work, clear communication, delivered as agreed.");
-  const [aiPolicy, setAiPolicy] = useState("🔴 Not allowed");
+  const [aiPolicy, setAiPolicy] = useState("Not allowed");
   const [reportOpen, setReportOpen] = useState(false);
   const deliveryScheduled = useRef(false);
 
@@ -249,9 +249,9 @@ export default function ProjectDrawer({
               <div>
                 <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">AI-generated work</label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {["🔴 Not allowed", "🟡 Allowed with disclosure", "🟢 Allowed"].map((o) => (
-                    <button key={o} type="button" onClick={() => setAiPolicy(o)} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${aiPolicy === o ? "border-zinc-400 bg-white/10 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
-                      {o}
+                  {([["Not allowed", "bg-red-400"], ["Allowed with disclosure", "bg-amber-400"], ["Allowed", "bg-lime-400"]] as [string, string][]).map(([o, c]) => (
+                    <button key={o} type="button" onClick={() => setAiPolicy(o)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${aiPolicy === o ? "border-zinc-400 bg-white/10 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${c}`} /> {o}
                     </button>
                   ))}
                 </div>
@@ -272,7 +272,7 @@ export default function ProjectDrawer({
             <div className="mt-5">
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">{service}</p>
               <h3 className="mt-1 text-lg font-bold tracking-tight text-zinc-50">{title}</h3>
-              <p className="mt-1 text-xs text-zinc-500">📅 {date} · 📍 {location}</p>
+              <p className="mt-1 text-xs text-zinc-500">{date} · {location}</p>
               <p className="mt-3 text-sm leading-relaxed text-zinc-300">
                 <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">what you&apos;ll receive</span>
                 <br />
@@ -310,7 +310,7 @@ export default function ProjectDrawer({
               <div className="card-money p-4">
                 <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-lime-400">{title}</p>
                 <div className="mt-2 flex items-baseline justify-between">
-                  <p className="text-xs text-zinc-500">📅 {date}</p>
+                  <p className="text-xs text-zinc-500">{date}</p>
                   <div className="text-right">
                     <p className={`text-xl font-extrabold tracking-tight tabular-nums ${stage === "countered" ? "text-zinc-500 line-through" : "text-lime-400"}`}>
                       ${budget}
@@ -378,7 +378,7 @@ export default function ProjectDrawer({
                 <p className="flex justify-between text-xs text-zinc-500"><span>UpNova service fee</span><span className="tabular-nums">{money(feeFor(counter))}</span></p>
               </div>
               <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
-                💳 <span className="font-mono font-medium">•••• 4242</span>
+                <span className="font-mono font-medium">•••• 4242</span>
                 <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">{money(totalFor(counter))}</span>
               </div>
               <button
@@ -403,7 +403,7 @@ export default function ProjectDrawer({
             <div className="mt-5">
               <div className="rounded-md border border-amber-400/30 bg-amber-400/5 p-3.5">
                 <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-400">
-                  🟡 extension requested
+<span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400 align-middle" />extension requested
                 </p>
                 <p className="mt-1.5 text-sm text-zinc-200">
                   {firstName} asked for <span className="font-bold">+2 days</span> on{" "}
@@ -439,7 +439,7 @@ export default function ProjectDrawer({
                 <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">{title}</p>
                 <p className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${counter}</p>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">📅 {date} · 📍 {location}</p>
+              <p className="mt-1 text-xs text-zinc-500">{date} · {location}</p>
 
               {/* extension result — shown once, never re-asked */}
               {extension === "approved" && (

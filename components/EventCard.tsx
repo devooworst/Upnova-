@@ -54,7 +54,7 @@ export default function EventCard({ id }: { id: string }) {
         <Link href={`/events/${event.id}`} className="absolute inset-0" aria-label={`Open ${event.title}`} />
       </div>
 
-      <div className="p-4 sm:p-5">
+      <div className="p-4">
         <div className="flex items-start gap-4">
           {/* date block — overlaps the banner like a real events app */}
           <div className="-mt-11 flex w-14 shrink-0 flex-col items-center rounded-lg border border-line bg-card-raised py-2 shadow-card">
@@ -77,9 +77,9 @@ export default function EventCard({ id }: { id: string }) {
           </div>
         </div>
 
-        <p className="mt-2.5 text-sm leading-relaxed text-zinc-400">{event.description}</p>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-400">{event.description}</p>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-zinc-300">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-300">
           <span className="flex items-center gap-1.5">
             <MapPin className="h-4 w-4 text-zinc-500" /> {event.location}
           </span>
@@ -97,7 +97,7 @@ export default function EventCard({ id }: { id: string }) {
         <Perforation className="mt-4" />
 
         {/* RSVP stub */}
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-3 flex items-center gap-3">
           {event.registration === "rsvp" ? (
             <button
               onClick={() => setGoing(!going)}

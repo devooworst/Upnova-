@@ -119,7 +119,7 @@ export default function CreateEventPage() {
                 age === a.id ? "bg-red-500/90 text-white" : "border border-line text-zinc-400 hover:bg-card-raised"
               }`}
             >
-              {a.id === "all" ? a.label : `🔞 ${a.label}`}
+              {a.label}
             </button>
           ))}
         </div>
@@ -137,11 +137,11 @@ export default function CreateEventPage() {
         <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-400">3 · Admission</h2>
         <div className="mt-3 flex gap-2">
           <button onClick={() => setPaid(false)} className={`flex-1 rounded-xl border p-3 text-left transition ${!paid ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"}`}>
-            <p className="text-sm font-semibold text-zinc-100">🟢 Free</p>
+            <p className="text-sm font-semibold text-zinc-100">Free</p>
             <p className="mt-0.5 text-xs text-zinc-500">No payment. RSVP or registration.</p>
           </button>
           <button onClick={() => setPaid(true)} className={`flex-1 rounded-xl border p-3 text-left transition ${paid ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"}`}>
-            <p className="text-sm font-semibold text-zinc-100">🎟️ Paid</p>
+            <p className="text-sm font-semibold text-zinc-100">Paid</p>
             <p className="mt-0.5 text-xs text-zinc-500">Tickets, checkout, QR admission.</p>
           </button>
         </div>

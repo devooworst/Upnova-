@@ -281,7 +281,7 @@ export default function SettingsPage() {
               </div>
               <div className="divide-y divide-line-soft border-t border-line-soft">
                 <Row label="Identity verification" hint="Status only — your ID never lives on UpNova">
-                  <span className="rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200">🟢 Identity Verified</span>
+                  <span className="flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200"><span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Identity Verified</span>
                 </Row>
                 <Row label="High-Trust verification" hint="Required for childcare, pet care, home access, transportation">
                   <button className="btn-ghost px-3.5 py-1.5 text-xs">Complete</button>
@@ -325,7 +325,7 @@ export default function SettingsPage() {
               <section className="card p-5">
                 <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Payment methods</h2>
                 <div className="mt-3 divide-y divide-line-soft">
-                  <Row label="💳 •••• 4242" hint="Default for hiring and Pro billing">
+                  <Row label="Card •••• 4242" hint="Default for hiring and Pro billing">
                     <button className="btn-ghost px-3.5 py-1.5 text-xs">Edit</button>
                   </Row>
                   <Row label="Payout account" hint="Where your earnings land — powered by Stripe Connect">
@@ -410,9 +410,9 @@ export default function SettingsPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {(
                   [
-                    ["dark", "🌙 Dark", "The UpNova look"],
-                    ["light", "☀️ Light", "Same UpNova, brighter room"],
-                    ["system", "🖥️ Use device settings", "Follows your computer"],
+                    ["dark", "Dark", "The UpNova look"],
+                    ["light", "Light", "Same UpNova, brighter room"],
+                    ["system", "Use device settings", "Follows your computer"],
                   ] as [ThemeChoice, string, string][]
                 ).map(([id, label, desc]) => (
                   <button
@@ -457,8 +457,8 @@ export default function SettingsPage() {
                   {(
                     [
                       ["free", "UpNova Free", "$0", "Everyone. The full core platform."],
-                      ["college", "🎓 UpNova College+", "$4.99/mo", "Optional student exposure boost. Verification & campus access are free."],
-                      ["pro", "⭐ UpNova Pro", "$12.99/mo", "Serious creators — analytics, discovery, pro tools."],
+                      ["college", "UpNova College+", "$4.99/mo", "Optional student exposure boost. Verification & campus access are free."],
+                      ["pro", "UpNova Pro", "$12.99/mo", "Serious creators — analytics, discovery, pro tools."],
                     ] as [Plan, string, string, string][]
                   ).map(([id, name, price, desc]) => (
                     <li key={id} className="flex items-center justify-between gap-3 py-3">
@@ -479,7 +479,7 @@ export default function SettingsPage() {
                 </ul>
                 {studentVerified && (
                   <p className="mt-3 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] text-zinc-400">
-                    🎓 <span className="font-semibold text-violet-300">Verified Student</span> —
+                    <span className="font-semibold text-violet-300">Verified Student</span> —
                     identity stays with your account across plan changes.
                   </p>
                 )}

@@ -233,7 +233,8 @@ export default function MessagesClient() {
           {project.discussing && project.extension === "requested" && (
             <div className="flex items-center gap-2 border-t border-amber-400/30 bg-amber-400/5 px-4 py-2">
               <p className="min-w-0 flex-1 truncate text-xs text-amber-300">
-                🟡 Discussing {active.name.split(" ")[0]}&apos;s extension request (+2 days)
+                <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400 align-middle" />
+                Discussing {active.name.split(" ")[0]}&apos;s extension request (+2 days)
               </p>
               <button
                 onClick={() => setDrawerOpen(true)}

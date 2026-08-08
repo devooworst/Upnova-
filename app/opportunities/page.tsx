@@ -50,7 +50,7 @@ export default function OpportunitiesPage() {
       {/* student opportunities — work that fits around student life */}
       <section className="rounded-xl border border-violet-400/30 bg-violet-400/[0.04] p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold tracking-tight text-violet-300">🎓 Student Opportunities</h2>
+          <h2 className="text-sm font-bold tracking-tight text-violet-300">Student Opportunities</h2>
           <span className="font-mono text-[10px] font-medium text-zinc-500">
             {opportunities.filter((o) => o.studentFriendly).length} open
           </span>

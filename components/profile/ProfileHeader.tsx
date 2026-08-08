@@ -98,14 +98,14 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
             </span>
             {isStudent && (
               <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300">
-                🎓 Verified Student
+                Verified Student
               </span>
             )}
             <span
               className="ml-1 inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200"
               title={`${reliability.onTimeRate}% of verified projects completed on time`}
             >
-              🟢 Reliable Creator · {reliability.onTimeRate}% on time
+              <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Reliable Creator · {reliability.onTimeRate}% on time
             </span>
           </h1>
           <p className="mt-1 text-sm font-medium text-zinc-400">{currentUser.role}</p>
