@@ -1548,7 +1548,7 @@ export const categoryFilters = ["Music", "Photography", "Video", "Fashion", "Gam
 
 export const availabilityFilters = ["Available Now", "Available This Week", "Open to Work", "Accepting Clients"];
 
-export const opportunityFilters = ["Nearby", "Remote", "Paid", "Collaborations", "Brand Deals", "Freelance", "Events", "Full-time"];
+export const opportunityFilters = ["Paid", "Collaborations", "Local", "Remote", "Creative Projects", "Events"];
 
 /* --------------------------------- radius UI -------------------------------- */
 

@@ -20,8 +20,8 @@ import { currentUser } from "@/lib/data";
 
 const createOptions = [
   { kind: "Post", icon: FileText, desc: "Share something with the community." },
-  { kind: "Opportunity", icon: Briefcase, desc: "Find someone for a job/project." },
-  { kind: "Service", icon: Sparkles, desc: "Offer your skills for money." },
+  { kind: "Opportunity", icon: Briefcase, desc: "Tell people you're looking for someone for a project." },
+  { kind: "Service", icon: Sparkles, desc: "Offer something people can hire you for." },
   { kind: "Community", icon: Users, desc: "Create a local community." },
   { kind: "Event", icon: Calendar, desc: "Create something happening in your area." },
   { kind: "Poll", icon: BarChart2, desc: "Ask your audience." },

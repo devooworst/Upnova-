@@ -412,7 +412,7 @@ export default function SettingsPage() {
                   <Sparkles className="h-4 w-4" /> UpNova Pro
                 </p>
                 <p className="mt-1 text-xs text-zinc-400">
-                  Advanced analytics, priority pitching, and a bigger reach for your work.
+                  Advanced analytics, priority applications, and a bigger reach for your work.
                 </p>
               </div>
               <div className="p-5">

@@ -134,7 +134,7 @@ export default function ServicesPage() {
         {items.length === 0 && (
           <p className="col-span-full py-10 text-center text-sm text-zinc-500">
             No services match. Try another category — or post it as an opportunity and let creators
-            pitch you.
+            apply.
           </p>
         )}
       </div>

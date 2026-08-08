@@ -15,12 +15,16 @@ export default function OpportunitiesPage() {
     if (active.length === 0) return true;
     return active.every((f) => {
       switch (f) {
-        case "Nearby":
+        case "Local":
           return ["Nearby", "Local", "City"].includes(o.reach.reach);
         case "Remote":
           return o.reach.reach === "Remote";
         case "Paid":
           return o.paid;
+        case "Creative Projects":
+          return ["Gig", "Collaboration", "Freelance"].includes(o.category);
+        case "Events":
+          return o.category === "Event Staff";
         default:
           return o.tags.includes(f) || o.category.toLowerCase().includes(f.toLowerCase());
       }
@@ -37,8 +41,9 @@ export default function OpportunitiesPage() {
           Opportunities
         </h1>
         <p className="mt-1.5 text-sm text-zinc-500">
-          <span className="font-semibold text-zinc-300">Somebody is looking for you.</span> Brands,
-          creators, and clients post projects — send a pitch to get picked.
+          <span className="font-semibold text-zinc-300">Find projects that are looking for people like you.</span>{" "}
+          Brands, creators, businesses, and event organizers post paid work, collaborations, and
+          project opportunities.
         </p>
       </header>
 

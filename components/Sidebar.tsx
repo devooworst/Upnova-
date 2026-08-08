@@ -156,7 +156,7 @@ export default function Sidebar() {
         <p className="mt-1 text-xs leading-relaxed text-zinc-400">
           {pro
             ? "Your Pro membership is active."
-            : "Advanced analytics, priority pitching, and a bigger reach for your work."}
+            : "Advanced analytics, priority applications, and a bigger reach for your work."}
         </p>
         <Link
           href="/pro"

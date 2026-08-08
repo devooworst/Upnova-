@@ -82,7 +82,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                     · {o.roles} · due {o.deadline}
                   </span>
                   <span className="shrink-0 font-semibold text-lime-400 opacity-0 transition group-hover:opacity-100">
-                    pitch →
+                    apply →
                   </span>
                 </p>
               </Link>

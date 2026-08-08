@@ -8,8 +8,10 @@ import VerifiedBadge from "./VerifiedBadge";
 import Perforation from "./Perforation";
 import { opportunities, currentUser } from "@/lib/data";
 
-/* Opportunities = somebody is looking for YOU. The CTA is Send Pitch:
-   portfolio + proposed rate + availability + message. Never "Hire Me". */
+/* Opportunities = "We're looking for someone." The CTA is Apply:
+   portfolio + availability + optional rate + short message. Never
+   "Hire Me" — that's the Services direction. "Pitch" survives only as
+   an optional proposal inside an application, never as UI language. */
 
 export default function OpportunityCard({ id }: { id: string }) {
   const [pitched, setPitched] = useState(false);
@@ -18,7 +20,7 @@ export default function OpportunityCard({ id }: { id: string }) {
   const opp = opportunities.find((o) => o.id === id);
   const [rate, setRate] = useState(opp?.budget.replace(/[^0-9]/g, "") ?? "");
   const [message, setMessage] = useState(
-    "I've done this kind of work before — portfolio attached. Available on your timeline."
+    "I've shot this kind of work before, portfolio attached. I'm free on your dates."
   );
   if (!opp) return null;
 
@@ -69,7 +71,7 @@ export default function OpportunityCard({ id }: { id: string }) {
             <dd className="mt-0.5 text-xs font-semibold tracking-tight text-amber-400">{opp.deadline}</dd>
           </div>
           <div>
-            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">pitches</dt>
+            <dt className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">applicants</dt>
             <dd className="mt-0.5 text-xs font-semibold tabular-nums tracking-tight text-zinc-200">
               {opp.applicants + (pitched ? 1 : 0)}
             </dd>
@@ -90,7 +92,7 @@ export default function OpportunityCard({ id }: { id: string }) {
           </div>
         </dl>
 
-        {/* CTA — pitch, never hire */}
+        {/* CTA — apply, never hire */}
         <div className="mt-4 flex items-center gap-3">
           <button
             onClick={() => (pitched ? setPitched(false) : setPitchOpen(true))}
@@ -103,17 +105,17 @@ export default function OpportunityCard({ id }: { id: string }) {
             {pitched ? (
               <>
                 <Check className="h-4 w-4" />
-                Pitch sent
+                Applied
               </>
             ) : (
               <>
-                Send Pitch
+                Apply Now
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
           <p className="hidden text-xs text-zinc-500 sm:block">
-            {opp.applicants + (pitched ? 1 : 0)} creators have pitched
+            {opp.applicants + (pitched ? 1 : 0)} creators applied
           </p>
           <button
             onClick={() => setReportOpen(true)}
@@ -130,7 +132,7 @@ export default function OpportunityCard({ id }: { id: string }) {
         <ReportModal context={`Opportunity · ${opp.title}`} onClose={() => setReportOpen(false)} />
       )}
 
-      {/* -------- pitch composer -------- */}
+      {/* -------- application -------- */}
       {pitchOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
@@ -140,9 +142,9 @@ export default function OpportunityCard({ id }: { id: string }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
-                  your pitch
+                  your application
                 </p>
-                <h2 className="mt-1 text-[15px] font-bold tracking-tight text-zinc-50">{opp.title}</h2>
+                <h2 className="mt-1 text-[15px] font-bold tracking-tight text-zinc-50">Apply to {opp.title}</h2>
               </div>
               <button onClick={() => setPitchOpen(false)} className="icon-btn h-8 w-8" aria-label="Close">
                 <X className="h-4 w-4" />
@@ -189,7 +191,7 @@ export default function OpportunityCard({ id }: { id: string }) {
 
             <div className="mt-3">
               <label htmlFor="pitch-msg" className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-                message to {opp.poster}
+                why are you a good fit?
               </label>
               <textarea
                 id="pitch-msg"
@@ -207,10 +209,10 @@ export default function OpportunityCard({ id }: { id: string }) {
               }}
               className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm"
             >
-              Submit Pitch
+              Send Application
             </button>
             <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
-              {opp.poster} reviews pitches and picks who to start a project with
+              {opp.poster} reviews applicants and picks who to start a project with
             </p>
           </div>
         </div>

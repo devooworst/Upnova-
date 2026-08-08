@@ -93,9 +93,10 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 - **Services vs Opportunities — never mixed.** Services (`/services`) is the creator
   catalog: clients hire a creator's predefined offering; the CTA is always **Hire Me**.
   Opportunities (`/opportunities`) is the job board: projects looking for people; the
-  CTA is always **Send Pitch** (portfolio + proposed rate + availability + message).
-  One direction per surface: Services = "I want to hire somebody." Opportunities =
-  "Somebody is looking for me."
+  CTA is always **Apply** (portfolio + availability + optional rate + short message —
+  "pitch" is never UI language; a proposal is just an optional field inside an
+  application). One direction per surface: Services = "I'm available to be hired."
+  Opportunities = "We're looking for someone."
 - **Two feeds, two data sources.** `GET /api/feed/for-you` is the global feed: no
   location logic, ranked by trending + engagement (Instagram/TikTok style).
   `GET /api/feed/near-you?radius=5|25|city` is the local feed: located items only,

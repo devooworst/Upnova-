@@ -5,7 +5,7 @@ import type { Creator } from "./data";
 
 /* ------------------------------------------------------------------ */
 /* The relationship layer. Follow = keep up with someone's content.    */
-/* Strictly separate from Message / Hire / Pitch / Join — nothing      */
+/* Strictly separate from Message / Hire / Apply / Join — nothing      */
 /* auto-follows. One store, so follow state persists everywhere.       */
 /* ------------------------------------------------------------------ */
 
