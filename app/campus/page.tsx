@@ -7,130 +7,114 @@ import {
   Lock,
   MessageSquare,
   Paperclip,
+  Plus,
+  Search,
   Send,
+  Star,
   Users,
   Zap,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
+import OpportunityCard from "@/components/OpportunityCard";
+import EventCard from "@/components/EventCard";
 import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 import { creators, campusOrgs } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
-/* The verified digital campus network. Not a generic college chat —   */
-/* channels for how students actually live, and every answer connects  */
-/* to the real ecosystem: Follow → Message → View Services → Hire.     */
-/* Graduation moves you to Alumni; you never lose what you built.      */
+/* Your Campus — NOT one giant collection of group chats.              */
+/* Four layers, separated on purpose:                                  */
+/*   💬 Communities   — interest-based conversation                    */
+/*   🛍️ Services      — discover students who offer services          */
+/*   💰 Opportunities — paid work, gigs, collaborations                */
+/*   🏛️ Organizations — verified orgs with their own pages            */
+/* plus Events and Campus Questions. Everything connects to the        */
+/* existing Follow / Profile / Services / Opportunities / Messaging /  */
+/* Booking / Payment systems.                                          */
 /* ------------------------------------------------------------------ */
 
-const channels = [
-  { id: "main", emoji: "💬", name: "Main campus chat" },
-  { id: "beauty", emoji: "💇", name: "Hair & Beauty" },
-  { id: "art", emoji: "🎨", name: "Art & Design" },
-  { id: "music", emoji: "🎵", name: "Music" },
-  { id: "photo", emoji: "📸", name: "Photography" },
-  { id: "fashion", emoji: "👗", name: "Fashion" },
-  { id: "tech", emoji: "💻", name: "Tech" },
-  { id: "collabs", emoji: "🤝", name: "Collaborations" },
-  { id: "questions", emoji: "📚", name: "School questions" },
-  { id: "opps", emoji: "📢", name: "Campus opportunities" },
-  { id: "events", emoji: "🎉", name: "Events" },
+const sections = [
+  { id: "communities", emoji: "💬", label: "Communities", desc: "Interest-based conversations" },
+  { id: "services", emoji: "🛍️", label: "Campus Services", desc: "Find students who offer services" },
+  { id: "opps", emoji: "💰", label: "Opportunities", desc: "Jobs, gigs & collaborations" },
+  { id: "orgs", emoji: "🏛️", label: "Organizations", desc: "Student organizations & groups" },
+  { id: "events", emoji: "🎉", label: "Events", desc: "What's happening on campus" },
+  { id: "questions", emoji: "📚", label: "Campus Questions", desc: "Questions, advice & info" },
+] as const;
+type SectionId = (typeof sections)[number]["id"];
+
+/* ---- 💬 interest communities: for talking, not selling ---- */
+const interestCommunities = [
+  { id: "general", emoji: "💬", name: "General Campus", members: 1284 },
+  { id: "fashion", emoji: "👗", name: "Fashion & Streetwear", members: 412 },
+  { id: "gaming", emoji: "🎮", name: "Gaming", members: 366 },
+  { id: "anime", emoji: "🍿", name: "Anime & TV", members: 298 },
+  { id: "musicfans", emoji: "🎵", name: "Music Fans", members: 521 },
+  { id: "art", emoji: "🎨", name: "Art Lovers", members: 187 },
+  { id: "tech", emoji: "💻", name: "Tech & Nerd Stuff", members: 243 },
+  { id: "sports", emoji: "🏀", name: "Sports", members: 350 },
+  { id: "study", emoji: "📚", name: "Study Talk", members: 402 },
+  { id: "memes", emoji: "😂", name: "Campus Memes", members: 876 },
+  { id: "latenight", emoji: "🌙", name: "Late Night Conversations", members: 231 },
 ];
 
-interface CampusMsg {
+interface ChatMsg {
   author: string;
   initials: string;
   gradient: string;
   avatar?: string | null;
   time: string;
   text: string;
-  /** inline creator card — the ecosystem moment */
   creatorCard?: string;
 }
 
-const channelMessages: Record<string, CampusMsg[]> = {
-  main: [
-    {
-      author: "Maya R.",
-      initials: "M",
-      gradient: "from-rose-500 to-pink-600",
-      time: "2:14 PM",
-      text: "Does anybody know somebody who does nails on campus? 💅",
-    },
-    {
-      author: "Toni A.",
-      initials: "T",
-      gradient: "from-amber-500 to-orange-600",
-      time: "2:16 PM",
-      text: "Yeah! @Ava does nails between shoots. Here's her profile 👇",
-      creatorCard: "ava",
-    },
-    {
-      author: "Maya R.",
-      initials: "M",
-      gradient: "from-rose-500 to-pink-600",
-      time: "2:19 PM",
-      text: "Just booked her for Friday. This app is dangerous 😭",
-    },
+const communityChats: Record<string, ChatMsg[]> = {
+  general: [
+    { author: "Maya R.", initials: "M", gradient: "from-rose-500 to-pink-600", time: "2:14 PM", text: "Does anybody know somebody who does nails on campus? 💅" },
+    { author: "Toni A.", initials: "T", gradient: "from-amber-500 to-orange-600", time: "2:16 PM", text: "Yeah! @Ava does nails between shoots. Here's her profile 👇", creatorCard: "ava" },
+    { author: "Maya R.", initials: "M", gradient: "from-rose-500 to-pink-600", time: "2:19 PM", text: "Just booked her for Friday. This app is dangerous 😭" },
   ],
-  music: [
-    {
-      author: "K. Boateng",
-      initials: "K",
-      gradient: "from-emerald-500 to-teal-600",
-      time: "11:02 AM",
-      text: "Studio in the media building is free Thursday nights — who wants to run a session? Need a vocalist and someone on keys.",
-    },
-    {
-      author: "Devon P.",
-      initials: "D",
-      gradient: "from-sky-500 to-indigo-600",
-      time: "11:20 AM",
-      text: "I'm in on keys. Posting it in #collabs so it counts on our portfolios 📁",
-    },
+  fashion: [
+    { author: "Sasha G.", initials: "S", gradient: "from-violet-500 to-fuchsia-600", time: "11:03 AM", text: "What's everybody wearing this semester? I need the fits report before syllabus week 👀" },
+    { author: "Nia C.", initials: "N", gradient: "from-rose-500 to-pink-600", time: "11:20 AM", text: "Thrifted everything. Drop day for my capsule is Sep 5 — details in the Fashion Club org page." },
   ],
-  collabs: [
-    {
-      author: "Sasha G.",
-      initials: "S",
-      gradient: "from-violet-500 to-fuchsia-600",
-      time: "9:41 AM",
-      text: "Photographer + model needed for a fashion-class final. Split the gallery, both portfolios. Weekend shoot on the quad.",
-    },
+  latenight: [
+    { author: "Devon P.", initials: "D", gradient: "from-sky-500 to-indigo-600", time: "1:12 AM", text: "media lab crew — who's still up? beat session in 20." },
   ],
-  opps: [
-    {
-      author: "Campus Bookstore",
-      initials: "B",
-      gradient: "from-zinc-600 to-zinc-800",
-      time: "Yesterday",
-      text: "Paid gig: we need a student videographer for our back-to-school promo. $250, weekend shoot. Posted on Opportunities — apply through UpNova so it's protected.",
-    },
-  ],
-  questions: [
-    {
-      author: "Devon P.",
-      initials: "D",
-      gradient: "from-sky-500 to-indigo-600",
-      time: "8:15 AM",
-      text: "Anybody taken Prof. Okafor's digital media class? Is the final a project or an exam?",
-    },
-  ],
-  events: [
-    {
-      author: "Student Activities",
-      initials: "S",
-      gradient: "from-lime-500 to-emerald-700",
-      time: "Mon",
-      text: "Homecoming creative showcase applications open Friday. Performers, designers, photographers — this is the one to be at. 🎉",
-    },
+  study: [
+    { author: "Toni A.", initials: "T", gradient: "from-amber-500 to-orange-600", time: "9:15 AM", text: "Study group for stats midterm, library room 204, Thursday 6pm. All welcome." },
   ],
 };
 
+/* ---- 🛍️ campus services: a directory, not a chat ---- */
+const lookingFor = ["Hair", "Nails", "Photography", "Editing", "Tutoring", "Design", "Music", "Other"];
+
+const campusServices = [
+  { id: "cs-ava", creatorId: "ava", name: "Ava Chen", service: "Braiding & Silk Press", category: "Hair", startingAt: 65, rating: 4.9, verified: true, spot: "On campus" },
+  { id: "cs-maya", name: "Maya Reyes", initials: "M", gradient: "from-rose-500 to-pink-600", service: "Nail Sets & Designs", category: "Nails", startingAt: 40, rating: 4.8, verified: true, spot: "Towers Hall" },
+  { id: "cs-toni", name: "Toni Alvarez", initials: "T", gradient: "from-amber-500 to-orange-600", service: "Portraits & Event Photography", category: "Photography", startingAt: 50, rating: 4.7, verified: true, spot: "On campus" },
+  { id: "cs-devon", name: "Devon Price", initials: "D", gradient: "from-sky-500 to-indigo-600", service: "Video Editing & Reels", category: "Editing", startingAt: 35, rating: 4.6, verified: true, spot: "Remote / campus" },
+  { id: "cs-sasha", name: "Sasha Green", initials: "S", gradient: "from-violet-500 to-fuchsia-600", service: "Stats & Math Tutoring", category: "Tutoring", startingAt: 20, rating: 5.0, verified: true, spot: "Library" },
+  { id: "cs-kb", name: "K. Boateng", initials: "K", gradient: "from-emerald-500 to-teal-600", service: "Beats & Mixing", category: "Music", startingAt: 45, rating: 4.7, verified: true, spot: "Media building" },
+];
+
+const campusOppIds = ["org-promo", "campus-web", "campus-mv-collab", "social-video"];
+
+const campusQuestions = [
+  { q: "Anybody taken Prof. Okafor's digital media class? Project or exam final?", by: "Devon P.", answers: 6, time: "3h" },
+  { q: "Best spot on campus to shoot golden hour portraits?", by: "Toni A.", answers: 11, time: "8h" },
+  { q: "Is the media lab open during break week?", by: "Maya R.", answers: 3, time: "1d" },
+  { q: "Where do I submit an org budget request to SGA?", by: "Sasha G.", answers: 4, time: "2d" },
+];
+
 export default function CampusPage() {
   const [verified, setVerified] = useState(false);
-  const [channel, setChannel] = useState("main");
+  const [section, setSection] = useState<SectionId>("communities");
+  const [community, setCommunity] = useState("general");
+  const [svcFilter, setSvcFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
 
   useEffect(() => {
     const sync = () => setVerified(isStudentVerified());
@@ -140,10 +124,11 @@ export default function CampusPage() {
   }, []);
 
   const ava = creators.find((c) => c.id === "ava")!;
-  const messages = channelMessages[channel] ?? [];
-  const activeChannel = channels.find((c) => c.id === channel)!;
+  const services = campusServices.filter((s) => !svcFilter || s.category === svcFilter);
+  const chat = communityChats[community] ?? [];
+  const activeCommunity = interestCommunities.find((c) => c.id === community)!;
 
-  /* ---------------- locked: verify first ---------------- */
+  /* ---------------- locked: free verification first ---------------- */
   if (!verified) {
     return (
       <div className="mx-auto max-w-md pt-12 text-center">
@@ -154,8 +139,8 @@ export default function CampusPage() {
           Your campus network is waiting
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
-          School communities are a verified digital campus — campus chat, creative channels,
-          collabs, campus gigs, and events. Verify your student status to enter.
+          Communities, campus services, opportunities, organizations, and events — verified
+          students only.
         </p>
         <Link
           href="/pro"
@@ -176,176 +161,291 @@ export default function CampusPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <header>
         <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-400">
-          <GraduationCap className="h-3.5 w-3.5" /> verified campus network
+          <GraduationCap className="h-3.5 w-3.5" /> your campus
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">
-              Bowie State University
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Bowie State University</h1>
             <p className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
-              <span className="flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" /> 1,284 members
-              </span>
+              <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> 2,841 verified students</span>
               <span className="flex items-center gap-1 text-violet-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" /> 116 online
-              </span>
-              <span className="rounded-full border border-violet-400/40 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-violet-300">
-                students + alumni
               </span>
             </p>
           </div>
         </div>
       </header>
 
-      <div className="card-people flex h-[520px] overflow-hidden">
-        {/* channels */}
-        <nav className="hidden w-52 shrink-0 overflow-y-auto border-r border-line-soft p-2 sm:block" aria-label="Campus channels">
-          {channels.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setChannel(c.id)}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${
-                channel === c.id
-                  ? "bg-white/10 font-semibold text-zinc-50"
-                  : "text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
-              }`}
-            >
-              <span aria-hidden>{c.emoji}</span>
-              <span className="truncate">{c.name}</span>
-            </button>
-          ))}
-        </nav>
+      {/* section nav — conversation, discovery, and commerce are separate layers */}
+      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Campus sections">
+        {sections.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setSection(s.id)}
+            className={`rounded-xl border p-3 text-left transition ${
+              section === s.id
+                ? "border-violet-400/50 bg-violet-400/5"
+                : "border-line hover:border-zinc-600 hover:bg-card-raised"
+            }`}
+          >
+            <p className="text-sm font-semibold text-zinc-100">{s.emoji} {s.label}</p>
+            <p className="mt-0.5 truncate text-[10px] text-zinc-500">{s.desc}</p>
+          </button>
+        ))}
+      </nav>
 
-        {/* channel chat */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-line-soft px-4 py-3 sm:hidden">
-            <select value={channel} onChange={(e) => setChannel(e.target.value)} className="input-dark py-2">
-              {channels.map((c) => (
-                <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="hidden items-center gap-2 border-b border-line-soft px-4 py-3 sm:flex">
-            <span aria-hidden>{activeChannel.emoji}</span>
-            <p className="text-sm font-semibold text-zinc-100">{activeChannel.name}</p>
-          </div>
-
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            {messages.length === 0 && (
-              <p className="pt-10 text-center text-xs text-zinc-600">
-                Quiet in here — start the conversation.
-              </p>
-            )}
-            {messages.map((m, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <Avatar src={m.avatar} initials={m.initials} gradient={m.gradient} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs">
-                    <span className="font-semibold text-zinc-100">{m.author}</span>{" "}
-                    <span className="text-zinc-600">{m.time}</span>
-                  </p>
-                  <p className="mt-0.5 text-sm leading-relaxed text-zinc-300">{m.text}</p>
-
-                  {/* the ecosystem moment: a profile shared in chat is hireable */}
-                  {m.creatorCard === "ava" && (
-                    <div className="card-people mt-2 max-w-sm p-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar src={ava.avatar} initials={ava.initials} gradient={ava.gradient} size="sm" className="ring-1 ring-line" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-zinc-100">{ava.name}</p>
-                          <p className="truncate text-xs text-zinc-500">
-                            Nails + photography · ⭐ {ava.rating} · on campus
-                          </p>
+      {/* ================= 💬 COMMUNITIES — for talking ================= */}
+      {section === "communities" && (
+        <div className="card-people flex h-[480px] overflow-hidden animate-fade-up">
+          <nav className="hidden w-56 shrink-0 overflow-y-auto border-r border-line-soft p-2 sm:block" aria-label="Interest communities">
+            {interestCommunities.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCommunity(c.id)}
+                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${
+                  community === c.id ? "bg-white/10 font-semibold text-zinc-50" : "text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
+                }`}
+              >
+                <span aria-hidden>{c.emoji}</span>
+                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                <span className="shrink-0 font-mono text-[9px] text-zinc-600">{c.members}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="border-b border-line-soft px-4 py-3 sm:hidden">
+              <select value={community} onChange={(e) => setCommunity(e.target.value)} className="input-dark py-2">
+                {interestCommunities.map((c) => (
+                  <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="hidden items-center gap-2 border-b border-line-soft px-4 py-3 sm:flex">
+              <span aria-hidden>{activeCommunity.emoji}</span>
+              <p className="text-sm font-semibold text-zinc-100">{activeCommunity.name}</p>
+              <span className="ml-auto font-mono text-[10px] text-zinc-600">{activeCommunity.members} members</span>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {chat.length === 0 && (
+                <p className="pt-10 text-center text-xs text-zinc-600">Quiet in here — start the conversation.</p>
+              )}
+              {chat.map((m, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <Avatar src={m.avatar} initials={m.initials} gradient={m.gradient} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs">
+                      <span className="font-semibold text-zinc-100">{m.author}</span>{" "}
+                      <span className="text-zinc-600">{m.time}</span>
+                    </p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-zinc-300">{m.text}</p>
+                    {/* social → discovery → business: a shared profile is hireable */}
+                    {m.creatorCard === "ava" && (
+                      <div className="card-people mt-2 max-w-sm p-3">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar src={ava.avatar} initials={ava.initials} gradient={ava.gradient} size="sm" className="ring-1 ring-line" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-zinc-100">{ava.name}</p>
+                            <p className="truncate text-xs text-zinc-500">Nails + photography · ⭐ {ava.rating} · on campus</p>
+                          </div>
+                        </div>
+                        <div className="mt-2.5 flex gap-1.5">
+                          <FollowButton id={ava.id} size="xs" />
+                          <Link href="/messages" className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
+                            <MessageSquare className="h-3 w-3" /> Message
+                          </Link>
+                          <Link href={`/creator/${ava.id}`} className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
+                            View Services
+                          </Link>
+                          <Link href="/services" className="flex items-center gap-1 rounded-full bg-lime-400 px-2.5 py-1 text-[11px] font-bold text-zinc-950 transition hover:bg-lime-300">
+                            <Zap className="h-3 w-3" /> Hire
+                          </Link>
                         </div>
                       </div>
-                      <div className="mt-2.5 flex gap-1.5">
-                        <FollowButton id={ava.id} size="xs" />
-                        <Link href="/messages" className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
-                          <MessageSquare className="h-3 w-3" /> Message
-                        </Link>
-                        <Link href={`/creator/${ava.id}`} className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
-                          View Services
-                        </Link>
-                        <Link href="/services" className="flex items-center gap-1 rounded-full bg-lime-400 px-2.5 py-1 text-[11px] font-bold text-zinc-950 transition hover:bg-lime-300">
-                          <Zap className="h-3 w-3" /> Hire
-                        </Link>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 border-t border-line-soft p-3">
+              <button className="icon-btn h-9 w-9" aria-label="Attach"><Paperclip className="h-4 w-4" /></button>
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={`Message ${activeCommunity.name}…`}
+                className="input-dark rounded-full"
+                onKeyDown={(e) => e.key === "Enter" && setDraft("")}
+              />
+              <button onClick={() => setDraft("")} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white" aria-label="Send">
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 🛍️ CAMPUS SERVICES — a directory, not a chat ================= */}
+      {section === "services" && (
+        <div className="space-y-4 animate-fade-up">
+          <div>
+            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+              I&apos;m looking for…
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {lookingFor.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setSvcFilter(svcFilter === f ? null : f)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                    svcFilter === f ? "border-violet-400/60 bg-violet-400/10 text-violet-300" : "border-line text-zinc-400 hover:border-zinc-600"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {services.map((s) => (
+              <article key={s.id} className="card-people card-lift flex items-center gap-3 p-4 hover:border-zinc-600">
+                {"creatorId" in s && s.creatorId ? (
+                  <Avatar src={ava.avatar} initials="A" size="md" className="ring-1 ring-line" />
+                ) : (
+                  <Avatar initials={(s as { initials?: string }).initials ?? s.name[0]} gradient={(s as { gradient?: string }).gradient} size="md" className="ring-1 ring-line" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
+                    {s.name}
+                    {s.verified && <span className="text-[9px] text-violet-300">🎓</span>}
+                  </p>
+                  <p className="truncate text-xs text-zinc-400">{s.service}</p>
+                  <p className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500">
+                    <span className="flex items-center gap-0.5"><Star className="h-3 w-3 fill-amber-400 text-amber-400" />{s.rating}</span>
+                    <span>📍 {s.spot}</span>
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-zinc-500">from <span className="text-base font-extrabold tabular-nums tracking-tight text-lime-400">${s.startingAt}</span></p>
+                  <Link
+                    href={"creatorId" in s && s.creatorId ? `/creator/${s.creatorId}` : "/services"}
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold text-zinc-950 transition hover:bg-lime-300"
+                  >
+                    <Zap className="h-3 w-3" /> Book
+                  </Link>
+                </div>
+              </article>
             ))}
+            {services.length === 0 && (
+              <p className="col-span-full py-8 text-center text-sm text-zinc-500">Nobody offers that yet — post a request below.</p>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 border-t border-line-soft p-3">
-            <button className="icon-btn h-9 w-9" aria-label="Attach">
-              <Paperclip className="h-4 w-4" />
-            </button>
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={`Message ${activeChannel.name}…`}
-              className="input-dark rounded-full"
-              onKeyDown={(e) => e.key === "Enter" && setDraft("")}
-            />
-            <button onClick={() => setDraft("")} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white" aria-label="Send">
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* organizations — another type of community, not a separate product */}
-      <section>
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">Organizations &amp; Campus Groups</h2>
-          <span className="font-mono text-[10px] font-medium text-zinc-500">{campusOrgs.length} on campus</span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {campusOrgs.map((org) => (
-            <Link
-              key={org.id}
-              href={`/campus/${org.id}`}
-              className="card-people card-lift overflow-hidden hover:border-zinc-600"
-            >
-              <div className={`h-14 bg-gradient-to-br ${org.gradient} opacity-70`} />
-              <div className="p-4">
-                <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${org.gradient}`}>
-                  {org.emoji}
-                </span>
-                <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-zinc-100">
-                  {org.name}
-                  {org.verified && <span className="text-sky-400" title="Verified Organization">✓</span>}
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {org.verified ? org.category : "Community Group"} · {org.members} members
-                </p>
+          {/* post a request → optionally becomes a Campus Opportunity */}
+          <div className="rounded-xl border border-dashed border-line p-4">
+            {requestSent ? (
+              <p className="text-center text-sm text-lime-300">
+                ✓ Request posted as a Campus Opportunity — students can apply now.
+              </p>
+            ) : requestOpen ? (
+              <div className="space-y-2.5">
+                <input placeholder="Looking for a makeup artist" className="input-dark" autoFocus />
+                <textarea rows={2} placeholder="Need makeup for a photoshoot on August 22. Bowie State campus. Budget: $75." className="input-dark resize-none" />
+                <div className="flex gap-2">
+                  <button onClick={() => setRequestSent(true)} className="btn-lime flex-1 rounded-md py-2 text-xs">
+                    Post Request
+                  </button>
+                  <button onClick={() => setRequestOpen(false)} className="btn-ghost px-4 py-2 text-xs">Cancel</button>
+                </div>
+                <p className="text-[10px] text-zinc-600">Requests post as Campus Opportunities — one system, not a million.</p>
               </div>
-            </Link>
+            ) : (
+              <button onClick={() => setRequestOpen(true)} className="flex w-full items-center justify-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200">
+                <Search className="h-4 w-4" /> Can&apos;t find what you&apos;re looking for? <span className="font-semibold text-lime-400">+ Post a Request</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= 💰 CAMPUS OPPORTUNITIES ================= */}
+      {section === "opps" && (
+        <div className="space-y-4 animate-fade-up">
+          <p className="text-sm text-zinc-500">
+            Paid work, gigs, and collaborations on campus — same protected system as everywhere on UpNova.
+          </p>
+          {campusOppIds.map((id) => (
+            <OpportunityCard key={id} id={id} />
           ))}
         </div>
-        <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
-          ✓ Verified Organization means the org is legitimate — it never proves who is a member.
-          Org branding colors are cosmetic. Membership verification comes in V2, approved by org
-          admins, never guessed by UpNova.
-        </p>
-      </section>
+      )}
+
+      {/* ================= 🏛️ ORGANIZATIONS ================= */}
+      {section === "orgs" && (
+        <div className="animate-fade-up">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {campusOrgs.map((org) => (
+              <Link key={org.id} href={`/campus/${org.id}`} className="card-people card-lift overflow-hidden hover:border-zinc-600">
+                <div className={`h-14 bg-gradient-to-br ${org.gradient} opacity-70`} />
+                <div className="p-4">
+                  <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${org.gradient}`}>
+                    {org.emoji}
+                  </span>
+                  <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-zinc-100">
+                    {org.name}
+                    {org.verified && <span className="text-sky-400" title="Verified Organization">✓</span>}
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {org.verified ? org.category : "Community Group"} · {org.members} members
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
+            ✓ Verified Organization means the org is legitimate — it never proves who is a member.
+            Membership verification comes in V2, approved by org admins.
+          </p>
+        </div>
+      )}
+
+      {/* ================= 🎉 EVENTS ================= */}
+      {section === "events" && (
+        <div className="grid gap-4 sm:grid-cols-2 animate-fade-up">
+          <EventCard id="meetup" />
+          <EventCard id="photo-walk" />
+        </div>
+      )}
+
+      {/* ================= 📚 CAMPUS QUESTIONS ================= */}
+      {section === "questions" && (
+        <div className="space-y-3 animate-fade-up">
+          <div className="flex justify-end">
+            <button className="btn-ghost px-4 py-1.5 text-xs"><Plus className="h-3.5 w-3.5" /> Ask a question</button>
+          </div>
+          <div className="card-people divide-y divide-line-soft overflow-hidden">
+            {campusQuestions.map((q) => (
+              <button key={q.q} className="flex w-full items-start gap-3 p-4 text-left transition hover:bg-card-raised">
+                <span className="mt-0.5 shrink-0 text-violet-400">📚</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-zinc-100">{q.q}</span>
+                  <span className="mt-0.5 block text-xs text-zinc-500">{q.by} · {q.answers} answers · {q.time} ago</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* graduation → alumni */}
       <section className="rounded-xl border border-line p-4">
         <p className="text-sm font-semibold text-zinc-200">🎓 After graduation</p>
         <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-          When your verified student status ends, this community becomes your{" "}
-          <span className="font-semibold text-zinc-300">Alumni Community</span> — you keep your
-          relationships, followers, portfolio, projects, and history. Entering grad school? Hold
-          both at once:
+          This community becomes your <span className="font-semibold text-zinc-300">Alumni Community</span> —
+          free, with your relationships, followers, portfolio, projects, and history intact. Grad school? Hold both:
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           <span className="chip px-2.5 py-1 text-[11px]">🎓 Bowie State Alumni</span>
-          <span className="chip border-violet-400/40 px-2.5 py-1 text-[11px] text-violet-300">
-            🎓 Current Graduate Student · Morgan State
-          </span>
+          <span className="chip border-violet-400/40 px-2.5 py-1 text-[11px] text-violet-300">🎓 Current Graduate Student · Morgan State</span>
         </div>
         <p className="mt-2.5 border-t border-line-soft pt-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600">
           school → community → skills → collabs → paid work → portfolio → alumni network → career

@@ -95,6 +95,14 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   subscription indicator — never the same thing. Switching College → Pro drops
   College perks but keeps verified school identity and campus access. College never
   takes over the interface: a College subscriber browses global UpNova normally.
+- **Your Campus is layered, not one giant group chat.** Six sections with distinct
+  jobs: 💬 Communities (interest-based conversation — fashion, gaming, memes, late
+  night), 🛍️ Campus Services (a searchable directory of student providers with
+  "I'm looking for…" filters and "+ Post a Request" that becomes a Campus
+  Opportunity), 💰 Campus Opportunities (real Opportunity cards — paid gigs and
+  unpaid collabs), 🏛️ Organizations, 🎉 Events, 📚 Campus Questions. The
+  social → discovery → business loop: ask in a community, get a creator card,
+  Follow → Message → View Services → Hire — all on the existing systems.
 - **College verification is free; College+ is the optional upgrade.** The paywall
   never sits between people and the network — verification, school community,
   campus chat, networking, following, DMs, applying, and basic portfolio are all $0
