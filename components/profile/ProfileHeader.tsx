@@ -6,7 +6,7 @@ import { PencilLine, MapPin, MessageSquare, Megaphone, Zap } from "lucide-react"
 import PromoteModal from "../PromoteModal";
 import FollowListModal from "../FollowListModal";
 import { useFollow, formatCount } from "@/lib/follow";
-import { getPlan, PRO_EVENT } from "@/lib/pro";
+import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 import { useEffect } from "react";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
@@ -19,7 +19,7 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const { followingCount } = useFollow();
   const [isStudent, setIsStudent] = useState(false);
   useEffect(() => {
-    const sync = () => setIsStudent(getPlan() === "college");
+    const sync = () => setIsStudent(isStudentVerified());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);

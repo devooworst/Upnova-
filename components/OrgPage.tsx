@@ -16,7 +16,7 @@ import {
 import Avatar from "@/components/Avatar";
 import OpportunityCard from "@/components/OpportunityCard";
 import { campusOrgs, creators } from "@/lib/data";
-import { getPlan, PRO_EVENT } from "@/lib/pro";
+import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 
 /* Organization page — another type of community, not a separate product.
    Verified Organization ✓ = the org is legitimate. Branding colors are
@@ -24,18 +24,18 @@ import { getPlan, PRO_EVENT } from "@/lib/pro";
 
 export default function OrgPage({ id }: { id: string }) {
   const org = campusOrgs.find((o) => o.id === id)!;
-  const [plan, setPlanState] = useState<"free" | "college" | "pro">("free");
+  const [verified, setVerified] = useState(false);
   const [joined, setJoined] = useState(false);
   const [rsvp, setRsvp] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const sync = () => setPlanState(getPlan());
+    const sync = () => setVerified(isStudentVerified());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
   }, []);
 
-  if (plan !== "college") {
+  if (!verified) {
     return (
       <div className="mx-auto max-w-md pt-12 text-center">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-400/10">

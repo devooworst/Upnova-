@@ -19,7 +19,7 @@ import {
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
 import { currentUser, communities } from "@/lib/data";
-import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
+import { getPlan, isStudentVerified, PRO_EVENT, type Plan } from "@/lib/pro";
 
 /* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
 const navGroups: {
@@ -60,9 +60,13 @@ export default function Sidebar() {
   const pathname = usePathname();
   const myCommunities = communities.filter((c) => c.joined);
   const [plan, setPlanState] = useState<Plan>("free");
+  const [studentVerified, setStudentVerifiedState] = useState(false);
 
   useEffect(() => {
-    const sync = () => setPlanState(getPlan());
+    const sync = () => {
+      setPlanState(getPlan());
+      setStudentVerifiedState(isStudentVerified());
+    };
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
@@ -114,7 +118,7 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
-        {plan === "college" && (
+        {studentVerified && (
           <div className="mt-1">
             <Link
               href="/campus"
@@ -125,6 +129,7 @@ export default function Sidebar() {
               }`}
             >
               <span aria-hidden>🎓</span> Your Campus
+              <span className="ml-auto truncate font-mono text-[9px] text-zinc-500">Bowie State</span>
             </Link>
           </div>
         )}

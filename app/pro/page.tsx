@@ -16,7 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import Perforation from "@/components/Perforation";
-import { getPlan, setPlan, type Plan } from "@/lib/pro";
+import { getPlan, setPlan, isStudentVerified, setStudentVerified } from "@/lib/pro";
 import { PRO_PRICE, COLLEGE_PRICE, money } from "@/lib/fees";
 
 /* ------------------------------------------------------------------ */
@@ -203,7 +203,8 @@ export default function ProPage() {
           </div>
           <button
             onClick={() => {
-              setPlan("college");
+              setStudentVerified(true); // identity — survives plan changes
+              setPlan("college"); // subscription — perks only
               setView("college");
             }}
             className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
@@ -322,6 +323,10 @@ export default function ProPage() {
                 Cancel College
               </button>
             </div>
+            <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
+              Plan ≠ identity: changing plans removes College perks only. Your verified school
+              identity, campus access, and everything you built stay with your account.
+            </p>
           </section>
         </>
       )}
@@ -387,6 +392,12 @@ export default function ProPage() {
               </span>
             </p>
             <p className="mt-1 text-xs text-zinc-500">Next billing date: September 7, 2026</p>
+            {isStudentVerified() && (
+              <p className="mt-2 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] text-zinc-400">
+                🎓 <span className="font-semibold text-violet-300">Verified Student</span> — your
+                school identity and campus access are independent of your plan and remain active.
+              </p>
+            )}
             <Perforation className="mt-4" />
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               <button className="btn-ghost py-2 text-xs"><CreditCard className="h-3.5 w-3.5" /> Manage payment method</button>

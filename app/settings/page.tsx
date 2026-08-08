@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
+import { getPlan, isStudentVerified, PRO_EVENT, type Plan } from "@/lib/pro";
 import { currentUser, services, bookings } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -33,7 +34,7 @@ const sections = [
   { id: "payments", label: "Payments & Earnings", icon: Wallet },
   { id: "hiring", label: "Hiring", icon: Briefcase },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "pro", label: "UpNova Pro", icon: Sparkles },
+  { id: "pro", label: "Plan & Billing", icon: Sparkles },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 
@@ -116,6 +117,17 @@ export default function SettingsPage() {
     setTheme(c);
     setThemeState(c);
   };
+  const [plan, setPlanState] = useState<Plan>("free");
+  const [studentVerified, setStudentVerifiedState] = useState(false);
+  useEffect(() => {
+    const sync = () => {
+      setPlanState(getPlan());
+      setStudentVerifiedState(isStudentVerified());
+    };
+    sync();
+    window.addEventListener(PRO_EVENT, sync);
+    return () => window.removeEventListener(PRO_EVENT, sync);
+  }, []);
   const setT = (k: string) => (v: boolean) => setToggles((s) => ({ ...s, [k]: v }));
 
   const earned = 4850;
@@ -428,23 +440,50 @@ export default function SettingsPage() {
             <section className="card overflow-hidden">
               <div className="border-b border-lime-400/20 bg-gradient-to-b from-lime-400/10 to-transparent p-5">
                 <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-lime-300">
-                  <Sparkles className="h-4 w-4" /> UpNova Pro
+                  <Sparkles className="h-4 w-4" /> Plan &amp; Billing
                 </p>
                 <p className="mt-1 text-xs text-zinc-400">
-                  Advanced analytics, priority applications, and a bigger reach for your work.
+                  Your plan controls perks — never your identity, communities, or navigation.
                 </p>
               </div>
               <div className="p-5">
-                <Row label="Current plan" hint="Free — core features, standard reach">
-                  <span className="chip">Free</span>
-                </Row>
-                <Row label="Billing" hint="No subscription active">
-                  <button className="btn-ghost px-3.5 py-1.5 text-xs" disabled>
-                    <CreditCard className="h-3.5 w-3.5" /> —
-                  </button>
-                </Row>
-                <button className="btn-lime mt-3 w-full rounded-md py-2 text-sm">Upgrade to Pro</button>
-                <p className="mt-2 text-center text-[10px] text-zinc-600">Cancel anytime. Pricing TBD with the fee model.</p>
+                <ul className="divide-y divide-line-soft">
+                  {(
+                    [
+                      ["free", "UpNova Free", "$0", "Everyone. The full core platform."],
+                      ["college", "🎓 UpNova College", "$4.99/mo", "Verified students — campus perks & Student Boost."],
+                      ["pro", "⭐ UpNova Pro", "$12.99/mo", "Serious creators — analytics, discovery, pro tools."],
+                    ] as [Plan, string, string, string][]
+                  ).map(([id, name, price, desc]) => (
+                    <li key={id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-zinc-100">{name}</p>
+                        <p className="text-xs text-zinc-500">{desc}</p>
+                      </div>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm font-bold tabular-nums tracking-tight text-zinc-200">{price}</span>
+                        {plan === id && (
+                          <span className="rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[10px] font-bold text-lime-300">
+                            Current
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {studentVerified && (
+                  <p className="mt-3 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] text-zinc-400">
+                    🎓 <span className="font-semibold text-violet-300">Verified Student</span> —
+                    identity stays with your account across plan changes.
+                  </p>
+                )}
+                <a href="/pro" className="btn-lime mt-4 flex w-full rounded-md py-2 text-sm">
+                  Change plan
+                </a>
+                <p className="mt-2 text-center text-[10px] text-zinc-600">
+                  Test prices. Transaction fees on paid work are separate — UpNova earns even from
+                  Free users when they earn.
+                </p>
               </div>
             </section>
           )}

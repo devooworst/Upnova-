@@ -87,6 +87,14 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   designed around Stripe Connect (connected accounts, destination charges with
   application fees, payouts, refunds, disputes). Transactions, projects, payments,
   fees, payouts, and reviews are modeled as separate entities from messaging.
+- **Account architecture: Plan ≠ Verification ≠ Navigation ≠ Feed Scope.** Four
+  independent properties: Plan (free / college / pro — perks only), Verification
+  (student identity — controls campus eligibility, survives plan changes),
+  Communities/School (navigation destinations), Feed Scope (a filter, never a mode).
+  "Your Campus" is navigation for a verified student; "UpNova College ✓" is a
+  subscription indicator — never the same thing. Switching College → Pro drops
+  College perks but keeps verified school identity and campus access. College never
+  takes over the interface: a College subscriber browses global UpNova normally.
 - **UpNova College — the campus-to-career pipeline.** Three plans with three jobs:
   Free ($0, get discovered — earning is never paywalled), College ($4.99/mo test
   price, verified students only: 🎓 badge, Student Boost, Student Opportunities,

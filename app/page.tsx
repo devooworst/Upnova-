@@ -7,7 +7,7 @@ import CreatePost from "@/components/CreatePost";
 import Feed, { type FeedTab, type FeedScope } from "@/components/Feed";
 import RightSidebar from "@/components/RightSidebar";
 import { currentUser } from "@/lib/data";
-import { getPlan, PRO_EVENT } from "@/lib/pro";
+import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 
 /* ------------------------------------------------------------------ */
 /* Home always stays Home. Two orthogonal controls:                    */
@@ -48,7 +48,7 @@ export default function Home() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const sync = () => setIsStudent(getPlan() === "college");
+    const sync = () => setIsStudent(isStudentVerified());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
@@ -122,7 +122,7 @@ export default function Home() {
                       ))}
                     {!isStudent && (
                       <li className="px-3 py-2 text-[10px] text-zinc-600">
-                        🎓 My School unlocks with verified student status
+                        🎓 My School unlocks with student verification
                       </li>
                     )}
                   </ul>

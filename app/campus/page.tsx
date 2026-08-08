@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
-import { getPlan, PRO_EVENT } from "@/lib/pro";
+import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 import { creators, campusOrgs } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -128,12 +128,12 @@ const channelMessages: Record<string, CampusMsg[]> = {
 };
 
 export default function CampusPage() {
-  const [plan, setPlanState] = useState<"free" | "college" | "pro">("free");
+  const [verified, setVerified] = useState(false);
   const [channel, setChannel] = useState("main");
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
-    const sync = () => setPlanState(getPlan());
+    const sync = () => setVerified(isStudentVerified());
     sync();
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
@@ -144,7 +144,7 @@ export default function CampusPage() {
   const activeChannel = channels.find((c) => c.id === channel)!;
 
   /* ---------------- locked: verify first ---------------- */
-  if (plan !== "college") {
+  if (!verified) {
     return (
       <div className="mx-auto max-w-md pt-12 text-center">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-400/10">
