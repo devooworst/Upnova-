@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Briefcase } from "lucide-react";
 import OpportunityCard from "@/components/OpportunityCard";
 import { opportunities, opportunityFilters } from "@/lib/data";
 
 export default function OpportunitiesPage() {
   const [active, setActive] = useState<string[]>([]);
+
+  /* arriving from the sidebar widget: preserve the feed scope */
+  useEffect(() => {
+    const scope = new URLSearchParams(window.location.search).get("scope");
+    if (scope && ["5", "25", "city", "county", "state", "school"].includes(scope)) {
+      setActive(["Local"]);
+    } else if (scope === "global" || scope === "country") {
+      setActive([]);
+    }
+  }, []);
 
   const toggle = (f: string) =>
     setActive((a) => (a.includes(f) ? a.filter((x) => x !== f) : [...a, f]));

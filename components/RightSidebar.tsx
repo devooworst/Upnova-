@@ -6,7 +6,8 @@ import { ArrowRight, Briefcase, ChevronDown, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
 import FollowButton from "./FollowButton";
 import ProfilePreview from "./ProfilePreview";
-import { opportunities, creators, events, type Creator, type RadiusId } from "@/lib/data";
+import { opportunities, creators, events, type Creator } from "@/lib/data";
+import type { FeedScope } from "./Feed";
 
 const MONTHS: Record<string, string> = {
   January: "JAN", February: "FEB", March: "MAR", April: "APR",
@@ -19,41 +20,67 @@ function monthDay(date: string): [string, string] {
   return m ? [MONTHS[m[1]], m[2]] : ["", ""];
 }
 
-export default function RightSidebar({ radius }: { radius: RadiusId }) {
+/* scope → how far the widget looks + what its header says */
+const scopeMax: Record<FeedScope, number> = {
+  foryou: 25, "5": 5, "25": 25, city: 40, county: 60, state: 150,
+  country: Infinity, global: Infinity, school: 5,
+};
+const scopeSub: Record<FeedScope, string> = {
+  foryou: "Paid work near you",
+  "5": "Near you · 5 mi",
+  "25": "Near you · 25 mi",
+  city: "Baltimore",
+  county: "Baltimore County",
+  state: "Maryland",
+  country: "United States",
+  global: "Global",
+  school: "Student jobs · gigs · collabs",
+};
+
+export default function RightSidebar({ scope }: { scope: FeedScope }) {
   const [preview, setPreview] = useState<Creator | null>(null);
   const [open, setOpen] = useState({ money: true, people: true, week: true });
   const toggle = (k: keyof typeof open) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
+  const max = scopeMax[scope];
   const inRange = (d?: number) =>
-    radius === "city" ? true : d !== undefined && d <= Number(radius);
+    max === Infinity ? true : d !== undefined && d <= max;
 
-  const nearOpps = opportunities.filter((o) => inRange(o.distanceMi));
-  const nearPeople = creators.filter((c) => inRange(c.distanceMi)).slice(0, 3);
+  const allInScope = opportunities.filter(
+    (o) => inRange(o.distanceMi) && (scope !== "school" || o.studentFriendly)
+  );
+  /* quick discovery, not a feed: cap at 5 */
+  const nearOpps = allInScope.slice(0, 5);
+  const moreCount = allInScope.length - nearOpps.length;
+  const nearPeople = creators
+    .filter((c) => (max === Infinity ? true : c.distanceMi !== undefined && c.distanceMi <= Math.max(max, 25)))
+    .slice(0, 3);
   const nearEvents = events.slice(0, 2);
 
-  const total = nearOpps.reduce(
+  const total = allInScope.reduce(
     (sum, o) => sum + (Number(o.budget.replace(/[^0-9.]/g, "")) || 0),
     0
   );
+  const oppsHref = `/opportunities?scope=${scope}`;
 
   return (
     <aside className="sticky top-20 hidden w-80 shrink-0 space-y-4 self-start xl:block">
       {/* ---- money: receipt. sharp corners, lime rule, mono, dashed rows ---- */}
       <section className="card-money px-5 pb-5 pt-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Open money</h2>
-          <span className="flex items-center gap-2">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-              {radius === "city" ? "city +" : `≤ ${radius} mi`}
-            </span>
-            <button
-              onClick={() => toggle("money")}
-              aria-label="Collapse open money"
-              className="text-zinc-500 transition hover:text-zinc-200"
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform ${open.money ? "rotate-180" : ""}`} />
-            </button>
-          </span>
+          <div>
+            <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">
+              {scope === "school" ? "Campus Opportunities" : "Open Opportunities"}
+            </h2>
+            <p className="font-mono text-[10px] font-medium text-zinc-500">{scopeSub[scope]}</p>
+          </div>
+          <button
+            onClick={() => toggle("money")}
+            aria-label="Collapse open opportunities"
+            className="text-zinc-500 transition hover:text-zinc-200"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${open.money ? "rotate-180" : ""}`} />
+          </button>
         </div>
         {open.money && (
         <>
@@ -63,7 +90,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
             <li key={o.id} className="border-t border-dashed border-zinc-700/60 first:border-t-0">
               <Link
                 href="/opportunities"
-                className="group -mx-2 block rounded-md px-2 py-3 transition hover:bg-card-raised"
+                className="group -mx-2 block rounded-md px-2 py-2 transition hover:bg-card-raised"
               >
                 <p className="flex items-baseline justify-between gap-3">
                   <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-zinc-100 group-hover:text-lime-300">
@@ -110,10 +137,10 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
         )}
 
         <Link
-          href="/opportunities"
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-lime-400/30 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-lime-300 transition hover:border-lime-400/60 hover:bg-lime-400/5"
+          href={oppsHref}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-lime-400/30 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-lime-300 transition hover:border-lime-400/60 hover:bg-lime-400/5"
         >
-          see all paid work <ArrowRight className="h-3 w-3" />
+          View all {moreCount > 0 ? `${allInScope.length} ` : ""}opportunities <ArrowRight className="h-3 w-3" />
         </Link>
         </>
         )}

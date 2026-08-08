@@ -151,7 +151,7 @@ export default function Home() {
         <Feed scope={scope} tab={tab} onTabChange={setTab} isStudent={isStudent} />
       </div>
 
-      <RightSidebar radius={scope === "5" ? "5" : scope === "25" ? "25" : "city"} />
+      <RightSidebar scope={scope} />
     </div>
   );
 }
