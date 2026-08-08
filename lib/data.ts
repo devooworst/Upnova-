@@ -303,6 +303,26 @@ export const opportunities: Opportunity[] = [
     distanceMi: 2.1,
   },
   {
+    id: "org-promo",
+    title: "Org Promo Videographer",
+    poster: "BSU Photography Club",
+    posterInitials: "P",
+    posterGradient: "from-sky-500 to-blue-700",
+    verifiedPoster: true,
+    category: "Collaboration",
+    description:
+      "We're shooting promotional content for the club — one afternoon, campus locations. Small budget from SGA funding, big portfolio piece.",
+    budget: "$150",
+    deadline: "Sep 05",
+    roles: "Videographer",
+    applicants: 5,
+    paid: true,
+    tags: ["Paid", "Campus"],
+    reach: { location: "Bowie, MD", reach: "Nearby", radius: "5 mi" },
+    distanceMi: 3.4,
+    studentFriendly: true,
+  },
+  {
     id: "social-video",
     title: "Social Media Videographer",
     poster: "Charm City Threads",
@@ -1211,6 +1231,95 @@ export const communityContent: Record<string, CommunityContent> = {
     ],
   },
 };
+
+/* --------------------------- campus organizations --------------------------- */
+/* V1: organization pages — another type of community, not a separate
+   product. Two statuses, deliberately distinct:
+   - Verified Organization ✓  = "this organization is legitimate"
+   - Community Group          = unofficial, still useful
+   Membership verification ("this person is a member") is V2 and is
+   approved by org admins — UpNova never guesses fraternity rosters.
+   Branding colors are just branding, not proof of membership.          */
+
+export interface CampusOrg {
+  id: string;
+  name: string;
+  emoji: string;
+  /** org branding gradient — cosmetic only */
+  gradient: string;
+  verified: boolean;
+  category: "Student Organization" | "Sports" | "Greek Life" | "Campus Business" | "Community Group";
+  school: string;
+  members: number;
+  about: string;
+  leadership: string[];
+  posts: { id: string; author: string; time: string; text: string }[];
+  orgEvents: { id: string; title: string; when: string; where: string; going: number }[];
+  opportunityId?: string;
+}
+
+export const campusOrgs: CampusOrg[] = [
+  {
+    id: "photo-club",
+    name: "BSU Photography Club",
+    emoji: "📸",
+    gradient: "from-sky-500 to-blue-700",
+    verified: true,
+    category: "Student Organization",
+    school: "Bowie State University",
+    members: 84,
+    about:
+      "Student photographers at every level. Weekly shoots, gear shares, critique nights, and paid campus gigs sourced for members.",
+    leadership: ["Toni Alvarez (President)", "Devon Price (Events)"],
+    posts: [
+      { id: "pc-1", author: "Toni Alvarez", time: "3h", text: "Critique night moved to Thursday — bring your three best from the quad shoot. 📷" },
+      { id: "pc-2", author: "Devon Price", time: "1d", text: "The bookstore promo gig went to two of our members. Paid work through UpNova — this is the point of the club." },
+    ],
+    orgEvents: [
+      { id: "pce-1", title: "Photography Club Meetup", when: "Thursday · 6:00 PM", where: "Student Center", going: 31 },
+      { id: "pce-2", title: "Golden Hour Campus Walk", when: "Sunday · 6:30 PM", where: "Main Quad", going: 18 },
+    ],
+    opportunityId: "org-promo",
+  },
+  {
+    id: "sga",
+    name: "Student Government Association",
+    emoji: "🏛️",
+    gradient: "from-violet-500 to-purple-800",
+    verified: true,
+    category: "Student Organization",
+    school: "Bowie State University",
+    members: 210,
+    about:
+      "Your student government. Campus initiatives, budget decisions, event funding, and the people to talk to when something needs fixing.",
+    leadership: ["Sasha Green (President)", "K. Boateng (Treasurer)"],
+    posts: [
+      { id: "sga-1", author: "Sasha Green", time: "5h", text: "Homecoming creative showcase budget approved — performers and designers, applications open Friday. 🎉" },
+    ],
+    orgEvents: [
+      { id: "sga-1e", title: "Town Hall: Student Activity Fees", when: "Tuesday · 5:00 PM", where: "Auditorium B", going: 64 },
+    ],
+  },
+  {
+    id: "late-night",
+    name: "Late Night Creatives",
+    emoji: "🌙",
+    gradient: "from-zinc-600 to-zinc-800",
+    verified: false,
+    category: "Community Group",
+    school: "Bowie State University",
+    members: 47,
+    about:
+      "Unofficial crew for people who make things after midnight. Beat sessions, edit marathons, late food runs. Not a registered org — just us.",
+    leadership: ["Maya Reyes (started it)"],
+    posts: [
+      { id: "ln-1", author: "Maya Reyes", time: "2h", text: "Media lab open till 2am tonight. Who's pulling up? 🌙" },
+    ],
+    orgEvents: [
+      { id: "ln-1e", title: "Midnight Edit Marathon", when: "Friday · 11:00 PM", where: "Media Lab 2", going: 12 },
+    ],
+  },
+];
 
 /* -------------------------------- bookings --------------------------------- */
 /* Service providers live off their calendar: who booked, when, for how much. */

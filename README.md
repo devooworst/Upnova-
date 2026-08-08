@@ -92,6 +92,13 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   isn't the source of truth; the email is never public). College ends at the
   verified graduation date; everything the student built stays theirs, with a
   natural transition to Pro.
+- **Organizations & Campus Groups (V1 scope, deliberately).** Org pages are another
+  type of community: branding gradient (cosmetic only), ✓ Verified Organization vs
+  Community Group (org legitimacy ≠ membership proof), about/leadership, posts,
+  events (big ticketed org events run on the full Events system), members, and org
+  opportunities feeding the work ecosystem. V2: private org/leadership chats, sports
+  teams, dorm communities (privacy-conscious, opt-in), admin-approved ✓ Verified
+  Member, org dashboards. Later: Greek-life integrations, school partnerships.
 - **Creative Integrity — AI-transparent, creator-controlled.** UpNova does not
   prohibit AI universally; it prohibits misrepresentation. Every service carries an
   AI policy (🔴 No AI / 🟡 with disclosure / 🟠 assisted / 🟢 client decides), clients

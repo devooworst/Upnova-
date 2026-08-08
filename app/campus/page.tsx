@@ -14,7 +14,7 @@ import {
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
 import { getPlan, PRO_EVENT } from "@/lib/pro";
-import { creators } from "@/lib/data";
+import { creators, campusOrgs } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
 /* The verified digital campus network. Not a generic college chat —   */
@@ -294,6 +294,42 @@ export default function CampusPage() {
           </div>
         </div>
       </div>
+
+      {/* organizations — another type of community, not a separate product */}
+      <section>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">Organizations &amp; Campus Groups</h2>
+          <span className="font-mono text-[10px] font-medium text-zinc-500">{campusOrgs.length} on campus</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {campusOrgs.map((org) => (
+            <Link
+              key={org.id}
+              href={`/campus/${org.id}`}
+              className="card-people card-lift overflow-hidden hover:border-zinc-600"
+            >
+              <div className={`h-14 bg-gradient-to-br ${org.gradient} opacity-70`} />
+              <div className="p-4">
+                <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${org.gradient}`}>
+                  {org.emoji}
+                </span>
+                <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-zinc-100">
+                  {org.name}
+                  {org.verified && <span className="text-sky-400" title="Verified Organization">✓</span>}
+                </p>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {org.verified ? org.category : "Community Group"} · {org.members} members
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+        <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
+          ✓ Verified Organization means the org is legitimate — it never proves who is a member.
+          Org branding colors are cosmetic. Membership verification comes in V2, approved by org
+          admins, never guessed by UpNova.
+        </p>
+      </section>
 
       {/* graduation → alumni */}
       <section className="rounded-xl border border-line p-4">
