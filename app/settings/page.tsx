@@ -280,6 +280,12 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="divide-y divide-line-soft border-t border-line-soft">
+                <Row label="Identity verification" hint="Status only — your ID never lives on UpNova">
+                  <span className="rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200">🟢 Identity Verified</span>
+                </Row>
+                <Row label="High-Trust verification" hint="Required for childcare, pet care, home access, transportation">
+                  <button className="btn-ghost px-3.5 py-1.5 text-xs">Complete</button>
+                </Row>
                 <Row label="Two-factor authentication" hint="Extra login step via authenticator app">
                   <Toggle on={t("twoFa")} onChange={setT("twoFa")} />
                 </Row>

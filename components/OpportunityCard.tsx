@@ -7,6 +7,7 @@ import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import Perforation from "./Perforation";
 import { opportunities, currentUser } from "@/lib/data";
+import { getTrustStatus, setTrustStatus } from "@/lib/pro";
 
 /* Opportunities = "We're looking for someone." The CTA is Apply:
    portfolio + availability + optional rate + short message. Never
@@ -19,6 +20,7 @@ export default function OpportunityCard({ id }: { id: string }) {
   const [reportOpen, setReportOpen] = useState(false);
   const opp = opportunities.find((o) => o.id === id);
   const [available, setAvailable] = useState<"yes" | "check" | null>(null);
+  const [trustOk, setTrustOk] = useState(false);
   const [message, setMessage] = useState(
     "I've shot this kind of work before, portfolio attached. I'm free on your dates."
   );
@@ -37,6 +39,11 @@ export default function OpportunityCard({ id }: { id: string }) {
               {opp.studentFriendly && (
                 <span className="rounded-full border border-violet-400/40 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.08em] text-violet-300">
                   🎓 STUDENT-FRIENDLY
+                </span>
+              )}
+              {opp.trustLevel === "high-trust" && (
+                <span className="rounded-full border border-red-400/40 bg-red-500/10 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.08em] text-red-300">
+                  🔴 HIGH-TRUST
                 </span>
               )}
             </p>
@@ -162,6 +169,38 @@ export default function OpportunityCard({ id }: { id: string }) {
               </button>
             </div>
 
+            {/* high-trust gate — applicants must meet the required level */}
+            {opp.trustLevel === "high-trust" && !trustOk && getTrustStatus() !== "high-trust" ? (
+              <div className="mt-4">
+                <div className="rounded-md border border-red-400/30 bg-red-500/5 p-3.5">
+                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-red-300">
+                    🔴 high-trust opportunity
+                  </p>
+                  <p className="mt-1.5 text-sm text-zinc-200">
+                    This job involves unsupervised access to a pet, home, or property. Applicants
+                    must complete High-Trust Verification.
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+                    <li>✓ Identity verification — you have this</li>
+                    <li>○ Age verification</li>
+                    <li>○ Background screening (where legally permitted)</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => {
+                    setTrustStatus("high-trust");
+                    setTrustOk(true);
+                  }}
+                  className="mt-3 w-full rounded-md bg-lime-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-lime-300"
+                >
+                  Complete High-Trust Verification
+                </button>
+                <p className="mt-2 text-center text-[10px] text-zinc-600">
+                  Runs through an identity-verification provider — UpNova never stores your ID.
+                </p>
+              </div>
+            ) : (
+            <>
             {/* portfolio attached automatically */}
             <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5">
               <FolderOpen className="h-4 w-4 shrink-0 text-lime-400" />
@@ -236,6 +275,8 @@ export default function OpportunityCard({ id }: { id: string }) {
               applying accepts the listed budget ({opp.budget}) · {opp.poster} reviews applicants
               and picks who to start a project with
             </p>
+            </>
+            )}
           </div>
         </div>
       )}

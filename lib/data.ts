@@ -46,6 +46,7 @@ export interface Creator {
   followers: number;
   /** public reliability summary — details stay private to the owner */
   onTimeRate?: number;
+  trustLevel?: TrustLevel;
 }
 
 /* ------------------------------ current user ------------------------------ */
@@ -104,6 +105,7 @@ export const stories: Story[] = [
 export const creators: Creator[] = [
   {
     id: "jordan",
+    trustLevel: "standard",
     onTimeRate: 96,
     followers: 12400,
     name: "Jordan Miles",
@@ -126,6 +128,7 @@ export const creators: Creator[] = [
   },
   {
     id: "ava",
+    trustLevel: "identity",
     onTimeRate: 100,
     followers: 3260,
     name: "Ava Chen",
@@ -149,6 +152,7 @@ export const creators: Creator[] = [
   },
   {
     id: "marcus",
+    trustLevel: "identity",
     onTimeRate: 92,
     followers: 1840,
     name: "Marcus Reed",
@@ -171,6 +175,7 @@ export const creators: Creator[] = [
   },
   {
     id: "nia",
+    trustLevel: "high-trust",
     followers: 2610,
     name: "Nia Carter",
     handle: "niastyled",
@@ -267,6 +272,8 @@ export interface Opportunity {
   studentFriendly?: boolean;
   /** when the work actually happens — availability questions reference this */
   projectDates?: string;
+  /** auto-categorized: applicants must meet this verification level */
+  trustLevel?: TrustLevel;
 }
 
 export const opportunities: Opportunity[] = [
@@ -311,6 +318,28 @@ export const opportunities: Opportunity[] = [
     tags: ["Paid", "Freelance"],
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
     distanceMi: 2.1,
+  },
+  {
+    id: "dog-sitter",
+    trustLevel: "high-trust",
+    projectDates: "Sat Aug 23 – Sun Aug 24",
+    title: "Weekend Dog Sitter Needed",
+    poster: "Harbor & Oak",
+    posterInitials: "H",
+    posterGradient: "from-teal-600 to-emerald-700",
+    verifiedPoster: false,
+    category: "Gig",
+    description:
+      "Our shop dog Biscuit needs a sitter for one weekend — feeding, two walks a day, and company. Keys handed over Friday.",
+    budget: "$120",
+    deadline: "Aug 21",
+    roles: "Pet Sitter",
+    applicants: 4,
+    paid: true,
+    tags: ["Paid", "Weekend"],
+    reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
+    distanceMi: 2.1,
+    studentFriendly: true,
   },
   {
     id: "campus-web",
@@ -983,6 +1012,41 @@ export const communities: Community[] = [
   },
 ];
 
+/* ------------------------------ trust levels -------------------------------- */
+/* Trust scales with what the job involves. The question: does the
+   customer trust the worker with a person, child, pet, home, property,
+   vehicle, or private access while they're not present?
+   Verification runs through an identity-verification provider — UpNova
+   never stores licenses/passports, and profiles show status only,
+   never legal name / ID number / DOB / address.                        */
+
+export type TrustLevel = "standard" | "identity" | "high-trust";
+
+export const trustLevelInfo: Record<TrustLevel, { dot: string; label: string; desc: string; checks: string[] }> = {
+  standard: {
+    dot: "🟢",
+    label: "Standard",
+    desc: "Normal creative/digital work. Email + phone verification; ID optional.",
+    checks: ["Email & phone verified", "Portfolio & reviews"],
+  },
+  identity: {
+    dot: "🟡",
+    label: "Identity Verified",
+    desc: "In-person work or handling something valuable.",
+    checks: ["Identity verification (via provider)", "Email & phone verified"],
+  },
+  "high-trust": {
+    dot: "🔴",
+    label: "High-Trust",
+    desc: "Unsupervised access to a person, child, pet, home, or valuable property.",
+    checks: [
+      "Identity verification",
+      "Age verification",
+      "Background screening (where appropriate & legally permitted)",
+    ],
+  },
+};
+
 /* ------------------------------ service catalog ----------------------------- */
 /* Services = clients are looking for a creator. Predefined offerings with
    clear starting prices. CTA is Hire Me. (Opportunities are the inverse.)  */
@@ -1030,16 +1094,18 @@ export interface CatalogService {
   id: string;
   creatorId: string;
   title: string;
-  category: "Music" | "Video" | "Photography" | "Design" | "Fashion" | "Writing";
+  category: "Music" | "Video" | "Photography" | "Design" | "Fashion" | "Writing" | "Care";
   startingAt: number;
   description: string;
   delivery: string;
   aiPolicy: AiPolicy;
+  trustLevel: TrustLevel;
 }
 
 export const serviceCatalog: CatalogService[] = [
   {
     id: "svc-jordan-production",
+    trustLevel: "standard",
     aiPolicy: "assisted",
     creatorId: "jordan",
     title: "Music Production",
@@ -1050,6 +1116,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-marcus-editing",
+    trustLevel: "standard",
     aiPolicy: "assisted",
     creatorId: "marcus",
     title: "Video Editing",
@@ -1060,6 +1127,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-ava-photography",
+    trustLevel: "identity",
     aiPolicy: "no-ai",
     creatorId: "ava",
     title: "Photography",
@@ -1070,6 +1138,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-jordan-songwriting",
+    trustLevel: "standard",
     aiPolicy: "no-ai",
     creatorId: "jordan",
     title: "Songwriting",
@@ -1080,6 +1149,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-tre-beats",
+    trustLevel: "standard",
     aiPolicy: "disclosure",
     creatorId: "tre",
     title: "Beat Licensing",
@@ -1090,6 +1160,7 @@ export const serviceCatalog: CatalogService[] = [
   },
   {
     id: "svc-lena-brand",
+    trustLevel: "standard",
     aiPolicy: "client-decides",
     creatorId: "lena",
     title: "Brand Identity",
@@ -1099,7 +1170,19 @@ export const serviceCatalog: CatalogService[] = [
     delivery: "1-2 weeks",
   },
   {
+    id: "svc-nia-petcare",
+    trustLevel: "high-trust",
+    creatorId: "nia",
+    title: "Dog Walking & Pet Sitting",
+    category: "Care",
+    startingAt: 25,
+    description: "30-minute walks or full-day sitting for your dog. Photo updates every visit.",
+    delivery: "Scheduled",
+    aiPolicy: "no-ai",
+  },
+  {
     id: "svc-nia-content",
+    trustLevel: "identity",
     aiPolicy: "no-ai",
     creatorId: "nia",
     title: "Fashion Content",

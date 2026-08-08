@@ -6,15 +6,17 @@ import { Briefcase, Check, Clock, Search, ShoppingBag, Star, Zap } from "lucide-
 import Avatar from "@/components/Avatar";
 import HireModal from "@/components/HireModal";
 import AiPolicyBadge from "@/components/AiPolicyBadge";
+import TrustBadge from "@/components/TrustBadge";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { serviceCatalog, creators, type CatalogService } from "@/lib/data";
 
-const categories = ["All", "Music", "Video", "Photography", "Design", "Fashion", "Writing"] as const;
+const categories = ["All", "Music", "Video", "Photography", "Design", "Fashion", "Writing", "Care"] as const;
 
 export default function ServicesPage() {
   const [category, setCategory] = useState<(typeof categories)[number]>("All");
   const [query, setQuery] = useState("");
   const [hiring, setHiring] = useState<CatalogService | null>(null);
+  const [safetyFor, setSafetyFor] = useState<CatalogService | null>(null);
 
   const items = serviceCatalog.filter((svc) => {
     const creator = creators.find((c) => c.id === svc.creatorId);
@@ -117,6 +119,7 @@ export default function ServicesPage() {
                   <Check className="h-3 w-3" /> {c.availability}
                 </span>
                 <AiPolicyBadge policy={svc.aiPolicy} />
+                <TrustBadge level={svc.trustLevel} />
               </div>
 
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-line-soft pt-3.5">
@@ -126,8 +129,11 @@ export default function ServicesPage() {
                     ${svc.startingAt}
                   </span>
                 </p>
-                <button onClick={() => setHiring(svc)} className="btn-lime px-4 py-1.5 text-xs">
-                  <Zap className="h-3.5 w-3.5" /> Hire Me
+                <button
+                  onClick={() => (svc.trustLevel === "high-trust" ? setSafetyFor(svc) : setHiring(svc))}
+                  className="btn-lime px-4 py-1.5 text-xs"
+                >
+                  <Zap className="h-3.5 w-3.5" /> {svc.trustLevel === "high-trust" ? "Book" : "Hire Me"}
                 </button>
               </div>
             </article>
@@ -145,6 +151,50 @@ export default function ServicesPage() {
         Every hire runs through the protected UpNova flow: agree on scope in Messages, pay securely,
         approve the work, then both sides review.
       </p>
+
+      {/* safety interstitial — verification shown BEFORE the customer pays */}
+      {safetyFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setSafetyFor(null)}>
+          <div className="card w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
+              🛡️ safety verification required
+            </p>
+            <h2 className="mt-1.5 text-[15px] font-bold tracking-tight text-zinc-50">
+              {safetyFor.title}
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+              This service involves unsupervised access to your pet or property.{" "}
+              <span className="font-semibold text-zinc-200">
+                {creators.find((c) => c.id === safetyFor.creatorId)?.name}
+              </span>{" "}
+              has completed the required UpNova verification for this service:
+            </p>
+            <ul className="mt-3 space-y-1.5 text-xs text-zinc-300">
+              <li>✓ Identity verification</li>
+              <li>✓ Age verification</li>
+              <li>✓ Background screening (where legally permitted)</li>
+              <li>✓ UpNova payment protection</li>
+            </ul>
+            <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
+              Verification is performed by an identity-verification provider — UpNova never
+              stores IDs, and status never exposes legal name, ID number, DOB, or address.
+              Verified means checks passed, not a guarantee.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setSafetyFor(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
+              <button
+                onClick={() => {
+                  setHiring(safetyFor);
+                  setSafetyFor(null);
+                }}
+                className="btn-lime flex-1 rounded-md py-2 text-xs"
+              >
+                Continue to booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {hiring && (
         <HireModal

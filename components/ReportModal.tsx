@@ -49,6 +49,9 @@ const groups: { label: string; items: string[] }[] = [
       "Copyright / IP issue",
       "Inappropriate content",
       "Off-platform payment request",
+      "Identity concern",
+      "Unsafe behavior",
+      "Property damage",
       "Other",
     ],
   },
@@ -109,6 +112,12 @@ export default function ReportModal({
               </button>
             </div>
             <p className="mt-0.5 text-xs text-zinc-500">{context}</p>
+
+            {/* high-trust jobs get an emergency lane — not ordinary support */}
+            <button className="mt-4 flex w-full items-center gap-2.5 rounded-md border border-red-500/50 bg-red-500/10 px-3.5 py-2.5 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/20">
+              🚨 Emergency / Safety Concern
+              <span className="ml-auto text-[10px] font-medium text-red-300/70">handled immediately, not as a ticket</span>
+            </button>
 
             <p className="mt-4 text-sm font-semibold text-zinc-200">What&apos;s wrong?</p>
             <div className="mt-2 space-y-3">

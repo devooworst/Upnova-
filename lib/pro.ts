@@ -44,3 +44,18 @@ export function isPro(): boolean {
 export function setPro(active: boolean) {
   setPlan(active ? "pro" : "free");
 }
+
+/* ---- verification level of the current account (mock) ----
+   Devin starts Identity Verified; High-Trust is completed on demand. */
+export type TrustStatus = "standard" | "identity" | "high-trust";
+
+export function getTrustStatus(): TrustStatus {
+  if (typeof window === "undefined") return "identity";
+  const v = window.localStorage.getItem("upnova-trust");
+  return v === "high-trust" ? "high-trust" : "identity";
+}
+
+export function setTrustStatus(t: TrustStatus) {
+  window.localStorage.setItem("upnova-trust", t);
+  window.dispatchEvent(new Event(PRO_EVENT));
+}

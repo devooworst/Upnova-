@@ -111,6 +111,8 @@ export default function CreateModal() {
   const [svcPrice, setSvcPrice] = useState("");
   const [availability, setAvailability] = useState("Accepting clients");
   const [originalWork, setOriginalWork] = useState(true);
+  const [svcType, setSvcType] = useState("Creative");
+  const [highTrustDone, setHighTrustDone] = useState(false);
 
   /* poll */
   const [question, setQuestion] = useState("");
@@ -475,6 +477,31 @@ export default function CreateModal() {
             </div>
             <textarea rows={2} placeholder="Describe your service — what clients get and how you work…" className="input-dark resize-none" />
             <div>
+              <p className={label}>What type of service is this?</p>
+              <Chips
+                options={["Creative", "In-person", "Home access", "Childcare", "Pet care", "Transportation", "Personal assistance", "Other"]}
+                value={svcType}
+                onChange={setSvcType}
+                accent="lime"
+              />
+              {(() => {
+                const level = ["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType)
+                  ? "High-Trust"
+                  : svcType === "In-person"
+                  ? "Identity Verified"
+                  : "Standard";
+                return (
+                  <p className="mt-2 text-[11px] text-zinc-500">
+                    Verification required:{" "}
+                    <span className={`font-semibold ${level === "High-Trust" ? "text-red-300" : level === "Identity Verified" ? "text-amber-300" : "text-zinc-300"}`}>
+                      {level}
+                    </span>
+                    {svcType === "Childcare" && <span className="text-zinc-600"> + applicable additional screening</span>}
+                  </p>
+                );
+              })()}
+            </div>
+            <div>
               <p className={label}>What do you deliver?</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {["Beat", "Mixing", "Mastering", "Recording", "Revisions", "Edited gallery", "Source files"].map((d) => (
@@ -529,13 +556,36 @@ export default function CreateModal() {
               <span>🔴 Original work — no undisclosed generative AI</span>
               <input type="checkbox" checked={originalWork} onChange={(e) => setOriginalWork(e.target.checked)} className="accent-lime-400" />
             </label>
-            <button
-              onClick={() => setPublished(true)}
-              disabled={!svcName.trim()}
-              className={`w-full rounded-md py-2.5 text-sm font-bold transition ${svcName.trim() ? "bg-lime-400 text-zinc-950 hover:bg-lime-300 hover:shadow-glow" : "cursor-not-allowed bg-card-raised text-zinc-600"}`}
-            >
-              Publish Service
-            </button>
+            {["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType) && !highTrustDone ? (
+              <div className="rounded-md border border-red-400/30 bg-red-500/5 p-3.5">
+                <p className="text-sm font-semibold text-zinc-100">❌ Cannot publish yet</p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                  {svcType} requires High-Trust Verification — identity, age, and background
+                  screening where legally permitted. Complete verification to offer this service.
+                </p>
+                <button
+                  onClick={() => setHighTrustDone(true)}
+                  className="mt-2.5 w-full rounded-md bg-lime-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-lime-300"
+                >
+                  Complete Verification
+                </button>
+              </div>
+            ) : (
+              <>
+                {highTrustDone && ["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType) && (
+                  <p className="rounded-md border border-lime-400/30 bg-lime-400/5 px-3 py-2 text-xs text-lime-300">
+                    ✓ Eligible to offer {svcType.toLowerCase()} services
+                  </p>
+                )}
+                <button
+                  onClick={() => setPublished(true)}
+                  disabled={!svcName.trim()}
+                  className={`w-full rounded-md py-2.5 text-sm font-bold transition ${svcName.trim() ? "bg-lime-400 text-zinc-950 hover:bg-lime-300 hover:shadow-glow" : "cursor-not-allowed bg-card-raised text-zinc-600"}`}
+                >
+                  Publish Service
+                </button>
+              </>
+            )}
           </div>
         )}
 

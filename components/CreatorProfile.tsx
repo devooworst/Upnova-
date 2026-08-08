@@ -11,6 +11,7 @@ import FollowListModal from "./FollowListModal";
 import ProfilePreview from "./ProfilePreview";
 import OpportunityCard from "./OpportunityCard";
 import AiPolicyBadge from "./AiPolicyBadge";
+import TrustBadge from "./TrustBadge";
 import {
   creators,
   serviceCatalog,
@@ -106,6 +107,7 @@ export default function CreatorProfile({ id }: { id: string }) {
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                 {creator.rating} ({creator.reviews} reviews)
               </span>
+              {creator.trustLevel && <TrustBadge level={creator.trustLevel} />}
               {creator.onTimeRate !== undefined && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[10px] font-semibold text-zinc-200"

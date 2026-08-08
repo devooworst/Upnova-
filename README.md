@@ -121,6 +121,16 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   isn't the source of truth; the email is never public). College ends at the
   verified graduation date; everything the student built stays theirs, with a
   natural transition to Pro.
+- **Trust Levels — verification scales with the job.** Three levels: 🟢 Standard
+  (creative/digital work; no ID needed to sell a logo), 🟡 Identity Verified
+  (in-person work, valuables), 🔴 High-Trust (unsupervised access to a person,
+  child, pet, home, vehicle, or property: identity + age verification + background
+  screening where legally permitted). Verification runs through a provider — UpNova
+  never stores IDs, and status never exposes legal name/DOB/address. Enforced, not
+  suggested: high-trust services can't be published without verification, high-trust
+  opportunities gate applicants, and buyers see a safety-verification interstitial
+  before paying (checks passed — never "100% safe person"). High-trust projects get
+  an 🚨 Emergency / Safety Concern lane that isn't ordinary support.
 - **One project system, participant-specific, never hardcoded.** Every conversation
   has its own ID + participant; every conversation owns its own project, payment,
   and extension state (keyed per conversation — switching chats switches ALL of it).
