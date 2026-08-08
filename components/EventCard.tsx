@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MapPin, Users, Ticket, Check } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import Perforation from "./Perforation";
 import { events } from "@/lib/data";
 
@@ -40,9 +41,17 @@ export default function EventCard({ id }: { id: string }) {
             {event.emoji}
           </span>
         )}
-        <span className="absolute right-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
-          {event.price}
+        <span className="absolute right-3 top-3 flex items-center gap-1.5">
+          {event.age !== "all" && (
+            <span className="rounded-md bg-red-500/90 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-white">
+              {event.age}
+            </span>
+          )}
+          <span className="rounded-md bg-black/55 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
+            {event.price}
+          </span>
         </span>
+        <Link href={`/events/${event.id}`} className="absolute inset-0" aria-label={`Open ${event.title}`} />
       </div>
 
       <div className="p-4 sm:p-5">
@@ -61,7 +70,9 @@ export default function EventCard({ id }: { id: string }) {
               {weekday} · {event.time}
             </p>
             <h3 className="mt-1 text-lg font-bold tracking-tight text-zinc-50">
-              {event.title}
+              <Link href={`/events/${event.id}`} className="transition hover:text-amber-300">
+                {event.title}
+              </Link>
             </h3>
           </div>
         </div>
@@ -73,7 +84,13 @@ export default function EventCard({ id }: { id: string }) {
             <MapPin className="h-4 w-4 text-zinc-500" /> {event.location}
           </span>
           <span className="flex items-center gap-1.5">
-            <Users className="h-4 w-4 text-violet-400" /> {event.attending + (going ? 1 : 0)} attending
+            <Users className="h-4 w-4 text-violet-400" />
+            <span className="font-mono text-xs font-medium tabular-nums">
+              {event.attending + (going ? 1 : 0)} / {event.capacity}
+            </span>
+            {event.attending + (going ? 1 : 0) >= event.capacity && (
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-red-400">sold out</span>
+            )}
           </span>
         </div>
 
@@ -81,24 +98,34 @@ export default function EventCard({ id }: { id: string }) {
 
         {/* RSVP stub */}
         <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={() => setGoing(!going)}
-            className={
-              going
-                ? "inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-400/40 px-5 py-2 text-sm font-semibold text-amber-300"
-                : "inline-flex items-center justify-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-amber-300 hover:shadow-glow-amber active:scale-[0.98]"
-            }
-          >
-            {going ? (
-              <>
-                <Check className="h-4 w-4" /> You&apos;re in
-              </>
-            ) : (
-              <>
-                <Ticket className="h-4 w-4" /> Claim a spot
-              </>
-            )}
-          </button>
+          {event.registration === "rsvp" ? (
+            <button
+              onClick={() => setGoing(!going)}
+              className={
+                going
+                  ? "inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-400/40 px-5 py-2 text-sm font-semibold text-amber-300"
+                  : "inline-flex items-center justify-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-amber-300 hover:shadow-glow-amber active:scale-[0.98]"
+              }
+            >
+              {going ? (
+                <>
+                  <Check className="h-4 w-4" /> You&apos;re in
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" /> RSVP
+                </>
+              )}
+            </button>
+          ) : (
+            <Link
+              href={`/events/${event.id}`}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-amber-300 hover:shadow-glow-amber active:scale-[0.98]"
+            >
+              <Ticket className="h-4 w-4" />
+              {event.registration === "ticket" ? "Get Tickets" : event.registration === "approval" ? "Request to Attend" : "Register"}
+            </Link>
+          )}
           <span className="text-xs text-zinc-500">Hosted by {event.host}</span>
           <span className="ml-auto hidden font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-600 sm:block">
             admit one

@@ -82,6 +82,14 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   designed around Stripe Connect (connected accounts, destination charges with
   application fees, payouts, refunds, disputes). Transactions, projects, payments,
   fees, payouts, and reviews are modeled as separate entities from messaging.
+- **Flexible Events — the organizer controls the rules.** No mandatory registration
+  model: one-click RSVP, registration-required, paid tickets (with ticket types +
+  QR check-in), or request-to-attend — the organizer picks admission (free/paid),
+  age restriction (all/16+/18+/21+, DOB only collected when the event needs it),
+  capacity (auto sold-out + optional waitlist), required attendee fields, and rules
+  (acknowledged at registration). Organizers get an Event Manager: attendees,
+  tickets, QR check-in, payments (buyer-pays fee; listed price = organizer payout),
+  settings, analytics. Ticketing is UpNova's third transaction stream.
 - **Services vs Opportunities — never mixed.** Services (`/services`) is the creator
   catalog: clients hire a creator's predefined offering; the CTA is always **Hire Me**.
   Opportunities (`/opportunities`) is the job board: projects looking for people; the

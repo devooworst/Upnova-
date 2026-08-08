@@ -550,12 +550,29 @@ export const feed: Post[] = [
 
 /* ---------------------------------- events --------------------------------- */
 
+export type EventCategory =
+  | "Party / Nightlife" | "Concert" | "Creative / Art" | "Networking"
+  | "Photoshoot" | "Workshop" | "Competition" | "Sports" | "Gaming"
+  | "Pop-up / Market" | "Other";
+
+export type AgeRestriction = "all" | "16+" | "18+" | "21+";
+
+/** The organizer picks the model; the UI adapts. */
+export type RegistrationModel = "rsvp" | "registration" | "ticket" | "approval";
+
+export interface TicketType {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface UpEvent {
   id: string;
   title: string;
   location: string;
   date: string;
   time: string;
+  endTime?: string;
   attending: number;
   price: string;
   image?: string;
@@ -564,6 +581,18 @@ export interface UpEvent {
   description: string;
   reach: ReachInfo;
   host: string;
+  /** true when the current user organizes this event → dashboard access */
+  organizedByYou?: boolean;
+  category: EventCategory;
+  age: AgeRestriction;
+  registration: RegistrationModel;
+  capacity: number;
+  waitlist: boolean;
+  /** fields the organizer requires at registration */
+  requiredFields: string[];
+  rules: string[];
+  ticketTypes?: TicketType[];
+  schedule?: { time: string; item: string }[];
 }
 
 export const events: UpEvent[] = [
@@ -573,6 +602,7 @@ export const events: UpEvent[] = [
     location: "Baltimore, MD",
     date: "Saturday, August 22",
     time: "7:00 PM",
+    endTime: "10:00 PM",
     attending: 84,
     price: "Free",
     gradient: "from-lime-500/70 to-emerald-800",
@@ -581,6 +611,19 @@ export const events: UpEvent[] = [
     description: "Connect with creators in the DMV. Lightning talks, open networking, and free pizza.",
     reach: { location: "Baltimore, MD", reach: "City" },
     host: "UpNova Events",
+    category: "Networking",
+    age: "all",
+    registration: "rsvp",
+    capacity: 100,
+    waitlist: true,
+    requiredFields: ["Full name"],
+    rules: ["No harassment", "Photography permitted", "Check-in required"],
+    schedule: [
+      { time: "7:00 PM", item: "Doors + open networking" },
+      { time: "7:45 PM", item: "Lightning talks (5 creators, 5 min each)" },
+      { time: "8:30 PM", item: "Collab matchmaking" },
+      { time: "9:30 PM", item: "Wind down + pizza" },
+    ],
   },
   {
     id: "networking",
@@ -588,6 +631,7 @@ export const events: UpEvent[] = [
     location: "Washington, DC",
     date: "Friday, August 28",
     time: "8:00 PM",
+    endTime: "11:30 PM",
     attending: 129,
     price: "$15",
     gradient: "from-violet-600/70 to-fuchsia-900",
@@ -596,6 +640,17 @@ export const events: UpEvent[] = [
     description: "Artists, producers, and A&Rs in one room. Bring your cards and your best 30 seconds.",
     reach: { location: "DMV", reach: "Local", radius: "25 mi" },
     host: "DMV Creators",
+    category: "Networking",
+    age: "18+",
+    registration: "ticket",
+    capacity: 150,
+    waitlist: true,
+    requiredFields: ["Full name", "Email", "Date of birth"],
+    rules: ["18+ only — ID may be checked at entry", "No harassment", "Industry conduct expected"],
+    ticketTypes: [
+      { id: "ga", name: "General Admission", price: 15 },
+      { id: "early", name: "Early Bird", price: 10 },
+    ],
   },
   {
     id: "photo-walk",
@@ -603,6 +658,7 @@ export const events: UpEvent[] = [
     location: "Federal Hill Park, Baltimore",
     date: "Sunday, August 16",
     time: "6:30 PM",
+    endTime: "8:30 PM",
     attending: 22,
     price: "Free",
     gradient: "from-sky-600/70 to-indigo-900",
@@ -611,6 +667,77 @@ export const events: UpEvent[] = [
     description: "Casual shoot walk along the waterfront. All skill levels and cameras welcome.",
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
     host: "Ava Chen",
+    category: "Photoshoot",
+    age: "all",
+    registration: "rsvp",
+    capacity: 40,
+    waitlist: false,
+    requiredFields: ["Full name"],
+    rules: ["All skill levels welcome", "Respect people who don't want to be photographed"],
+  },
+  {
+    id: "after-dark",
+    title: "After Dark Baltimore",
+    location: "Baltimore, MD",
+    date: "Saturday, August 30",
+    time: "9:00 PM",
+    endTime: "2:00 AM",
+    attending: 137,
+    price: "$30",
+    gradient: "from-red-600/70 to-rose-950",
+    emoji: "🔥",
+    image: "/images/event-afterdark.jpg",
+    description: "Music, creators, networking, DJs and photography. The DMV creator scene after hours.",
+    reach: { location: "Baltimore, MD", reach: "City" },
+    host: "Devin Carter",
+    organizedByYou: true,
+    category: "Party / Nightlife",
+    age: "21+",
+    registration: "ticket",
+    capacity: 200,
+    waitlist: true,
+    requiredFields: ["Full name", "Email", "Date of birth"],
+    rules: [
+      "21+ only — valid government-issued ID required at entry",
+      "No outside alcohol",
+      "No weapons",
+      "No harassment",
+      "Photography permitted",
+    ],
+    ticketTypes: [
+      { id: "early", name: "Early Bird", price: 20 },
+      { id: "ga", name: "General Admission", price: 30 },
+      { id: "vip", name: "VIP", price: 50 },
+    ],
+    schedule: [
+      { time: "9:00 PM", item: "Doors" },
+      { time: "10:00 PM", item: "DJ sets" },
+      { time: "12:00 AM", item: "Creator showcase" },
+    ],
+  },
+  {
+    id: "workshop",
+    title: "Mixing Masterclass",
+    location: "Station North, Baltimore",
+    date: "Wednesday, September 3",
+    time: "6:00 PM",
+    endTime: "9:00 PM",
+    attending: 14,
+    price: "$50",
+    gradient: "from-emerald-600/70 to-teal-950",
+    emoji: "🎚️",
+    image: "/images/event-workshop.jpg",
+    description: "Hands-on mixing session for 20 producers. Bring a rough mix — leave with a finished one.",
+    reach: { location: "Baltimore, MD", reach: "Local", radius: "25 mi" },
+    host: "Devin Carter",
+    organizedByYou: true,
+    category: "Workshop",
+    age: "18+",
+    registration: "approval",
+    capacity: 20,
+    waitlist: true,
+    requiredFields: ["Full name", "Email", "What do you want to improve?"],
+    rules: ["Bring headphones + a laptop with your DAW", "18+ only", "Recording the session is fine"],
   },
 ];
 
