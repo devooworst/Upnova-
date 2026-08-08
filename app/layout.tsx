@@ -7,7 +7,7 @@ import CreateModal from "@/components/CreateModal";
 
 export const metadata: Metadata = {
   title: {
-    default: "UpNova — Find what's happening around you",
+    default: "UpNova · Find what's happening around you",
     template: "%s • UpNova",
   },
   description:

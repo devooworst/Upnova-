@@ -69,7 +69,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
           ))}
           {nearOpps.length === 0 && (
             <li className="py-2.5 text-xs text-zinc-500">
-              Nothing paid inside this radius yet — widen it.
+              No paid openings inside this radius yet. Try 25 mi.
             </li>
           )}
         </ul>
@@ -173,7 +173,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
 
       <p className="px-2 font-mono text-[10px] leading-relaxed text-zinc-600">
         about · help · privacy · terms
-        <br />© 2026 upnova — find what&apos;s happening around you.
+        <br />© 2026 UpNova, Baltimore MD
       </p>
     </aside>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Users, Check, Plus } from "lucide-react";
+import Image from "next/image";
 import ReachBadge from "./ReachBadge";
 import type { Community } from "@/lib/data";
 
@@ -10,11 +11,24 @@ export default function CommunityCard({ community }: { community: Community }) {
 
   return (
     <article id={community.id} className="card-people flex flex-col overflow-hidden transition hover:border-zinc-600">
-      <div className={`relative flex h-20 items-center justify-center bg-gradient-to-br ${community.gradient}`}>
-        <span className="text-4xl drop-shadow" aria-hidden>
-          {community.emoji}
-        </span>
-        <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+      <div
+        className={`relative h-24 overflow-hidden ${
+          community.image
+            ? ""
+            : `flex items-center justify-center bg-gradient-to-br ${community.gradient}`
+        }`}
+      >
+        {community.image ? (
+          <>
+            <Image src={community.image} alt="" fill sizes="480px" className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          </>
+        ) : (
+          <span className="text-4xl drop-shadow" aria-hidden>
+            {community.emoji}
+          </span>
+        )}
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" />
           {community.online} online
         </span>

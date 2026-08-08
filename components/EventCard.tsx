@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MapPin, Users, Ticket, Check } from "lucide-react";
+import Image from "next/image";
 import Perforation from "./Perforation";
 import { events } from "@/lib/data";
 
@@ -24,11 +25,22 @@ export default function EventCard({ id }: { id: string }) {
 
   return (
     <article className="card-event relative overflow-hidden">
-      <div className={`relative flex h-24 items-center justify-center bg-gradient-to-br ${event.gradient}`}>
-        <span className="text-4xl drop-shadow-lg" aria-hidden>
-          {event.emoji}
-        </span>
-        <span className="absolute right-3 top-3 rounded-md bg-black/50 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-white backdrop-blur">
+      <div
+        className={`relative h-28 overflow-hidden ${
+          event.image ? "" : `flex items-center justify-center bg-gradient-to-br ${event.gradient}`
+        }`}
+      >
+        {event.image ? (
+          <>
+            <Image src={event.image} alt="" fill sizes="640px" className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          </>
+        ) : (
+          <span className="text-4xl drop-shadow-lg" aria-hidden>
+            {event.emoji}
+          </span>
+        )}
+        <span className="absolute right-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-white backdrop-blur">
           {event.price}
         </span>
       </div>

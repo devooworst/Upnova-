@@ -40,7 +40,7 @@ export default function DiscoverClient() {
       <header className="px-1">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Discover</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Search the entire UpNova ecosystem — people, services, work, and communities.
+          Search people, services, paid work, and communities on UpNova.
         </p>
       </header>
 
@@ -192,7 +192,7 @@ export default function DiscoverClient() {
             <div className="grid gap-4 md:grid-cols-2">
               {[
                 { name: "Harbor & Oak", type: "Lifestyle brand", emoji: "🌿", desc: "Local apparel brand collaborating with photographers and models.", location: "Baltimore, MD" },
-                { name: "Vaulted Co.", type: "Streetwear label", emoji: "🧢", desc: "Independent streetwear drop — hiring content creators nationwide.", location: "Remote" },
+                { name: "Vaulted Co.", type: "Streetwear label", emoji: "🧢", desc: "Independent streetwear label hiring content creators nationwide.", location: "Remote" },
                 { name: "Studio 410", type: "Recording studio", emoji: "🎚️", desc: "Booking sessions for artists and producers in the DMV.", location: "Baltimore, MD" },
                 { name: "FrameHouse", type: "Production company", emoji: "🎬", desc: "Commercial and music-video production. Always scouting editors.", location: "Washington, DC" },
               ].map((b) => (

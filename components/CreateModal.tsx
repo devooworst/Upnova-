@@ -123,7 +123,7 @@ export default function CreateModal() {
               className="input-dark"
               placeholder={
                 kind === "Service"
-                  ? "e.g. Music Production — Starting at $300"
+                  ? "e.g. Music Production, starting at $300"
                   : kind === "Event"
                   ? "Event name"
                   : `Give your ${kind.toLowerCase()} a title…`

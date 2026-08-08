@@ -273,7 +273,7 @@ export const opportunities: Opportunity[] = [
   },
   {
     id: "photo-gig",
-    title: "Photography Gig — Product Shoot",
+    title: "Product Shoot Photography",
     poster: "Harbor & Oak",
     posterInitials: "H",
     posterGradient: "from-teal-600 to-emerald-700",
@@ -534,6 +534,7 @@ export const events: UpEvent[] = [
     price: "Free",
     gradient: "from-lime-500/70 to-emerald-800",
     emoji: "🤝",
+    image: "/images/event-meetup.jpg",
     description: "Connect with creators in the DMV. Lightning talks, open networking, and free pizza.",
     reach: { location: "Baltimore, MD", reach: "City" },
     host: "UpNova Events",
@@ -548,6 +549,7 @@ export const events: UpEvent[] = [
     price: "$15",
     gradient: "from-violet-600/70 to-fuchsia-900",
     emoji: "🎤",
+    image: "/images/event-networking.jpg",
     description: "Artists, producers, and A&Rs in one room. Bring your cards and your best 30 seconds.",
     reach: { location: "DMV", reach: "Local", radius: "25 mi" },
     host: "DMV Creators",
@@ -562,6 +564,7 @@ export const events: UpEvent[] = [
     price: "Free",
     gradient: "from-sky-600/70 to-indigo-900",
     emoji: "📷",
+    image: "/images/event-photowalk.jpg",
     description: "Casual shoot walk along the waterfront. All skill levels and cameras welcome.",
     reach: { location: "Baltimore, MD", reach: "Nearby", radius: "5 mi" },
     host: "Ava Chen",
@@ -578,6 +581,7 @@ export interface Community {
   description: string;
   emoji: string;
   gradient: string;
+  image?: string;
   reach: ReachInfo;
   tags: string[];
   joined?: boolean;
@@ -592,6 +596,7 @@ export const communities: Community[] = [
     description: "A community for creators in the DMV. Collabs, gigs, feedback, and meetups.",
     emoji: "🌊",
     gradient: "from-lime-500/70 to-emerald-900",
+    image: "/images/community-dmv.jpg",
     reach: { location: "DMV", reach: "Local", radius: "25 mi" },
     tags: ["Collabs", "Meetups", "Gigs"],
     joined: true,
@@ -604,6 +609,7 @@ export const communities: Community[] = [
     description: "Beats, mixing tips, feedback threads, and weekly collab challenges.",
     emoji: "🎛️",
     gradient: "from-violet-600/70 to-purple-950",
+    image: "/images/community-producers.jpg",
     reach: { location: "United States", reach: "Remote" },
     tags: ["Feedback", "Challenges", "Collabs"],
     joined: true,
@@ -613,9 +619,10 @@ export const communities: Community[] = [
     name: "Film Makers",
     members: "1.8K",
     online: 38,
-    description: "From short films to commercial work — crew calls, gear talk, and premieres.",
+    description: "Short films to commercial work: crew calls, gear talk, and premieres.",
     emoji: "🎬",
     gradient: "from-amber-500/70 to-orange-950",
+    image: "/images/community-film.jpg",
     reach: { location: "Maryland", reach: "Regional" },
     tags: ["Crew Calls", "Premieres"],
     joined: true,
@@ -628,6 +635,7 @@ export const communities: Community[] = [
     description: "Portraits, events, product — share work, trade second-shooter gigs.",
     emoji: "📸",
     gradient: "from-sky-500/70 to-blue-950",
+    image: "/images/community-photo.jpg",
     reach: { location: "Baltimore, MD", reach: "City" },
     tags: ["Critique", "Gigs"],
   },
@@ -639,6 +647,7 @@ export const communities: Community[] = [
     description: "Drops, fits, design breakdowns, and brand-building for independent labels.",
     emoji: "🧢",
     gradient: "from-rose-500/70 to-pink-950",
+    image: "/images/community-streetwear.jpg",
     reach: { location: "Global", reach: "Global" },
     tags: ["Drops", "Design", "Brands"],
     joined: true,
