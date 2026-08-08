@@ -1,10 +1,14 @@
+"use client";
+
 import Image from "next/image";
-import { PencilLine, MapPin } from "lucide-react";
+import { useState } from "react";
+import { PencilLine, MapPin, MessageSquare, Zap } from "lucide-react";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { currentUser, profileStats, contact } from "@/lib/data";
 
-export default function ProfileHeader() {
+export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
+  const [following, setFollowing] = useState(false);
   return (
     <header className="card overflow-hidden">
       {/* banner */}
@@ -29,10 +33,33 @@ export default function ProfileHeader() {
             </span>
           </span>
           <div className="flex items-center gap-2 pb-1">
-            <button className="btn-ghost px-4 py-1.5 text-xs sm:text-sm">
-              <PencilLine className="h-4 w-4" />
-              Edit Profile
-            </button>
+            {isOwner ? (
+              <button className="btn-ghost px-4 py-1.5 text-xs sm:text-sm">
+                <PencilLine className="h-4 w-4" />
+                Edit Profile
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setFollowing(!following)}
+                  className={
+                    following
+                      ? "rounded-full border border-violet-400/40 px-4 py-1.5 text-xs font-semibold text-violet-300 sm:text-sm"
+                      : "rounded-full bg-violet-400 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet sm:text-sm"
+                  }
+                >
+                  {following ? "Following" : "Follow"}
+                </button>
+                <a href="/messages" className="btn-ghost px-3.5 py-1.5 text-xs sm:text-sm">
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="hidden sm:inline">Message</span>
+                </a>
+                <a href="/messages" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
+                  <Zap className="h-4 w-4" />
+                  Hire Me
+                </a>
+              </>
+            )}
           </div>
         </div>
 

@@ -1,8 +1,8 @@
 import Image from "next/image";
-import { ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, PencilLine, Plus } from "lucide-react";
 import { portfolio } from "@/lib/data";
 
-export default function PortfolioTab() {
+export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -55,21 +55,30 @@ export default function PortfolioTab() {
                   <dd className="font-medium text-zinc-300">{p.type}</dd>
                 </div>
               </dl>
-              <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
-                <ExternalLink className="h-3.5 w-3.5" />
-                View Project
-              </button>
+              {isOwner ? (
+                <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
+                  <PencilLine className="h-3.5 w-3.5" />
+                  Edit Project
+                </button>
+              ) : (
+                <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View Project
+                </button>
+              )}
             </div>
           </article>
         ))}
 
-        {/* add project */}
-        <button className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-zinc-500 transition hover:border-lime-400/40 hover:text-lime-300">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-card-raised">
-            <Plus className="h-5 w-5" />
-          </span>
-          <span className="text-sm font-medium">Add Project</span>
-        </button>
+        {/* add project — owner only */}
+        {isOwner && (
+          <button className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-zinc-500 transition hover:border-lime-400/40 hover:text-lime-300">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-card-raised">
+              <Plus className="h-5 w-5" />
+            </span>
+            <span className="text-sm font-medium">Add Project</span>
+          </button>
+        )}
       </div>
     </div>
   );

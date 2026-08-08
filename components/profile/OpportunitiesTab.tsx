@@ -8,15 +8,26 @@ const statusStyle: Record<string, string> = {
   "Accepting Clients": "border-lime-400/40 bg-lime-400/10 text-lime-300",
 };
 
-export default function OpportunitiesTab() {
+export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
   const applications = profileOpportunities.filter((o) => o.kind === "application");
   const listings = profileOpportunities.filter((o) => o.kind === "listing");
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-zinc-500">
-        <span className="font-semibold text-zinc-200">Here&apos;s what I&apos;m doing — and what I&apos;m looking for.</span>{" "}
-        Applications, completed work, and open listings.
+        {isOwner ? (
+          <>
+            <span className="font-semibold text-zinc-200">Your work pipeline.</span> Applications
+            you sent, completed projects, and listings you posted.
+          </>
+        ) : (
+          <>
+            <span className="font-semibold text-zinc-200">
+              Here&apos;s what I&apos;m doing — and what I&apos;m looking for.
+            </span>{" "}
+            Applications, completed work, and open listings.
+          </>
+        )}
       </p>
 
       <section>
@@ -70,6 +81,7 @@ export default function OpportunitiesTab() {
         </div>
       </section>
 
+      {isOwner && (
       <div className="card flex items-center gap-3 border-lime-400/25 bg-lime-400/5 p-4">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-lime-400/15">
           <Briefcase className="h-5 w-5 text-lime-400" />
@@ -81,6 +93,7 @@ export default function OpportunitiesTab() {
           Explore
         </a>
       </div>
+      )}
     </div>
   );
 }

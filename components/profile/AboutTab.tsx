@@ -1,9 +1,9 @@
 "use client";
 
-import { Mail, MapPin, Clock, Zap, Globe2, Check } from "lucide-react";
+import { Mail, MapPin, Clock, Zap, Globe2, Check, Settings2, PencilLine } from "lucide-react";
 import { currentUser, experience, services, contact } from "@/lib/data";
 
-export default function AboutTab() {
+export default function AboutTab({ isOwner }: { isOwner: boolean }) {
   return (
     <div className="grid gap-4 lg:grid-cols-5">
       {/* left column: bio + experience + contact */}
@@ -54,12 +54,21 @@ export default function AboutTab() {
         <section className="card p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-zinc-100">Services</h3>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold text-lime-300">
-              <Check className="h-3 w-3" /> Accepting Clients
+            <span className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold text-lime-300">
+                <Check className="h-3 w-3" /> Accepting Clients
+              </span>
+              {isOwner && (
+                <button className="btn-ghost px-3 py-1 text-[11px]">
+                  <Settings2 className="h-3.5 w-3.5" /> Manage Services
+                </button>
+              )}
             </span>
           </div>
           <p className="mt-1.5 text-xs text-zinc-500">
-            Hire me directly — agree on scope in messages, pay securely on UpNova.
+            {isOwner
+              ? "This is what visitors can book. Prices, scope, and availability are yours to change."
+              : "Hire me directly: agree on scope in messages, pay securely on UpNova."}
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -89,15 +98,23 @@ export default function AboutTab() {
                     <Globe2 className="h-3 w-3 text-lime-400" /> {s.reach}
                   </span>
                 </div>
-                <a href="/messages" className="btn-lime mt-3 w-full py-1.5 text-xs">
-                  <Zap className="h-3.5 w-3.5" />
-                  Hire Me
-                </a>
+                {isOwner ? (
+                  <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
+                    <PencilLine className="h-3.5 w-3.5" />
+                    Edit Service
+                  </button>
+                ) : (
+                  <a href="/messages" className="btn-lime mt-3 w-full py-1.5 text-xs">
+                    <Zap className="h-3.5 w-3.5" />
+                    Hire Me
+                  </a>
+                )}
               </article>
             ))}
           </div>
 
-          {/* money flow hint */}
+          {/* money flow hint — shown to visitors, who can actually hire */}
+          {!isOwner && (
           <div className="mt-4 rounded-2xl border border-line-soft bg-ink p-4">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
               How hiring works
@@ -122,6 +139,7 @@ export default function AboutTab() {
               ))}
             </ol>
           </div>
+          )}
         </section>
       </div>
     </div>

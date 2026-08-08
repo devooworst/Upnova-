@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import ProfileHeader from "@/components/profile/ProfileHeader";
-import ProfileTabs from "@/components/profile/ProfileTabs";
+import ProfileView from "@/components/profile/ProfileView";
 
 export const metadata: Metadata = {
   title: "Devin Carter",
@@ -10,9 +9,8 @@ export const metadata: Metadata = {
 
 export default function ProfilePage() {
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <ProfileHeader />
-      <ProfileTabs />
+    <div className="mx-auto max-w-4xl">
+      <ProfileView />
     </div>
   );
 }

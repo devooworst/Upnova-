@@ -14,7 +14,7 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
-export default function ProfileTabs() {
+export default function ProfileTabs({ isOwner }: { isOwner: boolean }) {
   const [tab, setTab] = useState<TabId>("portfolio");
 
   return (
@@ -39,9 +39,9 @@ export default function ProfileTabs() {
         ))}
       </div>
       <div className="p-4 sm:p-5">
-        {tab === "portfolio" && <PortfolioTab />}
-        {tab === "opportunities" && <OpportunitiesTab />}
-        {tab === "about" && <AboutTab />}
+        {tab === "portfolio" && <PortfolioTab isOwner={isOwner} />}
+        {tab === "opportunities" && <OpportunitiesTab isOwner={isOwner} />}
+        {tab === "about" && <AboutTab isOwner={isOwner} />}
       </div>
     </section>
   );
