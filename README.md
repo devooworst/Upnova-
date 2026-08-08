@@ -164,6 +164,14 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   results visibility. Event routes to the full Event Setup (it's an experience, not
   a popup). Live = title, category, watch scope, chat/reactions → Go Live. Shared
   controls only where shared: audience/reach, community, tags.
+- **Sidebar answers "where do I go?"; pages answer "what's here?".** The joined-
+  community list left the global sidebar (it's a compact "N joined" count on the
+  Communities nav item); the Communities page splits into Your Communities (compact
+  strip — places you're connected to) and Discover (big cards — places to join).
+  The freed sidebar space goes to the Your Account plan card, which changes with
+  the actual plan: Pro ✓ (perks + Manage Plan), College+ ✓ (school + benefits),
+  or Free (View Plans + free student verification hint). No plan ever replaces
+  navigation — College is a feature area, never a mode.
 - **Communities are creator-controlled spaces, not group chats.** Create Community
   is a setup wizard: type (15 categories), access (public / private / invite-only /
   verified-only), reach (5 mi → global, or a specific school), rules (members can be
