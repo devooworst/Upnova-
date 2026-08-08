@@ -78,6 +78,8 @@ export async function GET(req: NextRequest) {
           body: r.post.body,
           imageUrl: r.post.imageUrl,
           kind: r.post.kind,
+          category: r.post.category,
+          subcategory: r.post.subcategory,
           createdAt: r.post.createdAt.toISOString(),
           author: publicUser(r.user, r.profile),
           likes,

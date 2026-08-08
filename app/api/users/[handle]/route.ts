@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
+import { ctaFor } from "@/lib/server/cta";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,9 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         price: s.price,
         reach: s.reach,
         paused: s.paused,
+        category: s.category,
+        fulfillment: s.fulfillment,
+        cta: ctaFor(s),
       })),
       experience,
       portfolio,

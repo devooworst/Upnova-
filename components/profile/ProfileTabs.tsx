@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { LayoutGrid, Briefcase, Info } from "lucide-react";
-import PortfolioTab from "./PortfolioTab";
+import PostsTab from "./PostsTab";
 import OpportunitiesTab from "./OpportunitiesTab";
 import AboutTab from "./AboutTab";
 
 const tabs = [
-  { id: "portfolio", label: "Portfolio", icon: LayoutGrid },
+  { id: "posts", label: "Posts", icon: LayoutGrid },
   { id: "opportunities", label: "Opportunities", icon: Briefcase },
   { id: "about", label: "About", icon: Info },
 ] as const;
@@ -15,7 +15,7 @@ const tabs = [
 type TabId = (typeof tabs)[number]["id"];
 
 export default function ProfileTabs({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<TabId>("portfolio");
+  const [tab, setTab] = useState<TabId>("posts");
 
   return (
     <section className="card">
@@ -39,7 +39,7 @@ export default function ProfileTabs({ isOwner }: { isOwner: boolean }) {
         ))}
       </div>
       <div className="p-4 sm:p-5">
-        {tab === "portfolio" && <PortfolioTab isOwner={isOwner} />}
+        {tab === "posts" && <PostsTab isOwner={isOwner} />}
         {tab === "opportunities" && <OpportunitiesTab isOwner={isOwner} />}
         {tab === "about" && <AboutTab isOwner={isOwner} />}
       </div>

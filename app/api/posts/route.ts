@@ -15,12 +15,19 @@ export async function POST(req: NextRequest) {
     if (text.length > 2000) throw new ApiError(400, "Post is too long");
 
     const id = randomBytes(12).toString("hex");
+    const imageUrl =
+      typeof body.imageUrl === "string" && body.imageUrl.startsWith("data:image/") && body.imageUrl.length < 900_000
+        ? body.imageUrl
+        : null;
     db.insert(tables.posts)
       .values({
         id,
         authorId: user.id,
         body: text,
-        kind: ["post", "opportunity", "service", "poll", "event"].includes(body.kind) ? body.kind : "post",
+        kind: ["post", "work", "bts", "announcement", "promotion", "content"].includes(body.kind) ? body.kind : "post",
+        category: String(body.category || "").trim().slice(0, 30),
+        subcategory: String(body.subcategory || "").trim().slice(0, 40),
+        imageUrl,
       })
       .run();
     return { id };

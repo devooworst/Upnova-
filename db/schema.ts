@@ -145,7 +145,14 @@ export const posts = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
     imageUrl: text("image_url"),
-    kind: text("kind").notNull().default("post"), // post | opportunity | service | poll | event
+    // a post is something you CHOOSE to share — distinct from Service
+    // (what you offer), Booking (someone scheduled you), Project
+    // (structured paid work), and Opportunity (you're asking for people).
+    kind: text("kind").notNull().default("post"), // post | work | bts | announcement | promotion | content
+    // creator-defined, never hard-coded — the profile grid learns its
+    // filters from whatever categories this creator actually uses
+    category: text("category").notNull().default(""),
+    subcategory: text("subcategory").notNull().default(""),
     isSeed: seed(),
     createdAt: ts("created_at"),
   },

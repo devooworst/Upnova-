@@ -431,33 +431,37 @@ function seed() {
   }).run();
 
   /* -------------------------------- posts -------------------------------- */
-  const postDefs: { author: string; body: string; hours: number; image?: string; likes: string[]; comments: [string, string][] }[] = [
-    { author: "ava", body: "Golden hour session from Saturday's rooftop shoot. Baltimore skies never miss. 📸", hours: 5, image: "/images/studio-post.jpg", likes: ["devin", "nia", "lena", "marcusj", "sofia"], comments: [["devin", "These are unreal. That third frame 🔥"], ["lena", "The color grading on this set >>>"]] },
-    { author: "jordanmiles", body: "New loop pack drops Friday. 40 originals, all clearable. Producers — tags off, stems included.", hours: 9, likes: ["devin", "marcusj"], comments: [["devin", "Need that. Sending you something Monday."]] },
+  const postDefs: { author: string; body: string; hours: number; image?: string; likes: string[]; comments: [string, string][]; kind?: string; cat?: string; sub?: string }[] = [
+    { author: "ava", body: "Golden hour session from Saturday's rooftop shoot. Baltimore skies never miss. 📸", hours: 5, image: "/images/studio-post.jpg", likes: ["devin", "nia", "lena", "marcusj", "sofia"], comments: [["devin", "These are unreal. That third frame 🔥"], ["lena", "The color grading on this set >>>"]], kind: "work", cat: "Photography", sub: "Golden hour" },
+    { author: "jordanmiles", body: "New loop pack drops Friday. 40 originals, all clearable. Producers — tags off, stems included.", hours: 9, likes: ["devin", "marcusj"], comments: [["devin", "Need that. Sending you something Monday."]], kind: "announcement", cat: "Beats" },
     { author: "devin", body: "Wrapped mixing on an EP for an artist I found ON this app. From DM to delivered masters in 12 days. This is what the platform is for.", hours: 14, likes: ["ava", "jordanmiles", "nia", "lena"], comments: [["ava", "This is the way it should work."], ["jordanmiles", "12 days is crazy turnaround 🔥"]] },
-    { author: "nia", body: "Anyone on campus need event coverage during homecoming week? Booking now, student rates. DM me.", hours: 22, likes: ["devin", "ava"], comments: [] },
+    { author: "nia", body: "Anyone on campus need event coverage during homecoming week? Booking now, student rates. DM me.", hours: 22, likes: ["devin", "ava"], comments: [], kind: "promotion", cat: "Content" },
     { author: "marcusj", body: "Color graded 4 music videos this week. If your footage looks flat, it's not your camera — it's your grade. Happy to consult.", hours: 30, likes: ["devin"], comments: [["jordanmiles", "Facts. Grade makes the video."]] },
-    { author: "lena", body: "Brand identity delivered for a Baltimore coffee brand today. Logo, palette, menus, cups. Small brands deserve big design.", hours: 44, image: "/images/portfolio-spotify.jpg", likes: ["ava", "devin", "nia", "darius"], comments: [["ava", "The cup design is so clean"]] },
-    { author: "maya", body: "Cut vocals for three records this week. If your hook feels empty, it's not the melody — it's the stacks. Layer, then layer again.", hours: 3, likes: ["devin", "jordanmiles", "kofi"], comments: [["jordanmiles", "Stacks are everything 💯"]] },
+    { author: "lena", body: "Brand identity delivered for a Baltimore coffee brand today. Logo, palette, menus, cups. Small brands deserve big design.", hours: 44, image: "/images/portfolio-spotify.jpg", likes: ["ava", "devin", "nia", "darius"], comments: [["ava", "The cup design is so clean"]], kind: "work", cat: "Brand Identity" },
+    { author: "maya", body: "Cut vocals for three records this week. If your hook feels empty, it's not the melody — it's the stacks. Layer, then layer again.", hours: 3, likes: ["devin", "jordanmiles", "kofi"], comments: [["jordanmiles", "Stacks are everything 💯"]], kind: "work", cat: "Vocals" },
     { author: "kofi", body: "Sold my first exclusive through UpNova today. Buyer found me through the 25-mile feed. Local-first actually works.", hours: 7, likes: ["devin", "jordanmiles", "maya", "tj"], comments: [["devin", "This is exactly the point. Congrats!"]] },
-    { author: "sofia", body: "Styled a 12-look editorial in one day. Pull list, steamer, three racks, zero panic. Ask me about shoot styling.", hours: 11, image: "/images/community-streetwear.jpg", likes: ["ava", "rachel", "lena"], comments: [["rachel", "The silhouettes in look 7 😍"]] },
+    { author: "sofia", body: "Styled a 12-look editorial in one day. Pull list, steamer, three racks, zero panic. Ask me about shoot styling.", hours: 11, image: "/images/community-streetwear.jpg", likes: ["ava", "rachel", "lena"], comments: [["rachel", "The silhouettes in look 7 😍"]], kind: "work", cat: "Styling", sub: "Editorial" },
     { author: "tj", body: "Rooftop set this Friday. Bringing the full rig. If you're a photographer who wants event shots for your portfolio, pull up — trade content.", hours: 16, likes: ["devin", "nia", "omar"], comments: [["omar", "I might pull up with the 35mm"]] },
-    { author: "imani", body: "Booked out for homecoming week already 💅 Waitlist is open — campus people get priority.", hours: 20, likes: ["nia", "omar"], comments: [] },
-    { author: "darius", body: "Shipped a creator site in 9 days. Portfolio, booking, and a merch page. Your link-in-bio deserves better than a list of links.", hours: 27, likes: ["lena", "devin", "kofi"], comments: [["lena", "The type choices on this one are great"]] },
-    { author: "rachel", body: "Fashion film premiere next month. Two years of learning color inside one 90-second cut.", hours: 33, image: "/images/community-film.jpg", likes: ["sofia", "marcusj", "ava"], comments: [["marcusj", "Can't wait to see the grade"]] },
+    { author: "imani", body: "Booked out for homecoming week already 💅 Waitlist is open — campus people get priority.", hours: 20, likes: ["nia", "omar"], comments: [], kind: "announcement", cat: "Nails" },
+    { author: "darius", body: "Shipped a creator site in 9 days. Portfolio, booking, and a merch page. Your link-in-bio deserves better than a list of links.", hours: 27, likes: ["lena", "devin", "kofi"], comments: [["lena", "The type choices on this one are great"]], kind: "work", cat: "Websites" },
+    { author: "rachel", body: "Fashion film premiere next month. Two years of learning color inside one 90-second cut.", hours: 33, image: "/images/community-film.jpg", likes: ["sofia", "marcusj", "ava"], comments: [["marcusj", "Can't wait to see the grade"]], kind: "bts", cat: "Fashion Film" },
     { author: "omar", body: "Grad season is coming. Booking portrait slots for April now — campus rate stays $90.", hours: 38, likes: ["nia", "imani", "devin"], comments: [["imani", "Booking for my sister 🙌"]] },
     { author: "jordanmiles", body: "Placement news I can finally share: two records on a major project this fall. Everything routed through verified UpNova work. Keep your history clean.", hours: 50, image: "/images/beat-cover.jpg", likes: ["devin", "kofi", "maya", "marcusj", "ava"], comments: [["kofi", "Inspiring fr"], ["maya", "Huge!! 🎉"]] },
     { author: "ava", body: "PSA for new photographers: your rate is not just the shoot. It's the edit, the gear, the years. Price the whole thing.", hours: 55, likes: ["omar", "sofia", "devin", "rachel"], comments: [["omar", "Needed this today"]] },
     { author: "nia", body: "Dog sitting this weekend booked through my UpNova listing. Verified profile made the difference — the client said so directly.", hours: 60, likes: ["devin", "ava"], comments: [] },
-    { author: "marcusj", body: "Three-camera live session edit delivered. Multicam is a cheat code for artists who hate reshoots.", hours: 70, image: "/images/event-afterdark.jpg", likes: ["jordanmiles", "devin", "rachel"], comments: [] },
-    { author: "devin", body: "Studio day. Two mixes, one master, and a rough for something special. The 'Open to Work' badge stays on for a reason.", hours: 80, likes: ["ava", "maya", "jordanmiles", "tj", "kofi"], comments: [["maya", "That rough better be ours 👀"]] },
+    { author: "marcusj", body: "Three-camera live session edit delivered. Multicam is a cheat code for artists who hate reshoots.", hours: 70, image: "/images/event-afterdark.jpg", likes: ["jordanmiles", "devin", "rachel"], comments: [], kind: "work", cat: "Video", sub: "Multicam" },
+    { author: "devin", body: "Studio day. Two mixes, one master, and a rough for something special. The 'Open to Work' badge stays on for a reason.", hours: 80, likes: ["ava", "maya", "jordanmiles", "tj", "kofi"], comments: [["maya", "That rough better be ours 👀"]], kind: "bts", cat: "Production" },
   ];
   const postIds: string[] = [];
   for (const p of postDefs) {
     const postId = id();
     postIds.push(postId);
     db.insert(t.posts)
-      .values({ id: postId, authorId: uid[p.author], body: p.body, imageUrl: p.image ?? null, isSeed: true, createdAt: hoursAgo(p.hours) })
+      .values({
+        id: postId, authorId: uid[p.author], body: p.body, imageUrl: p.image ?? null,
+        kind: p.kind ?? "post", category: p.cat ?? "", subcategory: p.sub ?? "",
+        isSeed: true, createdAt: hoursAgo(p.hours),
+      })
       .run();
     for (const liker of p.likes) db.insert(t.likes).values({ postId, userId: uid[liker] }).run();
     for (const [commenter, text] of p.comments)

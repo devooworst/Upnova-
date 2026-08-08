@@ -279,6 +279,18 @@ never "escrow", which is a specific legal service UpNova does not claim to provi
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
+**Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
+filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
+gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /
+Promotion / Content), optional creator-defined category + subcategory, and an optional uploaded
+photo — all set in the Home composer. Clicking a grid item opens the post (likes, comments) and,
+when the creator has a related service (loose word-stem match), a **Book this service** strip
+with that listing's real CTA: Post → Creator → Service → Booking. The five entities stay
+distinct on purpose: Post = something you share · Service = something you offer · Booking =
+someone scheduled you · Project = structured paid work · Opportunity = you're asking for people.
+Verified client projects still live under Opportunities → Verified Projects; portfolio_items
+remain the curated "featured from completed work" layer managed in Edit Profile.
+
 **Dynamic CTAs & Demo Mode** — "Hire Me" is gone platform-wide. The CTA comes from the
 listing's fulfillment configuration (`ctaFor` in the services API): Book Appointment
 (hair/nails/care) · Book Session (photo/tutoring) · Book Time (studio/DJ) · Book Me (fixed

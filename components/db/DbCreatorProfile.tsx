@@ -13,6 +13,7 @@ import { MapPin, MessageSquare, Zap, Lock, Star } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
+import PostsGrid from "@/components/db/PostsGrid";
 import { useSession } from "@/lib/session";
 
 interface PublicProfile {
@@ -44,7 +45,7 @@ interface PublicProfile {
     approvedExtensions: number;
   };
   followedByMe: boolean;
-  services: { id: string; title: string; description: string; price: number; reach: string }[];
+  services: { id: string; title: string; description: string; price: number; reach: string; category?: string; cta?: string }[];
   experience: { id: string; position: string; organization: string; start: string; end: string; description: string }[];
   reviews?: { rating: number; body: string; createdAt: string }[];
 }
@@ -222,6 +223,17 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           </div>
         )}
       </header>
+
+      <section className="card p-5">
+        <h2 className="text-sm font-bold text-zinc-100">Posts</h2>
+        <div className="mt-3">
+          <PostsGrid
+            handle={user.handle}
+            displayName={user.displayName}
+            services={services.map((s) => ({ id: s.id, title: s.title, price: s.price, category: s.category ?? "", cta: s.cta }))}
+          />
+        </div>
+      </section>
 
       {services.length > 0 && (
         <section className="card p-5">

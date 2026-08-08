@@ -28,6 +28,8 @@ export interface FeedPost {
   body: string;
   imageUrl: string | null;
   kind: string;
+  category?: string;
+  subcategory?: string;
   createdAt: string;
   author: FeedAuthor;
   likes: number;
@@ -148,9 +150,29 @@ export default function DbPostCard({ post, savedInitial = false }: { post: FeedP
 
       {/* body */}
       <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-200">{post.body}</p>
+      {(post.category || ["work", "bts", "announcement", "promotion", "content"].includes(post.kind)) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {["work", "bts", "announcement", "promotion", "content"].includes(post.kind) && (
+            <span className="rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+              {post.kind === "bts" ? "Behind the scenes" : post.kind}
+            </span>
+          )}
+          {post.category && (
+            <span className="rounded-full border border-violet-400/30 bg-violet-400/5 px-2 py-0.5 text-[10px] font-semibold text-violet-300">
+              {post.category}
+              {post.subcategory ? ` · ${post.subcategory}` : ""}
+            </span>
+          )}
+        </div>
+      )}
       {post.imageUrl && (
         <div className="relative mt-3 aspect-[16/10] overflow-hidden rounded-xl border border-line">
-          <Image src={post.imageUrl} alt="" fill sizes="(max-width: 768px) 100vw, 640px" className="object-cover" />
+          {post.imageUrl.startsWith("data:") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <Image src={post.imageUrl} alt="" fill sizes="(max-width: 768px) 100vw, 640px" className="object-cover" />
+          )}
         </div>
       )}
 
