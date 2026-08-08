@@ -17,6 +17,12 @@ export default function CommunitiesPage() {
         <p className="mt-1.5 text-sm text-zinc-500">
           Find your people — local communities for creators, built around where you are.
         </p>
+        <a
+          href="/communities/create"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-400 px-4 py-2 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+        >
+          + Create Community
+        </a>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">

@@ -23,6 +23,8 @@ import EventCard from "./EventCard";
 import {
   communities,
   communityContent,
+  communityAccessInfo,
+  communityModeInfo,
   creators,
   currentUser,
 } from "@/lib/data";
@@ -49,6 +51,15 @@ export default function CommunityView({ id }: { id: string }) {
   const members = (content?.memberIds ?? [])
     .map((mid) => creators.find((c) => c.id === mid))
     .filter(Boolean) as typeof creators;
+
+  const broadcast = community.mode === "broadcast" || community.mode === "announcements";
+  const visibleTabs = tabs.filter((t) => {
+    if (t === "Discussions") return (content?.discussions ?? []).length > 0;
+    if (t === "Opportunities") return (content?.opportunityIds ?? []).length > 0;
+    if (t === "Events") return (content?.eventIds ?? []).length > 0;
+    if (t === "Members") return members.length > 0;
+    return true;
+  });
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -87,6 +98,12 @@ export default function CommunityView({ id }: { id: string }) {
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5" /> {community.reach.location}
                 </span>
+                <span title={communityAccessInfo[community.access].desc}>
+                  {communityAccessInfo[community.access].label}
+                </span>
+                <span title={communityModeInfo[community.mode].desc}>
+                  {communityModeInfo[community.mode].label}
+                </span>
               </p>
             </div>
             <button
@@ -109,7 +126,7 @@ export default function CommunityView({ id }: { id: string }) {
         </div>
         {/* tabs */}
         <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-line-soft px-3" aria-label="Community sections">
-          {tabs.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -128,12 +145,21 @@ export default function CommunityView({ id }: { id: string }) {
       {/* ---------------- Home: the community's mini feed ---------------- */}
       {tab === "Home" && (
         <div className="animate-fade-up space-y-4">
-          <div className="flex items-center gap-3 border-y border-line-soft py-3">
-            <Avatar src={currentUser.avatar} initials={currentUser.initials} size="sm" />
-            <button className="min-w-0 flex-1 truncate rounded-full border border-line bg-card px-4 py-2 text-left text-sm text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-400">
-              What&apos;s happening in {community.name}?
-            </button>
-          </div>
+          {broadcast ? (
+            <p className="rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-2.5 text-xs text-zinc-400">
+              🎤 <span className="font-semibold text-amber-300">
+                {communityModeInfo[community.mode].label.replace(/^\S+\s/, "")} community.
+              </span>{" "}
+              Only admins post here — react and save, no noise.
+            </p>
+          ) : (
+            <div className="flex items-center gap-3 border-y border-line-soft py-3">
+              <Avatar src={currentUser.avatar} initials={currentUser.initials} size="sm" />
+              <button className="min-w-0 flex-1 truncate rounded-full border border-line bg-card px-4 py-2 text-left text-sm text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-400">
+                What&apos;s happening in {community.name}?
+              </button>
+            </div>
+          )}
           {(content?.posts ?? []).map((post) => (
             <article key={post.id} className="card-people p-4 sm:p-5">
               <div className="flex items-start gap-3">
@@ -172,9 +198,16 @@ export default function CommunityView({ id }: { id: string }) {
                   <Heart className={`h-4 w-4 ${liked[post.id] ? "fill-violet-400" : ""}`} />
                   {post.likes + (liked[post.id] ? 1 : 0)}
                 </button>
-                <button className="flex items-center gap-1.5 transition hover:text-zinc-300">
-                  <MessageCircle className="h-4 w-4" /> {post.comments}
-                </button>
+                {!broadcast && (
+                  <button className="flex items-center gap-1.5 transition hover:text-zinc-300">
+                    <MessageCircle className="h-4 w-4" /> {post.comments}
+                  </button>
+                )}
+                {broadcast && (
+                  <button className="flex items-center gap-1.5 transition hover:text-amber-300">
+                    🔖 Save
+                  </button>
+                )}
               </div>
             </article>
           ))}
@@ -321,8 +354,28 @@ export default function CommunityView({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 border-t border-line-soft pt-3 text-xs text-zinc-500">
+            <div className="mt-4 border-t border-line-soft pt-3">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+                creator-controlled settings
+              </p>
+              <ul className="mt-2 grid grid-cols-2 gap-1.5 text-xs text-zinc-400">
+                {[
+                  ["Promote services", community.settings.promotion],
+                  ["Post opportunities", community.settings.opportunities],
+                  ["Promote events", community.settings.events],
+                  ["External links", community.settings.links],
+                  ["Posts need approval", community.settings.approval],
+                ].map(([label, on]) => (
+                  <li key={label as string} className="flex items-center gap-1.5">
+                    <span className={on ? "text-lime-400" : "text-zinc-600"}>{on ? "✓" : "✗"}</span>
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="mt-3 border-t border-line-soft pt-3 text-xs text-zinc-500">
               Created by <span className="font-semibold text-zinc-300">{content?.createdBy ?? "UpNova"}</span>
+              <span className="text-zinc-600"> · communities follow UpNova&apos;s platform rules — creators control their space, not safety policy</span>
             </p>
           </section>
           {joined && (

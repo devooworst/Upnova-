@@ -788,6 +788,24 @@ export const events: UpEvent[] = [
 
 /* -------------------------------- communities ------------------------------ */
 
+export type CommunityAccess = "public" | "private" | "invite" | "verified";
+export type CommunityMode = "discussion" | "announcements" | "broadcast" | "collaboration" | "qa";
+
+export const communityAccessInfo: Record<CommunityAccess, { label: string; desc: string }> = {
+  public: { label: "🌐 Public", desc: "Anyone can discover and join." },
+  private: { label: "🔒 Private", desc: "Discoverable — joining requires approval." },
+  invite: { label: "✉️ Invite-only", desc: "Hidden. Invitation or link required." },
+  verified: { label: "🎓 Verified-only", desc: "Only people who meet a requirement can join." },
+};
+
+export const communityModeInfo: Record<CommunityMode, { label: string; desc: string }> = {
+  discussion: { label: "💬 Discussion", desc: "Everyone can post and respond." },
+  announcements: { label: "📢 Announcements", desc: "Admins post; members read and react." },
+  broadcast: { label: "🎤 Broadcast", desc: "Admin updates; replies limited." },
+  collaboration: { label: "🤝 Collaboration", desc: "Built for finding partners and projects." },
+  qa: { label: "❓ Q&A", desc: "Members ask; others answer." },
+};
+
 export interface Community {
   id: string;
   name: string;
@@ -800,11 +818,24 @@ export interface Community {
   reach: ReachInfo;
   tags: string[];
   joined?: boolean;
+  access: CommunityAccess;
+  mode: CommunityMode;
+  /** creator-controlled permissions */
+  settings: {
+    promotion: boolean;
+    opportunities: boolean;
+    events: boolean;
+    links: boolean;
+    approval: boolean;
+  };
 }
 
 export const communities: Community[] = [
   {
     id: "dmv",
+    access: "public",
+    mode: "discussion",
+    settings: { promotion: true, opportunities: true, events: true, links: true, approval: false },
     name: "DMV Creators",
     members: "2.4K",
     online: 61,
@@ -818,6 +849,9 @@ export const communities: Community[] = [
   },
   {
     id: "music-producers",
+    access: "public",
+    mode: "collaboration",
+    settings: { promotion: true, opportunities: true, events: true, links: true, approval: false },
     name: "Music Producers",
     members: "5.1K",
     online: 143,
@@ -831,6 +865,9 @@ export const communities: Community[] = [
   },
   {
     id: "film-makers",
+    access: "public",
+    mode: "collaboration",
+    settings: { promotion: true, opportunities: true, events: true, links: true, approval: false },
     name: "Film Makers",
     members: "1.8K",
     online: 38,
@@ -844,6 +881,9 @@ export const communities: Community[] = [
   },
   {
     id: "photographers",
+    access: "public",
+    mode: "qa",
+    settings: { promotion: true, opportunities: true, events: true, links: false, approval: false },
     name: "Photographers",
     members: "3.3K",
     online: 87,
@@ -856,6 +896,9 @@ export const communities: Community[] = [
   },
   {
     id: "streetwear",
+    access: "public",
+    mode: "discussion",
+    settings: { promotion: true, opportunities: true, events: true, links: true, approval: true },
     name: "Streetwear",
     members: "4.7K",
     online: 210,
@@ -865,6 +908,21 @@ export const communities: Community[] = [
     image: "/images/community-streetwear.jpg",
     reach: { location: "Global", reach: "Global" },
     tags: ["Drops", "Design", "Brands"],
+    joined: true,
+  },
+  {
+    id: "daily-inspiration",
+    access: "public",
+    mode: "broadcast",
+    settings: { promotion: false, opportunities: false, events: false, links: false, approval: true },
+    name: "Daily Inspiration",
+    members: "8.9K",
+    online: 312,
+    description: "One reminder every morning. No noise, no ads — just something to carry into the day.",
+    emoji: "✨",
+    gradient: "from-amber-500/70 to-orange-950",
+    reach: { location: "Global", reach: "Global" },
+    tags: ["Motivation", "Daily"],
     joined: true,
   },
 ];
@@ -1034,6 +1092,38 @@ export interface CommunityContent {
 }
 
 export const communityContent: Record<string, CommunityContent> = {
+  "daily-inspiration": {
+    created: "November 2025",
+    createdBy: "Devin Carter",
+    memberIds: [],
+    opportunityIds: [],
+    eventIds: [],
+    posts: [
+      {
+        id: "di-p1",
+        author: "Daily Inspiration",
+        initials: "✨",
+        gradient: "from-amber-500 to-orange-700",
+        role: "Admin",
+        time: "6:00 AM",
+        text: "🌅 Today's Reminder — Keep going even when nobody sees the work you're putting in.",
+        likes: 1204,
+        comments: 0,
+      },
+      {
+        id: "di-p2",
+        author: "Daily Inspiration",
+        initials: "✨",
+        gradient: "from-amber-500 to-orange-700",
+        role: "Admin",
+        time: "1d",
+        text: "🌅 Yesterday's Reminder — The gig you didn't get was practice for the one you will.",
+        likes: 987,
+        comments: 0,
+      },
+    ],
+    discussions: [],
+  },
   dmv: {
     created: "March 2026",
     createdBy: "Devin Carter",

@@ -92,6 +92,17 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   isn't the source of truth; the email is never public). College ends at the
   verified graduation date; everything the student built stays theirs, with a
   natural transition to Pro.
+- **Communities are creator-controlled spaces, not group chats.** Create Community
+  is a setup wizard: type (15 categories), access (public / private / invite-only /
+  verified-only), reach (5 mi → global, or a specific school), rules (members can be
+  required to agree), interaction mode (💬 Discussion / 📢 Announcements / 🎤 Broadcast
+  / 🤝 Collaboration / ❓ Q&A), appearance (icon, color, banner), and member
+  permissions (promotion, opportunities, events, links, post approval). Roles:
+  Owner → Admin → Moderator → Member. Modes actually change the product: Daily
+  Inspiration is a broadcast community — admins post, members react and save.
+  Community rules never override UpNova's safety policies. V2: advanced roles,
+  approval workflows, community analytics, community-scoped services/opportunities
+  surfaces, private org chats. Later: sponsored communities, community monetization.
 - **Organizations & Campus Groups (V1 scope, deliberately).** Org pages are another
   type of community: branding gradient (cosmetic only), ✓ Verified Organization vs
   Community Group (org legitimacy ≠ membership proof), about/leadership, posts,
