@@ -241,8 +241,8 @@ export default function ProPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/communities" className="btn-ghost mt-3.5 flex w-full py-2 text-xs">
-                Explore campus network
+              <Link href="/campus" className="mt-3.5 flex w-full items-center justify-center rounded-full bg-violet-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet">
+                Enter your campus →
               </Link>
             </section>
 

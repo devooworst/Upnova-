@@ -114,6 +114,20 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
+        {plan === "college" && (
+          <div className="mt-1">
+            <Link
+              href="/campus"
+              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                pathname.startsWith("/campus")
+                  ? "bg-violet-400/15 text-violet-200"
+                  : "text-violet-300 hover:bg-violet-400/10"
+              }`}
+            >
+              <span aria-hidden>🎓</span> Your Campus
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Your communities — people DNA: round card, real photos */}
