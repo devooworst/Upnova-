@@ -4,14 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { Briefcase, Check, Clock, Search, ShoppingBag, Star, Zap } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import HireModal from "@/components/HireModal";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { serviceCatalog, creators } from "@/lib/data";
+import { serviceCatalog, creators, type CatalogService } from "@/lib/data";
 
 const categories = ["All", "Music", "Video", "Photography", "Design", "Fashion", "Writing"] as const;
 
 export default function ServicesPage() {
   const [category, setCategory] = useState<(typeof categories)[number]>("All");
   const [query, setQuery] = useState("");
+  const [hiring, setHiring] = useState<CatalogService | null>(null);
 
   const items = serviceCatalog.filter((svc) => {
     const creator = creators.find((c) => c.id === svc.creatorId);
@@ -122,9 +124,9 @@ export default function ServicesPage() {
                     ${svc.startingAt}
                   </span>
                 </p>
-                <Link href="/messages" className="btn-lime px-4 py-1.5 text-xs">
+                <button onClick={() => setHiring(svc)} className="btn-lime px-4 py-1.5 text-xs">
                   <Zap className="h-3.5 w-3.5" /> Hire Me
-                </Link>
+                </button>
               </div>
             </article>
           );
@@ -141,6 +143,14 @@ export default function ServicesPage() {
         Every hire runs through the protected UpNova flow: agree on scope in Messages, pay securely,
         approve the work, then both sides review.
       </p>
+
+      {hiring && (
+        <HireModal
+          creator={creators.find((c) => c.id === hiring.creatorId)!}
+          service={hiring}
+          onClose={() => setHiring(null)}
+        />
+      )}
     </div>
   );
 }

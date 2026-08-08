@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { PencilLine, MapPin, MessageSquare, Zap } from "lucide-react";
+import { PencilLine, MapPin, MessageSquare, Megaphone, Zap } from "lucide-react";
+import PromoteModal from "../PromoteModal";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { currentUser, profileStats, contact } from "@/lib/data";
 
 export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const [following, setFollowing] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
   return (
     <header className="card overflow-hidden">
       {/* banner */}
@@ -34,10 +36,19 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
           </span>
           <div className="flex items-center gap-2 pb-1">
             {isOwner ? (
-              <button className="btn-ghost px-4 py-1.5 text-xs sm:text-sm">
-                <PencilLine className="h-4 w-4" />
-                Edit Profile
-              </button>
+              <>
+                <button
+                  onClick={() => setPromoteOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 px-3.5 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-400/10 sm:text-sm"
+                >
+                  <Megaphone className="h-4 w-4" />
+                  Promote
+                </button>
+                <button className="btn-ghost px-4 py-1.5 text-xs sm:text-sm">
+                  <PencilLine className="h-4 w-4" />
+                  Edit Profile
+                </button>
+              </>
             ) : (
               <>
                 <button
@@ -100,6 +111,7 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
           ))}
         </div>
       </div>
+      {promoteOpen && <PromoteModal onClose={() => setPromoteOpen(false)} />}
     </header>
   );
 }

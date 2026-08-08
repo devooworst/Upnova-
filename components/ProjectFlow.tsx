@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Avatar from "./Avatar";
 import Perforation from "./Perforation";
+import { feeFor, totalFor, money, PLATFORM_FEE_RATE } from "@/lib/fees";
 
 /* ------------------------------------------------------------------ */
 /* The UpNova money loop, as UI state:                                 */
@@ -33,8 +34,6 @@ type Stage =
   | "submitted"
   | "reviewing"
   | "done";
-
-const FEE = 15; // placeholder flat fee — real fee model TBD, lives server-side later
 
 interface Bubble {
   from: "me" | "them";
@@ -256,7 +255,7 @@ export default function ProjectFlow({
                 onClick={() => setStage("checkout")}
                 className="mt-3 w-full rounded-md bg-lime-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-lime-300 hover:shadow-glow"
               >
-                Pay ${counter + FEE}
+                Pay {money(totalFor(counter))}
               </button>
             )}
           </div>
@@ -326,8 +325,8 @@ export default function ProjectFlow({
                     <span className="font-bold tabular-nums text-lime-400">${counter}</span>
                   </p>
                   <p className="flex justify-between text-zinc-500">
-                    <span>UpNova platform fee</span>
-                    <span className="font-medium tabular-nums">${FEE}</span>
+                    <span>UpNova service fee (paid by client)</span>
+                    <span className="font-medium tabular-nums">{money(feeFor(counter))}</span>
                   </p>
                   <p className="flex justify-between text-zinc-500">
                     <span>Payout status</span>
@@ -360,7 +359,7 @@ export default function ProjectFlow({
               <div className="mt-3 space-y-1.5 rounded-md border border-line bg-card-raised p-3 text-xs text-zinc-400">
                 <p><span className="text-zinc-500">Scope:</span> {desc}</p>
                 <p><span className="text-zinc-500">Deadline:</span> {deadline}</p>
-                <p><span className="text-zinc-500">Payment:</span> ${counter + FEE} held by UpNova until you approve</p>
+                <p><span className="text-zinc-500">Payment:</span> {money(totalFor(counter))} held by the payment processor until you approve</p>
                 <p><span className="text-zinc-500">Agreement:</span> offer + counter accepted in this thread</p>
               </div>
             )}
@@ -482,8 +481,8 @@ export default function ProjectFlow({
                 <Perforation className="mt-4" />
                 <div className="mt-3.5 space-y-1.5 text-sm">
                   <p className="flex justify-between text-zinc-400"><span>Project total</span><span className="font-bold tabular-nums text-zinc-100">${offer}</span></p>
-                  <p className="flex justify-between text-zinc-500 text-xs"><span>UpNova platform fee</span><span className="font-medium tabular-nums">${FEE}</span></p>
-                  <p className="flex justify-between border-t border-line-soft pt-2 text-zinc-300"><span className="text-xs">You&apos;ll pay</span><span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${offer + FEE}</span></p>
+                  <p className="flex justify-between text-zinc-500 text-xs"><span>UpNova service fee ({PLATFORM_FEE_RATE * 100}%)</span><span className="font-medium tabular-nums">{money(feeFor(offer))}</span></p>
+                  <p className="flex justify-between border-t border-line-soft pt-2 text-zinc-300"><span className="text-xs">You&apos;ll pay</span><span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">{money(totalFor(offer))}</span></p>
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
                   <button onClick={() => setStage("form")} className="btn-ghost px-4 py-2 text-xs">Back</button>
@@ -514,14 +513,14 @@ export default function ProjectFlow({
               <p className="text-xs text-zinc-500">{creatorName}</p>
             </div>
             <div className="mt-4 space-y-1.5 text-sm">
-              <p className="flex justify-between text-zinc-400"><span>Project total</span><span className="font-bold tabular-nums text-zinc-100">${counter}.00</span></p>
-              <p className="flex justify-between text-xs text-zinc-500"><span>Platform fee</span><span className="tabular-nums">${FEE}.00</span></p>
+              <p className="flex justify-between text-zinc-400"><span>Creator price</span><span className="font-bold tabular-nums text-zinc-100">${counter}.00</span></p>
+              <p className="flex justify-between text-xs text-zinc-500"><span>UpNova service fee ({PLATFORM_FEE_RATE * 100}%)</span><span className="tabular-nums">{money(feeFor(counter))}</span></p>
             </div>
             <div className="mt-4">
               <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Payment method</p>
               <div className="mt-1.5 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
                 💳 <span className="font-mono font-medium">•••• 4242</span>
-                <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${counter + FEE}</span>
+                <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">{money(totalFor(counter))}</span>
               </div>
             </div>
             <button

@@ -16,8 +16,9 @@ import {
 } from "lucide-react";
 import Perforation from "@/components/Perforation";
 import { isPro, setPro } from "@/lib/pro";
+import { PRO_PRICE } from "@/lib/fees";
 
-const PRICE = 9.99;
+const PRICE = PRO_PRICE;
 
 const proBenefits = [
   { icon: Zap, title: "Priority Opportunities", desc: "Better visibility for paid opportunities that match your skills and radius." },
@@ -27,12 +28,14 @@ const proBenefits = [
   { icon: Star, title: "Featured Creator placement", desc: "Eligibility for featured slots across Discover." },
 ];
 
+/* Free keeps the full ability to earn — Pro is growth, never a paywall. */
 const freeFeatures = [
-  "Basic creator profile",
-  "Portfolio",
-  "Communities",
-  "Basic opportunities",
-  "Messaging",
+  "Create profile & portfolio",
+  "Join communities & post",
+  "Discover creators",
+  "Apply to opportunities",
+  "Offer services & get hired",
+  "Messaging & basic bookings",
   "Basic analytics",
 ];
 

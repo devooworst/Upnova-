@@ -72,6 +72,16 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   - **people** = round (`rounded-3xl`), avatar-forward, soft
   - **events** = ticket with a real date block (month/day tile), dashed stub divider,
     "admit one" stub detail
+- **Monetization (lib/fees.ts is the single source of truth).** Free to join and
+  earn — the core ability to make money is never paywalled. Three revenue streams:
+  (1) **5% transaction fee**, paid by the buyer on top of the creator's listed price,
+  shown transparently before checkout; (2) **UpNova Pro, $7.99/mo** — growth tools,
+  not earning ability; (3) **paid promotion** (Boost Service $3.99/3d, Featured
+  Profile $7.99/7d, Featured Opportunity $9.99/7d) — always labeled, never overrides
+  relevance. No proprietary wallet, no stored balances: production payments are
+  designed around Stripe Connect (connected accounts, destination charges with
+  application fees, payouts, refunds, disputes). Transactions, projects, payments,
+  fees, payouts, and reviews are modeled as separate entities from messaging.
 - **Services vs Opportunities — never mixed.** Services (`/services`) is the creator
   catalog: clients hire a creator's predefined offering; the CTA is always **Hire Me**.
   Opportunities (`/opportunities`) is the job board: projects looking for people; the
