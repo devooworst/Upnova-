@@ -53,7 +53,12 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 
 ## Visual identity
 
-- Background `#0A0A0F`, cards `#111111`, zinc borders. One UI family: **Plus Jakarta Sans**
+- **Light + dark mode (V1).** The entire palette rides on CSS variables — light
+  mode is a class on `<html>`, not a redesign. Same structure, same lime identity;
+  accents darken in light mode for contrast. Settings → Appearance offers Dark /
+  Light / Use device settings (persisted, no-flash init script), plus a sun/moon
+  toggle in the navbar.
+- Background `#0A0A0F` (dark), cards `#111111`, zinc borders. One UI family: **Plus Jakarta Sans**
   (weight/size/tracking carry all hierarchy — every page title is `text-2xl` bold tight).
   **JetBrains Mono** is the data voice: distances, budgets, receipt lines, overlines.
   **Syne** appears exactly once, as the UpNova wordmark.

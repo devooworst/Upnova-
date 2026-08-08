@@ -14,8 +14,12 @@ import {
   Settings,
   ShieldCheck,
   LogOut,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { getTheme, setTheme } from "@/lib/theme";
 import Avatar from "./Avatar";
 import { currentUser } from "@/lib/data";
 import { openCreateModal } from "./CreateModalTrigger";
@@ -24,6 +28,15 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const router = useRouter();
+  const [lightMode, setLightMode] = useState(false);
+  useEffect(() => {
+    setLightMode(document.documentElement.classList.contains("light"));
+  }, []);
+  const flipTheme = () => {
+    const next = lightMode ? "dark" : "light";
+    setTheme(next);
+    setLightMode(!lightMode);
+  };
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-xl">
@@ -62,6 +75,15 @@ export default function Navbar() {
             <MessageSquare className="h-5 w-5" />
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-400" />
           </Link>
+
+          <button
+            onClick={flipTheme}
+            className="icon-btn hidden sm:inline-flex"
+            aria-label={lightMode ? "Switch to dark mode" : "Switch to light mode"}
+            title={lightMode ? "Dark mode" : "Light mode"}
+          >
+            {lightMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          </button>
 
           <button className="icon-btn relative" aria-label="Notifications">
             <Bell className="h-5 w-5" />

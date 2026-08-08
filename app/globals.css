@@ -11,6 +11,69 @@
   --font-sans: "Plus Jakarta Sans Variable", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
   --font-display: "Syne Variable", "Plus Jakarta Sans Variable", sans-serif;
+
+  /* ---------- dark (default) palette · RGB triplets ---------- */
+  --c-ink: 10 10 15;
+  --c-ink-soft: 14 14 20;
+  --c-card: 17 17 17;
+  --c-card-raised: 22 22 28;
+  --c-card-hover: 26 26 33;
+  --c-line: 38 38 46;
+  --c-line-soft: 29 29 36;
+  /* contrast surface: white in dark mode, near-black in light */
+  --c-contrast: 255 255 255;
+  --c-on-contrast: 9 9 11;
+  --c-z50: 250 250 250;
+  --c-z100: 244 244 245;
+  --c-z200: 228 228 231;
+  --c-z300: 212 212 216;
+  --c-z400: 161 161 170;
+  --c-z500: 113 113 122;
+  --c-z600: 82 82 91;
+  --c-lime-300: 190 242 100;
+  --c-lime-400: 163 230 53;
+  --c-violet-300: 196 181 253;
+  --c-violet-400: 167 139 250;
+  --c-amber-300: 252 211 77;
+  --c-amber-400: 251 191 36;
+  --c-sky-300: 125 211 252;
+  --c-sky-400: 56 189 248;
+  --c-red-300: 252 165 165;
+  --c-red-400: 248 113 113;
+  --scrollbar: #2b2b33;
+}
+
+/* ---------- light mode: same UpNova, different room ---------- */
+html.light {
+  color-scheme: light;
+  --c-ink: 244 244 246;
+  --c-ink-soft: 238 238 242;
+  --c-card: 255 255 255;
+  --c-card-raised: 244 244 246;
+  --c-card-hover: 235 235 240;
+  --c-line: 214 214 222;
+  --c-line-soft: 228 228 234;
+  --c-contrast: 24 24 27;
+  --c-on-contrast: 250 250 250;
+  --c-z50: 24 24 27;
+  --c-z100: 39 39 42;
+  --c-z200: 63 63 70;
+  --c-z300: 82 82 91;
+  --c-z400: 113 113 122;
+  --c-z500: 113 113 122;
+  --c-z600: 161 161 170;
+  /* accents darken for contrast on light — lime stays lime */
+  --c-lime-300: 77 124 15;
+  --c-lime-400: 101 163 13;
+  --c-violet-300: 109 40 217;
+  --c-violet-400: 124 58 237;
+  --c-amber-300: 180 83 9;
+  --c-amber-400: 217 119 6;
+  --c-sky-300: 3 105 161;
+  --c-sky-400: 2 132 199;
+  --c-red-300: 185 28 28;
+  --c-red-400: 220 38 38;
+  --scrollbar: #c8c8d2;
 }
 
 html {
@@ -76,7 +139,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2b2b33 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -85,7 +148,7 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #2b2b33;
+  background: var(--scrollbar);
   border-radius: 999px;
 }
 

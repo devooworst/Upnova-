@@ -9,18 +9,51 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        /* the whole palette rides on CSS variables so light mode is a
+           class on <html>, not a rewrite — same UpNova, different room */
         ink: {
-          DEFAULT: "#0A0A0F",
-          soft: "#0E0E14",
+          DEFAULT: "rgb(var(--c-ink) / <alpha-value>)",
+          soft: "rgb(var(--c-ink-soft) / <alpha-value>)",
         },
         card: {
-          DEFAULT: "#111111",
-          raised: "#16161C",
-          hover: "#1A1A21",
+          DEFAULT: "rgb(var(--c-card) / <alpha-value>)",
+          raised: "rgb(var(--c-card-raised) / <alpha-value>)",
+          hover: "rgb(var(--c-card-hover) / <alpha-value>)",
         },
         line: {
-          DEFAULT: "#26262E",
-          soft: "#1D1D24",
+          DEFAULT: "rgb(var(--c-line) / <alpha-value>)",
+          soft: "rgb(var(--c-line-soft) / <alpha-value>)",
+        },
+        white: "rgb(var(--c-contrast) / <alpha-value>)",
+        zinc: {
+          50: "rgb(var(--c-z50) / <alpha-value>)",
+          100: "rgb(var(--c-z100) / <alpha-value>)",
+          200: "rgb(var(--c-z200) / <alpha-value>)",
+          300: "rgb(var(--c-z300) / <alpha-value>)",
+          400: "rgb(var(--c-z400) / <alpha-value>)",
+          500: "rgb(var(--c-z500) / <alpha-value>)",
+          600: "rgb(var(--c-z600) / <alpha-value>)",
+          950: "rgb(var(--c-on-contrast) / <alpha-value>)",
+        },
+        lime: {
+          300: "rgb(var(--c-lime-300) / <alpha-value>)",
+          400: "rgb(var(--c-lime-400) / <alpha-value>)",
+        },
+        violet: {
+          300: "rgb(var(--c-violet-300) / <alpha-value>)",
+          400: "rgb(var(--c-violet-400) / <alpha-value>)",
+        },
+        amber: {
+          300: "rgb(var(--c-amber-300) / <alpha-value>)",
+          400: "rgb(var(--c-amber-400) / <alpha-value>)",
+        },
+        sky: {
+          300: "rgb(var(--c-sky-300) / <alpha-value>)",
+          400: "rgb(var(--c-sky-400) / <alpha-value>)",
+        },
+        red: {
+          300: "rgb(var(--c-red-300) / <alpha-value>)",
+          400: "rgb(var(--c-red-400) / <alpha-value>)",
         },
       },
       fontFamily: {

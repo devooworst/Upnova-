@@ -142,7 +142,7 @@ export default function MessagesPage() {
                   }`}
                 >
                   {m.text}
-                  <span className={`mt-1 block text-[10px] ${m.from === "me" ? "text-zinc-800/70" : "text-zinc-500"}`}>
+                  <span className={`mt-1 block text-[10px] ${m.from === "me" ? "text-zinc-950/60" : "text-zinc-500"}`}>
                     {m.time}
                   </span>
                 </div>
@@ -159,7 +159,7 @@ export default function MessagesPage() {
                     }`}
                   >
                     {m.text}
-                    <span className={`mt-1 block text-[10px] ${m.from === "me" ? "text-zinc-800/70" : "text-zinc-500"}`}>
+                    <span className={`mt-1 block text-[10px] ${m.from === "me" ? "text-zinc-950/60" : "text-zinc-500"}`}>
                       now
                     </span>
                   </div>

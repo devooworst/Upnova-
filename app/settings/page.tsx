@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   User,
   Palette,
@@ -17,6 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import { currentUser, services, bookings } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -109,6 +110,12 @@ export default function SettingsPage() {
     motion: true,
   });
   const t = (k: string) => toggles[k] ?? false;
+  const [theme, setThemeState] = useState<ThemeChoice>("dark");
+  useEffect(() => setThemeState(getTheme()), []);
+  const pickTheme = (c: ThemeChoice) => {
+    setTheme(c);
+    setThemeState(c);
+  };
   const setT = (k: string) => (v: boolean) => setToggles((s) => ({ ...s, [k]: v }));
 
   const earned = 4850;
@@ -382,17 +389,29 @@ export default function SettingsPage() {
           {section === "appearance" && (
             <section className="card p-5">
               <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Appearance</h2>
-              <div className="mt-4 flex gap-3">
-                <button className="flex-1 rounded-xl border border-lime-400/50 bg-ink p-4 text-left">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-                    <Check className="h-4 w-4 text-lime-400" /> Dark
-                  </span>
-                  <span className="mt-1 block text-xs text-zinc-500">The UpNova look</span>
-                </button>
-                <button disabled className="flex-1 cursor-not-allowed rounded-xl border border-line bg-card-raised p-4 text-left opacity-60">
-                  <span className="text-sm font-semibold text-zinc-300">Light</span>
-                  <span className="mt-1 block text-xs text-zinc-500">Coming later</span>
-                </button>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {(
+                  [
+                    ["dark", "🌙 Dark", "The UpNova look"],
+                    ["light", "☀️ Light", "Same UpNova, brighter room"],
+                    ["system", "🖥️ Use device settings", "Follows your computer"],
+                  ] as [ThemeChoice, string, string][]
+                ).map(([id, label, desc]) => (
+                  <button
+                    key={id}
+                    onClick={() => pickTheme(id)}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      theme === id
+                        ? "border-lime-400/50 bg-lime-400/5"
+                        : "border-line hover:border-zinc-600"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                      {theme === id && <Check className="h-4 w-4 text-lime-400" />} {label}
+                    </span>
+                    <span className="mt-1 block text-xs text-zinc-500">{desc}</span>
+                  </button>
+                ))}
               </div>
               <div className="mt-4 divide-y divide-line-soft border-t border-line-soft">
                 <Row label="Compact mode" hint="Tighter cards and smaller media">
