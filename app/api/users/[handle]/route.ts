@@ -67,6 +67,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
 
     return {
       user: publicUser(user, profile, { viewerIsOwner: isOwner }),
+      joined: user.createdAt.toISOString(),
       stats: {
         followers: isOwner || profile.showFollowers ? followers : null,
         following: isOwner || profile.showFollowing ? following : null,

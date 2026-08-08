@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Mail, MapPin, Clock, Zap, Globe2, Check, Settings2, PencilLine, GraduationCap, Link2 } from "lucide-react";
-import { contact } from "@/lib/data";
 import { useProfile } from "@/lib/profile";
+import { useSession } from "@/lib/session";
 
 interface OwnService {
   id: string;
@@ -22,6 +22,7 @@ interface OwnService {
  */
 export default function AboutTab({ isOwner }: { isOwner: boolean }) {
   const profile = useProfile();
+  const { user } = useSession();
   const [services, setServices] = useState<OwnService[]>([]);
 
   useEffect(() => {
@@ -107,9 +108,11 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
         <section className="card p-5">
           <h3 className="text-sm font-bold text-zinc-100">Contact</h3>
           <ul className="mt-3 space-y-2.5 text-sm text-zinc-300">
-            <li className="flex items-center gap-2.5">
-              <Mail className="h-4 w-4 text-lime-400" /> {contact.email}
-            </li>
+            {isOwner && user && (
+              <li className="flex items-center gap-2.5">
+                <Mail className="h-4 w-4 text-lime-400" /> {user.email}
+              </li>
+            )}
             {(isOwner || profile.showLocation) && (
               <li className="flex items-center gap-2.5">
                 <MapPin className="h-4 w-4 text-lime-400" /> {profile.city}
@@ -118,7 +121,8 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
               </li>
             )}
             <li className="flex items-center gap-2.5">
-              <Clock className="h-4 w-4 text-lime-400" /> {contact.responseTime}
+              <Clock className="h-4 w-4 text-lime-400" /> Response time builds from your real reply
+              activity
             </li>
           </ul>
         </section>

@@ -611,6 +611,37 @@ function seed() {
     { id: id(), userId: uid["devin"], position: "Freelance Video Editor", organization: "Self-employed", start: "2020", description: "Reels, music videos, and recap films.", order: 2 },
   ]).run();
 
+  /* -------------------------------- events -------------------------------- */
+  const eventDefs = [
+    { slug: "meetup", host: "devin", title: "UpNova Creator Meetup", time: "7:00 PM", loc: "The Assembly Room", city: "Baltimore, MD", days: 15, price: null, cap: 150, att: 84, img: "/images/event-meetup.jpg", kind: "rsvp", desc: "Meet the creators you keep seeing in your feed. Demos, collabs, and a live showcase." },
+    { slug: "networking", host: "tj", title: "DMV Music Networking Night", time: "8:00 PM", loc: "Union Stage", city: "Washington, DC", days: 21, price: 15, cap: 200, att: 132, img: "/images/event-networking.jpg", kind: "ticket", desc: "Producers, artists, engineers, and managers in one room. Bring business cards." },
+    { slug: "photo-walk", host: "ava", title: "Golden Hour Photo Walk", time: "6:30 PM", loc: "Federal Hill Park", city: "Baltimore, MD", days: 9, price: null, cap: 40, att: 27, img: "/images/event-photowalk.jpg", kind: "registration", desc: "All levels. Bring any camera — we shoot the skyline at golden hour, then compare edits." },
+    { slug: "after-dark", host: "tj", title: "After Dark — Rooftop Set", time: "10:00 PM", loc: "Rooftop at The Crown", city: "Baltimore, MD", days: 12, price: 25, cap: 180, att: 164, img: "/images/event-afterdark.jpg", kind: "ticket", age: "21+", desc: "Full rig on the roof. Photographers welcome — trade content for entry." },
+    { slug: "workshop", host: "lena", title: "Brand Design Workshop", time: "1:00 PM", loc: "Open Works", city: "Baltimore, MD", days: 18, price: 40, cap: 30, att: 22, img: "/images/event-workshop.jpg", kind: "registration", desc: "Hands-on: build a one-page brand system in three hours. Laptops required." },
+  ];
+  for (const e of eventDefs) {
+    db.insert(t.events)
+      .values({
+        id: e.slug, // slug ids so the existing /events/[slug] detail pages resolve
+        slug: e.slug,
+        hostId: uid[e.host],
+        title: e.title,
+        description: e.desc,
+        startsAt: daysFromNow(e.days),
+        timeLabel: e.time,
+        location: `${e.loc}, ${e.city}`,
+        city: e.city,
+        price: e.price,
+        capacity: e.cap,
+        attending: e.att,
+        imageUrl: e.img,
+        kind: e.kind,
+        ageRule: (e as { age?: string }).age ?? "all",
+        isSeed: true,
+      })
+      .run();
+  }
+
   /* ---------------------------- notifications ---------------------------- */
   // deterministic, each one pointing at a REAL record created above
   const notifs: { user: string; actor: string; type: string; title: string; body: string; href: string; cat: string; pri: string; h: number }[] = [

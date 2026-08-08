@@ -23,6 +23,12 @@ export function getPlan(): Plan {
 
 export function setPlan(plan: Plan) {
   window.localStorage.setItem("upnova-plan", plan);
+  // plan is account state — persist to the DB so it survives user switches
+  fetch("/api/me/plan", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan }),
+  }).catch(() => {});
   window.dispatchEvent(new Event(PRO_EVENT));
 }
 

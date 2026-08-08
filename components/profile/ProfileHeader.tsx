@@ -8,7 +8,6 @@ import PromoteModal from "../PromoteModal";
 import FollowListModal from "../FollowListModal";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
-import { contact, reliability } from "@/lib/data";
 import { useProfile, roleLine, locationLine } from "@/lib/profile";
 import { useSession } from "@/lib/session";
 
@@ -24,16 +23,24 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const [following, setFollowing] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [listOpen, setListOpen] = useState<"followers" | "following" | null>(null);
-  const [stats, setStats] = useState<{ followers: number | null; following: number | null }>({
-    followers: null,
-    following: null,
-  });
+  const [stats, setStats] = useState<{
+    followers: number | null;
+    following: number | null;
+    rating?: number | null;
+    reviewsCount?: number;
+    completedProjects?: number | null;
+    approvedExtensions?: number;
+  }>({ followers: null, following: null });
+  const [joined, setJoined] = useState<string | null>(null);
   const [projectCounts, setProjectCounts] = useState<{ total: number; completed: number }>({ total: 0, completed: 0 });
   useEffect(() => {
     if (!user) return;
     fetch(`/api/users/${user.handle}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => d.stats && setStats(d.stats));
+      .then((d) => {
+        if (d.stats) setStats(d.stats);
+        if (d.joined) setJoined(d.joined);
+      });
     fetch("/api/projects", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -168,12 +175,12 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
                 Verified Student
               </span>
             )}
-            {(isOwner || profile.showWorkPerformance) && (
+            {(isOwner || profile.showWorkPerformance) && (stats.completedProjects ?? 0) > 0 && (
               <span
                 className="ml-1 inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200"
-                title={`Platform-calculated — ${reliability.onTimeRate}% of verified projects completed on time. Not manually editable.`}
+                title="Platform-calculated from verified projects — not manually editable. Approved extensions never count against you."
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Reliable Creator · {reliability.onTimeRate}% on time
+                <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Reliable Creator · {stats.completedProjects} completed, none late
               </span>
             )}
           </h1>
@@ -183,10 +190,15 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
             {(isOwner || profile.showLocation) && (
               <>
                 <MapPin className="h-3.5 w-3.5 text-lime-400" />
-                {locationLine(profile)} •{" "}
+                {locationLine(profile)}
               </>
             )}
-            {contact.joined} • {contact.responseTime.toLowerCase()}
+            {joined && (
+              <>
+                {" "}• Joined{" "}
+                {new Date(joined).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </>
+            )}
           </p>
         </div>
 

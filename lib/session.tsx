@@ -91,6 +91,12 @@ export function invalidateSession() {
 export async function logout() {
   await fetch("/api/auth/logout", { method: "POST" });
   cached = null;
+  // per-user client caches must not leak into the next session
+  for (const k of ["upnova-plan", "upnova-trust", "upnova-student-verified", "upnova-notif-read", "upnova-following"]) {
+    try {
+      window.localStorage.removeItem(k);
+    } catch {}
+  }
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 

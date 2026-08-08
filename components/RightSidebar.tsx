@@ -11,20 +11,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Briefcase, ChevronDown, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
-import { events } from "@/lib/data";
 import { useSession } from "@/lib/session";
 import type { FeedScope } from "./Feed";
 
-const MONTHS: Record<string, string> = {
-  January: "JAN", February: "FEB", March: "MAR", April: "APR",
-  May: "MAY", June: "JUN", July: "JUL", August: "AUG",
-  September: "SEP", October: "OCT", November: "NOV", December: "DEC",
-};
-
-function monthDay(date: string): [string, string] {
-  const m = date.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d+)/);
-  return m ? [MONTHS[m[1]], m[2]] : ["", ""];
-}
+const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 const scopeParam: Record<FeedScope, string> = {
   foryou: "25mi", "5": "5mi", "25": "25mi", city: "city", county: "county",
@@ -39,6 +29,16 @@ interface OppRow {
   remote: boolean;
   applyBy: string | null;
   studentFriendly: boolean;
+}
+
+interface EventRow {
+  id: string;
+  slug: string;
+  title: string;
+  startsAt: string;
+  timeLabel: string;
+  location: string;
+  attending: number;
 }
 
 interface PersonRow {
@@ -58,6 +58,7 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
 
   const [opps, setOpps] = useState<OppRow[] | null>(null);
   const [people, setPeople] = useState<PersonRow[]>([]);
+  const [eventRows, setEventRows] = useState<EventRow[]>([]);
 
   const scopeSub = (() => {
     const city = user?.profile.city ? `${user.profile.city}, ${user.profile.state}` : "near you";
@@ -76,10 +77,12 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const [o, p] = await Promise.all([
+    const [o, p, ev] = await Promise.all([
       fetch(`/api/opportunities?scope=${scopeParam[scope]}`, { cache: "no-store" }),
       fetch("/api/users?near=1&limit=3", { cache: "no-store" }),
+      fetch("/api/events", { cache: "no-store" }),
     ]);
+    if (ev.ok) setEventRows(((await ev.json()).events ?? []).slice(0, 2));
     if (o.ok) {
       const d = await o.json();
       let list: OppRow[] = (d.opportunities ?? []).filter((x: { isMine: boolean }) => !x.isMine);
@@ -103,7 +106,6 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
   /* quick discovery, not a feed: cap at 4 */
   const shown = (opps ?? []).slice(0, 4);
   const total = (opps ?? []).reduce((sum, o) => sum + (o.budget ?? 0), 0);
-  const nearEvents = events.slice(0, 2);
   const oppsHref = `/opportunities?scope=${scope}`;
 
   return (
@@ -251,17 +253,17 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
         </div>
         {open.week && (
         <ul className="divide-y divide-line-soft">
-          {nearEvents.map((e) => {
-            const [mon, day] = monthDay(e.date);
+          {eventRows.map((e) => {
+            const d = new Date(e.startsAt);
             return (
               <li key={e.id}>
-                <Link href="/events" className="group flex items-stretch transition hover:bg-card-raised">
+                <Link href={`/events/${e.slug}`} className="group flex items-stretch transition hover:bg-card-raised">
                   <span className="flex w-14 shrink-0 flex-col items-center justify-center border-r border-dashed border-zinc-700/60 bg-amber-400/[0.06] py-3">
                     <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-400">
-                      {mon}
+                      {MON[d.getMonth()]}
                     </span>
                     <span className="text-xl font-extrabold leading-tight text-zinc-50">
-                      {day}
+                      {d.getDate()}
                     </span>
                   </span>
                   <span className="min-w-0 flex-1 px-4 py-3">
@@ -269,7 +271,7 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
                       {e.title}
                     </span>
                     <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500">
-                      {e.time} ·
+                      {e.timeLabel} ·
                       <MapPin className="h-3 w-3 shrink-0" />
                       {e.location.split(",")[0]} · {e.attending} going
                     </span>

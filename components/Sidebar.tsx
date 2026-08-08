@@ -62,14 +62,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useSession();
   const myCommunities = communities.filter((c) => c.joined);
-  const [plan, setPlanState] = useState<Plan>("free");
-
+  // plan is account state from the session; PRO_EVENT re-render covers
+  // same-tab changes made on /pro before the session refetch lands
+  const [, forceTick] = useState(0);
   useEffect(() => {
-    const sync = () => setPlanState(getPlan());
-    sync();
+    const sync = () => forceTick((n) => n + 1);
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
   }, []);
+  const plan = (user?.plan ?? "free") as Plan;
   const pro = plan === "pro";
   // campus access is a database fact (verified school), never a local flag
   const campus = user?.campus ?? null;

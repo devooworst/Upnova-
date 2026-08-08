@@ -299,15 +299,21 @@ user would use; none of it runs for non-seed accounts. Delete that module for pr
 
 ### Audit — still on static demo data (next passes)
 
-- Events, Communities, Campus page CONTENT (the campus gate + verification are real; the sections
-  inside are demo data) — models and APIs are ready, UI still reads `lib/data`.
-- "This week" events widget in the right sidebar; Analytics; Discover; Resolution Center demo
-  case; Settings; the profile's Portfolio-tab items and work-history records (reliability
-  breakdown numbers). Public creator ratings/completed counts ARE computed from real projects.
-- Legacy components no longer mounted anywhere but kept in the tree: `components/Feed.tsx`,
-  `MessagesClient`, `NotificationBell`, `NearbyNow`, `CreatePost`, `HireModal`, `lib/follow.tsx`,
-  `lib/notifications.ts`, old `api/feed/for-you` + `near-you` routes.
-- Username/handle change, notification delivery channels, community feeds, event bookmarks.
+- Communities pages and Campus page CONTENT (the campus gate + verification are real; the
+  sections inside are demo data) — models and APIs are ready, UI still reads `lib/data`.
+- Event DETAIL pages (`/events/[slug]` ticketing/QR/manage) — the events list, "This week"
+  widget, and event bookmarks are DB-backed; the rich detail experience is still demo.
+- Analytics, Discover, Resolution Center demo case, Settings.
+- Legacy components no longer mounted anywhere but kept in the tree: `components/Feed.tsx`
+  (type exports only), `MessagesClient`, `NotificationBell`, `NearbyNow`, `CreatePost`,
+  `HireModal`, `lib/follow.tsx`, `lib/notifications.ts`.
+- Username/handle change, notification delivery channels, community feeds.
+
+Everything on the user's own profile is now real: verified projects, applications, listings,
+portfolio items (`portfolio_items` via /api/me/portfolio), computed reliability chip (only shown
+with actual completed work — approved extensions never count against anyone), real joined date,
+real contact email. Plan and trust state live on the account (DB), and logout purges per-user
+client caches so nothing leaks between users.
 
 ## Data & the road ahead
 

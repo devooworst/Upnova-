@@ -58,8 +58,6 @@ import {
   EducationEntry,
   SocialLink,
 } from "@/lib/profile";
-import { reliability, workRecords, contact } from "@/lib/data";
-import { getTrustStatus, TrustStatus, PRO_EVENT } from "@/lib/pro";
 import { useSession, invalidateSession } from "@/lib/session";
 
 /* ------------------------------ constants ------------------------------ */
@@ -251,7 +249,7 @@ export default function EditProfile() {
   const { user: sessionUser } = useSession();
   const campus = sessionUser?.campus ?? null;
   const studentVerified = !!campus;
-  const [trust, setTrust] = useState<TrustStatus>("identity");
+  const trust = (sessionUser?.profile.trustLevel ?? "standard") as "standard" | "identity" | "high-trust";
   const [verifyBusy, setVerifyBusy] = useState(false);
   const verifySchool = async () => {
     setVerifyBusy(true);
@@ -273,10 +271,6 @@ export default function EditProfile() {
       setSaved(p);
       setDraft(p);
     });
-    const sync = () => setTrust(getTrustStatus());
-    sync();
-    window.addEventListener(PRO_EVENT, sync);
-    return () => window.removeEventListener(PRO_EVENT, sync);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -324,6 +318,49 @@ export default function EditProfile() {
     paused: boolean;
   }
   const [myServices, setMyServices] = useState<MyService[]>([]);
+  interface CompletedProject {
+    id: string;
+    title: string;
+    client: string;
+    rating: number | null;
+    inPortfolio: boolean;
+  }
+  const [completedProjects, setCompletedProjects] = useState<CompletedProject[]>([]);
+  const [workStats, setWorkStats] = useState<{
+    completedProjects?: number | null;
+    approvedExtensions?: number;
+    rating?: number | null;
+    reviewsCount?: number;
+  }>({});
+  const loadWork = async () => {
+    const res = await fetch("/api/me/portfolio", { cache: "no-store" });
+    if (res.ok) setCompletedProjects((await res.json()).completedProjects ?? []);
+  };
+  useEffect(() => {
+    loadWork();
+  }, []);
+  useEffect(() => {
+    if (!sessionUser) return;
+    fetch(`/api/users/${sessionUser.handle}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.stats && setWorkStats(d.stats));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUser?.handle]);
+  const togglePortfolioProject = async (cp: CompletedProject) => {
+    if (cp.inPortfolio) {
+      const res = await fetch("/api/me/portfolio", { cache: "no-store" });
+      const d = await res.json();
+      const item = (d.items ?? []).find((i: { projectId: string | null }) => i.projectId === cp.id);
+      if (item) await fetch(`/api/me/portfolio?id=${item.id}`, { method: "DELETE" });
+    } else {
+      await fetch("/api/me/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: cp.id }),
+      });
+    }
+    loadWork();
+  };
   const loadServices = async () => {
     const res = await fetch("/api/services", { cache: "no-store" });
     const data = await res.json();
@@ -874,39 +911,35 @@ export default function EditProfile() {
                 Portfolio
               </FieldLabel>
               <ul className="space-y-2">
-                {workRecords.map((w) => {
-                  const on = draft.workInPortfolio.includes(w.id);
-                  return (
-                    <li
-                      key={w.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card-raised px-3.5 py-2.5"
+                {completedProjects.map((w) => (
+                  <li
+                    key={w.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card-raised px-3.5 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-zinc-100">{w.title}</p>
+                      <p className="text-xs text-zinc-500">
+                        Client: {w.client}
+                        {w.rating != null && ` · ★ ${w.rating.toFixed(1)}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => togglePortfolioProject(w)}
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                        w.inPortfolio
+                          ? "border border-lime-400/40 bg-lime-400/10 text-lime-300"
+                          : "border border-line text-zinc-400 hover:border-zinc-600"
+                      }`}
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-zinc-100">{w.title}</p>
-                        <p className="text-xs text-zinc-500">
-                          Completed {w.completed} · Client: {w.client} · ★ {w.rating.toFixed(1)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          set(
-                            "workInPortfolio",
-                            on
-                              ? draft.workInPortfolio.filter((id) => id !== w.id)
-                              : [...draft.workInPortfolio, w.id]
-                          )
-                        }
-                        className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                          on
-                            ? "border border-lime-400/40 bg-lime-400/10 text-lime-300"
-                            : "border border-line text-zinc-400 hover:border-zinc-600"
-                        }`}
-                      >
-                        {on ? "✓ In portfolio" : "Add to portfolio"}
-                      </button>
-                    </li>
-                  );
-                })}
+                      {w.inPortfolio ? "✓ In portfolio" : "Add to portfolio"}
+                    </button>
+                  </li>
+                ))}
+                {completedProjects.length === 0 && (
+                  <li className="rounded-xl border border-dashed border-line px-3.5 py-3 text-xs text-zinc-500">
+                    No completed projects yet — finish one and it can become a verified portfolio entry.
+                  </li>
+                )}
               </ul>
               <p className="mt-2 text-xs text-zinc-500">
                 Uploads (images, video, audio, links) are managed on your{" "}
@@ -1156,8 +1189,8 @@ export default function EditProfile() {
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2.5">
                 <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
                 <p className="text-xs text-zinc-500">
-                  <span className="font-semibold text-zinc-300">Response time — {contact.responseTime.toLowerCase()}.</span>{" "}
-                  Calculated from your actual reply behavior, not self-reported, so it stays honest.
+                  <span className="font-semibold text-zinc-300">Response time is calculated.</span>{" "}
+                  It builds from your actual reply behavior, not self-reported claims, so it stays honest.
                 </p>
               </div>
             </div>
@@ -1284,10 +1317,10 @@ export default function EditProfile() {
               </FieldLabel>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
-                  { v: `${reliability.onTimeRate}%`, l: "On-time" },
-                  { v: `${reliability.completed}`, l: "Completed" },
-                  { v: `${reliability.extensions}`, l: "Extension" },
-                  { v: `${reliability.responseRate}%`, l: "Response rate" },
+                  { v: `${workStats.completedProjects ?? 0}`, l: "Completed" },
+                  { v: `${workStats.approvedExtensions ?? 0}`, l: "Approved extensions" },
+                  { v: workStats.rating != null ? workStats.rating.toFixed(1) : "—", l: "Rating" },
+                  { v: `${workStats.reviewsCount ?? 0}`, l: "Reviews" },
                 ].map((m) => (
                   <div key={m.l} className="rounded-xl border border-line bg-card-raised px-3 py-2.5 text-center">
                     <p className="font-mono text-lg font-medium tracking-[0.08em] text-zinc-50">{m.v}</p>
@@ -1558,7 +1591,7 @@ export default function EditProfile() {
       )}
 
       {/* ------------------------------ preview ------------------------------ */}
-      {previewOpen && <PublicPreview draft={draft} studentVerified={studentVerified} onClose={() => setPreviewOpen(false)} />}
+      {previewOpen && <PublicPreview draft={draft} studentVerified={studentVerified} completedCount={workStats.completedProjects ?? 0} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
 }
@@ -1568,10 +1601,12 @@ export default function EditProfile() {
 function PublicPreview({
   draft,
   studentVerified,
+  completedCount,
   onClose,
 }: {
   draft: ProfileData;
   studentVerified: boolean;
+  completedCount: number;
   onClose: () => void;
 }) {
   const canMessage = draft.whoCanMessage !== "nobody";
@@ -1643,10 +1678,10 @@ function PublicPreview({
                         Verified Student
                       </span>
                     )}
-                    {draft.showWorkPerformance && (
+                    {draft.showWorkPerformance && completedCount > 0 && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[10px] font-semibold text-zinc-200">
                         <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Reliable Creator ·{" "}
-                        {reliability.onTimeRate}% on time
+                        {completedCount} completed
                       </span>
                     )}
                   </div>

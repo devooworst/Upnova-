@@ -549,3 +549,28 @@ export const bookmarks = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.targetType, t.targetId] })]
 );
+
+/* --------------------------------- events --------------------------------- */
+/* Slug ids match the event detail routes; list surfaces query this table.   */
+
+export const events = sqliteTable("events", {
+  id: id(),
+  slug: text("slug").notNull().unique(),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
+  timeLabel: text("time_label").notNull().default(""),
+  location: text("location").notNull().default(""),
+  city: text("city").notNull().default(""),
+  price: integer("price"), // null = free
+  capacity: integer("capacity"),
+  attending: integer("attending").notNull().default(0),
+  imageUrl: text("image_url"),
+  kind: text("kind").notNull().default("rsvp"), // rsvp | registration | ticket | approval
+  ageRule: text("age_rule").notNull().default("all"),
+  isSeed: seed(),
+  createdAt: ts("created_at"),
+});

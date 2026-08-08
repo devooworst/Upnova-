@@ -1,10 +1,68 @@
+"use client";
+
+/* ------------------------------------------------------------------ */
+/*  Profile → Portfolio: real portfolio_items records. Entries added   */
+/*  from completed UpNova projects carry the Verified badge; uploads   */
+/*  and links render with typed placeholder tiles — never a broken     */
+/*  image.                                                             */
+/* ------------------------------------------------------------------ */
+
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, PencilLine, Plus, EyeOff } from "lucide-react";
-import { portfolio, aiInvolvementInfo } from "@/lib/data";
+import Link from "next/link";
+import { BadgeCheck, EyeOff, FileImage, FileVideo, Music, Link2, Briefcase, Trash2, Plus } from "lucide-react";
 import { useProfile } from "@/lib/profile";
+
+interface Item {
+  id: string;
+  title: string;
+  kind: string;
+  mediaUrl: string | null;
+  client: string;
+  projectId: string | null;
+  aiInvolvement: string;
+  visible: boolean;
+}
+
+const KIND_ICON: Record<string, typeof FileImage> = {
+  image: FileImage,
+  video: FileVideo,
+  audio: Music,
+  link: Link2,
+  project: Briefcase,
+  upnova_project: BadgeCheck,
+};
+
+const KIND_TONE: Record<string, string> = {
+  image: "from-violet-500/30 to-violet-900/40 text-violet-300",
+  video: "from-amber-500/30 to-amber-900/40 text-amber-300",
+  audio: "from-lime-500/25 to-emerald-900/40 text-lime-300",
+  link: "from-zinc-600/40 to-zinc-900/40 text-zinc-300",
+  project: "from-lime-500/25 to-emerald-900/40 text-lime-300",
+  upnova_project: "from-lime-500/25 to-emerald-900/40 text-lime-300",
+};
 
 export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
   const profile = useProfile();
+  const [items, setItems] = useState<Item[] | null>(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/me/portfolio", { cache: "no-store" });
+    if (!res.ok) {
+      setItems([]);
+      return;
+    }
+    setItems((await res.json()).items ?? []);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const remove = async (id: string) => {
+    await fetch(`/api/me/portfolio?id=${id}`, { method: "DELETE" });
+    load();
+  };
 
   // privacy: owner can hide the portfolio from visitors in Edit Profile
   if (!isOwner && !profile.showPortfolio) {
@@ -17,90 +75,91 @@ export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
     );
   }
 
+  const shown = (items ?? []).filter((i) => isOwner || i.visible);
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-zinc-500">
           <span className="font-semibold text-zinc-200">Show me what you can do.</span> Completed
-          work, client projects, and published releases.
+          work, client projects, and published pieces.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {portfolio.map((p) => (
-          <article key={p.id} className="card group overflow-hidden transition hover:border-zinc-600">
-            <div className="relative aspect-[4/3] overflow-hidden">
-              {p.thumbnail ? (
-                <Image
-                  src={p.thumbnail}
-                  alt={p.title}
-                  fill
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
-                  className="object-cover transition duration-500 group-hover:scale-[1.04]"
-                />
-              ) : (
-                <div className={`flex h-full items-center justify-center bg-gradient-to-br text-5xl ${p.gradient}`}>
-                  {p.emoji}
+      {items === null ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="card aspect-[4/3] animate-pulse" />
+          ))}
+        </div>
+      ) : shown.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-line p-8 text-center">
+          <p className="text-sm font-semibold text-zinc-300">Nothing here yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">
+            Complete a project and add it from the Opportunities tab, or add entries in{" "}
+            <Link href="/profile/edit" className="text-violet-300 hover:underline">
+              Edit Profile → Portfolio
+            </Link>
+            .
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {shown.map((item) => {
+            const Icon = KIND_ICON[item.kind] ?? Link2;
+            return (
+              <article key={item.id} className="card group overflow-hidden transition hover:border-zinc-600">
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  {item.mediaUrl ? (
+                    <Image
+                      src={item.mediaUrl}
+                      alt={item.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 320px"
+                      className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${KIND_TONE[item.kind] ?? KIND_TONE.link}`}>
+                      <Icon className="h-8 w-8 opacity-80" />
+                    </div>
+                  )}
+                  {item.kind === "upnova_project" && (
+                    <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-ink/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300 backdrop-blur">
+                      <BadgeCheck className="h-3 w-3" /> Verified project
+                    </span>
+                  )}
                 </div>
-              )}
-              <span
-                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide backdrop-blur ${
-                  p.status === "Published"
-                    ? "bg-lime-400/90 text-zinc-950"
-                    : "bg-black/60 text-lime-300"
-                }`}
-              >
-                {p.status}
-              </span>
-            </div>
-            <div className="p-4">
-              <h3 className="text-sm font-bold text-zinc-50">{p.title}</h3>
-              <dl className="mt-2 space-y-1 text-xs text-zinc-500">
-                <div className="flex justify-between gap-2">
-                  <dt>Client</dt>
-                  <dd className="font-medium text-zinc-300">{p.client}</dd>
+                <div className="flex items-start justify-between gap-2 p-3.5">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-bold text-zinc-100">{item.title}</h3>
+                    <p className="mt-0.5 truncate text-xs text-zinc-500">
+                      {item.client ? `Client: ${item.client}` : item.kind.replace("_", " ")}
+                    </p>
+                  </div>
+                  {isOwner && (
+                    <button
+                      onClick={() => remove(item.id)}
+                      title="Remove from portfolio"
+                      className="shrink-0 rounded-md p-1 text-zinc-600 transition hover:text-rose-300"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt>Role</dt>
-                  <dd className="font-medium text-zinc-300">{p.role}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt>Type</dt>
-                  <dd className="font-medium text-zinc-300">{p.type}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt>AI involvement</dt>
-                  <dd className="flex items-center gap-1.5 font-medium text-zinc-300" title={p.aiDisclosure}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${aiInvolvementInfo[p.aiInvolvement].dot}`} />
-                    {aiInvolvementInfo[p.aiInvolvement].label}
-                  </dd>
-                </div>
-              </dl>
-              {isOwner ? (
-                <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
-                  <PencilLine className="h-3.5 w-3.5" />
-                  Edit Project
-                </button>
-              ) : (
-                <button className="btn-ghost mt-3 w-full py-1.5 text-xs">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  View Project
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
-
-        {/* add project — owner only */}
-        {isOwner && (
-          <button className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-zinc-500 transition hover:border-lime-400/40 hover:text-lime-300">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-card-raised">
-              <Plus className="h-5 w-5" />
-            </span>
-            <span className="text-sm font-medium">Add Project</span>
-          </button>
-        )}
-      </div>
+              </article>
+            );
+          })}
+          {isOwner && (
+            <Link
+              href="/profile/edit"
+              className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
+            >
+              <Plus className="h-6 w-6" />
+              <span className="text-xs font-semibold">Add work</span>
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

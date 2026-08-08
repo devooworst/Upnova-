@@ -37,6 +37,9 @@ export async function GET() {
           .where(inArray(tables.opportunities.id, byType("opportunity")))
           .all()
       : [];
+    const eventRows = byType("event").length
+      ? db.select().from(tables.events).where(inArray(tables.events.id, byType("event"))).all()
+      : [];
     const services = byType("service").length
       ? db
           .select({ service: tables.services, profile: tables.profiles, user: tables.users })
@@ -74,6 +77,20 @@ export async function GET() {
             byHandle: "",
             meta: o.opp.budget != null ? `$${o.opp.budget} · ${o.opp.remote ? "Remote" : o.opp.location}` : `Collab · ${o.opp.remote ? "Remote" : o.opp.location}`,
             href: "/opportunities",
+            savedAt: r.createdAt.toISOString(),
+          };
+        }
+        if (r.targetType === "event") {
+          const e = eventRows.find((x) => x.id === r.targetId);
+          if (!e) return null;
+          return {
+            type: "event" as const,
+            id: r.targetId,
+            title: e.title,
+            by: e.city,
+            byHandle: "",
+            meta: `${e.startsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${e.timeLabel} · ${e.price != null ? `$${e.price}` : "Free"}`,
+            href: `/events/${e.slug}`,
             savedAt: r.createdAt.toISOString(),
           };
         }
