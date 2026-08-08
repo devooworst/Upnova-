@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   ShieldCheck,
+  Sparkles,
   LogOut,
   Moon,
   Sun,
@@ -20,6 +21,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getTheme, setTheme } from "@/lib/theme";
+import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
+import NotificationBell from "./NotificationBell";
 import Avatar from "./Avatar";
 import { currentUser } from "@/lib/data";
 import { openCreateModal } from "./CreateModalTrigger";
@@ -37,6 +40,14 @@ export default function Navbar() {
     setTheme(next);
     setLightMode(!lightMode);
   };
+  const [plan, setPlanState] = useState<Plan>("free");
+  useEffect(() => {
+    const sync = () => setPlanState(getPlan());
+    sync();
+    window.addEventListener(PRO_EVENT, sync);
+    return () => window.removeEventListener(PRO_EVENT, sync);
+  }, []);
+  const planLabel = plan === "pro" ? "Pro" : plan === "college" ? "College+" : "Free";
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-xl">
@@ -85,10 +96,7 @@ export default function Navbar() {
             {lightMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </button>
 
-          <button className="icon-btn relative" aria-label="Notifications">
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-400 animate-pulse-dot" />
-          </button>
+          <NotificationBell />
 
           {/* Profile dropdown */}
           <div className="relative">
@@ -117,6 +125,15 @@ export default function Navbar() {
                         {currentUser.name}
                       </p>
                       <p className="truncate text-xs text-zinc-500">@{currentUser.handle}</p>
+                      <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+                        plan === "pro"
+                          ? "border-lime-400/40 bg-lime-400/10 text-lime-300"
+                          : plan === "college"
+                          ? "border-violet-400/40 bg-violet-400/10 text-violet-300"
+                          : "border-line text-zinc-400"
+                      }`}>
+                        UpNova {planLabel}
+                      </span>
                     </div>
                   </div>
                   <nav className="p-1.5 text-sm">
@@ -124,6 +141,7 @@ export default function Navbar() {
                       { href: "/profile", icon: User, label: "View Profile" },
                       { href: "/bookmarks", icon: Bookmark, label: "Bookmarks" },
                       { href: "/analytics", icon: BarChart3, label: "Analytics" },
+                      { href: "/pro", icon: Sparkles, label: "Your Plan" },
                       { href: "/resolution", icon: ShieldCheck, label: "Resolution Center" },
                       { href: "/settings", icon: Settings, label: "Settings" },
                     ].map((item) => (
