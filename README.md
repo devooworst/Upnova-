@@ -294,9 +294,20 @@ carries the transaction-safety banner, and off-platform payment mentions trigger
 warning.
 
 **Creator-defined policies** — one configurable service engine, never 50 systems.
-`/services/new` asks seven questions (offer · fulfillment · location · travel & radius ·
-scheduling · policies · customer requirements) and stores them as the listing's config
-(`lib/servicePolicies.ts`). UpNova compiles the config into the customer flow: travel fees are
+`/services/new` is a dynamic seven-STEP wizard (Service → Fulfillment → Availability →
+Location → Pricing & policies → Show your work → Preview & publish) built on one rule:
+category = defaults only, fulfillment model = workflow, creator settings = the service.
+Retwist → Beauty + Appointment and Logo → Design + Project use the same system. Picking a
+category suggests fulfillment + duration; picking Appointment unlocks weekly days, hours,
+appointment length, buffer, max/day, same-day and advance-notice rules — all enforced
+server-side at booking time ("doesn't take bookings on Sundays", "outside working hours",
+buffer-widened conflicts). Pricing is a model (fixed / starting at / hourly / custom quote)
+plus an optional deposit; "Show your work" attaches up to 3 photos; Preview renders the exact
+customer-facing card before Publish; and the post-publish screen offers an editable
+auto-generated announcement post ("Retwist appointments are open…"). Verification is explained,
+not thrown: care categories say WHY High-Trust is needed and link to Settings. The legacy
+Create-modal Service/Opportunity forms now route to the real builders. Everything lands in the
+listing's config (`lib/servicePolicies.ts`). UpNova compiles the config into the customer flow: travel fees are
 computed from real profile distances ($2/mi after 5 mi → calculated automatically), service
 radius rejects out-of-area bookings, maxPerDay caps the creator's calendar, duration comes from
 their scheduling rules, and cancellation/reschedule/late/no-show policies are shown IN the

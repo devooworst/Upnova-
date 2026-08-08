@@ -352,6 +352,8 @@ export const services = sqliteTable("services", {
   // cancellation/reschedule/late/no-show policies. UpNova provides the
   // infrastructure; the creator decides how their business operates.
   config: text("config").notNull().default("{}"),
+  // "show your work" — up to 3 images attached to the listing (JSON array)
+  media: text("media").notNull().default("[]"),
   // promoted listings are labeled and slotted separately — they NEVER
   // enter the organic ranking
   promoted: bool("promoted", false),

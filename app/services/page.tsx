@@ -283,9 +283,15 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
   const [convId, setConvId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // duration comes from the creator's scheduling config when set
-  const durationMin = service.config?.scheduling.durationMin ?? DEFAULT_DURATION[service.category] ?? 60;
+  // duration + slots come from the creator's scheduling config
+  const sched = service.config?.scheduling;
+  const durationMin = sched?.durationMin ?? DEFAULT_DURATION[service.category] ?? 60;
   const travelFee = service.travelEstimate ?? 0;
+  const slotHours = sched?.startHour != null && sched?.endHour != null
+    ? Array.from({ length: Math.max(0, sched.endHour - sched.startHour) }, (_, i) => sched.startHour! + i)
+    : SLOT_HOURS;
+  const allowedDays = sched?.days && sched.days.length ? sched.days : null;
+  const dayAllowed = !date || !allowedDays || allowedDays.includes(new Date(`${date}T12:00:00`).getDay());
 
   const fmtHour = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
   const startDate = date && hour != null ? new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`) : null;
@@ -383,11 +389,17 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
                 className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
               />
             </div>
-            {date && (
+            {date && !dayAllowed && (
+              <p className="rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-xs text-amber-300">
+                {firstName} doesn&apos;t take bookings on{" "}
+                {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long" })}s — pick another day.
+              </p>
+            )}
+            {date && dayAllowed && (
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Available times</p>
                 <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  {SLOT_HOURS.map((h) => (
+                  {slotHours.map((h) => (
                     <button
                       key={h}
                       onClick={() => setHour(h)}
@@ -415,7 +427,7 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
               placeholder={`Anything ${firstName} should know? (optional)`}
               className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
             />
-            <button onClick={() => setStep("review")} disabled={!date || hour == null} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+            <button onClick={() => setStep("review")} disabled={!date || hour == null || !dayAllowed} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
               Continue
             </button>
           </div>

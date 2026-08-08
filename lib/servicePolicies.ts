@@ -25,6 +25,17 @@ export interface ServiceConfig {
   scheduling: {
     durationMin: number;
     maxPerDay?: number;
+    /** 0=Sun … 6=Sat — days the creator takes appointments */
+    days?: number[];
+    startHour?: number; // 0–23
+    endHour?: number;
+    bufferMin?: number; // gap enforced between appointments
+    sameDayBooking?: boolean;
+    advanceNoticeHours?: number;
+  };
+  pricing?: {
+    type: "fixed" | "starting" | "hourly" | "quote";
+    deposit?: number;
   };
   policies: {
     cancellation: CancellationPolicy;
@@ -41,7 +52,16 @@ export interface ServiceConfig {
 export const DEFAULT_CONFIG: ServiceConfig = {
   locationMode: "flexible",
   travel: { mode: "none" },
-  scheduling: { durationMin: 60 },
+  scheduling: {
+    durationMin: 60,
+    days: [1, 2, 3, 4, 5, 6],
+    startHour: 9,
+    endHour: 17,
+    bufferMin: 0,
+    sameDayBooking: true,
+    advanceNoticeHours: 2,
+  },
+  pricing: { type: "starting" },
   policies: {
     cancellation: "free_24h",
     reschedule: "free",
@@ -60,6 +80,7 @@ export function parseConfig(raw: string | null | undefined): ServiceConfig {
       ...p,
       travel: { ...DEFAULT_CONFIG.travel, ...(p.travel ?? {}) },
       scheduling: { ...DEFAULT_CONFIG.scheduling, ...(p.scheduling ?? {}) },
+      pricing: { ...DEFAULT_CONFIG.pricing, ...(p.pricing ?? {}) },
       policies: { ...DEFAULT_CONFIG.policies, ...(p.policies ?? {}) },
       requirements: Array.isArray(p.requirements) ? p.requirements : [],
     };
@@ -138,6 +159,37 @@ export function noShowLabel(p: ServiceConfig["policies"]): string {
 /** Every policy line a customer must see before paying. */
 export function policyLines(c: ServiceConfig): string[] {
   return [cancellationLabel(c.policies), rescheduleLabel(c.policies), lateLabel(c.policies), noShowLabel(c.policies)];
+}
+
+export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export function priceLabel(c: ServiceConfig, price: number): string {
+  switch (c.pricing?.type) {
+    case "fixed":
+      return `$${price}`;
+    case "hourly":
+      return `$${price}/hr`;
+    case "quote":
+      return "Custom quote";
+    default:
+      return `From $${price}`;
+  }
+}
+
+export function availabilityLabel(s: ServiceConfig["scheduling"]): string {
+  const days = s.days ?? [];
+  const daysTxt =
+    days.length === 7
+      ? "Every day"
+      : days.length
+        ? days
+            .slice()
+            .sort()
+            .map((d) => DAY_LABELS[d])
+            .join(" · ")
+        : "By arrangement";
+  const fmt = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
+  return `${daysTxt} · ${fmt(s.startHour ?? 9)}–${fmt(s.endHour ?? 17)}`;
 }
 
 /** Travel fee for a given distance — the same math server and client use. */

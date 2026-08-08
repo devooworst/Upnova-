@@ -345,251 +345,30 @@ export default function CreateModal() {
 
         {/* ================= OPPORTUNITY — a project listing builder ================= */}
         {kind === "Opportunity" && !published && (
-          <div className="space-y-4">
-            <div>
-              <p className={label}>1 · What are you looking for?</p>
-              <input value={oppTitle} onChange={(e) => setOppTitle(e.target.value)} placeholder="Nike Fall Campaign" className="input-dark mt-1.5" autoFocus />
-              <Chips
-                options={["Brand Collaboration", "Freelance", "Gig", "Creative Project", "Casting", "Event Work", "Internship", "Other"]}
-                value={oppType}
-                onChange={setOppType}
-                accent="lime"
-              />
-            </div>
-
-            <div>
-              <p className={label}>2 · Who are you looking for?</p>
-              <div className="mt-1.5 space-y-1.5">
-                {roles.map((r, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      value={r.role}
-                      onChange={(e) => setRoles(roles.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))}
-                      placeholder="Videographer"
-                      className="input-dark flex-1"
-                    />
-                    <input
-                      value={r.count}
-                      onChange={(e) => setRoles(roles.map((x, j) => (j === i ? { ...x, count: Number(e.target.value.replace(/\D/g, "")) || 1 } : x)))}
-                      className="input-dark w-14 text-center tabular-nums"
-                      aria-label="How many"
-                    />
-                    {roles.length > 1 && (
-                      <button onClick={() => setRoles(roles.filter((_, j) => j !== i))} className="icon-btn h-8 w-8" aria-label="Remove role">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button onClick={() => setRoles([...roles, { role: "", count: 1 }])} className="text-xs font-semibold text-lime-400 hover:text-lime-300">
-                  + Add role
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <p className={label}>3 · Payment</p>
-              <Chips options={["Paid", "Unpaid / Collaboration", "Negotiable", "Revenue / Royalty split"]} value={payType} onChange={setPayType} accent="lime" />
-              {payType === "Paid" && (
-                <div className="mt-2 flex gap-2">
-                  <div className="relative w-32">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
-                    <input value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, ""))} placeholder="2400" inputMode="numeric" className="input-dark pl-7 tabular-nums" />
-                  </div>
-                  <select value={payStructure} onChange={(e) => setPayStructure(e.target.value)} className="input-dark flex-1">
-                    <option>Fixed payment</option>
-                    <option>Hourly</option>
-                    <option>Per deliverable</option>
-                    <option>Milestone payments</option>
-                    <option>Royalty split</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className={label}>4 · Project details</p>
-              <textarea rows={2} placeholder="Describe the project and what they'll be doing…" className="input-dark mt-1.5 resize-none" />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {["Portfolio", "Experience", "Equipment", "Transportation", "Age requirement"].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => toggleIn(oppNeeds, setOppNeeds, n)}
-                    className={`rounded-full border px-2 py-1 text-[11px] transition ${oppNeeds.includes(n) ? "border-lime-400/60 bg-lime-400/10 text-lime-300" : "border-line text-zinc-500"}`}
-                  >
-                    {oppNeeds.includes(n) ? "✓ " : "+ "}{n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <p className={label}>5 · Where &amp; who sees it</p>
-                <select className="input-dark mt-1.5">
-                  <option>Baltimore</option>
-                  <option>Remote</option>
-                  <option>Multiple locations</option>
-                </select>
-                <select className="input-dark mt-1.5">
-                  <option>25 miles</option>
-                  <option>5 miles</option>
-                  <option>City</option>
-                  <option>State</option>
-                  <option>Nationwide</option>
-                  <option>Global / Remote</option>
-                </select>
-              </div>
-              <div className="flex-1">
-                <p className={label}>6 · Deadlines</p>
-                <input placeholder="Apply by · Aug 18" className="input-dark mt-1.5" />
-                <input placeholder="Project date · Sep 5–7" className="input-dark mt-1.5" />
-              </div>
-            </div>
-
-            <div>
-              <p className={label}>7 · How should people respond?</p>
-              <Chips options={["Apply", "Message first", "Apply + portfolio", "Invite only"]} value={respond} onChange={setRespond} accent="lime" />
-            </div>
-
-            <button
-              onClick={() => setPublished(true)}
-              disabled={!oppTitle.trim()}
-              className={`w-full rounded-md py-2.5 text-sm font-bold transition ${oppTitle.trim() ? "bg-lime-400 text-zinc-950 hover:bg-lime-300 hover:shadow-glow" : "cursor-not-allowed bg-card-raised text-zinc-600"}`}
-            >
-              Publish Opportunity
-            </button>
+          <div className="space-y-3 px-5 py-6 text-center">
+            <p className="text-sm font-semibold text-zinc-100">Opportunities get the full form</p>
+            <p className="mx-auto max-w-sm text-xs leading-relaxed text-zinc-500">
+              Budget, dates, and what applicants must provide — you decide the requirements.
+            </p>
+            <a href="/opportunities/new" className="btn-lime inline-flex px-5 py-2 text-sm">
+              Post an opportunity
+            </a>
           </div>
         )}
 
-        {/* ================= SERVICE — a professional listing ================= */}
         {kind === "Service" && !published && (
-          <div className="space-y-4">
-            <div>
-              <p className={label}>What are you offering?</p>
-              <input value={svcName} onChange={(e) => setSvcName(e.target.value)} placeholder="Music Production" className="input-dark mt-1.5" autoFocus />
-              <Chips
-                options={["Music", "Photography", "Video", "Design", "Fashion", "Beauty", "Writing", "Technology", "Business", "Other"]}
-                value={svcCategory}
-                onChange={setSvcCategory}
-                accent="lime"
-              />
-            </div>
-            <textarea rows={2} placeholder="Describe your service — what clients get and how you work…" className="input-dark resize-none" />
-            <div>
-              <p className={label}>What type of service is this?</p>
-              <Chips
-                options={["Creative", "In-person", "Home access", "Childcare", "Pet care", "Transportation", "Personal assistance", "Other"]}
-                value={svcType}
-                onChange={setSvcType}
-                accent="lime"
-              />
-              {(() => {
-                const level = ["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType)
-                  ? "High-Trust"
-                  : svcType === "In-person"
-                  ? "Identity Verified"
-                  : "Standard";
-                return (
-                  <p className="mt-2 text-[11px] text-zinc-500">
-                    Verification required:{" "}
-                    <span className={`font-semibold ${level === "High-Trust" ? "text-red-300" : level === "Identity Verified" ? "text-amber-300" : "text-zinc-300"}`}>
-                      {level}
-                    </span>
-                    {svcType === "Childcare" && <span className="text-zinc-600"> + applicable additional screening</span>}
-                  </p>
-                );
-              })()}
-            </div>
-            <div>
-              <p className={label}>What do you deliver?</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {["Beat", "Mixing", "Mastering", "Recording", "Revisions", "Edited gallery", "Source files"].map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => toggleIn(deliverables, setDeliverables, d)}
-                    className={`rounded-full border px-2 py-1 text-[11px] transition ${deliverables.includes(d) ? "border-lime-400/60 bg-lime-400/10 text-lime-300" : "border-line text-zinc-500"}`}
-                  >
-                    {deliverables.includes(d) ? "✓ " : ""}{d}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <p className={label}>Pricing</p>
-                <select value={priceModel} onChange={(e) => setPriceModel(e.target.value)} className="input-dark mt-1.5">
-                  <option>Starting at</option>
-                  <option>Fixed price</option>
-                  <option>Hourly</option>
-                  <option>Custom quote</option>
-                </select>
-              </div>
-              <div className="w-28">
-                <p className={label}>&nbsp;</p>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
-                  <input value={svcPrice} onChange={(e) => setSvcPrice(e.target.value.replace(/\D/g, ""))} placeholder="300" inputMode="numeric" className="input-dark pl-7 tabular-nums" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <p className={label}>Turnaround</p>
-                <input placeholder="3–5 days" className="input-dark mt-1.5" />
-              </div>
-            </div>
-            <div>
-              <p className={label}>Availability &amp; reach</p>
-              <Chips options={["Accepting clients", "Available this week", "Currently booked", "Not accepting"]} value={availability} onChange={setAvailability} accent="lime" />
-              <select className="input-dark mt-2">
-                <option>Nationwide / Remote</option>
-                <option>Nearby (5 mi)</option>
-                <option>25 miles</option>
-                <option>City</option>
-                <option>State</option>
-                <option>Global</option>
-              </select>
-            </div>
-            <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-4 text-xs text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300">
-              <Plus className="h-3.5 w-3.5" /> Attach portfolio examples — photos, video, audio, past projects
-            </button>
-            <label className="flex cursor-pointer items-center justify-between rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-300">
-              <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-red-400" /> Original work — no undisclosed generative AI</span>
-              <input type="checkbox" checked={originalWork} onChange={(e) => setOriginalWork(e.target.checked)} className="accent-lime-400" />
-            </label>
-            {["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType) && !highTrustDone ? (
-              <div className="rounded-md border border-red-400/30 bg-red-500/5 p-3.5">
-                <p className="text-sm font-semibold text-red-300">Cannot publish yet</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                  {svcType} requires High-Trust Verification — identity, age, and background
-                  screening where legally permitted. Complete verification to offer this service.
-                </p>
-                <button
-                  onClick={() => setHighTrustDone(true)}
-                  className="mt-2.5 w-full rounded-md bg-lime-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-lime-300"
-                >
-                  Complete Verification
-                </button>
-              </div>
-            ) : (
-              <>
-                {highTrustDone && ["Childcare", "Pet care", "Home access", "Transportation", "Personal assistance"].includes(svcType) && (
-                  <p className="rounded-md border border-lime-400/30 bg-lime-400/5 px-3 py-2 text-xs text-lime-300">
-                    ✓ Eligible to offer {svcType.toLowerCase()} services
-                  </p>
-                )}
-                <button
-                  onClick={() => setPublished(true)}
-                  disabled={!svcName.trim()}
-                  className={`w-full rounded-md py-2.5 text-sm font-bold transition ${svcName.trim() ? "bg-lime-400 text-zinc-950 hover:bg-lime-300 hover:shadow-glow" : "cursor-not-allowed bg-card-raised text-zinc-600"}`}
-                >
-                  Publish Service
-                </button>
-              </>
-            )}
+          <div className="space-y-3 px-5 py-6 text-center">
+            <p className="text-sm font-semibold text-zinc-100">Services get the full builder</p>
+            <p className="mx-auto max-w-sm text-xs leading-relaxed text-zinc-500">
+              What you offer, how it&apos;s fulfilled, availability, travel, pricing, and your
+              policies — set once, and UpNova builds the booking experience from your rules.
+            </p>
+            <a href="/services/new" className="btn-lime inline-flex px-5 py-2 text-sm">
+              Open the service builder
+            </a>
           </div>
         )}
 
-        {/* ================= POLL — actually useful ================= */}
         {kind === "Poll" && !published && (
           <div className="space-y-4">
             <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="What type of content should I make next?" className="input-dark" autoFocus />

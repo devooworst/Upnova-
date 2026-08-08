@@ -76,6 +76,13 @@ export async function GET() {
         owner: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.service.ownerId,
         promoted: r.service.promoted,
+        media: (() => {
+          try {
+            return JSON.parse(r.service.media);
+          } catch {
+            return [];
+          }
+        })(),
         config,
         distanceMi,
         travelEstimate: travel.fee,
@@ -122,6 +129,20 @@ export async function POST(req: NextRequest) {
       scheduling: {
         durationMin: num(inC.scheduling?.durationMin, 480) ?? 60,
         maxPerDay: num(inC.scheduling?.maxPerDay, 20),
+        days: Array.isArray(inC.scheduling?.days)
+          ? inC.scheduling!.days!.map(Number).filter((d) => d >= 0 && d <= 6).slice(0, 7)
+          : DEFAULT_CONFIG.scheduling.days,
+        startHour: num(inC.scheduling?.startHour, 23) ?? 9,
+        endHour: num(inC.scheduling?.endHour, 24) ?? 17,
+        bufferMin: num(inC.scheduling?.bufferMin, 120) ?? 0,
+        sameDayBooking: inC.scheduling?.sameDayBooking !== false,
+        advanceNoticeHours: num(inC.scheduling?.advanceNoticeHours, 168) ?? 2,
+      },
+      pricing: {
+        type: ["fixed", "starting", "hourly", "quote"].includes(inC.pricing?.type as string)
+          ? (inC.pricing!.type as NonNullable<ServiceConfig["pricing"]>["type"])
+          : "starting",
+        deposit: num(inC.pricing?.deposit, 5000),
       },
       policies: {
         cancellation: ["anytime", "free_24h", "partial_48h", "custom"].includes(inC.policies?.cancellation as string)
@@ -156,6 +177,13 @@ export async function POST(req: NextRequest) {
         category,
         fulfillment,
         config: JSON.stringify(config),
+        media: JSON.stringify(
+          Array.isArray(body.media)
+            ? body.media
+                .filter((m: unknown) => typeof m === "string" && (m as string).startsWith("data:image/") && (m as string).length < 700_000)
+                .slice(0, 3)
+            : []
+        ),
         aiPolicy: ["no-ai", "disclosure", "assisted", "client-decides"].includes(body.aiPolicy)
           ? body.aiPolicy
           : "client-decides",

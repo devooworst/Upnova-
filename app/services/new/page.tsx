@@ -1,31 +1,77 @@
 "use client";
 
 /* ------------------------------------------------------------------ */
-/*  Create a service — the configurable service engine.                */
-/*  Seven questions, one listing: what you offer, how it's fulfilled,  */
-/*  where it happens, what you charge (incl. travel), how scheduling   */
-/*  works, what your policies are, and what the customer provides.     */
-/*  UpNova compiles these choices into the customer-facing flow —      */
-/*  every fee and policy is disclosed before payment.                  */
+/*  Create Service — a dynamic wizard, not a business application      */
+/*  form. "Tell us what you're offering, and we'll build the listing   */
+/*  around it."                                                        */
+/*                                                                     */
+/*  The architecture rule:                                             */
+/*    Category           = recommendations/defaults only               */
+/*    Fulfillment model  = determines the workflow + next questions    */
+/*    Creator settings   = determine the actual service                */
+/*  Retwist → Beauty + Appointment. Logo → Design + Project. Same      */
+/*  underlying Service system, never 20 hard-coded forms.              */
 /* ------------------------------------------------------------------ */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, ImagePlus, X, Check, MapPin, BadgeCheck } from "lucide-react";
+import { useSession } from "@/lib/session";
 import {
   type ServiceConfig,
   DEFAULT_CONFIG,
   LOCATION_LABEL,
   travelLabel,
   policyLines,
+  priceLabel,
+  availabilityLabel,
+  DAY_LABELS,
 } from "@/lib/servicePolicies";
 
 const inputCls =
   "w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-lime-400/50";
 
 const CATEGORIES = ["creative", "music", "photography", "video", "design", "beauty", "care", "fashion", "events", "education"];
-const REQUIREMENT_OPTIONS = ["References", "Photos", "Measurements", "Project brief", "Special instructions"];
+
+/* category → sensible defaults. Suggestions only — never a different system. */
+const CATEGORY_DEFAULTS: Record<string, { fulfillment: "appointment" | "project" | "quote"; durationMin: number }> = {
+  beauty: { fulfillment: "appointment", durationMin: 90 },
+  care: { fulfillment: "appointment", durationMin: 60 },
+  photography: { fulfillment: "appointment", durationMin: 120 },
+  education: { fulfillment: "appointment", durationMin: 60 },
+  events: { fulfillment: "appointment", durationMin: 240 },
+  music: { fulfillment: "project", durationMin: 60 },
+  design: { fulfillment: "project", durationMin: 60 },
+  video: { fulfillment: "project", durationMin: 60 },
+  fashion: { fulfillment: "project", durationMin: 60 },
+  creative: { fulfillment: "project", durationMin: 60 },
+};
+
+const HIGH_TRUST_CATEGORIES = ["care"];
+
+const STEPS = ["Service", "Fulfillment", "Availability", "Location", "Pricing & policies", "Show your work", "Preview"];
+
+function readImage(file: File, maxW: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -40,46 +86,60 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-lime-400/10 font-mono text-[10px] font-semibold text-lime-300">
-          {n}
-        </span>
-        {title}
-      </h2>
-      {hint && <p className="mt-1 text-xs text-zinc-500">{hint}</p>}
-      <div className="mt-3">{children}</div>
-    </section>
-  );
-}
-
 export default function NewServicePage() {
   const router = useRouter();
+  const { user } = useSession();
+  const [step, setStep] = useState(0);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("creative");
-  const [fulfillment, setFulfillment] = useState<"appointment" | "project" | "quote">("appointment");
+  const [fulfillment, setFulfillment] = useState<"appointment" | "project" | "quote">("project");
   const [config, setConfig] = useState<ServiceConfig>(JSON.parse(JSON.stringify(DEFAULT_CONFIG)));
+  const [media, setMedia] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [liveId, setLiveId] = useState<string | null>(null);
+  const [postDraft, setPostDraft] = useState("");
+  const [posted, setPosted] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  const setTravel = (patch: Partial<ServiceConfig["travel"]>) =>
-    setConfig((c) => ({ ...c, travel: { ...c.travel, ...patch } }));
-  const setPolicies = (patch: Partial<ServiceConfig["policies"]>) =>
-    setConfig((c) => ({ ...c, policies: { ...c.policies, ...patch } }));
-  const setScheduling = (patch: Partial<ServiceConfig["scheduling"]>) =>
-    setConfig((c) => ({ ...c, scheduling: { ...c.scheduling, ...patch } }));
+  const setTravel = (patch: Partial<ServiceConfig["travel"]>) => setConfig((c) => ({ ...c, travel: { ...c.travel, ...patch } }));
+  const setPolicies = (patch: Partial<ServiceConfig["policies"]>) => setConfig((c) => ({ ...c, policies: { ...c.policies, ...patch } }));
+  const setScheduling = (patch: Partial<ServiceConfig["scheduling"]>) => setConfig((c) => ({ ...c, scheduling: { ...c.scheduling, ...patch } }));
+  const setPricing = (patch: Partial<NonNullable<ServiceConfig["pricing"]>>) =>
+    setConfig((c) => ({ ...c, pricing: { type: "starting", ...c.pricing, ...patch } }));
 
+  const pickCategory = (c: string) => {
+    setCategory(c);
+    const d = CATEGORY_DEFAULTS[c];
+    if (d) {
+      setFulfillment(d.fulfillment);
+      setScheduling({ durationMin: d.durationMin });
+    }
+  };
+
+  /* steps that apply given the fulfillment model */
+  const activeSteps = STEPS.filter((s) => s !== "Availability" || fulfillment === "appointment");
+  const stepName = activeSteps[step];
+  const needsHighTrust = HIGH_TRUST_CATEGORIES.includes(category);
+  const trustOk = !needsHighTrust || user?.profile.trustLevel === "high-trust";
   const travelRelevant = ["client_location", "both", "flexible"].includes(config.locationMode);
 
-  const submit = async () => {
-    if (!title.trim() || !price) {
-      setError("A title and base price are required");
+  const next = () => {
+    setError(null);
+    if (stepName === "Service" && (!title.trim() || !description.trim())) {
+      setError("Give it a name and tell clients what they'll receive");
       return;
     }
+    if (stepName === "Pricing & policies" && fulfillment !== "quote" && !price) {
+      setError("Set your price");
+      return;
+    }
+    setStep((s) => Math.min(s + 1, activeSteps.length - 1));
+  };
+
+  const publish = async () => {
     setBusy(true);
     setError(null);
     const res = await fetch("/api/services", {
@@ -88,23 +148,95 @@ export default function NewServicePage() {
       body: JSON.stringify({
         title,
         description,
-        price: Number(price),
+        price: fulfillment === "quote" ? Number(price) || 1 : Number(price),
         category,
         fulfillment,
         reach: config.travel.radiusMi ? `${config.travel.radiusMi} mi radius` : config.locationMode === "remote" ? "Remote" : "Local",
         config,
+        media,
       }),
     });
     const d = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setError(d.error || "Could not create the service");
+      setError(d.error || "Could not publish");
       if (res.status === 401) router.push("/login");
       return;
     }
-    router.push("/services");
+    setLiveId(d.id);
+    setPostDraft(
+      `${title} ${fulfillment === "appointment" ? "appointments are open" : "requests are open"}.\n` +
+        `${fulfillment === "appointment" ? "I have openings this week — book" : "Send your request"} through UpNova.\n` +
+        `${priceLabel(config, Number(price) || 0)}${user?.profile.city ? ` · ${user.profile.city}, ${user.profile.state}` : ""}`
+    );
   };
 
+  const shareAsPost = async () => {
+    setBusy(true);
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        body: postDraft,
+        kind: "announcement",
+        category: category.charAt(0).toUpperCase() + category.slice(1),
+        imageUrl: media[0] ?? null,
+      }),
+    });
+    setBusy(false);
+    if (res.ok) setPosted(true);
+  };
+
+  /* ------------------------------ live screen ------------------------------ */
+  if (liveId) {
+    return (
+      <div className="mx-auto max-w-md space-y-4 py-10 text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-lime-400/40 bg-lime-400/10">
+          <Check className="h-6 w-6 text-lime-300" />
+        </span>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-50">Your service is live</h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            <span className="font-semibold text-zinc-200">{title}</span> is now available for{" "}
+            {fulfillment === "appointment" ? "booking" : "requests"}.
+          </p>
+        </div>
+
+        {!posted ? (
+          <div className="card p-4 text-left">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Want to tell people?</p>
+            <p className="mt-1 text-[11px] text-zinc-500">Edit the draft, then share it to your feed and profile grid.</p>
+            <textarea
+              value={postDraft}
+              onChange={(e) => setPostDraft(e.target.value)}
+              rows={4}
+              className={`${inputCls} mt-2 resize-none text-xs leading-relaxed`}
+            />
+            <div className="mt-2 flex gap-2">
+              <button onClick={shareAsPost} disabled={busy || !postDraft.trim()} className="btn-lime flex-1 justify-center py-2 text-xs disabled:opacity-40">
+                Create a Post
+              </button>
+              <button onClick={() => router.push("/services")} className="btn-ghost px-4 py-2 text-xs">
+                Skip
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="rounded-xl border border-lime-400/30 bg-lime-400/5 px-4 py-3 text-sm text-lime-300">
+              Posted — it&apos;s in the feed and on your profile grid.
+            </p>
+            <div className="flex justify-center gap-2">
+              <Link href="/services" className="btn-lime px-5 py-2 text-sm">View on Services</Link>
+              <Link href="/profile" className="btn-ghost px-5 py-2 text-sm">Your profile</Link>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* -------------------------------- wizard -------------------------------- */
   return (
     <div className="mx-auto max-w-xl space-y-4 pb-10">
       <div>
@@ -115,227 +247,423 @@ export default function NewServicePage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
             <Sparkles className="h-5 w-5 text-lime-400" />
           </span>
-          Create a service
+          Create Service
         </h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          You decide how your business operates — UpNova builds the booking experience from your rules.
-        </p>
       </div>
 
-      <Section n={1} title="What are you offering?">
-        <div className="space-y-2.5">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Service name — e.g. Mobile Hair Service" className={inputCls} maxLength={80} />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What's included?" className={`${inputCls} resize-none`} />
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-32">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
-              <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Base price" className={`${inputCls} pl-7`} />
-            </div>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={`${inputCls} w-auto capitalize`}>
+      {/* step rail */}
+      <div className="flex items-center gap-1">
+        {activeSteps.map((s, i) => (
+          <button
+            key={s}
+            onClick={() => i < step && setStep(i)}
+            className={`h-1.5 flex-1 rounded-full transition ${i <= step ? "bg-lime-400" : "bg-card-raised"}`}
+            title={s}
+          />
+        ))}
+      </div>
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+        Step {step + 1} of {activeSteps.length} — {stepName}
+      </p>
+
+      {/* ============================ 1 · SERVICE ============================ */}
+      {stepName === "Service" && (
+        <section className="card space-y-3 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">What are you offering?</p>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Retwist, Portrait Session, Logo Design" className={`${inputCls} mt-1.5`} maxLength={80} autoFocus />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Category</p>
+            <p className="text-[11px] text-zinc-600">Sets smart defaults — you can change everything after.</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
               {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <Chip key={c} on={category === c} onClick={() => pickCategory(c)}>
+                  <span className="capitalize">{c}</span>
+                </Chip>
               ))}
-            </select>
-            <span className="text-[11px] text-zinc-600">Your price is your payout — buyers pay the 5% fee on top.</span>
+            </div>
           </div>
-        </div>
-      </Section>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Describe your service</p>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Tell clients what they'll receive. e.g. Full retwist for locs. Includes washing and basic styling." className={`${inputCls} mt-1.5 resize-none`} />
+          </div>
 
-      <Section n={2} title="How is it fulfilled?" hint="This decides the customer's flow and the button they see.">
-        <div className="flex flex-wrap gap-1.5">
-          <Chip on={fulfillment === "appointment"} onClick={() => setFulfillment("appointment")}>Appointment — time slots</Chip>
-          <Chip on={fulfillment === "project"} onClick={() => setFulfillment("project")}>Project — request & deliver</Chip>
-          <Chip on={fulfillment === "quote"} onClick={() => setFulfillment("quote")}>Quote — price after discussion</Chip>
-        </div>
-      </Section>
+          {/* verification — explained, never just thrown at people */}
+          <div className={`rounded-xl border px-3.5 py-2.5 ${needsHighTrust && !trustOk ? "border-amber-400/40 bg-amber-400/5" : "border-line-soft bg-card-raised/50"}`}>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Verification</p>
+            {needsHighTrust ? (
+              trustOk ? (
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-lime-300">
+                  <BadgeCheck className="h-3.5 w-3.5" /> High-Trust verified — you can publish care services.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs leading-relaxed text-amber-300">
+                  Care services need High-Trust identity verification before publishing — clients are trusting
+                  you with their homes, pets, or people.{" "}
+                  <Link href="/settings" className="underline">Verify in Settings</Link>. Only the badge is ever shown, never your documents.
+                </p>
+              )
+            ) : (
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
+                <Check className="h-3.5 w-3.5 text-lime-400" /> Standard verification — nothing extra needed for this category.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
-      <Section n={3} title="Where does it happen?">
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(LOCATION_LABEL) as (keyof typeof LOCATION_LABEL)[]).map((m) => (
-            <Chip key={m} on={config.locationMode === m} onClick={() => setConfig((c) => ({ ...c, locationMode: m }))}>
-              {LOCATION_LABEL[m]}
-            </Chip>
+      {/* ========================== 2 · FULFILLMENT ========================== */}
+      {stepName === "Fulfillment" && (
+        <section className="card space-y-2 p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">How do clients get this service?</p>
+          {(
+            [
+              { v: "appointment", t: "Appointment", d: "Clients choose a date and time from your availability." },
+              { v: "project", t: "Project request", d: "Clients describe what they need; you deliver by a deadline." },
+              { v: "quote", t: "Quote", d: "You review the request and set the price before anything starts." },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.v}
+              onClick={() => setFulfillment(o.v)}
+              className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                fulfillment === o.v ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"
+              }`}
+            >
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${fulfillment === o.v ? "bg-lime-400" : "bg-zinc-700"}`} />
+              <span>
+                <span className={`block text-sm font-semibold ${fulfillment === o.v ? "text-lime-300" : "text-zinc-200"}`}>{o.t}</span>
+                <span className="block text-xs text-zinc-500">{o.d}</span>
+              </span>
+            </button>
           ))}
-        </div>
-      </Section>
+          <p className="pt-1 text-[11px] leading-relaxed text-zinc-600">
+            The rest of this wizard adapts to your choice — appointments get availability and booking rules;
+            projects and quotes skip straight to location and pricing.
+          </p>
+        </section>
+      )}
 
-      <Section n={4} title="Travel & service area" hint={travelRelevant ? "Your rules — free, flat, per mile, or quoted. Never dictated by UpNova." : "Travel doesn't apply to this location setting."}>
-        {travelRelevant ? (
-          <div className="space-y-2.5">
-            <div className="flex flex-wrap gap-1.5">
-              {([
-                ["none", "No travel offered"],
-                ["free", "Free travel"],
-                ["flat", "Flat travel fee"],
-                ["per_mile", "Fee by distance"],
-                ["quote", "Custom quote"],
-              ] as const).map(([m, l]) => (
-                <Chip key={m} on={config.travel.mode === m} onClick={() => setTravel({ mode: m })}>{l}</Chip>
+      {/* ========================== 3 · AVAILABILITY ========================== */}
+      {stepName === "Availability" && (
+        <section className="card space-y-4 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Days</p>
+            <div className="mt-1.5 flex gap-1.5">
+              {DAY_LABELS.map((d, i) => (
+                <button
+                  key={d}
+                  onClick={() =>
+                    setScheduling({
+                      days: (config.scheduling.days ?? []).includes(i)
+                        ? (config.scheduling.days ?? []).filter((x) => x !== i)
+                        : [...(config.scheduling.days ?? []), i],
+                    })
+                  }
+                  className={`flex-1 rounded-lg border py-1.5 text-xs font-semibold transition ${
+                    (config.scheduling.days ?? []).includes(i)
+                      ? "border-lime-400/50 bg-lime-400/10 text-lime-300"
+                      : "border-line text-zinc-500"
+                  }`}
+                >
+                  {d}
+                </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {config.travel.mode === "flat" && (
-                <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  Fee $<input value={config.travel.flatFee ?? ""} onChange={(e) => setTravel({ flatFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-20 py-1.5`} />
-                </label>
-              )}
-              {config.travel.mode === "per_mile" && (
-                <>
-                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    $<input value={config.travel.perMile ?? ""} onChange={(e) => setTravel({ perMile: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-16 py-1.5`} />/mile
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    after<input value={config.travel.freeMiles ?? ""} onChange={(e) => setTravel({ freeMiles: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-16 py-1.5`} />mi
-                  </label>
-                </>
-              )}
-              {config.travel.mode !== "none" && (
-                <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  Service radius<input value={config.travel.radiusMi ?? ""} onChange={(e) => setTravel({ radiusMi: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="mi" className={`${inputCls} w-16 py-1.5`} />mi
-                </label>
-              )}
-            </div>
-            <p className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2 text-xs text-zinc-500">
-              Customers see: <span className="font-medium text-zinc-300">{travelLabel(config.travel)}</span>
-              {config.travel.mode === "per_mile" && " — UpNova calculates the exact fee from their distance."}
-            </p>
           </div>
-        ) : (
-          <p className="text-xs text-zinc-600">—</p>
-        )}
-      </Section>
-
-      {fulfillment === "appointment" && (
-        <Section n={5} title="Scheduling" hint="Duration per booking and how many you'll take per day.">
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-              Duration
-              <select
-                value={config.scheduling.durationMin}
-                onChange={(e) => setScheduling({ durationMin: Number(e.target.value) })}
-                className={`${inputCls} w-auto py-1.5`}
-              >
+              Hours
+              <select value={config.scheduling.startHour} onChange={(e) => setScheduling({ startHour: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" })}</option>
+                ))}
+              </select>
+              –
+              <select value={config.scheduling.endHour} onChange={(e) => setScheduling({ endHour: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" })}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+              Length
+              <select value={config.scheduling.durationMin} onChange={(e) => setScheduling({ durationMin: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
                 {[30, 45, 60, 90, 120, 180, 240].map((m) => (
                   <option key={m} value={m}>{m >= 60 ? `${m / 60} hr${m > 60 ? "s" : ""}` : `${m} min`}</option>
                 ))}
               </select>
             </label>
             <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-              Max bookings/day
-              <input
-                value={config.scheduling.maxPerDay ?? ""}
-                onChange={(e) => setScheduling({ maxPerDay: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })}
-                placeholder="∞"
-                className={`${inputCls} w-16 py-1.5`}
-              />
+              Buffer
+              <select value={config.scheduling.bufferMin} onChange={(e) => setScheduling({ bufferMin: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                {[0, 15, 30, 60].map((m) => <option key={m} value={m}>{m} min</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+              Max/day
+              <input value={config.scheduling.maxPerDay ?? ""} onChange={(e) => setScheduling({ maxPerDay: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="∞" className={`${inputCls} w-14 py-1.5`} />
             </label>
           </div>
-        </Section>
+          <div className="border-t border-line-soft pt-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Booking rules</p>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-xs text-zinc-300">
+                <input type="checkbox" checked={config.scheduling.sameDayBooking !== false} onChange={(e) => setScheduling({ sameDayBooking: e.target.checked })} className="accent-lime-400" />
+                Allow same-day booking
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                Advance notice
+                <select value={config.scheduling.advanceNoticeHours} onChange={(e) => setScheduling({ advanceNoticeHours: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                  {[0, 1, 2, 4, 12, 24, 48].map((h) => <option key={h} value={h}>{h} hr{h === 1 ? "" : "s"}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
       )}
 
-      <Section n={fulfillment === "appointment" ? 6 : 5} title="Your policies" hint="Shown to every customer BEFORE they pay — no surprise fees, ever.">
-        <div className="space-y-3">
+      {/* ============================ 4 · LOCATION ============================ */}
+      {stepName === "Location" && (
+        <section className="card space-y-4 p-5">
           <div>
-            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Cancellation</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([
-                ["anytime", "Free anytime"],
-                ["free_24h", "Free up to 24h before"],
-                ["partial_48h", "Full 48h+ · 50% after"],
-                ["custom", "Custom"],
-              ] as const).map(([v, l]) => (
-                <Chip key={v} on={config.policies.cancellation === v} onClick={() => setPolicies({ cancellation: v })}>{l}</Chip>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Where do you provide this service?</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {(Object.keys(LOCATION_LABEL) as (keyof typeof LOCATION_LABEL)[]).map((m) => (
+                <Chip key={m} on={config.locationMode === m} onClick={() => setConfig((c) => ({ ...c, locationMode: m }))}>
+                  {LOCATION_LABEL[m]}
+                </Chip>
               ))}
             </div>
-            {config.policies.cancellation === "custom" && (
-              <input
-                value={config.policies.cancellationNote ?? ""}
-                onChange={(e) => setPolicies({ cancellationNote: e.target.value })}
-                placeholder="Describe your policy"
-                className={`${inputCls} mt-2`}
-                maxLength={160}
-              />
-            )}
           </div>
-          <div>
-            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Rescheduling</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([
-                ["free", "Free"],
-                ["one_free", "One free"],
-                ["fee", "Fee"],
-                ["approval", "Needs approval"],
-              ] as const).map(([v, l]) => (
-                <Chip key={v} on={config.policies.reschedule === v} onClick={() => setPolicies({ reschedule: v })}>{l}</Chip>
-              ))}
-              {config.policies.reschedule === "fee" && (
-                <label className="flex items-center gap-1 text-xs text-zinc-400">
-                  $<input value={config.policies.rescheduleFee ?? ""} onChange={(e) => setPolicies({ rescheduleFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-16 py-1`} />
-                </label>
-              )}
+          {travelRelevant && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Do you charge a travel fee?</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {([["none", "No"], ["free", "Travel included"], ["flat", "Flat fee"], ["per_mile", "Distance-based"], ["quote", "Custom"]] as const).map(([m, l]) => (
+                  <Chip key={m} on={config.travel.mode === m} onClick={() => setTravel({ mode: m })}>{l}</Chip>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                {config.travel.mode === "flat" && (
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    Fee $<input value={config.travel.flatFee ?? ""} onChange={(e) => setTravel({ flatFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-20 py-1.5`} />
+                  </label>
+                )}
+                {config.travel.mode === "per_mile" && (
+                  <>
+                    <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      $<input value={config.travel.perMile ?? ""} onChange={(e) => setTravel({ perMile: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-14 py-1.5`} />/mi
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      after<input value={config.travel.freeMiles ?? ""} onChange={(e) => setTravel({ freeMiles: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-14 py-1.5`} />mi
+                    </label>
+                  </>
+                )}
+                {config.travel.mode !== "none" && (
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    Radius<input value={config.travel.radiusMi ?? ""} onChange={(e) => setTravel({ radiusMi: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="mi" className={`${inputCls} w-14 py-1.5`} />mi
+                  </label>
+                )}
+              </div>
             </div>
+          )}
+          <div className="rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2.5">
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+              <MapPin className="h-3 w-3" /> Location visibility
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+              Clients see your <span className="font-medium text-zinc-300">service area</span>, never your address.
+              Your public location is controlled by your{" "}
+              <Link href="/profile/edit" className="text-violet-300 underline">profile setting</Link>
+              {user ? <> (currently: <span className="capitalize text-zinc-300">{user.profile.locationVisibility}</span>)</> : null}.
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-              Grace period
-              <select value={config.policies.lateGraceMin} onChange={(e) => setPolicies({ lateGraceMin: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
-                {[0, 5, 10, 15, 30].map((m) => <option key={m} value={m}>{m} min</option>)}
-              </select>
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-              Late fee $<input value={config.policies.lateFee || ""} onChange={(e) => setPolicies({ lateFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} placeholder="0" className={`${inputCls} w-16 py-1.5`} />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-              No-show
-              <select value={config.policies.noShow} onChange={(e) => setPolicies({ noShow: e.target.value as ServiceConfig["policies"]["noShow"] })} className={`${inputCls} w-auto py-1.5`}>
-                <option value="none">No charge</option>
-                <option value="partial">50% charge</option>
-                <option value="full">Full charge</option>
-              </select>
-            </label>
-          </div>
-          <div className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Customers will see</p>
-            <ul className="mt-1 space-y-0.5 text-xs text-zinc-400">
-              {policyLines(config).map((l) => (
-                <li key={l} className="flex items-center gap-1.5">
-                  <span className="h-1 w-1 rounded-full bg-zinc-600" /> {l}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </Section>
+        </section>
+      )}
 
-      <Section n={fulfillment === "appointment" ? 7 : 6} title="What does the customer provide?" hint="Only ask for what you actually need.">
-        <div className="flex flex-wrap gap-1.5">
-          {REQUIREMENT_OPTIONS.map((r) => (
-            <Chip
-              key={r}
-              on={config.requirements.includes(r)}
-              onClick={() =>
-                setConfig((c) => ({
-                  ...c,
-                  requirements: c.requirements.includes(r) ? c.requirements.filter((x) => x !== r) : [...c.requirements, r],
-                }))
-              }
-            >
-              {r}
-            </Chip>
-          ))}
-        </div>
-      </Section>
+      {/* ======================= 5 · PRICING & POLICIES ======================= */}
+      {stepName === "Pricing & policies" && (
+        <section className="card space-y-4 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">How do you charge?</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {([["fixed", "Fixed price"], ["starting", "Starting at"], ["hourly", "Hourly"], ["quote", "Custom quote"]] as const).map(([v, l]) => (
+                <Chip key={v} on={(config.pricing?.type ?? "starting") === v} onClick={() => setPricing({ type: v })}>{l}</Chip>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              {config.pricing?.type !== "quote" && (
+                <div className="relative w-32">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
+                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))} placeholder={config.pricing?.type === "hourly" ? "per hour" : "price"} className={`${inputCls} pl-7`} />
+                </div>
+              )}
+              {config.pricing?.type === "quote" && (
+                <div className="relative w-40">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
+                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))} placeholder="typical from…" className={`${inputCls} pl-7`} />
+                </div>
+              )}
+              <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                Deposit (optional) $
+                <input value={config.pricing?.deposit ?? ""} onChange={(e) => setPricing({ deposit: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} className={`${inputCls} w-20 py-1.5`} />
+              </label>
+            </div>
+            <p className="mt-1.5 text-[11px] text-zinc-600">Your price is your payout — buyers pay the 5% UpNova fee on top.</p>
+          </div>
+
+          <div className="border-t border-line-soft pt-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Your policies</p>
+            <div className="mt-2 space-y-3">
+              <div>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Cancellation</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {([["anytime", "Free anytime"], ["free_24h", "Free up to 24h"], ["partial_48h", "Full 48h+ · 50% after"], ["custom", "Custom"]] as const).map(([v, l]) => (
+                    <Chip key={v} on={config.policies.cancellation === v} onClick={() => setPolicies({ cancellation: v })}>{l}</Chip>
+                  ))}
+                </div>
+                {config.policies.cancellation === "custom" && (
+                  <input value={config.policies.cancellationNote ?? ""} onChange={(e) => setPolicies({ cancellationNote: e.target.value })} placeholder="Describe your policy" className={`${inputCls} mt-2`} maxLength={160} />
+                )}
+              </div>
+              <div>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Rescheduling</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {([["free", "Free"], ["one_free", "One free"], ["fee", "Fee"], ["approval", "Needs approval"]] as const).map(([v, l]) => (
+                    <Chip key={v} on={config.policies.reschedule === v} onClick={() => setPolicies({ reschedule: v })}>{l}</Chip>
+                  ))}
+                  {config.policies.reschedule === "fee" && (
+                    <label className="flex items-center gap-1 text-xs text-zinc-400">
+                      $<input value={config.policies.rescheduleFee ?? ""} onChange={(e) => setPolicies({ rescheduleFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-16 py-1`} />
+                    </label>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  Grace
+                  <select value={config.policies.lateGraceMin} onChange={(e) => setPolicies({ lateGraceMin: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                    {[0, 5, 10, 15, 30].map((m) => <option key={m} value={m}>{m} min</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  Late fee $<input value={config.policies.lateFee || ""} onChange={(e) => setPolicies({ lateFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} placeholder="0" className={`${inputCls} w-16 py-1.5`} />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  No-show
+                  <select value={config.policies.noShow} onChange={(e) => setPolicies({ noShow: e.target.value as ServiceConfig["policies"]["noShow"] })} className={`${inputCls} w-auto py-1.5`}>
+                    <option value="none">No charge</option>
+                    <option value="partial">50% charge</option>
+                    <option value="full">Full charge</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================= 6 · SHOW YOUR WORK ========================= */}
+      {stepName === "Show your work" && (
+        <section className="card space-y-3 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Show your work</p>
+            <p className="text-[11px] text-zinc-600">Add photos of what you do — up to 3. Optional but powerful.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {media.map((m, i) => (
+              <div key={i} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={m} alt={`Work example ${i + 1}`} className="h-24 w-24 rounded-xl border border-line object-cover" />
+                <button onClick={() => setMedia(media.filter((_, x) => x !== i))} className="absolute -right-1.5 -top-1.5 rounded-full border border-line bg-ink p-1 text-zinc-400 hover:text-rose-300">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            {media.length < 3 && (
+              <button onClick={() => fileInput.current?.click()} className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300">
+                <ImagePlus className="h-5 w-5" />
+                <span className="text-[10px] font-semibold">Add media</span>
+              </button>
+            )}
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  const img = await readImage(f, 900);
+                  setMedia((m) => (m.length < 3 ? [...m, img] : m));
+                }
+                e.target.value = "";
+              }}
+            />
+          </div>
+        </section>
+      )}
+
+      {/* ============================ 7 · PREVIEW ============================ */}
+      {stepName === "Preview" && (
+        <section className="space-y-3">
+          <p className="text-xs text-zinc-500">This is what clients will see. Publish when it looks right.</p>
+          <article className="card-money p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-zinc-50">{title || "Untitled service"}</h3>
+                <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">
+                  {priceLabel(config, Number(price) || 0)}
+                </p>
+              </div>
+              <span className="rounded-full border border-line px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400 capitalize">
+                {fulfillment}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">{description}</p>
+            {media.length > 0 && (
+              <div className="mt-3 flex gap-2">
+                {media.map((m, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={m} alt="" className="h-16 w-16 rounded-lg border border-line object-cover" />
+                ))}
+              </div>
+            )}
+            <div className="mt-3 space-y-1 border-t border-dashed border-line pt-3 text-[11px] text-zinc-500">
+              {fulfillment === "appointment" && (
+                <p>{availabilityLabel(config.scheduling)} · {config.scheduling.durationMin! >= 60 ? `${config.scheduling.durationMin! / 60} hr` : `${config.scheduling.durationMin} min`}{config.scheduling.maxPerDay ? ` · max ${config.scheduling.maxPerDay}/day` : ""}</p>
+              )}
+              <p>{LOCATION_LABEL[config.locationMode]}{travelRelevant ? ` · ${travelLabel(config.travel)}` : ""}</p>
+              {config.pricing?.deposit ? <p>Deposit ${config.pricing.deposit}</p> : null}
+              {policyLines(config).map((l) => <p key={l}>{l}</p>)}
+              {user?.profile.city && <p>Serving {user.profile.city}, {user.profile.state}</p>}
+            </div>
+          </article>
+        </section>
+      )}
 
       {error && (
         <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
           <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> {error}
         </p>
       )}
-      <div className="flex justify-end gap-2">
-        <Link href="/services" className="btn-ghost px-4 py-2 text-sm">Cancel</Link>
-        <button onClick={submit} disabled={busy} className="btn-lime px-5 py-2 text-sm disabled:opacity-50">
-          {busy ? "Publishing…" : "Publish service"}
+
+      {/* nav */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => (step === 0 ? router.push("/services") : setStep(step - 1))} className="btn-ghost px-4 py-2 text-sm">
+          <ArrowLeft className="h-4 w-4" /> {step === 0 ? "Cancel" : "Back"}
         </button>
+        {stepName !== "Preview" ? (
+          <button onClick={next} className="btn-lime px-5 py-2 text-sm">
+            Continue <ArrowRight className="h-4 w-4" />
+          </button>
+        ) : (
+          <button onClick={publish} disabled={busy || (needsHighTrust && !trustOk)} className="btn-lime px-6 py-2 text-sm disabled:opacity-40">
+            {busy ? "Publishing…" : "Publish Service"}
+          </button>
+        )}
       </div>
     </div>
   );

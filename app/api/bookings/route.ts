@@ -115,6 +115,20 @@ export async function POST(req: NextRequest) {
 
     const travelFee = travelFeeFor(config.travel, distanceMi).fee;
 
+    // --- the creator's booking rules, enforced server-side ---
+    const sched = config.scheduling;
+    const reqStart = new Date(body.startsAt);
+    if (sched.days && sched.days.length && !sched.days.includes(reqStart.getDay()))
+      throw new ApiError(409, `${providerProfileFull.displayName} doesn't take bookings on ${reqStart.toLocaleDateString("en-US", { weekday: "long" })}s`);
+    const hour = reqStart.getHours();
+    if (sched.startHour != null && sched.endHour != null && (hour < sched.startHour || hour >= sched.endHour))
+      throw new ApiError(409, `Outside working hours (${sched.startHour}:00–${sched.endHour}:00)`);
+    const hoursOut = (reqStart.getTime() - Date.now()) / 3600_000;
+    if (sched.sameDayBooking === false && reqStart.toDateString() === new Date().toDateString())
+      throw new ApiError(409, "Same-day booking isn't available for this service");
+    if (sched.advanceNoticeHours && hoursOut < sched.advanceNoticeHours)
+      throw new ApiError(409, `Needs at least ${sched.advanceNoticeHours} hours advance notice`);
+
     // booking limits: the creator caps their own day
     if (config.scheduling.maxPerDay) {
       const dayStart = new Date(body.startsAt);
@@ -144,8 +158,10 @@ export async function POST(req: NextRequest) {
       .all()
       .some((x) => {
         if (!["accepted", "confirmed", "pending", "reschedule_requested"].includes(x.status)) return false;
-        const aStart = startsAt.getTime();
-        const aEnd = aStart + durationMin * 60_000;
+        // the creator's buffer widens every conflict window
+        const buffer = (config.scheduling.bufferMin ?? 0) * 60_000;
+        const aStart = startsAt.getTime() - buffer;
+        const aEnd = startsAt.getTime() + durationMin * 60_000 + buffer;
         const bStart = x.startsAt.getTime();
         const bEnd = bStart + x.durationMin * 60_000;
         return aStart < bEnd && bStart < aEnd;
