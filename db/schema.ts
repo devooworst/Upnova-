@@ -489,6 +489,10 @@ export const bookings = sqliteTable(
     startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
     durationMin: integer("duration_min").notNull().default(60),
     price: integer("price").notNull(),
+    // itemized snapshot of what was selected from the creator's menu —
+    // [{label, amount}] in payout dollars; frozen at booking time so the
+    // receipt never changes even if the creator edits the menu later
+    items: text("items").notNull().default("[]"),
     location: text("location").notNull().default(""),
     // travel fee computed server-side from the service's travel config and
     // the real distance between client and provider — disclosed before pay

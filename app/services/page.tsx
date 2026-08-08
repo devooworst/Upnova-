@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, ShoppingBag, Zap, X, Bookmark, CalendarDays, Plus } from "lucide-react";
-import { policyLines, travelLabel, type ServiceConfig } from "@/lib/servicePolicies";
+import { policyLines, travelLabel, computeSelection, menuSummary, type ServiceConfig } from "@/lib/servicePolicies";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useSession } from "@/lib/session";
@@ -195,6 +195,12 @@ export default function ServicesPage() {
                 )}
               </div>
               <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
+              {menuSummary(s.config?.menu) && (
+                <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.05em] text-zinc-500">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-lime-400/60" />
+                  <span className="truncate">Add-ons: {menuSummary(s.config?.menu)}</span>
+                </p>
+              )}
               <p className="mt-2 flex items-center gap-1.5 text-[10px] text-zinc-500">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> {AI_LABEL[s.aiPolicy]}
                 <span aria-hidden>·</span> {s.reach}
@@ -274,7 +280,11 @@ const DEFAULT_DURATION: Record<string, number> = {
 function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () => void }) {
   const router = useRouter();
   const firstName = service.owner.displayName.split(" ")[0];
-  const [step, setStep] = useState<"slot" | "review" | "pay" | "done" | "requested">("slot");
+  const menu = service.config?.menu;
+  const hasMenu = !!menu && (menu.addons.length > 0 || menu.packages.length > 0);
+  const [step, setStep] = useState<"options" | "slot" | "review" | "pay" | "done" | "requested">(hasMenu ? "options" : "slot");
+  const [pkgId, setPkgId] = useState<string | null>(null);
+  const [addonIds, setAddonIds] = useState<Set<string>>(new Set());
   const [date, setDate] = useState("");
   const [hour, setHour] = useState<number | null>(null);
   const [location, setLocation] = useState("");
@@ -285,7 +295,12 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
   const [error, setError] = useState<string | null>(null);
   // duration + slots come from the creator's scheduling config
   const sched = service.config?.scheduling;
-  const durationMin = sched?.durationMin ?? DEFAULT_DURATION[service.category] ?? 60;
+  // the customer's selection, priced with the SAME calculator the server
+  // uses — add-ons change the total AND the reserved appointment time
+  const selection = service.config
+    ? computeSelection(service.config, { title: service.title, price: service.price }, { packageId: pkgId, addonIds: Array.from(addonIds) })
+    : null;
+  const durationMin = selection?.durationMin ?? sched?.durationMin ?? DEFAULT_DURATION[service.category] ?? 60;
   const travelFee = service.travelEstimate ?? 0;
   const slotHours = sched?.startHour != null && sched?.endHour != null
     ? Array.from({ length: Math.max(0, sched.endHour - sched.startHour) }, (_, i) => sched.startHour! + i)
@@ -296,20 +311,30 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
   const fmtHour = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
   const startDate = date && hour != null ? new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`) : null;
   const endDate = startDate ? new Date(startDate.getTime() + durationMin * 60_000) : null;
-  const subtotal = service.price + travelFee;
+  const payout = selection?.payout ?? service.price;
+  const subtotal = payout + travelFee;
   const fee = Math.round(subtotal * 5) / 100;
+  const pkg = pkgId ? menu?.packages.find((p) => p.id === pkgId) : null;
+  const toggleAddon = (id: string) =>
+    setAddonIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   /* step 3 → create the shared record: conversation + booking */
   const request = async () => {
     if (!startDate) return;
     setBusy(true);
     setError(null);
+    const picked = selection?.lines.slice(1).map((l) => l.label).filter(Boolean) ?? [];
     const convRes = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         toHandle: service.owner.handle,
-        firstMessage: `Hi ${firstName}! I'd like to book ${service.title} for ${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${fmtHour(hour!)}.${note.trim() ? ` ${note.trim()}` : ""}`,
+        firstMessage: `Hi ${firstName}! I'd like to book ${pkg ? `${service.title} (${pkg.name})` : service.title} for ${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${fmtHour(hour!)}.${picked.length ? ` Adding: ${picked.join(", ")}.` : ""}${note.trim() ? ` ${note.trim()}` : ""}`,
       }),
     });
     const conv = await convRes.json();
@@ -326,6 +351,8 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
         serviceId: service.id,
         startsAt: startDate.toISOString(),
         durationMin,
+        packageId: pkgId,
+        addonIds: Array.from(addonIds),
         location,
         conversationId: conv.conversationId,
       }),
@@ -349,7 +376,8 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
     const res = await fetch(`/api/bookings/${bookingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "pay" }),
+      // the client approves THIS amount — the server refuses if it changed
+      body: JSON.stringify({ action: "pay", expectedTotal: +(subtotal + fee).toFixed(2) }),
     });
     const d = await res.json();
     setBusy(false);
@@ -366,7 +394,7 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
         <div className="flex items-start justify-between">
           <div>
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-              {step === "slot" ? "Choose appointment" : step === "review" ? "Booking details" : step === "pay" ? "Demo payment" : step === "done" ? "Confirmed" : "Request sent"}
+              {step === "options" ? "Build your service" : step === "slot" ? "Choose appointment" : step === "review" ? "Booking details" : step === "pay" ? "Demo payment" : step === "done" ? "Confirmed" : "Request sent"}
             </p>
             <h3 className="mt-1 text-sm font-bold text-zinc-100">{service.title}</h3>
             <p className="text-xs text-zinc-500">{service.owner.displayName}</p>
@@ -375,6 +403,114 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* ----------------------- 0 · options (menu) ----------------------- */}
+        {step === "options" && menu && (
+          <div className="mt-4 space-y-3">
+            {/* packages — the creator's own bundles, one tap */}
+            {menu.packages.length > 0 && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Choose your service</p>
+                <div className="mt-1.5 space-y-1.5">
+                  <button
+                    onClick={() => setPkgId(null)}
+                    className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left transition ${
+                      pkgId === null ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"
+                    }`}
+                  >
+                    <span className={`text-sm font-semibold ${pkgId === null ? "text-lime-300" : "text-zinc-200"}`}>
+                      {service.title}
+                      <span className="block text-[10px] font-normal text-zinc-500">Base service · {sched?.durationMin ?? 60} min</span>
+                    </span>
+                    <span className="font-mono text-sm tracking-[0.08em] text-zinc-200">${service.price}</span>
+                  </button>
+                  {menu.packages.map((p) => {
+                    const inclNames = p.includes
+                      .map((id) => menu.addons.find((a) => a.id === id)?.name)
+                      .filter(Boolean);
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => setPkgId(p.id)}
+                        className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left transition ${
+                          pkgId === p.id ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"
+                        }`}
+                      >
+                        <span className={`text-sm font-semibold ${pkgId === p.id ? "text-lime-300" : "text-zinc-200"}`}>
+                          {p.name}
+                          {inclNames.length > 0 && (
+                            <span className="block text-[10px] font-normal text-zinc-500">Includes {inclNames.join(" + ")}</span>
+                          )}
+                        </span>
+                        <span className="font-mono text-sm tracking-[0.08em] text-zinc-200">${p.price}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* add-ons — priced and timed by the creator */}
+            {menu.addons.length > 0 && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Add-ons</p>
+                <div className="mt-1.5 space-y-1">
+                  {menu.addons.map((a) => {
+                    const inPkg = !!pkg && pkg.includes.includes(a.id);
+                    const on = a.required || inPkg || addonIds.has(a.id);
+                    const priceTxt = a.priceMode === "quote" ? "Quote" : a.priceMode === "starting" ? `from $${a.price}` : `+$${a.price}`;
+                    return (
+                      <label
+                        key={a.id}
+                        className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 transition ${
+                          on ? "border-lime-400/40 bg-lime-400/5" : "border-line hover:border-zinc-600"
+                        } ${a.required || inPkg ? "cursor-default opacity-80" : ""}`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={a.required || inPkg}
+                            onChange={() => toggleAddon(a.id)}
+                            className="accent-lime-400"
+                          />
+                          <span className="text-xs font-medium text-zinc-200">
+                            {a.name}
+                            <span className="ml-1.5 text-[10px] font-normal text-zinc-500">
+                              {inPkg ? "included in package" : a.required ? "required" : a.timeMin > 0 ? `+${a.timeMin} min` : ""}
+                            </span>
+                          </span>
+                        </span>
+                        <span className={`font-mono text-[11px] tracking-[0.08em] ${a.priceMode === "quote" ? "text-amber-300" : "text-zinc-300"}`}>
+                          {inPkg ? "—" : priceTxt}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {selection?.hasQuoted && (
+              <p className="rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-300">
+                Quote-priced items aren&apos;t charged now — {firstName} prices them with you in the conversation before any extra payment.
+              </p>
+            )}
+
+            {/* running total — recalculated as you build */}
+            <div className="flex items-center justify-between rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+              <span className="text-xs text-zinc-400">
+                {durationMin >= 60 ? `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}m` : ""}` : `${durationMin} min`} reserved
+              </span>
+              <span className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">
+                ${payout}{travelFee > 0 ? ` + $${travelFee} travel` : ""}
+              </span>
+            </div>
+            <button onClick={() => setStep("slot")} className="btn-lime w-full justify-center py-2.5 text-sm">
+              Continue to date &amp; time
+            </button>
+          </div>
+        )}
 
         {/* ------------------------- 1 · slot ------------------------- */}
         {step === "slot" && (
@@ -430,6 +566,11 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
             <button onClick={() => setStep("review")} disabled={!date || hour == null || !dayAllowed} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
               Continue
             </button>
+            {hasMenu && (
+              <button onClick={() => setStep("options")} className="btn-ghost w-full justify-center py-2 text-xs">
+                Back to options
+              </button>
+            )}
           </div>
         )}
 
@@ -439,7 +580,14 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
             <dl className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
               <div className="flex justify-between"><dt className="text-zinc-500">Date</dt><dd className="text-zinc-200">{startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</dd></div>
               <div className="flex justify-between"><dt className="text-zinc-500">Time</dt><dd className="font-mono text-xs tracking-[0.08em] text-zinc-200">{startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</dd></div>
-              <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${service.price}</dd></div>
+              {(selection?.lines ?? [{ label: service.title, amount: service.price }]).map((l, i) => (
+                <div key={i} className="flex justify-between">
+                  <dt className="text-zinc-500">{l.label}</dt>
+                  <dd className={`font-mono tracking-[0.08em] ${l.amount == null ? "text-amber-300" : i === 0 ? "font-medium text-lime-300" : "text-zinc-200"}`}>
+                    {l.amount == null ? "Quoted" : `$${l.amount}`}
+                  </dd>
+                </div>
+              ))}
               {travelFee > 0 && service.distanceMi != null && (
                 <div className="flex justify-between"><dt className="text-zinc-500">Travel ({service.distanceMi} mi)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${travelFee}</dd></div>
               )}
@@ -488,8 +636,14 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
               transaction — no real money is charged. {firstName} accepted your request.
             </p>
             <dl className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
-              <div className="flex justify-between"><dt className="text-zinc-500">Service</dt><dd className="text-zinc-200">{service.title}</dd></div>
-              <div className="flex justify-between"><dt className="text-zinc-500">Creator payout</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${service.price.toFixed(2)}</dd></div>
+              {(selection?.lines ?? [{ label: service.title, amount: service.price }]).map((l, i) => (
+                <div key={i} className="flex justify-between">
+                  <dt className="text-zinc-500">{l.label}</dt>
+                  <dd className={`font-mono tracking-[0.08em] ${l.amount == null ? "text-amber-300" : "text-zinc-200"}`}>
+                    {l.amount == null ? "Quoted later" : `$${l.amount.toFixed(2)}`}
+                  </dd>
+                </div>
+              ))}
               {travelFee > 0 && (
                 <div className="flex justify-between"><dt className="text-zinc-500">Travel{service.distanceMi != null ? ` (${service.distanceMi} mi)` : ""}</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${travelFee.toFixed(2)}</dd></div>
               )}

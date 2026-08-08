@@ -294,8 +294,8 @@ carries the transaction-safety banner, and off-platform payment mentions trigger
 warning.
 
 **Creator-defined policies** — one configurable service engine, never 50 systems.
-`/services/new` is a dynamic seven-STEP wizard (Service → Fulfillment → Availability →
-Location → Pricing & policies → Show your work → Preview & publish) built on one rule:
+`/services/new` is a dynamic eight-step wizard (Service → Fulfillment → Availability →
+Location → Pricing & policies → Service menu → Show your work → Preview & publish) built on one rule:
 category = defaults only, fulfillment model = workflow, creator settings = the service.
 Retwist → Beauty + Appointment and Logo → Design + Project use the same system. Picking a
 category suggests fulfillment + duration; picking Appointment unlocks weekly days, hours,
@@ -316,6 +316,27 @@ policy server-side (provider-initiated cancels always refund in full). Each seed
 operates differently on purpose: Imani (no travel, 15-min grace + $10 late fee, 4/day), Nia
 (free travel within 10 mi, cancel anytime), Ava (per-mile travel, 48h partial policy), TJ (flat
 $25 travel, 1 booking/day, no-show full charge).
+
+**The service menu** — creators build their own price structure, not UpNova's. A service can
+carry a `menu` in its config: **add-ons** (name, price mode fixed / starting-at / quote-required,
+minutes added to the appointment, optional/required) and **packages** (creator-priced bundles of
+the base service + add-ons, so "Retwist $60 / Retwist + Wash $70 / Retwist + Style $80 / Full
+Package $90" is ONE listing, not four). The wizard's "Service menu" step is optional — a
+one-price service simply skips it. On the customer side, Book opens with a **Build your service**
+step: pick a package or the base, toggle add-ons, and watch one calculator
+(`computeSelection` in `lib/servicePolicies.ts`, shared verbatim by client and server) recompute
+the payout AND the reserved calendar time (Retwist 60 + Wash 20 + Style 30 + Detangling 30 =
+140 minutes actually blocked — overlapping requests are rejected). Quote-priced add-ons are
+never silently charged: they appear as "quoted separately in the conversation" lines. The server
+re-prices every booking from the creator's stored menu — the client sends ids only, unknown ids
+are 400s, and `pay` carries `expectedTotal`: if the amount the client reviewed differs from the
+server's number by a cent, the payment is refused (409) and the summary is re-shown. The selected
+lines are frozen into `bookings.items` at request time, so the receipt survives later menu edits,
+shows itemized in the calendar detail, and lands as an itemized "Payment secured" system message
+in the shared conversation. Seed example: Imani's **Loc Retwist** carries the full canonical menu
+(wash/style/deep clean/detangling, "Loc Repair — starting at $25", "Loc Reattachment — quote",
+same-day fee, three packages); her Gel Nail Set and Ava's Event Photography have their own,
+differently-shaped menus.
 
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer

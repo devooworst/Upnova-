@@ -353,6 +353,7 @@ function seed() {
     { owner: "sofia", title: "Custom Piece", price: 350, desc: "One-of-one garment designed and made for your event or video.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
     { owner: "tj", title: "Event DJ — 4 Hours", price: 400, desc: "Open format, full rig, MC-ready. Books 2 weeks out.", reach: "DMV · 40 mi", ai: "no-ai", category: "events" },
     { owner: "imani", title: "Gel Nail Set", price: 55, desc: "Full gel set with custom design. On campus or nearby.", reach: "Bowie · 5 mi", ai: "no-ai", category: "beauty" },
+    { owner: "imani", title: "Loc Retwist", price: 60, desc: "Full retwist for locs. Includes retwisting and basic styling — build your visit with add-ons and packages.", reach: "Bowie · 5 mi", ai: "no-ai", category: "beauty" },
     { owner: "darius", title: "Creator Website", price: 300, desc: "One-page site: portfolio, booking link, socials. Live in 10 days.", reach: "Remote", ai: "assisted", category: "design" },
     { owner: "darius", title: "Full Brand Site", price: 750, desc: "Multi-page site with CMS, SEO basics, and analytics.", reach: "Remote", ai: "assisted", category: "design" },
     { owner: "rachel", title: "Fashion Film", price: 600, desc: "60–90s fashion film: concept, shoot, edit, color.", reach: "NYC · travel open", ai: "no-ai", category: "video" },
@@ -372,6 +373,41 @@ function seed() {
         scheduling: { durationMin: 90, maxPerDay: 4 },
         policies: { cancellation: "free_24h", reschedule: "one_free", lateGraceMin: 15, lateFee: 10, noShow: "partial" },
         requirements: ["Photos"],
+        // Imani's own nail menu — add-ons change price AND chair time
+        menu: {
+          addons: [
+            { id: "art", name: "Nail Art", priceMode: "fixed", price: 15, timeMin: 20 },
+            { id: "chrome", name: "Chrome Finish", priceMode: "fixed", price: 12, timeMin: 10 },
+            { id: "soak", name: "Soak-off Removal", priceMode: "fixed", price: 10, timeMin: 15 },
+          ],
+          packages: [{ id: "pk_art", name: "Gel Set + Art", price: 65, includes: ["art"] }],
+        },
+      },
+      // the canonical menu example: a loc stylist's real price structure —
+      // base $60, add-ons with their own price + time, creator-priced bundles,
+      // a "starting at" repair, and a quote-only reattachment
+      "imani:Loc Retwist": {
+        locationMode: "my_location",
+        travel: { mode: "none" },
+        scheduling: { durationMin: 60, maxPerDay: 5 },
+        policies: { cancellation: "free_24h", reschedule: "one_free", lateGraceMin: 10, lateFee: 10, noShow: "partial" },
+        requirements: [],
+        menu: {
+          addons: [
+            { id: "wash", name: "Wash", priceMode: "fixed", price: 10, timeMin: 20 },
+            { id: "style", name: "Style", priceMode: "fixed", price: 20, timeMin: 30 },
+            { id: "deep", name: "Deep Clean", priceMode: "fixed", price: 15, timeMin: 15 },
+            { id: "detangle", name: "Detangling", priceMode: "fixed", price: 30, timeMin: 30 },
+            { id: "repair", name: "Loc Repair", priceMode: "starting", price: 25, timeMin: 30 },
+            { id: "reattach", name: "Loc Reattachment", priceMode: "quote", price: 0, timeMin: 0 },
+            { id: "sameday", name: "Emergency / Same-day", priceMode: "fixed", price: 20, timeMin: 0 },
+          ],
+          packages: [
+            { id: "pk_wash", name: "Retwist + Wash", price: 70, includes: ["wash"] },
+            { id: "pk_style", name: "Retwist + Style", price: 80, includes: ["style"] },
+            { id: "pk_full", name: "Full Package — Wash + Retwist + Style", price: 90, includes: ["wash", "style"] },
+          ],
+        },
       },
       "nia:Dog Walking": {
         locationMode: "client_location",
@@ -386,6 +422,14 @@ function seed() {
         scheduling: { durationMin: 180, maxPerDay: 2 },
         policies: { cancellation: "partial_48h", reschedule: "one_free", lateGraceMin: 15, lateFee: 25, noShow: "partial" },
         requirements: ["References", "Special instructions"],
+        menu: {
+          addons: [
+            { id: "hour", name: "Extra Hour", priceMode: "fixed", price: 75, timeMin: 60 },
+            { id: "rush", name: "Rush Edit (48h)", priceMode: "fixed", price: 40, timeMin: 0 },
+            { id: "second", name: "Second Shooter", priceMode: "quote", price: 0, timeMin: 0 },
+          ],
+          packages: [],
+        },
       },
       "tj:Event DJ — 4 Hours": {
         locationMode: "client_location",

@@ -6,7 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser } from "@/lib/server/demo";
-import { parseConfig, travelFeeFor } from "@/lib/servicePolicies";
+import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
 import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
 
@@ -59,6 +59,7 @@ export async function GET() {
           proposedStartsAt: b.proposedStartsAt?.toISOString() ?? null,
           durationMin: b.durationMin,
           price: b.price,
+          items: (() => { try { return JSON.parse(b.items); } catch { return []; } })(),
           location: b.location,
           status: b.status,
           paymentStatus: payment?.status ?? null,
@@ -149,8 +150,21 @@ export async function POST(req: NextRequest) {
         throw new ApiError(409, `${providerProfileFull.displayName} is fully booked that day (max ${config.scheduling.maxPerDay}/day)`);
     }
 
+    // --- the customer's menu selection, priced by the CREATOR's menu ---
+    // The client sends ids only; price, time, and line items are recomputed
+    // here from the service config. A tampered request can't change what
+    // anything costs — it can only pick items that actually exist.
+    const addonIds = Array.isArray(body.addonIds) ? body.addonIds.map(String).slice(0, 12) : [];
+    const packageId = body.packageId ? String(body.packageId) : null;
+    const menu = config.menu;
+    if (packageId && !menu?.packages.some((p) => p.id === packageId))
+      throw new ApiError(400, "That package is no longer on the menu");
+    for (const aid of addonIds)
+      if (!menu?.addons.some((a) => a.id === aid)) throw new ApiError(400, "That add-on is no longer on the menu");
+    const selection = computeSelection(config, { title: service.title, price: service.price }, { packageId, addonIds });
+
     // the calendar is the source of truth: no double-booking a taken slot
-    const durationMin = config.scheduling.durationMin || Math.min(480, Math.max(15, Number(body.durationMin) || 60));
+    const durationMin = selection.durationMin || Math.min(480, Math.max(15, Number(body.durationMin) || 60));
     const conflicts = db
       .select()
       .from(tables.bookings)
@@ -175,10 +189,11 @@ export async function POST(req: NextRequest) {
         serviceId: service.id,
         clientId: user.id,
         providerId: service.ownerId,
-        title: service.title,
+        title: selection.title,
         startsAt,
         durationMin,
-        price: service.price,
+        price: selection.payout,
+        items: JSON.stringify(selection.lines),
         travelFee,
         location: String(body.location || "").slice(0, 120),
         conversationId: body.conversationId ? String(body.conversationId) : null,
@@ -190,7 +205,7 @@ export async function POST(req: NextRequest) {
       actorId: user.id,
       type: "booking",
       title: `${user.profile.displayName} requested a booking`,
-      body: `${service.title} · $${service.price}`,
+      body: `${selection.title} · $${selection.payout}${selection.hasQuoted ? " + quoted items" : ""} · ${durationMin} min`,
       href: "/calendar",
     });
 

@@ -60,7 +60,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     } else if (action === "pay") {
       if (!isClient) throw new ApiError(403, "Only the client pays");
       if (b.status !== "accepted") throw new ApiError(409, `Cannot pay from ${b.status}`);
-      // total = service + creator-defined travel fee, both disclosed pre-pay
+      // transaction authentication: the client approves a SPECIFIC amount.
+      // If anything changed since the summary was shown, refuse and re-show.
+      if (body.expectedTotal != null) {
+        const expectCents = Math.round(Number(body.expectedTotal) * 100);
+        const actualCents = Math.round((b.price + b.travelFee) * 105);
+        if (expectCents !== actualCents)
+          throw new ApiError(409, `The total changed since you reviewed it — it is now $${(actualCents / 100).toFixed(2)}. Review the summary before paying.`);
+      }
+      // total = selected menu items + creator-defined travel fee, all disclosed pre-pay
       const amountCents = (b.price + b.travelFee) * 100;
       db.insert(tables.payments)
         .values({
@@ -74,7 +82,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         })
         .run();
       set({ status: "confirmed" });
-      sys(`Booking confirmed — ${b.title} · ${when(b.startsAt)}. Payment secured: $${((b.price + b.travelFee) * 1.05).toFixed(2)}${b.travelFee ? ` (incl. $${b.travelFee} travel)` : ""}.`);
+      // itemized receipt into the shared conversation — the frozen snapshot
+      const items: { label: string; amount: number | null }[] = (() => {
+        try { return JSON.parse(b.items); } catch { return []; }
+      })();
+      const itemized = items.length
+        ? items.map((l) => `${l.label} ${l.amount == null ? "(quoted separately)" : `$${l.amount}`}`).join(" · ") + (b.travelFee ? ` · Travel $${b.travelFee}` : "")
+        : "";
+      sys(
+        `Booking confirmed — ${b.title} · ${when(b.startsAt)}. Payment secured: $${((b.price + b.travelFee) * 1.05).toFixed(2)}.${itemized ? ` Includes: ${itemized}.` : b.travelFee ? ` (incl. $${b.travelFee} travel)` : ""}`
+      );
       notify({ userId: other, actorId: user.id, type: "payment", title: `Booking confirmed — payment secured`, body: `${b.title} · ${when(b.startsAt)} · $${b.price}`, href: "/calendar", category: "payments" });
       // demo mode: the seed provider confirms in chat right away
       seedConfirmsBookingPayment(b.id);

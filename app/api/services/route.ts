@@ -8,7 +8,7 @@ import { publicUser } from "@/lib/server/serialize";
 export const dynamic = "force-dynamic";
 
 import { ctaFor } from "@/lib/server/cta";
-import { parseConfig, travelFeeFor, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
+import { parseConfig, travelFeeFor, normalizeMenu, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
 import { haversineMi } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
@@ -117,6 +117,8 @@ export async function POST(req: NextRequest) {
       locationMode: ["my_location", "client_location", "both", "remote", "flexible"].includes(inC.locationMode as string)
         ? (inC.locationMode as ServiceConfig["locationMode"])
         : "flexible",
+      // the creator's own menu — add-ons and packages, sanitized bounds only
+      menu: normalizeMenu(inC.menu),
       travel: {
         mode: ["none", "free", "flat", "per_mile", "quote"].includes(inC.travel?.mode as string)
           ? (inC.travel!.mode as ServiceConfig["travel"]["mode"])

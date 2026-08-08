@@ -39,6 +39,7 @@ interface Booking {
   status: string;
   paymentStatus: string | null;
   travelFee?: number;
+  items?: { label: string; amount: number | null }[];
   myRole: "client" | "provider";
   with: { handle: string; displayName: string; avatarUrl: string | null };
 }
@@ -492,7 +493,24 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
           {b.location && (
             <div className="flex justify-between"><dt className="text-zinc-500">Location</dt><dd className="flex items-center gap-1 text-zinc-200"><MapPin className="h-3 w-3 text-zinc-500" />{b.location}</dd></div>
           )}
-          <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${b.price}</dd></div>
+          {(b.items?.length ?? 0) > 1 ? (
+            <>
+              {b.items!.map((l, i) => (
+                <div key={i} className="flex justify-between">
+                  <dt className="text-zinc-500">{l.label}</dt>
+                  <dd className={`font-mono tracking-[0.08em] ${l.amount == null ? "text-amber-300" : "text-zinc-200"}`}>
+                    {l.amount == null ? "Quoted" : `$${l.amount}`}
+                  </dd>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-dashed border-line pt-1.5">
+                <dt className="text-zinc-400">Subtotal</dt>
+                <dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${b.price}</dd>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${b.price}</dd></div>
+          )}
           {(b.travelFee ?? 0) > 0 && (
             <div className="flex justify-between"><dt className="text-zinc-500">Travel fee</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${b.travelFee}</dd></div>
           )}

@@ -16,11 +16,15 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Sparkles, ImagePlus, X, Check, MapPin, BadgeCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, ImagePlus, X, Check, MapPin, BadgeCheck, Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
 import {
   type ServiceConfig,
+  type ServiceMenu,
+  type MenuAddon,
+  type MenuPackage,
   DEFAULT_CONFIG,
+  EMPTY_MENU,
   LOCATION_LABEL,
   travelLabel,
   policyLines,
@@ -50,7 +54,7 @@ const CATEGORY_DEFAULTS: Record<string, { fulfillment: "appointment" | "project"
 
 const HIGH_TRUST_CATEGORIES = ["care"];
 
-const STEPS = ["Service", "Fulfillment", "Availability", "Location", "Pricing & policies", "Show your work", "Preview"];
+const STEPS = ["Service", "Fulfillment", "Availability", "Location", "Pricing & policies", "Service menu", "Show your work", "Preview"];
 
 function readImage(file: File, maxW: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -110,6 +114,31 @@ export default function NewServicePage() {
   const setPricing = (patch: Partial<NonNullable<ServiceConfig["pricing"]>>) =>
     setConfig((c) => ({ ...c, pricing: { type: "starting", ...c.pricing, ...patch } }));
 
+  /* --- the creator's own menu: add-ons + packages, all optional --- */
+  const menu: ServiceMenu = config.menu ?? EMPTY_MENU;
+  const setMenu = (m: ServiceMenu) =>
+    setConfig((c) => ({ ...c, menu: m.addons.length || m.packages.length ? m : undefined }));
+  const newId = () => Math.random().toString(36).slice(2, 10);
+  const addAddon = () =>
+    setMenu({ ...menu, addons: [...menu.addons, { id: newId(), name: "", priceMode: "fixed", price: 0, timeMin: 0 }] });
+  const patchAddon = (id: string, patch: Partial<MenuAddon>) =>
+    setMenu({ ...menu, addons: menu.addons.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
+  const rmAddon = (id: string) =>
+    setMenu({
+      addons: menu.addons.filter((a) => a.id !== id),
+      packages: menu.packages.map((p) => ({ ...p, includes: p.includes.filter((x) => x !== id) })),
+    });
+  const addPackage = () =>
+    setMenu({ ...menu, packages: [...menu.packages, { id: newId(), name: "", price: 0, includes: [] }] });
+  const patchPackage = (id: string, patch: Partial<MenuPackage>) =>
+    setMenu({ ...menu, packages: menu.packages.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+  const rmPackage = (id: string) => setMenu({ ...menu, packages: menu.packages.filter((p) => p.id !== id) });
+  const togglePkgInclude = (pid: string, aid: string) => {
+    const p = menu.packages.find((x) => x.id === pid);
+    if (!p) return;
+    patchPackage(pid, { includes: p.includes.includes(aid) ? p.includes.filter((x) => x !== aid) : [...p.includes, aid] });
+  };
+
   const pickCategory = (c: string) => {
     setCategory(c);
     const d = CATEGORY_DEFAULTS[c];
@@ -136,6 +165,12 @@ export default function NewServicePage() {
       setError("Set your price");
       return;
     }
+    // leaving the menu step: silently drop unfinished rows
+    if (stepName === "Service menu")
+      setMenu({
+        addons: menu.addons.filter((a) => a.name.trim()),
+        packages: menu.packages.filter((p) => p.name.trim() && p.price > 0),
+      });
     setStep((s) => Math.min(s + 1, activeSteps.length - 1));
   };
 
@@ -565,7 +600,154 @@ export default function NewServicePage() {
         </section>
       )}
 
-      {/* ========================= 6 · SHOW YOUR WORK ========================= */}
+      {/* =========================== 6 · SERVICE MENU =========================== */}
+      {stepName === "Service menu" && (
+        <section className="card space-y-4 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Build your menu</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
+              Price your business the way you actually run it — a base service, add-ons that change the price
+              {fulfillment === "appointment" ? " and the appointment time" : ""}, and packages that bundle them.
+              All optional: skip this if you have one price.
+            </p>
+          </div>
+
+          {/* base service — set in earlier steps, shown for context */}
+          <div className="flex items-center justify-between rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+            <span className="text-sm font-semibold text-zinc-100">
+              {title || "Your service"}
+              <span className="block text-[10px] font-normal text-zinc-500">
+                Base service{fulfillment === "appointment" ? ` · ${config.scheduling.durationMin} min` : ""}
+              </span>
+            </span>
+            <span className="font-mono text-sm tracking-[0.08em] text-lime-300">${price || 0}</span>
+          </div>
+
+          {/* add-ons */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Add-ons</p>
+            <div className="mt-1.5 space-y-2">
+              {menu.addons.map((a) => (
+                <div key={a.id} className="rounded-xl border border-line p-2.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={a.name}
+                      onChange={(e) => patchAddon(a.id, { name: e.target.value })}
+                      placeholder="e.g. Wash, Style, Loc repair"
+                      className={`${inputCls} flex-1 py-1.5 text-xs`}
+                      maxLength={60}
+                    />
+                    <button onClick={() => rmAddon(a.id)} className="rounded-md p-1 text-zinc-500 hover:text-rose-300">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <select
+                      value={a.priceMode}
+                      onChange={(e) => patchAddon(a.id, { priceMode: e.target.value as MenuAddon["priceMode"] })}
+                      className={`${inputCls} w-auto py-1.5 text-xs`}
+                    >
+                      <option value="fixed">Fixed price</option>
+                      <option value="starting">Starting at</option>
+                      <option value="quote">Quote required</option>
+                    </select>
+                    {a.priceMode !== "quote" && (
+                      <label className="flex items-center gap-1 text-xs text-zinc-400">
+                        $
+                        <input
+                          value={a.price || ""}
+                          onChange={(e) => patchAddon(a.id, { price: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })}
+                          placeholder="0"
+                          className={`${inputCls} w-16 py-1.5 text-xs`}
+                        />
+                      </label>
+                    )}
+                    {fulfillment === "appointment" && (
+                      <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                        Adds
+                        <select
+                          value={a.timeMin}
+                          onChange={(e) => patchAddon(a.id, { timeMin: Number(e.target.value) })}
+                          className={`${inputCls} w-auto py-1.5 text-xs`}
+                        >
+                          {[0, 10, 15, 20, 30, 45, 60, 90, 120].map((m) => (
+                            <option key={m} value={m}>{m === 0 ? "no time" : `${m} min`}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      <input
+                        type="checkbox"
+                        checked={!!a.required}
+                        onChange={(e) => patchAddon(a.id, { required: e.target.checked || undefined })}
+                        className="accent-lime-400"
+                      />
+                      Required
+                    </label>
+                  </div>
+                </div>
+              ))}
+              <button onClick={addAddon} className="btn-ghost w-full justify-center py-2 text-xs">
+                <Plus className="h-3.5 w-3.5" /> Add an add-on
+              </button>
+            </div>
+          </div>
+
+          {/* packages */}
+          <div className="border-t border-line-soft pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Packages</p>
+            <p className="text-[11px] text-zinc-600">
+              Bundle the base service with add-ons at your own price — clients pick one option instead of you
+              publishing four separate services.
+            </p>
+            <div className="mt-1.5 space-y-2">
+              {menu.packages.map((p) => (
+                <div key={p.id} className="rounded-xl border border-line p-2.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={p.name}
+                      onChange={(e) => patchPackage(p.id, { name: e.target.value })}
+                      placeholder={`e.g. ${title || "Service"} + Wash`}
+                      className={`${inputCls} flex-1 py-1.5 text-xs`}
+                      maxLength={80}
+                    />
+                    <label className="flex items-center gap-1 text-xs text-zinc-400">
+                      $
+                      <input
+                        value={p.price || ""}
+                        onChange={(e) => patchPackage(p.id, { price: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })}
+                        placeholder="0"
+                        className={`${inputCls} w-16 py-1.5 text-xs`}
+                      />
+                    </label>
+                    <button onClick={() => rmPackage(p.id)} className="rounded-md p-1 text-zinc-500 hover:text-rose-300">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {menu.addons.filter((a) => a.name.trim()).length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-[10px] text-zinc-600">Includes (base service always included):</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {menu.addons.filter((a) => a.name.trim()).map((a) => (
+                          <Chip key={a.id} on={p.includes.includes(a.id)} onClick={() => togglePkgInclude(p.id, a.id)}>
+                            {a.name}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button onClick={addPackage} className="btn-ghost w-full justify-center py-2 text-xs">
+                <Plus className="h-3.5 w-3.5" /> Add a package
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================= 7 · SHOW YOUR WORK ========================= */}
       {stepName === "Show your work" && (
         <section className="card space-y-3 p-5">
           <div>
@@ -623,6 +805,29 @@ export default function NewServicePage() {
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">{description}</p>
+            {(menu.addons.some((a) => a.name.trim()) || menu.packages.some((p) => p.name.trim())) && (
+              <div className="mt-3 rounded-xl border border-line-soft bg-card-raised/50 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Menu</p>
+                <ul className="mt-1.5 space-y-1 text-[11px]">
+                  {menu.packages.filter((p) => p.name.trim()).map((p) => (
+                    <li key={p.id} className="flex justify-between gap-2">
+                      <span className="text-zinc-300">{p.name}</span>
+                      <span className="font-mono tracking-[0.08em] text-lime-300">${p.price}</span>
+                    </li>
+                  ))}
+                  {menu.addons.filter((a) => a.name.trim()).map((a) => (
+                    <li key={a.id} className="flex justify-between gap-2">
+                      <span className="text-zinc-400">
+                        {a.name}{a.required ? " (required)" : ""}{fulfillment === "appointment" && a.timeMin > 0 ? ` · +${a.timeMin} min` : ""}
+                      </span>
+                      <span className="font-mono tracking-[0.08em] text-zinc-300">
+                        {a.priceMode === "quote" ? "Quote" : a.priceMode === "starting" ? `from $${a.price}` : `+$${a.price}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {media.length > 0 && (
               <div className="mt-3 flex gap-2">
                 {media.map((m, i) => (
