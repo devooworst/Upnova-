@@ -14,12 +14,15 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import Avatar from "./Avatar";
 import { currentUser } from "@/lib/data";
 import { openCreateModal } from "./CreateModalTrigger";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-xl">
@@ -98,7 +101,7 @@ export default function Navbar() {
                       { href: "/profile", icon: User, label: "View Profile" },
                       { href: "/bookmarks", icon: Bookmark, label: "Bookmarks" },
                       { href: "/analytics", icon: BarChart3, label: "Analytics" },
-                      { href: "#", icon: Settings, label: "Settings" },
+                      { href: "/settings", icon: Settings, label: "Settings" },
                     ].map((item) => (
                       <Link
                         key={item.label}
@@ -111,7 +114,13 @@ export default function Navbar() {
                       </Link>
                     ))}
                     <div className="my-1.5 h-px bg-line-soft" />
-                    <button className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-red-400 transition hover:bg-red-500/10">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setLogoutOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-red-400 transition hover:bg-red-500/10"
+                    >
                       <LogOut className="h-4 w-4" />
                       Log out
                     </button>
@@ -122,6 +131,36 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* Log out confirmation */}
+      {logoutOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setLogoutOpen(false)}
+        >
+          <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Log out of UpNova?</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+              You&apos;ll need to sign back in to access your account. Nothing is deleted — your
+              profile, portfolio, messages, and projects stay right here.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setLogoutOpen(false)} className="btn-ghost flex-1 py-2 text-xs">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setLogoutOpen(false);
+                  router.push("/welcome");
+                }}
+                className="flex-1 rounded-full bg-red-500 py-2 text-xs font-bold text-white transition hover:bg-red-400"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile search */}
       <div className="px-3 pb-3 md:hidden">
