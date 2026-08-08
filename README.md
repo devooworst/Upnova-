@@ -121,6 +121,17 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   isn't the source of truth; the email is never public). College ends at the
   verified graduation date; everything the student built stays theirs, with a
   natural transition to Pro.
+- **One project system, participant-specific, never hardcoded.** Every conversation
+  has its own ID + participant; every conversation owns its own project, payment,
+  and extension state (keyed per conversation — switching chats switches ALL of it).
+  Hire Me / Message / Book anywhere deep-links to `/messages?to=<creatorId>`,
+  creating the conversation if needed (seeded with "Hi X! I'm interested in your Y
+  service."). Create Project prefills from the creator's service (name + starting
+  price). Extensions are stateful and idempotent: one request → one decision → one
+  result; approved extensions show as a ✓ status with the new deadline and never
+  re-ask. Discuss closes the drawer, focuses the conversation on the extension, and
+  keeps the decision available. Services and Opportunities converge into this same
+  lifecycle: two ways to find work, one transaction system.
 - **Work History & Reliability.** Every paid job creates a verified work record.
   Portfolio = "look what I can create"; Experience = "look what I've actually done"
   (Verified UpNova Project — added to the public portfolio only with the creator's

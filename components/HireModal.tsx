@@ -190,7 +190,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
           the full record. Never pay outside UpNova.
         </p>
 
-        <button onClick={() => router.push("/messages")} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm">
+        <button onClick={() => router.push(`/messages?to=${creator.id}`)} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm">
           <Zap className="h-4 w-4" /> Continue to Message
         </button>
       </div>

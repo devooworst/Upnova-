@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -17,11 +17,14 @@ import ReportModal from "./ReportModal";
 import { feeFor, totalFor, money, PLATFORM_FEE_RATE } from "@/lib/fees";
 
 /* ------------------------------------------------------------------ */
-/* The project drawer. The chat stays a chat — this side panel is      */
-/* where the deal happens: Create Project → Review → Send Offer →      */
-/* creator accepts (or counters in the conversation) → Pay → work →    */
-/* deliver → approve → payout → reviews. Nothing interrupts the        */
-/* conversation; no "job detected" boxes.                              */
+/* One reusable project lifecycle for EVERY creator — no special Ava   */
+/* workflow, no special demo workflow. The drawer is fully driven by   */
+/* its props (participant + service + lifted state); mounting it with  */
+/* key={conversationId} gives each conversation its own project.       */
+/*                                                                     */
+/* draft → offer → accepted → payment secured → in progress →          */
+/* extension requested/approved (stateful, idempotent) → delivered →   */
+/* approved → payment released → review → experience.                  */
 /* ------------------------------------------------------------------ */
 
 export type ProjectStage =
@@ -38,6 +41,8 @@ export type ProjectStage =
   | "reviewing"
   | "done";
 
+export type ExtensionState = "none" | "requested" | "approved";
+
 interface ProjectDrawerProps {
   creatorName: string;
   creatorAvatar?: string | null;
@@ -48,16 +53,21 @@ interface ProjectDrawerProps {
   open: boolean;
   stage: ProjectStage;
   setStage: (s: ProjectStage) => void;
+  extension: ExtensionState;
+  setExtension: (e: ExtensionState) => void;
   onClose: () => void;
-  /** appends a real message to the conversation */
+  /** appends a real message to this conversation */
   onMessage: (from: "me" | "them", text: string) => void;
   /** keeps the status bar's amount in sync */
   onAmount: (n: number) => void;
+  /** Discuss: close the drawer and focus the conversation on the extension */
+  onDiscuss: () => void;
 }
 
-function Milestones({ stage }: { stage: ProjectStage }) {
+function Milestones({ stage, extension }: { stage: ProjectStage; extension: ExtensionState }) {
   const steps = [
     { label: "Payment secured", done: true },
+    ...(extension === "approved" ? [{ label: "Extension approved (+2 days)", done: true }] : []),
     { label: "Project in progress", done: true },
     { label: "Work submitted", done: ["submitted", "reviewing", "done"].includes(stage) },
     { label: "Client approved", done: ["reviewing", "done"].includes(stage) },
@@ -99,25 +109,29 @@ export default function ProjectDrawer({
   open,
   stage,
   setStage,
+  extension,
+  setExtension,
   onClose,
   onMessage,
   onAmount,
+  onDiscuss,
 }: ProjectDrawerProps) {
-  const [title, setTitle] = useState("Creator Meetup Photography");
-  const [date, setDate] = useState("August 22, 2026");
+  /* prefilled from the service — don't make the buyer retype what UpNova knows */
+  const [title, setTitle] = useState(service);
+  const [date, setDate] = useState("September 15, 2026");
   const [location, setLocation] = useState("Baltimore, MD");
   const [scope, setScope] = useState(
-    "Event photography coverage for the Creator Meetup, including an edited gallery of 40+ photos delivered through UpNova."
+    `${service} delivered through UpNova — scope, files, and approval all recorded on the project.`
   );
   const [budget, setBudget] = useState(startingAt);
   const [myStars, setMyStars] = useState(0);
-  const [myReview, setMyReview] = useState("Fantastic eye. The gallery was better than the brief.");
+  const [myReview, setMyReview] = useState("Great work, clear communication, delivered as agreed.");
   const [aiPolicy, setAiPolicy] = useState("🔴 Not allowed");
   const [reportOpen, setReportOpen] = useState(false);
+  const deliveryScheduled = useRef(false);
 
   const counter = budget + 50;
   const firstName = creatorName.split(" ")[0];
-  const price = stage === "offered" || stage === "form" || stage === "review" ? budget : counter;
 
   /* the other side responds — in the conversation, where humans talk */
   useEffect(() => {
@@ -125,33 +139,38 @@ export default function ProjectDrawer({
       const t = setTimeout(() => {
         onMessage(
           "them",
-          `Just saw the project offer! One thing — the meetup runs long, so I'd need $${counter} to cover the extra hours and a second card of edits. I'll send a counter.`
+          `Just saw the project offer! The scope is a bit bigger than my base rate — I'd need $${counter} to do it right. Sending a counter.`
         );
         onAmount(counter);
         setStage("countered");
       }, 2000);
       return () => clearTimeout(t);
     }
-    if (stage === "paid") {
+    if (stage === "paid" && extension === "none") {
       const t = setTimeout(() => {
-        onMessage("them", "Payment came through 🙌 I'm booked for the 22nd. Gallery lands within 48h of the event.");
+        onMessage("them", "Payment came through 🙌 Starting on schedule.");
         const t2 = setTimeout(() => {
-          onMessage("them", "Heads up — the venue's second card is coming to me a day late. Can I get 2 extra days on the gallery? Requesting an extension now so it's official.");
+          onMessage("them", "Heads up — one dependency is arriving a day late on my end. Can I get 2 extra days? Requesting an extension now so it's official.");
+          setExtension("requested");
           setStage("extension");
         }, 2400);
         return () => clearTimeout(t2);
       }, 1200);
       return () => clearTimeout(t);
     }
-    if (stage === "extension") {
-      return; // waits for the client's decision — communication, not silence
+    if (stage === "paid" && extension === "approved" && !deliveryScheduled.current) {
+      deliveryScheduled.current = true; // one request → one decision → one result
+      const t = setTimeout(() => {
+        onMessage("them", "Delivery is in — final files attached. Thanks for the trust 🙏");
+        setStage("submitted");
+      }, 2600);
+      return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
+  }, [stage, extension]);
 
   return (
     <>
-      {/* backdrop only on small screens; desktop keeps the chat visible */}
       {open && <div className="fixed inset-0 z-40 bg-black/50 lg:bg-transparent" onClick={onClose} />}
 
       <aside
@@ -160,19 +179,18 @@ export default function ProjectDrawer({
         }`}
         aria-hidden={!open}
       >
-        {/* drawer header */}
         <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
           <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">
             {stage === "form" && "Create Project"}
             {stage === "review" && "Review Project"}
             {(stage === "offered" || stage === "countered") && "Project Offer"}
             {(stage === "agreed" || stage === "checkout") && "Payment"}
-            {(stage === "paid" || stage === "submitted") && "Project"}
+            {(stage === "paid" || stage === "submitted" || stage === "extension") && "Project"}
             {(stage === "reviewing" || stage === "done") && "Project Complete"}
             {stage === "idle" && "Project"}
           </h2>
           <div className="flex items-center gap-1">
-            {["paid", "submitted", "reviewing", "done"].includes(stage) && (
+            {["paid", "submitted", "reviewing", "done", "extension"].includes(stage) && (
               <button onClick={() => setReportOpen(true)} className="icon-btn h-8 w-8" title="Report / Get Help" aria-label="Report or get help">
                 <Flag className="h-4 w-4" />
               </button>
@@ -184,21 +202,21 @@ export default function ProjectDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {/* who you're hiring — always visible */}
+          {/* who you're hiring */}
           <div className="flex items-center gap-3">
             <Avatar src={creatorAvatar} initials={creatorInitials} gradient={creatorGradient} size="md" className="ring-1 ring-line" />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-100">{creatorName}</p>
-              <p className="text-xs text-zinc-500">{service}</p>
+              <p className="text-xs text-zinc-500">{service} · starting at ${startingAt}</p>
             </div>
-            {["paid", "submitted", "reviewing", "done"].includes(stage) && (
+            {["paid", "submitted", "reviewing", "done", "extension"].includes(stage) && (
               <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300">
                 <ShieldCheck className="h-3 w-3" /> Protected
               </span>
             )}
           </div>
 
-          {/* ---------------- form ---------------- */}
+          {/* ---------------- form (prefilled from the service) ---------------- */}
           {(stage === "idle" || stage === "form") && (
             <div className="mt-5 space-y-3.5">
               <div>
@@ -207,7 +225,7 @@ export default function ProjectDrawer({
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Date</label>
+                  <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Deadline</label>
                   <input value={date} onChange={(e) => setDate(e.target.value)} className="input-dark mt-1.5" />
                 </div>
                 <div className="flex-1">
@@ -216,32 +234,23 @@ export default function ProjectDrawer({
                 </div>
               </div>
               <div>
-                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">What you&apos;ll receive</label>
+                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Project details / deliverables</label>
                 <textarea value={scope} onChange={(e) => setScope(e.target.value)} rows={3} className="input-dark mt-1.5 resize-none" />
               </div>
               <div>
-                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Budget</label>
+                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+                  Agreed price · {firstName}&apos;s {service} starts at ${startingAt}
+                </label>
                 <div className="relative mt-1.5 max-w-[9rem]">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
                   <input value={budget || ""} onChange={(e) => setBudget(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="input-dark pl-7 tabular-nums" />
                 </div>
               </div>
               <div>
-                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-                  AI-generated work
-                </label>
+                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">AI-generated work</label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {["🔴 Not allowed", "🟡 Allowed with disclosure", "🟢 Allowed"].map((o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      onClick={() => setAiPolicy(o)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
-                        aiPolicy === o
-                          ? "border-zinc-400 bg-white/10 text-zinc-100"
-                          : "border-line text-zinc-400 hover:border-zinc-600"
-                      }`}
-                    >
+                    <button key={o} type="button" onClick={() => setAiPolicy(o)} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${aiPolicy === o ? "border-zinc-400 bg-white/10 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
                       {o}
                     </button>
                   ))}
@@ -272,12 +281,6 @@ export default function ProjectDrawer({
               <p className="mt-3 rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">
                 <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">ai policy · </span>
                 {aiPolicy}
-                {aiPolicy === "🔴 Not allowed" && (
-                  <span className="block text-[10px] leading-relaxed text-zinc-500">
-                    Work must be created by {creatorName.split(" ")[0]} and must not contain
-                    undisclosed AI-generated material.
-                  </span>
-                )}
               </p>
               <Perforation className="mt-4" />
               <div className="mt-3.5 space-y-1.5 text-sm">
@@ -395,16 +398,16 @@ export default function ProjectDrawer({
             </div>
           )}
 
-          {/* ---------------- extension request — the 🟡 path ---------------- */}
-          {stage === "extension" && (
+          {/* ---------------- extension request — one request, one decision ---------------- */}
+          {stage === "extension" && extension === "requested" && (
             <div className="mt-5">
               <div className="rounded-md border border-amber-400/30 bg-amber-400/5 p-3.5">
                 <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-400">
                   🟡 extension requested
                 </p>
                 <p className="mt-1.5 text-sm text-zinc-200">
-                  {firstName} asked for <span className="font-bold">+2 days</span> — new deadline
-                  would be <span className="font-semibold">August 24</span>.
+                  {firstName} asked for <span className="font-bold">+2 days</span> on{" "}
+                  <span className="font-semibold">{title}</span>.
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-zinc-500">
                   Approving officially moves the deadline. No penalty to {firstName}&apos;s record —
@@ -414,18 +417,17 @@ export default function ProjectDrawer({
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => {
-                    onMessage("me", "Extension approved — Aug 24 works. Thanks for flagging it early 🙏");
+                    setExtension("approved");
+                    onMessage("me", "Extension approved — new deadline works. Thanks for flagging it early 🙏");
                     setStage("paid");
-                    setTimeout(() => {
-                      onMessage("them", "Here's the final gallery — 52 edited shots. Thanks for the trust 🙏");
-                      setStage("submitted");
-                    }, 2400);
                   }}
                   className="flex-1 rounded-md bg-amber-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-amber-300"
                 >
                   Approve Extension
                 </button>
-                <button className="btn-ghost flex-1 py-2 text-xs">Discuss</button>
+                <button onClick={onDiscuss} className="btn-ghost flex-1 py-2 text-xs">
+                  Discuss
+                </button>
               </div>
             </div>
           )}
@@ -439,17 +441,22 @@ export default function ProjectDrawer({
               </div>
               <p className="mt-1 text-xs text-zinc-500">📅 {date} · 📍 {location}</p>
 
-              <p className="mt-2 font-mono text-[10px] font-medium text-zinc-500">
-                agreement: {aiPolicy.toLowerCase()} ai-generated work
-              </p>
-              <div className="mt-4"><Milestones stage={stage as ProjectStage} /></div>
+              {/* extension result — shown once, never re-asked */}
+              {extension === "approved" && (
+                <p className="mt-2.5 rounded-md border border-line bg-card-raised px-3 py-2 text-[11px] text-zinc-400">
+                  ✓ <span className="font-semibold text-zinc-200">Extension approved</span> · +2
+                  days · approved by you
+                </p>
+              )}
+
+              <div className="mt-4"><Milestones stage={stage} extension={extension} /></div>
 
               {["submitted", "reviewing", "done"].includes(stage) && (
                 <div className="mt-4 rounded-md border border-line bg-card-raised p-3">
                   <p className="flex items-center gap-2 text-xs font-semibold text-zinc-100">
                     <FileArchive className="h-4 w-4 text-lime-400" />
-                    meetup-gallery.zip
-                    <span className="font-mono text-[10px] font-medium text-zinc-500">52 files · 1.2 GB</span>
+                    final-delivery.zip
+                    <span className="font-mono text-[10px] font-medium text-zinc-500">files attached</span>
                   </p>
                 </div>
               )}
@@ -457,7 +464,7 @@ export default function ProjectDrawer({
               {stage === "submitted" && (
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => setStage("reviewing")} className="btn-lime flex-1 rounded-md py-2 text-xs">
-                    <CheckCheck className="mr-1 inline h-3.5 w-3.5" /> Approve work
+                    <CheckCheck className="mr-1 inline h-3.5 w-3.5" /> Approve &amp; release payment
                   </button>
                   <button className="btn-ghost flex-1 py-2 text-xs">Request revision</button>
                 </div>
@@ -465,7 +472,7 @@ export default function ProjectDrawer({
 
               {stage === "paid" && (
                 <p className="mt-4 text-center text-xs text-zinc-500">
-                  Waiting on {firstName}&apos;s delivery — due within 48h of the event.
+                  Waiting on {firstName}&apos;s delivery.
                 </p>
               )}
 
@@ -484,7 +491,7 @@ export default function ProjectDrawer({
                 <div className="mt-4 border-t border-line-soft pt-4">
                   <p className="text-sm font-bold tracking-tight text-zinc-100">Rate {firstName}</p>
                   <p className="mt-0.5 text-[10px] text-zinc-500">
-                    Verified UpNova Project review · covers communication, quality, reliability,
+                    Verified UpNova Project review · communication, quality, reliability,
                     professionalism, met deadline
                   </p>
                   <div className="mt-2"><Stars value={myStars} onChange={setMyStars} /></div>
@@ -492,9 +499,7 @@ export default function ProjectDrawer({
                   <button
                     onClick={() => setStage("done")}
                     disabled={myStars === 0}
-                    className={`mt-2.5 w-full rounded-full py-2 text-xs font-bold transition ${
-                      myStars === 0 ? "cursor-not-allowed bg-card-raised text-zinc-600" : "bg-violet-400 text-zinc-950 hover:bg-violet-300 hover:shadow-glow-violet"
-                    }`}
+                    className={`mt-2.5 w-full rounded-full py-2 text-xs font-bold transition ${myStars === 0 ? "cursor-not-allowed bg-card-raised text-zinc-600" : "bg-violet-400 text-zinc-950 hover:bg-violet-300 hover:shadow-glow-violet"}`}
                   >
                     Submit review
                   </button>
@@ -507,7 +512,7 @@ export default function ProjectDrawer({
                   <p className="mt-2 flex items-center justify-between"><span>{firstName} rated you</span><Stars value={5} /></p>
                   <p className="mt-2 italic text-zinc-500">&ldquo;Clear brief, quick decisions, paid on time.&rdquo;</p>
                   <p className="mt-3 border-t border-line-soft pt-2.5 text-center font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-                    ✓ completed · counts on both profiles
+                    ✓ completed · added to {firstName}&apos;s experience · counts on both profiles
                   </p>
                 </div>
               )}

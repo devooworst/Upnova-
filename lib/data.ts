@@ -1619,11 +1619,18 @@ export interface Conversation {
   unread: number;
   online: boolean;
   messages: { from: "me" | "them"; text: string; time: string }[];
+  /** when the participant is a hireable creator: powers Create Project */
+  creatorId?: string;
+  service?: string;
+  startingAt?: number;
 }
 
 export const conversations: Conversation[] = [
   {
     id: "ava",
+    creatorId: "ava",
+    service: "Event Photography",
+    startingAt: 250,
     name: "Ava Chen",
     role: "Photographer",
     avatar: "/images/ava.jpg",
@@ -1658,6 +1665,9 @@ export const conversations: Conversation[] = [
   },
   {
     id: "jordan",
+    creatorId: "jordan",
+    service: "Music Production",
+    startingAt: 300,
     name: "Jordan Miles",
     role: "Music Producer",
     avatar: "/images/jordan.jpg",
@@ -1670,6 +1680,26 @@ export const conversations: Conversation[] = [
     messages: [
       { from: "me", text: "That new beat is crazy 🔥 you mixing it yourself?", time: "Tue" },
       { from: "them", text: "Send me the stems and I'll take a pass this weekend.", time: "Tue" },
+    ],
+  },
+  {
+    id: "marcus",
+    creatorId: "marcus",
+    service: "Video Editing",
+    startingAt: 200,
+    name: "Marcus Reed",
+    role: "Videographer",
+    avatar: "/images/marcus.jpg",
+    initials: "M",
+    gradient: "from-amber-500 to-orange-600",
+    lastMessage: "Send the raw footage whenever — I can start Monday.",
+    time: "1d",
+    unread: 0,
+    online: false,
+    messages: [
+      { from: "me", text: "Yo Marcus — got a 6-min interview edit, interested?", time: "Mon 4:10 PM" },
+      { from: "them", text: "For sure. My editing service starts at $200 for that length.", time: "Mon 4:32 PM" },
+      { from: "them", text: "Send the raw footage whenever — I can start Monday.", time: "Mon 4:33 PM" },
     ],
   },
   {

@@ -67,7 +67,7 @@ export default function ProfilePreview({
           <div className="mt-4 flex gap-2">
             <FollowButton id={creator.id} className="flex-1 !py-2" />
             <Link
-              href="/messages"
+              href={`/messages?to=${creator.id}`}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-line py-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-card-raised"
             >
               <MessageSquare className="h-3.5 w-3.5" /> Message
