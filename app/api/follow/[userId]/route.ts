@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
+import { recordInteraction } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function POST(_req: NextRequest, { params }: { params: { userId: st
       .get();
     if (!existing) {
       db.insert(tables.follows).values({ followerId: user.id, followingId: target.id }).run();
+      recordInteraction(user.id, "user", target.id, "follow");
       notify({
         userId: target.id,
         actorId: user.id,
@@ -39,6 +41,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { userId: 
     db.delete(tables.follows)
       .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, params.userId)))
       .run();
+    recordInteraction(user.id, "user", params.userId, "unfollow");
     return { following: false };
   });
 }

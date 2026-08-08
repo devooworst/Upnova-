@@ -71,6 +71,17 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
     load();
   }, [load]);
 
+  // profile-view signal for the recommendation engine (never for yourself)
+  useEffect(() => {
+    if (!data || !me || me.id === data.user.id) return;
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetType: "user", targetId: data.user.id, action: "profile_view" }),
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.user.id, me?.id]);
+
   if (error)
     return (
       <div className="mx-auto max-w-md py-16 text-center">

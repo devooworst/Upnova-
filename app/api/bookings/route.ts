@@ -7,6 +7,7 @@ import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser } from "@/lib/server/demo";
 import { parseConfig, travelFeeFor } from "@/lib/servicePolicies";
+import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
 
 export const dynamic = "force-dynamic";
@@ -176,6 +177,8 @@ export async function POST(req: NextRequest) {
       body: `${service.title} · $${service.price}`,
       href: "/calendar",
     });
+
+    recordInteraction(user.id, "service", service.id, "book");
 
     // demo mode: seed providers respond immediately — the flow never stalls
     seedAcceptsBooking(id);

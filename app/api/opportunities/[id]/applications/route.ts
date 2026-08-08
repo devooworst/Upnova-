@@ -6,6 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { requireOpportunityPoster } from "@/lib/server/authz";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
+import { recordInteraction } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         }),
       })
       .run();
+
+    recordInteraction(user.id, "opportunity", opp.id, "apply");
 
     notify({
       userId: opp.posterId,

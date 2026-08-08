@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
+import { recordInteraction } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const id = randomBytes(12).toString("hex");
     db.insert(tables.comments).values({ id, postId: post.id, authorId: user.id, body: text }).run();
+    recordInteraction(user.id, "post", post.id, "comment");
     notify({
       userId: post.authorId,
       actorId: user.id,

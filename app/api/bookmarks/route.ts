@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { recordInteraction, type TargetType } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -148,9 +149,11 @@ export async function POST(req: NextRequest) {
           )
         )
         .run();
+      recordInteraction(user.id, targetType as TargetType, targetId, "unsave");
       return { saved: false };
     }
     db.insert(tables.bookmarks).values({ userId: user.id, targetType, targetId }).run();
+    recordInteraction(user.id, targetType as TargetType, targetId, "save");
     return { saved: true };
   });
 }

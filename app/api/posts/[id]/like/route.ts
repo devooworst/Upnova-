@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
+import { recordInteraction } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       db.delete(tables.likes)
         .where(and(eq(tables.likes.postId, post.id), eq(tables.likes.userId, user.id)))
         .run();
+      recordInteraction(user.id, "post", post.id, "unlike");
       return { liked: false };
     }
 
     db.insert(tables.likes).values({ postId: post.id, userId: user.id }).run();
+    recordInteraction(user.id, "post", post.id, "like");
     notify({
       userId: post.authorId,
       actorId: user.id,

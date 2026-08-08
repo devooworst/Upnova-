@@ -11,6 +11,8 @@ import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import DbPostCard, { type FeedPost } from "./DbPostCard";
 import OpportunityList from "./OpportunityList";
+import Avatar from "@/components/Avatar";
+import { Zap } from "lucide-react";
 import { useSession } from "@/lib/session";
 import type { FeedScope } from "@/components/Feed";
 
@@ -69,6 +71,14 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
   const { user } = useSession();
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
+  const [promoted, setPromoted] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    price: number;
+    cta: string;
+    owner: { handle: string; displayName: string; avatarUrl: string | null };
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,6 +103,15 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       const data = await res.json();
       setError(null);
       setPosts(data.items ?? []);
+      setPromoted(data.promoted ?? null);
+      // passive view signals for what actually rendered (deduped server-side)
+      const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
+      if (viewed.length)
+        fetch("/api/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ events: viewed }),
+        }).catch(() => {});
     } catch {
       setError("network");
       setPosts([]);
@@ -155,8 +174,33 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
         <Skeleton />
       ) : (
         <div key={`${tab}-${scope}`} className="animate-fade-up space-y-4">
-          {posts.map((p) => (
-            <DbPostCard key={p.id} post={p} savedInitial={savedPosts.has(p.id)} />
+          {posts.map((p, i) => (
+            <span key={p.id} className="block space-y-4">
+              <DbPostCard
+                post={p}
+                savedInitial={savedPosts.has(p.id)}
+                onHidden={(id) => setPosts((cur) => (cur ?? []).filter((x) => x.id !== id))}
+              />
+              {/* promoted slot — labeled, separate from organic ranking */}
+              {i === 2 && promoted && (
+                <aside className="card flex flex-wrap items-center gap-3 border-line p-4">
+                  <span className="w-full font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    Promoted · not part of your recommendations
+                  </span>
+                  <Avatar src={promoted.owner.avatarUrl} initials={promoted.owner.displayName.charAt(0)} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-zinc-100">{promoted.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {promoted.owner.displayName} ·{" "}
+                      <span className="font-mono tracking-[0.08em] text-lime-300">from ${promoted.price}</span>
+                    </p>
+                  </div>
+                  <Link href="/services" className="btn-lime shrink-0 px-3.5 py-1.5 text-xs">
+                    <Zap className="h-3.5 w-3.5" /> {promoted.cta}
+                  </Link>
+                </aside>
+              )}
+            </span>
           ))}
           {posts.length === 0 && (
             <p className="py-10 text-center text-sm text-zinc-500">

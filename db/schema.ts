@@ -352,6 +352,9 @@ export const services = sqliteTable("services", {
   // cancellation/reschedule/late/no-show policies. UpNova provides the
   // infrastructure; the creator decides how their business operates.
   config: text("config").notNull().default("{}"),
+  // promoted listings are labeled and slotted separately — they NEVER
+  // enter the organic ranking
+  promoted: bool("promoted", false),
   active: bool("active", true),
   paused: bool("paused", false),
   isSeed: seed(),
@@ -575,6 +578,28 @@ export const payments = sqliteTable("payments", {
   providerRef: text("provider_ref"),
   createdAt: ts("created_at"),
 });
+
+/* ------------------------------ interactions ------------------------------ */
+/* The behavioral event log feeding the recommendation engine — views,
+   likes, saves, bookings, hides, and everything between. Raw signals
+   only; ranking logic lives in lib/server/recsys.ts and can be swapped
+   for an ML model without touching this table. */
+
+export const interactions = sqliteTable(
+  "interactions",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetType: text("target_type").notNull(), // post | service | opportunity | community | event | user
+    targetId: text("target_id").notNull(),
+    action: text("action").notNull(), // view | like | unlike | comment | save | unsave | follow | unfollow | profile_view | service_view | book | apply | join | hide | not_interested | report
+    meta: text("meta").notNull().default(""),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("interactions_user").on(t.userId, t.action), index("interactions_target").on(t.targetType, t.targetId)]
+);
 
 /* ------------------------------- moderation ------------------------------- */
 

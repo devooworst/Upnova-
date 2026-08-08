@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, viewerContext, verifiedCampusMap } from "@/lib/server/feed";
+import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,28 @@ export async function GET(req: NextRequest) {
         : serviceOwners.has(u.id) || completedCreators.has(u.id)
           ? "creator"
           : "community";
+
+    // For You ordering comes from the engine; hides apply everywhere
+    if (viewer) {
+      const taste = buildTaste(viewer.id, viewer.profile);
+      const mapped = filtered.map((r) => ({
+        item: r,
+        scorable: {
+          id: r.opp.id,
+          type: "opportunity",
+          authorId: r.opp.posterId,
+          category: r.opp.type,
+          tags: [r.opp.title, r.opp.type],
+          lat: r.opp.lat,
+          lng: r.opp.lng,
+          locationOk: r.profile.locationVisibility !== "hidden",
+          sameCity: !!viewer.profile.city && r.profile.city === viewer.profile.city,
+          createdAt: r.opp.createdAt,
+          engagement: 0,
+        } as Scorable,
+      }));
+      filtered = ranker.rank(mapped, taste).map((x) => x.item);
+    }
 
     const myApplications = viewer
       ? new Set(

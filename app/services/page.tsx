@@ -26,6 +26,7 @@ interface ServiceItem {
   trustRequired: string;
   fulfillment?: string; // appointment | project | quote
   cta?: string; // from the listing's fulfillment configuration
+  promoted?: boolean;
   config?: ServiceConfig;
   distanceMi?: number | null;
   travelEstimate?: number;
@@ -110,6 +111,12 @@ export default function ServicesPage() {
       router.push("/login");
       return;
     }
+    // service-view signal for the recommendation engine
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetType: "service", targetId: s.id, action: "service_view" }),
+    }).catch(() => {});
     // fulfillment model decides the flow — appointments book time slots,
     // project work sends a project request. Never force a calendar.
     if (s.fulfillment === "appointment") setBooking(s);
@@ -171,6 +178,11 @@ export default function ServicesPage() {
             <article key={s.id} className="card-money flex flex-col p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
+                  {s.promoted && (
+                    <p className="mb-0.5 font-mono text-[8px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                      Promoted
+                    </p>
+                  )}
                   <h3 className="text-sm font-bold text-zinc-100">{s.title}</h3>
                   <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">
                     From ${s.price}

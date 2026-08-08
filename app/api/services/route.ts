@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 import { ctaFor } from "@/lib/server/cta";
 import { parseConfig, travelFeeFor, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
 import { haversineMi } from "@/lib/server/feed";
+import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
 /** GET /api/services — active marketplace listings with real owners. */
 export async function GET() {
@@ -24,8 +25,35 @@ export async function GET() {
       .all()
       .filter((r) => r.service.active && !r.service.paused && r.user.status === "active");
 
+    // organic ordering from the recommendation engine (viewer's taste);
+    // promoted listings are pinned first and labeled — never mixed in
+    let ordered = rows;
+    if (viewer) {
+      const taste = buildTaste(viewer.id, viewer.profile);
+      const mapped = rows
+        .filter((r) => !r.service.promoted)
+        .map((r) => ({
+          item: r,
+          scorable: {
+            id: r.service.id,
+            type: "service",
+            authorId: r.service.ownerId,
+            category: r.service.category,
+            tags: [r.service.category, r.service.title],
+            lat: r.profile.lat,
+            lng: r.profile.lng,
+            locationOk: r.profile.locationVisibility !== "hidden",
+            sameCity: !!viewer.profile.city && r.profile.city === viewer.profile.city,
+            createdAt: r.service.createdAt,
+            engagement: 0,
+          } as Scorable,
+        }));
+      const ranked = ranker.rank(mapped, taste).map((x) => x.item);
+      ordered = [...rows.filter((r) => r.service.promoted), ...ranked];
+    }
+
     return {
-      services: rows.map((r) => {
+      services: ordered.map((r) => {
         const config = parseConfig(r.service.config);
         // per-viewer travel estimate from real profile distances —
         // disclosed here, recomputed server-side at booking time
@@ -47,6 +75,7 @@ export async function GET() {
         reach: r.service.reach,
         owner: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.service.ownerId,
+        promoted: r.service.promoted,
         config,
         distanceMi,
         travelEstimate: travel.fee,

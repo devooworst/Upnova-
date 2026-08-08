@@ -259,11 +259,25 @@ membership, project parties, service/opportunity ownership, message permissions)
 documents the equivalent Postgres Row Level Security policies for production, where the database
 becomes the second line of defense.
 
-**Feed & recommendations** — `/api/feed?tab=&scope=` queries the DB. Scope (5 mi / 25 mi / City /
-County / State / Country / Global / My School) filters by the author's real location or verified
-campus; tab picks the ranking. For You uses deterministic scoring (documented weights in
-`lib/server/feed.ts`): follows +50, shared skills/interests +8 each (cap 24), shared community +12,
-same city +15, recency decay to −30 over 48 h, engagement +6·ln(likes + 2·comments + 1).
+**Recommendation architecture** — modular ranking system (`lib/server/recsys.ts`), nothing
+hard-coded. An `interactions` event log records views, likes, comments, saves, follows, profile
+views, service views, bookings, applications, hides, not-interested, and reports — domain routes
+record their own actions server-side; `/api/track` accepts only passive/negative client signals
+(forged likes are rejected). `buildTaste()` turns the log into a taste profile: follows,
+interests, per-author and per-category affinity (tanh-squashed action weights), hidden targets,
+and downranked authors/categories. Everything rankable (Posts, Services, Opportunities —
+Communities/Events map to the same `Scorable` shape) flows through a transparent `WEIGHTS` table
+(the whole algorithm on one screen: followed +50, interest match +8×cap 24, shared community +12,
+proximity +10/15, author affinity ±20, category affinity ±15, freshness 30→0 over 48 h,
+engagement 6·ln, not-interested −25/−40) and every scored item carries human-readable `reasons`
+("you follow them", "near you", "you engage with this creator"). The `Ranker` interface is the ML
+swap point — a learned model replaces `weightedRanker` without touching routes or UI. Privacy
+shapes the algorithm: authors with hidden location visibility get NO proximity scoring. Negative
+feedback is first-class: the post overflow menu offers Hide (never shown again, enforced
+server-side) and Not Interested (downranks the author + category). Promoted content NEVER enters
+organic ranking — it is fetched separately, slotted after the third feed item, and labeled
+"Promoted · not part of your recommendations"; on Services it's pinned first with a Promoted tag.
+Scope filtering (5 mi → My School) still lives in `lib/server/feed.ts` and runs before ranking.
 
 **The transaction backbone** — Messages is the transaction hub: conversations carry normal chat
 plus system messages for every project event (offer sent, terms updated, accepted, payment

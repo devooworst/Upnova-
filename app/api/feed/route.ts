@@ -3,13 +3,10 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
-import {
-  FeedScope,
-  inScope,
-  scorePost,
-  verifiedCampusMap,
-  viewerContext,
-} from "@/lib/server/feed";
+import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
+import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
+import { parseConfig } from "@/lib/servicePolicies";
+import { ctaFor } from "@/lib/server/cta";
 
 export const dynamic = "force-dynamic";
 
@@ -68,44 +65,93 @@ export async function GET(req: NextRequest) {
       communitiesByUser.get(m.userId)!.add(m.communityId);
     }
 
-    let items = rows
-      .filter((r) => inScope(scope, ctx, r.profile, campusMap.get(r.post.authorId)))
-      .map((r) => {
-        const likes = likesByPost.get(r.post.id) ?? 0;
-        const commentsCount = commentsByPost.get(r.post.id) ?? 0;
-        return {
-          id: r.post.id,
-          body: r.post.body,
-          imageUrl: r.post.imageUrl,
-          kind: r.post.kind,
-          category: r.post.category,
-          subcategory: r.post.subcategory,
-          createdAt: r.post.createdAt.toISOString(),
-          author: publicUser(r.user, r.profile),
-          likes,
-          comments: commentsCount,
-          likedByMe: likedByMe.has(r.post.id),
-          isMine: r.post.authorId === user.id,
-          score: scorePost(
-            r.post,
-            r.profile,
-            communitiesByUser.get(r.post.authorId) ?? new Set(),
-            likes,
-            commentsCount,
-            ctx
-          ),
-        };
-      });
+    // ---- the recommendation engine ranks; the route only maps shapes ----
+    const taste = buildTaste(user.id, user.profile);
 
+    const parseTags = (s: string) => {
+      try {
+        return JSON.parse(s) as string[];
+      } catch {
+        return [];
+      }
+    };
+
+    const scoped = rows.filter((r) => inScope(scope, ctx, r.profile, campusMap.get(r.post.authorId)));
+    const mapped = scoped.map((r) => {
+      const likes = likesByPost.get(r.post.id) ?? 0;
+      const commentsCount = commentsByPost.get(r.post.id) ?? 0;
+      const scorable: Scorable = {
+        id: r.post.id,
+        type: "post",
+        authorId: r.post.authorId,
+        category: r.post.category,
+        tags: [...parseTags(r.profile.skills), ...parseTags(r.profile.interests), r.post.category].filter(Boolean),
+        lat: r.profile.lat,
+        lng: r.profile.lng,
+        locationOk: r.profile.locationVisibility !== "hidden",
+        sameCity: !!user.profile.city && r.profile.city === user.profile.city,
+        createdAt: r.post.createdAt,
+        engagement: likes + 2 * commentsCount,
+        authorCommunityIds: communitiesByUser.get(r.post.authorId) ?? new Set(),
+      };
+      const item = {
+        id: r.post.id,
+        body: r.post.body,
+        imageUrl: r.post.imageUrl,
+        kind: r.post.kind,
+        category: r.post.category,
+        subcategory: r.post.subcategory,
+        createdAt: r.post.createdAt.toISOString(),
+        author: publicUser(r.user, r.profile),
+        likes,
+        comments: commentsCount,
+        likedByMe: likedByMe.has(r.post.id),
+        isMine: r.post.authorId === user.id,
+      };
+      return { item, scorable };
+    });
+
+    let items: (typeof mapped)[number]["item"][];
+    let reasons: Record<string, string[]> = {};
     if (tab === "following") {
-      items = items.filter((i) => ctx.followingIds.has(i.author.id) || i.isMine);
-      // chronological for Following — you asked for these people, don't reorder them
+      // chronological — you asked for these people, don't reorder them.
+      // hides still apply.
+      items = mapped
+        .filter(({ scorable, item }) => !taste.hiddenTargets.has(scorable.id) && (taste.followingIds.has(item.author.id) || item.isMine))
+        .map(({ item }) => item);
     } else if (tab === "trending") {
-      items.sort((a, b) => b.likes + 2 * b.comments - (a.likes + 2 * a.comments));
+      items = mapped
+        .filter(({ scorable }) => !taste.hiddenTargets.has(scorable.id))
+        .sort((a, b) => b.scorable.engagement - a.scorable.engagement)
+        .map(({ item }) => item);
     } else {
-      items.sort((a, b) => b.score - a.score);
+      const ranked = ranker.rank(mapped.map(({ item, scorable }) => ({ item, scorable })), taste);
+      items = ranked.map((r) => r.item);
+      for (const r of ranked.slice(0, 20)) reasons[r.item.id] = r.reasons;
     }
 
-    return { items: items.slice(0, 60).map(({ score, ...rest }) => rest) };
+    // ---- promoted slot: labeled, separate, NEVER part of organic ranking ----
+    let promoted: object | null = null;
+    if (tab === "for-you") {
+      const promo = db
+        .select({ service: tables.services, profile: tables.profiles, u: tables.users })
+        .from(tables.services)
+        .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
+        .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+        .all()
+        .find((r) => r.service.promoted && r.service.active && !r.service.paused && r.service.ownerId !== user.id);
+      if (promo && !taste.hiddenTargets.has(promo.service.id)) {
+        promoted = {
+          id: promo.service.id,
+          title: promo.service.title,
+          description: promo.service.description,
+          price: promo.service.price,
+          cta: ctaFor(promo.service),
+          owner: publicUser(promo.u, promo.profile),
+        };
+      }
+    }
+
+    return { items: items.slice(0, 60), reasons, promoted };
   });
 }

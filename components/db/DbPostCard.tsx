@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, MessageCircle, MapPin, Send, Bookmark } from "lucide-react";
+import { Heart, MessageCircle, MapPin, Send, Bookmark, MoreHorizontal, EyeOff, Ban } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { BadgeCheck } from "lucide-react";
@@ -53,7 +53,16 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
-export default function DbPostCard({ post, savedInitial = false }: { post: FeedPost; savedInitial?: boolean }) {
+export default function DbPostCard({
+  post,
+  savedInitial = false,
+  onHidden,
+}: {
+  post: FeedPost;
+  savedInitial?: boolean;
+  onHidden?: (id: string) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [saved, setSaved] = useState(savedInitial);
   const [liked, setLiked] = useState(post.likedByMe);
   const [likes, setLikes] = useState(post.likes);
@@ -89,6 +98,16 @@ export default function DbPostCard({ post, savedInitial = false }: { post: FeedP
       const data = await res.json();
       setComments(data.comments ?? []);
     }
+  };
+
+  const feedback = async (action: "hide" | "not_interested", meta = "") => {
+    setMenuOpen(false);
+    onHidden?.(post.id); // gone immediately — the server remembers
+    await fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetType: "post", targetId: post.id, action, meta }),
+    });
   };
 
   const sendComment = async () => {
@@ -146,6 +165,46 @@ export default function DbPostCard({ post, savedInitial = false }: { post: FeedP
             )}
           </p>
         </div>
+        {!post.isMine && onHidden && (
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Post options"
+              className="rounded-md p-1 text-zinc-600 transition hover:bg-card-raised hover:text-zinc-300"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 z-40 mt-1 w-56 overflow-hidden rounded-xl border border-line bg-card shadow-card">
+                  <button
+                    onClick={() => feedback("hide")}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-card-raised"
+                  >
+                    <EyeOff className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>
+                      Hide this post
+                      <span className="block text-[10px] text-zinc-600">Never show it again</span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => feedback("not_interested", post.category ? `category:${post.category}` : "")}
+                    className="flex w-full items-center gap-2.5 border-t border-line-soft px-3.5 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-card-raised"
+                  >
+                    <Ban className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>
+                      Not interested
+                      <span className="block text-[10px] text-zinc-600">
+                        See less {post.category ? `${post.category} and ` : ""}less from {a.displayName.split(" ")[0]}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* body */}

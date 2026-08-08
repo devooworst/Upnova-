@@ -347,7 +347,7 @@ function seed() {
     { owner: "nia", title: "Weekend Dog Sitter", price: 120, desc: "Overnight sitting at your place, daily photo updates.", reach: "Towson · 10 mi", ai: "no-ai", category: "care", trust: "high-trust" },
     { owner: "maya", title: "Session Vocals", price: 200, desc: "Lead vocals for your record — hook and one verse, comped and tuned.", reach: "Remote", ai: "no-ai", category: "music" },
     { owner: "maya", title: "Topline Writing", price: 160, desc: "Melody and lyrics written to your beat, demo vocal included.", reach: "Remote", ai: "no-ai", category: "music" },
-    { owner: "kofi", title: "Custom Beat — Exclusive", price: 250, desc: "Made-to-order beat, exclusive license, stems included.", reach: "Remote", ai: "disclosure", category: "music" },
+    { owner: "kofi", title: "Custom Beat — Exclusive", price: 250, desc: "Made-to-order beat, exclusive license, stems included.", reach: "Remote", ai: "disclosure", category: "music", promoted: true },
     { owner: "kofi", title: "Drum Kit — Producer Pack", price: 40, desc: "300 originals: drums, 808s, textures. Royalty-free.", reach: "Remote", ai: "disclosure", category: "music" },
     { owner: "sofia", title: "Shoot Styling", price: 220, desc: "Full wardrobe styling for your shoot — pull, fit, on-set.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
     { owner: "sofia", title: "Custom Piece", price: 350, desc: "One-of-one garment designed and made for your event or video.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
@@ -413,6 +413,7 @@ function seed() {
         // design/production/builds stay project requests
         fulfillment: ["care", "beauty", "events", "photography", "education"].includes(cat) ? "appointment" : "project",
         config: cfg ? JSON.stringify(cfg) : "{}",
+        promoted: !!(s as { promoted?: boolean }).promoted,
         isSeed: true,
       })
       .run();

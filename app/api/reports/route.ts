@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { recordInteraction, TARGET_TYPES, type TargetType } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
         details: String(body.details || "").slice(0, 2000),
       })
       .run();
+    if (TARGET_TYPES.includes(targetType as TargetType) && body.targetId)
+      recordInteraction(user.id, targetType as TargetType, String(body.targetId), "report");
     return { id };
   });
 }
