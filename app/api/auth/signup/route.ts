@@ -4,6 +4,8 @@ import { randomBytes } from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { hashPassword, createSession, SESSION_COOKIE, guarded, ApiError } from "@/lib/server/auth";
+import { rateLimit } from "@/lib/server/ratelimit";
+import { validatePassword, HANDLE_RE, HANDLE_RULE } from "@/lib/passwordPolicy";
 import { ownProfile } from "@/lib/server/serialize";
 
 export const dynamic = "force-dynamic";
@@ -11,15 +13,19 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
+    // handle uniqueness is case-insensitive: handles are stored lowercased
     const email = String(body.email || "").trim().toLowerCase();
     const handle = String(body.handle || "").trim().toLowerCase().replace(/^@/, "");
-    const password = String(body.password || "");
+    const password = String(body.password || ""); // never trimmed, never truncated
     const displayName = String(body.displayName || "").trim();
 
+    const rl = rateLimit(`signup:${email}`, 5, 15 * 60_000);
+    if (!rl.ok) throw new ApiError(429, `Too many attempts — try again in ${Math.ceil(rl.retryAfterSec / 60)} min`);
+
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ApiError(400, "Enter a valid email");
-    if (!/^[a-z0-9_.]{3,20}$/.test(handle))
-      throw new ApiError(400, "Handle must be 3–20 characters: letters, numbers, underscores, periods");
-    if (password.length < 8) throw new ApiError(400, "Password must be at least 8 characters");
+    if (!HANDLE_RE.test(handle)) throw new ApiError(400, `Username: ${HANDLE_RULE}`);
+    const pwError = validatePassword(password);
+    if (pwError) throw new ApiError(400, pwError);
     if (!displayName) throw new ApiError(400, "Display name is required");
 
     const existing = db

@@ -317,6 +317,6 @@ export type UsernameStatus = "current" | "available" | "unavailable" | "invalid"
 export function checkUsername(name: string, current: string): UsernameStatus {
   const n = name.trim().toLowerCase().replace(/^@/, "");
   if (n === current.toLowerCase()) return "current";
-  if (!/^[a-z0-9_.]{3,20}$/.test(n)) return "invalid";
+  if (!/^[a-z0-9_.]{3,30}$/.test(n)) return "invalid";
   return "available";
 }

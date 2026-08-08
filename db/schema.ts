@@ -34,9 +34,26 @@ export const users = sqliteTable("users", {
   role: text("role").notNull().default("user"), // user | admin
   plan: text("plan").notNull().default("free"), // free | college | pro
   status: text("status").notNull().default("active"), // active | suspended
+  mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).notNull().default(false),
+  mfaSecret: text("mfa_secret"),
   isSeed: seed(),
   createdAt: ts("created_at"),
 });
+
+export const passwordResets = sqliteTable(
+  "password_resets",
+  {
+    id: id(),
+    token: text("token").notNull().unique(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("pwreset_user").on(t.userId)]
+);
 
 export const sessions = sqliteTable(
   "sessions",

@@ -549,7 +549,7 @@ export default function EditProfile() {
                     value={draft.username}
                     readOnly
                     className={`${inputCls} pl-8 opacity-60`}
-                    maxLength={20}
+                    maxLength={30}
                     title="Username changes are an account-level operation — coming to Settings"
                   />
                 </div>
@@ -565,7 +565,7 @@ export default function EditProfile() {
                 )}
                 {usernameStatus === "invalid" && (
                   <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> 3–20 characters: letters, numbers,
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> 3–30 characters: letters, numbers,
                     underscores, periods.
                   </p>
                 )}

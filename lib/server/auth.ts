@@ -6,20 +6,14 @@
 
 import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
-import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 
 export const SESSION_COOKIE = "upnova_session";
 const SESSION_DAYS = 30;
 
-export function hashPassword(pw: string) {
-  return bcrypt.hashSync(pw, 10);
-}
-
-export function verifyPassword(pw: string, hash: string) {
-  return bcrypt.compareSync(pw, hash);
-}
+// scrypt with per-password salt; legacy bcrypt verified + rehashed on login
+export { hashPassword, verifyPassword, needsRehash } from "./passwords";
 
 export function createSession(userId: string) {
   const token = randomBytes(32).toString("hex");

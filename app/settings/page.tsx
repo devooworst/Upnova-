@@ -17,6 +17,8 @@ import {
   Check,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import SecurityCard from "@/components/SecurityCard";
+import { useSession } from "@/lib/session";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import { getPlan, isStudentVerified, PRO_EVENT, type Plan } from "@/lib/pro";
 import { currentUser, services, bookings } from "@/lib/data";
@@ -95,6 +97,7 @@ function Select({ label, options, hint }: { label: string; options: string[]; hi
 }
 
 export default function SettingsPage() {
+  const { user } = useSession();
   const [section, setSection] = useState<SectionId>("account");
   const [toggles, setToggles] = useState<Record<string, boolean>>({
     openToWork: true,
@@ -146,7 +149,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-5xl">
       <header className="mb-6">
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-500">
-          @{currentUser.handle}
+          {user ? `@${user.handle}` : ""}
         </p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-50">Settings</h1>
       </header>
@@ -181,15 +184,15 @@ export default function SettingsPage() {
               <section className="card p-5">
                 <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Account</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field label="Name" defaultValue={currentUser.name} />
-                  <Field label="Username" defaultValue={`@${currentUser.handle}`} />
-                  <Field label="Email" defaultValue="devin@upnova.app" type="email" />
-                  <Field label="Phone" defaultValue="+1 (410) 555-0147" />
+                  <Field label="Name" defaultValue={user?.profile.displayName ?? ""} />
+                  <Field label="Username" defaultValue={user ? `@${user.handle}` : ""} />
+                  <Field label="Email" defaultValue={user?.email ?? ""} type="email" />
                 </div>
-                <div className="mt-4 divide-y divide-line-soft border-t border-line-soft">
-                  <Row label="Password" hint="Last changed 3 months ago">
-                    <button className="btn-ghost px-3.5 py-1.5 text-xs">Change password</button>
-                  </Row>
+                <div className="mt-4 border-t border-line-soft pt-4">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Security
+                  </p>
+                  <SecurityCard />
                 </div>
                 <Select
                   label="Profile visibility"
@@ -213,7 +216,7 @@ export default function SettingsPage() {
             <section className="card p-5">
               <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Profile &amp; Creator</h2>
               <div className="mt-4 flex items-center gap-4">
-                <Avatar src={currentUser.avatar} initials={currentUser.initials} size="lg" />
+                <Avatar src={user?.profile.avatarUrl} initials={user?.profile.displayName.charAt(0) ?? "?"} size="lg" />
                 <div className="flex gap-2">
                   <button className="btn-ghost px-3.5 py-1.5 text-xs">Change photo</button>
                   <button className="btn-ghost px-3.5 py-1.5 text-xs">Change banner</button>

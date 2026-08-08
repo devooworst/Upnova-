@@ -1,35 +1,68 @@
 "use client";
 
+/* ------------------------------------------------------------------ */
+/*  Auth — NIST/OWASP-aligned UX. Length over composition rules,       */
+/*  passphrases welcome (spaces included), live strength feedback,     */
+/*  show/hide, confirm-match, forgot-password, and an MFA code step    */
+/*  when the account has two-factor enabled. Security happens server-  */
+/*  side: scrypt hashing, common-password blocking, rate limiting.     */
+/* ------------------------------------------------------------------ */
+
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ShieldCheck } from "lucide-react";
 import { invalidateSession } from "@/lib/session";
+import PasswordField from "@/components/PasswordField";
+import { PASSWORD_MIN, HANDLE_RULE, validatePassword } from "@/lib/passwordPolicy";
 
-/**
- * Shared login/signup form — real authentication against the database.
- * Dev seed accounts: devin@upnova.dev / ava@upnova.dev / jordanmiles@… ·
- * password upnova123 (listed on the login screen in dev only).
- */
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaStep, setMfaStep] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const confirmState = mode === "signup" && confirm ? (confirm === password ? "match" : "differ") : null;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+
+    if (mode === "signup") {
+      const pwError = validatePassword(password);
+      if (pwError) {
+        setError(pwError);
+        return;
+      }
+      if (password !== confirm) {
+        setError("Passwords don't match");
+        return;
+      }
+    }
+
+    setBusy(true);
     const res = await fetch(`/api/auth/${mode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mode === "login" ? { email, password } : { email, password, displayName, handle }),
+      body: JSON.stringify(
+        mode === "login"
+          ? { email, password, ...(mfaStep ? { code: mfaCode } : {}) }
+          : { email, password, displayName, handle }
+      ),
     });
     const data = await res.json();
     setBusy(false);
+
+    if (res.ok && data.mfaRequired) {
+      setMfaStep(true);
+      return;
+    }
     if (!res.ok) {
       setError(data.error || "Something went wrong");
       return;
@@ -48,55 +81,154 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
         UpNova <span className="text-lime-400">✦</span>
       </p>
       <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">
-        {mode === "login" ? "Welcome back" : "Create your account"}
+        {mfaStep ? "Two-factor code" : mode === "login" ? "Welcome back" : "Create your account"}
       </h1>
       <p className="mt-1 text-sm text-zinc-400">
-        {mode === "login"
-          ? "Sign in to your UpNova account."
-          : "Find what's happening around you — and the people who can make it happen."}
+        {mfaStep
+          ? "Enter the 6-digit code from your authenticator app."
+          : mode === "login"
+            ? "Sign in to your UpNova account."
+            : "Find what's happening around you — and the people who can make it happen."}
       </p>
 
       <form onSubmit={submit} className="mt-6 space-y-3">
-        {mode === "signup" && (
-          <>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Display name" className={inputCls} required />
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500">@</span>
-              <input value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} placeholder="username" className={`${inputCls} pl-8`} required />
-            </div>
-          </>
-        )}
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className={inputCls} required />
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={mode === "signup" ? "Password (8+ characters)" : "Password"} className={inputCls} required />
-        {error && (
-          <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> {error}
-          </p>
-        )}
-        <button type="submit" disabled={busy} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-50">
-          {busy ? "One moment…" : mode === "login" ? "Sign in" : "Create account"}
-        </button>
-      </form>
-
-      <p className="mt-4 text-center text-xs text-zinc-500">
-        {mode === "login" ? (
-          <>
-            New here?{" "}
-            <Link href="/signup" className="font-semibold text-violet-300 hover:underline">
-              Create an account
-            </Link>
-          </>
+        {mfaStep ? (
+          <div className="flex items-center gap-2.5 rounded-xl border border-violet-400/30 bg-violet-400/5 px-3.5 py-3">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-violet-300" />
+            <input
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+              placeholder="000000"
+              inputMode="numeric"
+              autoFocus
+              className="w-full bg-transparent font-mono text-lg tracking-[0.4em] text-zinc-100 outline-none placeholder:text-zinc-600"
+            />
+          </div>
         ) : (
           <>
-            Already have an account?{" "}
-            <Link href="/login" className="font-semibold text-violet-300 hover:underline">
-              Sign in
-            </Link>
+            {mode === "signup" && (
+              <>
+                <input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Display name"
+                  autoComplete="name"
+                  className={inputCls}
+                  required
+                />
+                <div>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                      @
+                    </span>
+                    <input
+                      value={handle}
+                      onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/\s+/g, ""))}
+                      placeholder="username"
+                      autoComplete="username"
+                      maxLength={30}
+                      className={`${inputCls} pl-8`}
+                      required
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-500">{HANDLE_RULE}</p>
+                </div>
+              </>
+            )}
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              autoComplete="email"
+              className={inputCls}
+              required
+            />
+            <div>
+              <PasswordField
+                value={password}
+                onChange={setPassword}
+                placeholder="Password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                showMeter={mode === "signup"}
+              />
+              {mode === "signup" && !password && (
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  At least {PASSWORD_MIN} characters. Longer passwords are stronger — spaces and
+                  passphrases welcome.
+                </p>
+              )}
+            </div>
+            {mode === "signup" && (
+              <div>
+                <PasswordField
+                  value={confirm}
+                  onChange={setConfirm}
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
+                />
+                {confirmState && (
+                  <p
+                    className={`mt-1 flex items-center gap-1.5 text-[11px] font-medium ${
+                      confirmState === "match" ? "text-lime-300" : "text-rose-300"
+                    }`}
+                    aria-live="polite"
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${confirmState === "match" ? "bg-lime-400" : "bg-rose-400"}`}
+                    />
+                    {confirmState === "match" ? "Passwords match" : "Passwords don't match"}
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
-      </p>
 
-      {mode === "login" && (
+        {error && (
+          <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300" aria-live="assertive">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy || (mfaStep && mfaCode.length !== 6)}
+          className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-50"
+        >
+          {busy ? "One moment…" : mfaStep ? "Verify code" : mode === "login" ? "Sign in" : "Create account"}
+        </button>
+
+        {mode === "login" && !mfaStep && (
+          <p className="text-center">
+            <Link href="/forgot" className="text-xs font-medium text-zinc-500 hover:text-zinc-300">
+              Forgot password?
+            </Link>
+          </p>
+        )}
+      </form>
+
+      {!mfaStep && (
+        <p className="mt-4 text-center text-xs text-zinc-500">
+          {mode === "login" ? (
+            <>
+              New here?{" "}
+              <Link href="/signup" className="font-semibold text-violet-300 hover:underline">
+                Create an account
+              </Link>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <Link href="/login" className="font-semibold text-violet-300 hover:underline">
+                Sign in
+              </Link>
+            </>
+          )}
+        </p>
+      )}
+
+      {mode === "login" && !mfaStep && (
         <div className="mt-6 rounded-xl border border-line-soft bg-card p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Development seed accounts</p>
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">

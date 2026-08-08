@@ -279,6 +279,21 @@ Seed accounts: `devin@upnova.dev` (admin), `ava@`, `jordanmiles@`, `marcusj@`, `
 **Admin** — `/admin` (role-gated): platform stats, user management (suspend/reactivate kills
 sessions immediately), and report moderation with an emergency lane.
 
+**Authentication & password policy** (NIST SP 800-63B / OWASP-aligned) — length over composition:
+12–128 characters, NO required character classes, spaces and passphrases welcome, never
+truncated, never expired on a timer. Common passwords are blocked server-side
+(`lib/passwordPolicy.ts` — the seam swaps to the HIBP k-anonymity API in production). The signup
+form gives live strength feedback (length + repeat/sequence/common patterns, never "add 1
+uppercase"), show/hide toggles, and real-time confirm-match. Handles are 3–30 chars
+(letters/numbers/`_`/`.`), unique case-insensitively. Server side: **scrypt** hashing
+(N=2^15, r=8, p=1, unique 16-byte salt — memory-hard, no 72-byte truncation; legacy bcrypt hashes
+verify and transparently rehash on login), login rate limiting (5 fails / 15 min per account),
+single-use 30-minute password-reset tokens that revoke all sessions (`/forgot` → `/reset`; the
+link is emailed in production, returned as a labeled dev URL in the sandbox), **real TOTP MFA**
+(RFC 6238, works with any authenticator app — manage it in Settings → Account → Security), and
+security notifications for sign-ins, password changes, and MFA changes. Email verification and
+HIBP checks are production items (no SMTP/egress in the sandbox).
+
 ### Connected to the database (this pass)
 
 Auth (login/signup/logout, navbar session), Home feed + composer + likes + comments, feed scopes,
