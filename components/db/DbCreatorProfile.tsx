@@ -12,6 +12,7 @@ import Link from "next/link";
 import { MapPin, MessageSquare, Zap, Lock, Star } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
 import { useSession } from "@/lib/session";
 
 interface PublicProfile {
@@ -31,6 +32,8 @@ interface PublicProfile {
     openToWork: boolean;
     hiringEnabled: boolean;
     trustLevel: string;
+    accountType?: string;
+    businessVerified?: boolean;
   };
   stats: {
     followers: number | null;
@@ -109,12 +112,15 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
               <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-zinc-50">
                 {user.displayName}
                 {user.verified && <VerifiedBadge className="h-5 w-5" />}
-                {user.openToWork && (
+                {user.openToWork && user.accountType !== "business" && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-lime-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse-dot" /> Open to Work
                   </span>
                 )}
-                {user.trustLevel !== "standard" && (
+                {user.accountType === "business" && (
+                  <PosterBadge type={posterTypeOf(user)} size="md" />
+                )}
+                {user.accountType !== "business" && user.trustLevel !== "standard" && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
                     title="Verified through UpNova's identity process. Documents are never shown to other users — only this badge."

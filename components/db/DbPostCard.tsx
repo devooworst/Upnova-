@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Heart, MessageCircle, MapPin, Send, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { BadgeCheck } from "lucide-react";
 
 export interface FeedAuthor {
   id: string;
@@ -18,6 +19,8 @@ export interface FeedAuthor {
   state: string | null;
   /** the most precise location the author chose to share */
   locationLabel?: string | null;
+  accountType?: string;
+  businessVerified?: boolean;
 }
 
 export interface FeedPost {
@@ -117,6 +120,14 @@ export default function DbPostCard({ post, savedInitial = false }: { post: FeedP
               {a.displayName}
             </Link>
             {a.verified && <VerifiedBadge />}
+            {a.accountType === "business" && a.businessVerified && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-sky-300"
+                title="Verified business"
+              >
+                <BadgeCheck className="h-3 w-3" /> Business
+              </span>
+            )}
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500">
             {a.roleLine || `@${a.handle}`}

@@ -34,12 +34,18 @@ export function locationLabel(profile: Profile): string | null {
   }
 }
 
-export function publicUser(user: Pick<User, "id" | "handle">, profile: Profile, opts?: { viewerIsOwner?: boolean }) {
+export function publicUser(
+  user: Pick<User, "id" | "handle"> & Partial<Pick<User, "accountType" | "businessVerified">>,
+  profile: Profile,
+  opts?: { viewerIsOwner?: boolean }
+) {
   const owner = !!opts?.viewerIsOwner;
   const showLoc = owner || (profile.showLocation && profile.locationVisibility !== "hidden");
   return {
     id: user.id,
     handle: user.handle,
+    accountType: user.accountType ?? "individual",
+    businessVerified: !!user.businessVerified,
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
     verified: profile.verified,
@@ -69,6 +75,8 @@ export function ownProfile(user: User, profile: Profile) {
     handle: user.handle,
     role: user.role,
     plan: user.plan,
+    accountType: user.accountType,
+    businessVerified: !!user.businessVerified,
     profile: {
       displayName: profile.displayName,
       bio: profile.bio,

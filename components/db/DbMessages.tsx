@@ -20,6 +20,7 @@ import Link from "next/link";
 import { Send, ChevronLeft, Briefcase, Flag, X, Star, Check } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import ReportModal from "@/components/ReportModal";
+import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
 import { useSession } from "@/lib/session";
 
 /* ------------------------------- types ------------------------------- */
@@ -30,6 +31,8 @@ interface ConvUser {
   displayName: string;
   avatarUrl: string | null;
   roleLine: string;
+  accountType?: string;
+  businessVerified?: boolean;
 }
 
 interface Conv {
@@ -296,7 +299,12 @@ export default function DbMessages() {
                 <Avatar src={active.with?.avatarUrl} initials={active.with?.displayName.charAt(0) ?? "?"} size="sm" />
               </Link>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-zinc-100">{active.with?.displayName}</p>
+                <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-zinc-100">
+                  <span className="truncate">{active.with?.displayName}</span>
+                  {active.with?.accountType === "business" && (
+                    <PosterBadge type={posterTypeOf(active.with)} />
+                  )}
+                </p>
                 <p className="truncate text-[11px] text-zinc-500">{active.with?.roleLine || `@${active.with?.handle}`}</p>
               </div>
               <button

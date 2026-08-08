@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, Users, X, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import PosterBadge, { PosterOverline, type PosterType } from "@/components/PosterBadge";
 
 export interface OpportunityItem {
   id: string;
@@ -24,7 +25,8 @@ export interface OpportunityItem {
   applyBy: string | null;
   eventDate: string | null;
   applyConfig?: { requireMessage?: boolean; question?: string };
-  poster: { id: string; handle: string; displayName: string; avatarUrl: string | null };
+  posterType?: PosterType;
+  poster: { id: string; handle: string; displayName: string; avatarUrl: string | null; locationLabel?: string | null };
   isMine: boolean;
   applied: boolean;
 }
@@ -81,9 +83,15 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
   return (
     <div className="space-y-3">
       {items.map((o) => (
-        <article key={o.id} className="card-money p-4 sm:p-5">
+        <article
+          key={o.id}
+          className={`card-money p-4 sm:p-5 ${
+            o.posterType === "verified_business" ? "border-l-2 border-l-sky-400/70" : ""
+          }`}
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
+              {o.posterType && <PosterOverline type={o.posterType} />}
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-bold text-zinc-100">{o.title}</h3>
                 {o.budget != null ? (
@@ -101,11 +109,19 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
               </div>
               {!compact && <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{o.description}</p>}
               <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1.5">
                   <Avatar src={o.poster.avatarUrl} initials={o.poster.displayName.charAt(0)} size="xs" />
-                  <Link href={`/creator/${o.poster.handle}`} className="font-medium text-zinc-300 hover:text-violet-300">
+                  <Link
+                    href={`/creator/${o.poster.handle}`}
+                    className={`font-medium hover:underline ${
+                      o.posterType === "verified_business" ? "text-sky-300" : "text-zinc-300 hover:text-violet-300"
+                    }`}
+                  >
                     {o.poster.displayName}
                   </Link>
+                  {o.posterType && o.posterType !== "verified_business" && o.posterType !== "business_pending" && (
+                    <PosterBadge type={o.posterType} locationLabel={o.poster.locationLabel} />
+                  )}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
@@ -235,8 +251,10 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
       <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
+            {opp.posterType && <PosterOverline type={opp.posterType} />}
             <h3 className="text-sm font-bold text-zinc-100">Apply — {opp.title}</h3>
             <p className="mt-0.5 text-xs text-zinc-500">
+              {opp.posterType === "verified_business" ? `${opp.poster.displayName} · ` : ""}
               {opp.budget != null
                 ? `Applying accepts the listed budget of $${opp.budget}.`
                 : "This is a collaboration — no payment attached."}

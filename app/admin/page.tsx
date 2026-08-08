@@ -34,6 +34,8 @@ interface AdminUser {
   role: string;
   plan: string;
   status: string;
+  accountType?: string;
+  businessVerified?: boolean;
   isSeed: boolean;
   createdAt: string;
 }
@@ -77,7 +79,7 @@ export default function AdminPage() {
     load();
   }, [load]);
 
-  const moderate = async (userId: string, action: "suspend" | "activate") => {
+  const moderate = async (userId: string, action: "suspend" | "activate" | "verify_business" | "revoke_business") => {
     await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -181,6 +183,15 @@ export default function AdminPage() {
                   {u.role === "admin" && (
                     <span className="rounded-full border border-violet-400/40 px-2 py-0.5 text-[9px] font-bold uppercase text-violet-300">admin</span>
                   )}
+                  {u.accountType === "business" && (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${
+                        u.businessVerified ? "border-sky-400/40 bg-sky-400/10 text-sky-300" : "border-line text-zinc-500"
+                      }`}
+                    >
+                      {u.businessVerified ? "verified business" : "business · pending"}
+                    </span>
+                  )}
                   {u.isSeed && (
                     <span className="rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-500">seed</span>
                   )}
@@ -192,6 +203,16 @@ export default function AdminPage() {
                   Plan: {u.plan} · Joined {new Date(u.createdAt).toLocaleDateString()}
                 </p>
               </div>
+              {u.accountType === "business" &&
+                (u.businessVerified ? (
+                  <button onClick={() => moderate(u.id, "revoke_business")} className="rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:text-rose-300">
+                    Revoke verification
+                  </button>
+                ) : (
+                  <button onClick={() => moderate(u.id, "verify_business")} className="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1.5 text-[11px] font-semibold text-sky-300 transition hover:bg-sky-400/20">
+                    Verify business
+                  </button>
+                ))}
               {u.role !== "admin" &&
                 (u.status === "active" ? (
                   <button onClick={() => moderate(u.id, "suspend")} className="rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300">

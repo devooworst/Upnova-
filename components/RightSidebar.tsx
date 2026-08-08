@@ -29,6 +29,8 @@ interface OppRow {
   remote: boolean;
   applyBy: string | null;
   studentFriendly: boolean;
+  posterType?: string;
+  poster?: { displayName: string };
 }
 
 interface EventRow {
@@ -138,8 +140,15 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
               >
                 <p className="flex items-baseline justify-between gap-3">
                   <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-zinc-100 group-hover:text-lime-300">
-                    <Briefcase className="h-3 w-3 shrink-0 text-lime-400/70" />
+                    <Briefcase
+                      className={`h-3 w-3 shrink-0 ${o.posterType === "verified_business" ? "text-sky-400" : "text-lime-400/70"}`}
+                    />
                     <span className="truncate">{o.title.split("—")[0].trim()}</span>
+                    {o.posterType === "verified_business" && (
+                      <span className="shrink-0 rounded-sm border border-sky-400/40 px-1 font-mono text-[8px] font-bold uppercase tracking-[0.1em] text-sky-300" title={`Verified business · ${o.poster?.displayName ?? ""}`}>
+                        biz
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 text-[15px] font-bold tracking-tight tabular-nums text-lime-400">
                     {o.budget != null ? `$${o.budget}` : "collab"}

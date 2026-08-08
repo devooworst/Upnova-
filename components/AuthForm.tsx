@@ -23,6 +23,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [confirm, setConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
+  const [accountType, setAccountType] = useState<"individual" | "business">("individual");
   const [mfaCode, setMfaCode] = useState("");
   const [mfaStep, setMfaStep] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       body: JSON.stringify(
         mode === "login"
           ? { email, password, ...(mfaStep ? { code: mfaCode } : {}) }
-          : { email, password, displayName, handle }
+          : { email, password, displayName, handle, accountType }
       ),
     });
     const data = await res.json();
@@ -108,10 +109,36 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <>
             {mode === "signup" && (
               <>
+                <div className="flex gap-1.5 rounded-xl border border-line bg-card-raised p-1">
+                  <button
+                    type="button"
+                    onClick={() => setAccountType("individual")}
+                    className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition ${
+                      accountType === "individual" ? "bg-lime-400/15 text-lime-300" : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    Individual creator
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountType("business")}
+                    className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition ${
+                      accountType === "business" ? "bg-sky-400/15 text-sky-300" : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    Business
+                  </button>
+                </div>
+                {accountType === "business" && (
+                  <p className="text-[11px] leading-relaxed text-zinc-500">
+                    Business accounts start unverified. The Verified Business badge comes from
+                    UpNova&apos;s verification process — it is never included with a subscription.
+                  </p>
+                )}
                 <input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Display name"
+                  placeholder={accountType === "business" ? "Organization name" : "Display name"}
                   autoComplete="name"
                   className={inputCls}
                   required

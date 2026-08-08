@@ -279,6 +279,17 @@ never "escrow", which is a specific legal service UpNova does not claim to provi
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
+**Poster identity** — every opportunity communicates WHO is posting and how much UpNova has
+verified them, never rank: `Verified Business` (dedicated sky accent — reserved alongside
+lime=money, violet=people, amber=events — subtle left border + overline + BadgeCheck icon),
+`Business · Verification pending`, `Independent Creator`, and `Local Creator · <city>`. Always
+color + label + icon so the distinction survives color-blindness and quick scanning
+(`components/PosterBadge.tsx`, consistent across opportunity cards, the apply screen, profiles,
+conversations, the sidebar widget, and feed posts). **Business verification is independent of any
+subscription** — accounts choose Individual/Business at signup, businesses start unverified, and
+only UpNova's verification process (admin dashboard action; a document flow in production) grants
+the badge. Verified live: a business bought Pro and stayed "pending".
+
 **Adaptive intake** — no universal application form. Opportunities are a short application
 ("I want to be considered"): why-you (poster can waive it), availability Yes/No/Need-to-confirm
 (added automatically only when the gig has a date), at most ONE poster-defined question, and an

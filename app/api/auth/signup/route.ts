@@ -37,7 +37,15 @@ export async function POST(req: NextRequest) {
 
     const userId = randomBytes(12).toString("hex");
     db.insert(tables.users)
-      .values({ id: userId, email, handle, passwordHash: hashPassword(password) })
+      .values({
+        id: userId,
+        email,
+        handle,
+        passwordHash: hashPassword(password),
+        // business accounts start UNVERIFIED — verification is a separate
+        // process, never granted by signup or any subscription
+        accountType: body.accountType === "business" ? "business" : "individual",
+      })
       .run();
     db.insert(tables.profiles)
       .values({ id: randomBytes(12).toString("hex"), userId, displayName })

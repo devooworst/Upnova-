@@ -23,6 +23,8 @@ export async function GET() {
         role: r.user.role,
         plan: r.user.plan,
         status: r.user.status,
+        accountType: r.user.accountType,
+        businessVerified: !!r.user.businessVerified,
         isSeed: r.user.isSeed,
         createdAt: r.user.createdAt.toISOString(),
       })),
@@ -46,6 +48,11 @@ export async function PATCH(req: NextRequest) {
       db.delete(tables.sessions).where(eq(tables.sessions.userId, target.id)).run();
     } else if (action === "activate") {
       db.update(tables.users).set({ status: "active" }).where(eq(tables.users.id, target.id)).run();
+    } else if (action === "verify_business") {
+      if (target.accountType !== "business") throw new ApiError(400, "Not a business account");
+      db.update(tables.users).set({ businessVerified: true }).where(eq(tables.users.id, target.id)).run();
+    } else if (action === "revoke_business") {
+      db.update(tables.users).set({ businessVerified: false }).where(eq(tables.users.id, target.id)).run();
     } else {
       throw new ApiError(400, "Unknown action");
     }

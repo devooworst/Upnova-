@@ -32,6 +32,28 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // poster identity: verified_business | business_pending | creator | community
+    // "creator" = has active listings or completed work; purely descriptive.
+    const posterIds = Array.from(new Set(filtered.map((r) => r.opp.posterId)));
+    const serviceOwners = new Set(
+      db.select({ ownerId: tables.services.ownerId }).from(tables.services).all()
+        .filter((s) => posterIds.includes(s.ownerId))
+        .map((s) => s.ownerId)
+    );
+    const completedCreators = new Set(
+      db.select({ creatorId: tables.projects.creatorId, state: tables.projects.state }).from(tables.projects).all()
+        .filter((pr) => ["completed", "reviewed"].includes(pr.state))
+        .map((pr) => pr.creatorId)
+    );
+    const posterTypeFor = (u: { id: string; accountType: string; businessVerified: boolean }) =>
+      u.accountType === "business"
+        ? u.businessVerified
+          ? "verified_business"
+          : "business_pending"
+        : serviceOwners.has(u.id) || completedCreators.has(u.id)
+          ? "creator"
+          : "community";
+
     const myApplications = viewer
       ? new Set(
           db
@@ -64,6 +86,7 @@ export async function GET(req: NextRequest) {
           }
         })(),
         poster: publicUser(r.user, r.profile),
+        posterType: posterTypeFor(r.user),
         isMine: viewer?.id === r.opp.posterId,
         applied: myApplications.has(r.opp.id),
       })),

@@ -56,6 +56,8 @@ export interface SessionUser {
   handle: string;
   role: string;
   plan: string;
+  accountType?: string;
+  businessVerified?: boolean;
   profile: SessionProfile;
   campus?: { name: string; slug: string; program: string } | null;
 }

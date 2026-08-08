@@ -34,6 +34,10 @@ export const users = sqliteTable("users", {
   role: text("role").notNull().default("user"), // user | admin
   plan: text("plan").notNull().default("free"), // free | college | pro
   status: text("status").notNull().default("active"), // active | suspended
+  // individual | business. businessVerified is EARNED through UpNova's
+  // business-verification process — it is never granted by a subscription.
+  accountType: text("account_type").notNull().default("individual"),
+  businessVerified: integer("business_verified", { mode: "boolean" }).notNull().default(false),
   mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).notNull().default(false),
   mfaSecret: text("mfa_secret"),
   isSeed: seed(),

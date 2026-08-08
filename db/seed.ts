@@ -106,6 +106,8 @@ function seed() {
     verified?: boolean;
     trust?: string;
     admin?: boolean;
+    business?: boolean;
+    bizVerified?: boolean;
   };
 
   const defs: SeedUser[] = [
@@ -219,6 +221,24 @@ function seed() {
       interests: ["Film", "Fashion"], verified: true,
     },
     {
+      handle: "nikecreative", name: "Nike Creative", role: "Brand — Sports & Lifestyle",
+      bio: "Creative team behind Nike's regional campaigns. We hire local creators for shoots, content, and events.",
+      avatar: null, city: "Atlanta", state: "GA", county: "Fulton",
+      lat: 33.749, lng: -84.388,
+      skills: ["Campaigns", "Content Production", "Events"],
+      interests: ["Brands", "Photography", "Film"],
+      business: true, bizVerified: true,
+    },
+    {
+      handle: "harboroak", name: "Harbor & Oak", role: "Brand — Coffee & Goods",
+      bio: "Baltimore coffee and goods brand. We work with local photographers, designers, and musicians.",
+      avatar: null, city: "Baltimore", state: "MD", county: "Baltimore City",
+      lat: 39.287, lng: -76.607,
+      skills: ["Retail", "Local Events"],
+      interests: ["Brands", "Music", "Photography"],
+      business: true, bizVerified: false,
+    },
+    {
       handle: "omar", name: "Omar Diallo", role: "Photographer",
       extraRoles: ["Tutor"],
       bio: "Bowie State junior — portraits, grad shoots, and calculus tutoring.",
@@ -240,6 +260,8 @@ function seed() {
         passwordHash: PASSWORD,
         handle: d.handle,
         role: d.admin ? "admin" : "user",
+        accountType: d.business ? "business" : "individual",
+        businessVerified: !!d.bizVerified,
         isSeed: true,
       })
       .run();
@@ -369,6 +391,9 @@ function seed() {
     { poster: "omar", title: "Collab: Grad Season Mini-Sessions", budget: null, loc: "Bowie, MD", type: "collab", student: true, desc: "Pairing with a second photographer to run grad mini-sessions — split bookings." },
     { poster: "lena", title: "Icon Set — 24 Icons", budget: 240, loc: "Remote", type: "gig", remote: true, apply: 9, desc: "Custom icon set for a client dashboard, consistent 2px stroke style." },
     { poster: "marcusj", title: "Drone Operator — Music Video", budget: 300, loc: "Washington, DC", type: "gig", event: 10, apply: 6, desc: "Licensed drone op for three exterior shots. Half-day." },
+    { poster: "nikecreative", title: "Nike Fall Campaign", budget: 2400, loc: "Atlanta, GA", type: "gig", event: 20, apply: 12, desc: "Regional fall campaign: models and videographers for a two-day shoot. Usage rights covered in the project terms. Travel not included." },
+    { poster: "nikecreative", title: "Campaign BTS Photographer", budget: 600, loc: "Atlanta, GA", type: "gig", event: 20, apply: 12, desc: "Stills coverage across both shoot days for internal and social use." },
+    { poster: "harboroak", title: "Fall Menu Content Shoot", budget: 450, loc: "Baltimore, MD", type: "gig", event: 13, apply: 8, desc: "Photograph the fall menu + 3 short verticals for social. Half-day at the Fells Point shop." },
   ];
   const oid: Record<string, string> = {};
   for (const o of oppDefs) {
