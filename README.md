@@ -105,6 +105,18 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   isn't the source of truth; the email is never public). College ends at the
   verified graduation date; everything the student built stays theirs, with a
   natural transition to Pro.
+- **Work History & Reliability.** Every paid job creates a verified work record.
+  Portfolio = "look what I can create"; Experience = "look what I've actually done"
+  (Verified UpNova Project — added to the public portfolio only with the creator's
+  permission; client work is never auto-exposed). Reliability is a private record
+  (on-time / approved extension / late-communicated / late-silent / cancels /
+  disputes) shown to the owner in the Work Performance dashboard; the public surface
+  is only the summary (🟢 Reliable Creator · 98% on time). Consequences are quiet
+  privilege changes — visibility, recommendation priority, project limits, payout
+  timing — never public marks. Communication protects the record: approved
+  extensions carry no penalty (the flow demos this). Reviews come exclusively from
+  verified projects, are two-sided, and cover communication / quality / reliability
+  / professionalism / deadline. Clients build reliability too.
 - **The Create system: no generic forms.** Each creation type has its own
   purpose-specific form, fields, validation, and resulting feed card. Post = social
   (media, post type, audience, community, tags). Opportunity = a project listing

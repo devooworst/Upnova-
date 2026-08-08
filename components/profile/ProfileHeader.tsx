@@ -10,7 +10,7 @@ import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 import { useEffect } from "react";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
-import { currentUser, profileStats, contact } from "@/lib/data";
+import { currentUser, profileStats, contact, reliability } from "@/lib/data";
 
 export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const [following, setFollowing] = useState(false);
@@ -101,6 +101,12 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
                 🎓 Verified Student
               </span>
             )}
+            <span
+              className="ml-1 inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200"
+              title={`${reliability.onTimeRate}% of verified projects completed on time`}
+            >
+              🟢 Reliable Creator · {reliability.onTimeRate}% on time
+            </span>
           </h1>
           <p className="mt-1 text-sm font-medium text-zinc-400">{currentUser.role}</p>
           <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-zinc-300">{currentUser.bio}</p>

@@ -1,5 +1,8 @@
-import { Briefcase, ArrowRight } from "lucide-react";
-import { profileOpportunities } from "@/lib/data";
+"use client";
+
+import { useState } from "react";
+import { Briefcase, ArrowRight, BadgeCheck, Star } from "lucide-react";
+import { profileOpportunities, workRecords } from "@/lib/data";
 
 const statusStyle: Record<string, string> = {
   "Applied • Under Review": "border-amber-400/40 bg-amber-400/10 text-amber-300",
@@ -9,6 +12,9 @@ const statusStyle: Record<string, string> = {
 };
 
 export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
+  const [inPortfolio, setInPortfolio] = useState<Record<string, boolean>>(
+    Object.fromEntries(workRecords.map((w) => [w.id, w.inPortfolio]))
+  );
   const applications = profileOpportunities.filter((o) => o.kind === "application");
   const listings = profileOpportunities.filter((o) => o.kind === "listing");
 
@@ -30,9 +36,56 @@ export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
         )}
       </p>
 
+      {/* Experience — "look what I've actually done", verified through UpNova */}
       <section>
         <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          Work History
+          Experience · Verified UpNova Projects
+        </h3>
+        <div className="space-y-2.5">
+          {workRecords.map((w) => (
+            <article key={w.id} className="card-money flex flex-wrap items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <h4 className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-zinc-100">
+                  {w.title}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300">
+                    <BadgeCheck className="h-3 w-3" /> Verified
+                  </span>
+                </h4>
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+                  Client: {w.client} · Completed {w.completed}
+                  <span className="flex items-center gap-0.5 font-semibold text-zinc-300">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {w.rating.toFixed(1)}
+                  </span>
+                </p>
+              </div>
+              {isOwner ? (
+                <button
+                  onClick={() => setInPortfolio((m) => ({ ...m, [w.id]: !m[w.id] }))}
+                  className={
+                    inPortfolio[w.id]
+                      ? "rounded-full border border-lime-400/40 px-3 py-1.5 text-[11px] font-semibold text-lime-300"
+                      : "rounded-full border border-line px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-zinc-600"
+                  }
+                >
+                  {inPortfolio[w.id] ? "✓ In portfolio" : "Add to portfolio"}
+                </button>
+              ) : (
+                inPortfolio[w.id] && <span className="text-[11px] text-zinc-500">Shown in portfolio</span>
+              )}
+            </article>
+          ))}
+        </div>
+        {isOwner && (
+          <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
+            Completed projects appear publicly only when you add them — client work is never
+            auto-exposed. Reviews come exclusively from verified projects.
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          Applications
         </h3>
         <div className="space-y-2.5">
           {applications.map((o) => (

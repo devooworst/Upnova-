@@ -17,6 +17,7 @@ function stepIndex(stage: ProjectStage): number {
     case "checkout":
       return 1;
     case "paid":
+    case "extension":
       return 3;
     case "submitted":
       return 4;

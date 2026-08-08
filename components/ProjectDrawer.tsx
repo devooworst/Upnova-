@@ -25,6 +25,7 @@ import { feeFor, totalFor, money, PLATFORM_FEE_RATE } from "@/lib/fees";
 /* ------------------------------------------------------------------ */
 
 export type ProjectStage =
+  | "extension"
   | "idle"
   | "form"
   | "review"
@@ -135,12 +136,15 @@ export default function ProjectDrawer({
       const t = setTimeout(() => {
         onMessage("them", "Payment came through 🙌 I'm booked for the 22nd. Gallery lands within 48h of the event.");
         const t2 = setTimeout(() => {
-          onMessage("them", "Here's the final gallery — 52 edited shots. Thanks for the trust 🙏");
-          setStage("submitted");
+          onMessage("them", "Heads up — the venue's second card is coming to me a day late. Can I get 2 extra days on the gallery? Requesting an extension now so it's official.");
+          setStage("extension");
         }, 2400);
         return () => clearTimeout(t2);
       }, 1200);
       return () => clearTimeout(t);
+    }
+    if (stage === "extension") {
+      return; // waits for the client's decision — communication, not silence
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
@@ -391,6 +395,41 @@ export default function ProjectDrawer({
             </div>
           )}
 
+          {/* ---------------- extension request — the 🟡 path ---------------- */}
+          {stage === "extension" && (
+            <div className="mt-5">
+              <div className="rounded-md border border-amber-400/30 bg-amber-400/5 p-3.5">
+                <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-400">
+                  🟡 extension requested
+                </p>
+                <p className="mt-1.5 text-sm text-zinc-200">
+                  {firstName} asked for <span className="font-bold">+2 days</span> — new deadline
+                  would be <span className="font-semibold">August 24</span>.
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                  Approving officially moves the deadline. No penalty to {firstName}&apos;s record —
+                  this is exactly the communication UpNova rewards.
+                </p>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => {
+                    onMessage("me", "Extension approved — Aug 24 works. Thanks for flagging it early 🙏");
+                    setStage("paid");
+                    setTimeout(() => {
+                      onMessage("them", "Here's the final gallery — 52 edited shots. Thanks for the trust 🙏");
+                      setStage("submitted");
+                    }, 2400);
+                  }}
+                  className="flex-1 rounded-md bg-amber-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-amber-300"
+                >
+                  Approve Extension
+                </button>
+                <button className="btn-ghost flex-1 py-2 text-xs">Discuss</button>
+              </div>
+            </div>
+          )}
+
           {/* ---------------- workspace ---------------- */}
           {["paid", "submitted", "reviewing", "done"].includes(stage) && (
             <div className="mt-5">
@@ -444,6 +483,10 @@ export default function ProjectDrawer({
               {stage === "reviewing" && (
                 <div className="mt-4 border-t border-line-soft pt-4">
                   <p className="text-sm font-bold tracking-tight text-zinc-100">Rate {firstName}</p>
+                  <p className="mt-0.5 text-[10px] text-zinc-500">
+                    Verified UpNova Project review · covers communication, quality, reliability,
+                    professionalism, met deadline
+                  </p>
                   <div className="mt-2"><Stars value={myStars} onChange={setMyStars} /></div>
                   <textarea value={myReview} onChange={(e) => setMyReview(e.target.value)} rows={2} className="input-dark mt-2.5 resize-none text-xs" />
                   <button

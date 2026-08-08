@@ -44,6 +44,8 @@ export interface Creator {
   online?: boolean;
   /** follower count baseline (includes your follow if you already follow them) */
   followers: number;
+  /** public reliability summary — details stay private to the owner */
+  onTimeRate?: number;
 }
 
 /* ------------------------------ current user ------------------------------ */
@@ -102,6 +104,7 @@ export const stories: Story[] = [
 export const creators: Creator[] = [
   {
     id: "jordan",
+    onTimeRate: 96,
     followers: 12400,
     name: "Jordan Miles",
     handle: "jordanmiles",
@@ -123,6 +126,7 @@ export const creators: Creator[] = [
   },
   {
     id: "ava",
+    onTimeRate: 100,
     followers: 3260,
     name: "Ava Chen",
     handle: "avashoots",
@@ -145,6 +149,7 @@ export const creators: Creator[] = [
   },
   {
     id: "marcus",
+    onTimeRate: 92,
     followers: 1840,
     name: "Marcus Reed",
     handle: "marcusfilms",
@@ -209,6 +214,7 @@ export const creators: Creator[] = [
   },
   {
     id: "lena",
+    onTimeRate: 97,
     followers: 4120,
     name: "Lena Ortiz",
     handle: "lenadesigns",
@@ -1410,6 +1416,47 @@ export const campusOrgs: CampusOrg[] = [
     ],
   },
 ];
+
+/* ------------------------------ work history -------------------------------- */
+/* Every paid job creates a completed work record. Portfolio = "look
+   what I can create." Experience = "look what I've actually done" —
+   verified through UpNova, added to the public portfolio only with
+   permission. Reviews only come from verified projects.               */
+
+export interface WorkRecord {
+  id: string;
+  title: string;
+  client: string;
+  role: string;
+  completed: string;
+  rating: number;
+  /** 🟢 on-time · 🟡 approved extension · 🟠 late, communicated · 🔴 late, silent */
+  outcome: "on-time" | "extension" | "late-communicated" | "late-silent";
+  /** creator chose to show this client work publicly */
+  inPortfolio: boolean;
+}
+
+export const workRecords: WorkRecord[] = [
+  { id: "wr-1", title: "Event Photography — Creator Meetup", client: "Ava Chen", role: "Client", completed: "Aug 22", rating: 5.0, outcome: "on-time", inPortfolio: true },
+  { id: "wr-2", title: "Mixing Session", client: "Maya Reyes", role: "Producer", completed: "Aug 3", rating: 5.0, outcome: "on-time", inPortfolio: false },
+  { id: "wr-3", title: "Brand Audio Package", client: "Harbor & Oak", role: "Producer", completed: "Jul 30", rating: 4.8, outcome: "extension", inPortfolio: false },
+  { id: "wr-4", title: "Loop Kit — Exclusive License", client: "K. Boateng", role: "Beat Maker", completed: "Jul 18", rating: 5.0, outcome: "on-time", inPortfolio: true },
+];
+
+/* Private reliability record — visible to the account owner only.
+   Public surface is just the summary: 🟢 Reliable Creator · on-time %. */
+export const reliability = {
+  onTimeRate: 98,
+  completed: 24,
+  onTime: 23,
+  extensions: 1,
+  lateCommunicated: 0,
+  lateSilent: 0,
+  cancelled: 0,
+  disputes: 0,
+  rating: 4.9,
+  responseRate: 100,
+};
 
 /* -------------------------------- bookings --------------------------------- */
 /* Service providers live off their calendar: who booked, when, for how much. */

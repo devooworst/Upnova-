@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Clock, MapPin, Plus } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import { bookings } from "@/lib/data";
+import { bookings, reliability } from "@/lib/data";
 
 /* August 2026: starts on a Saturday, 31 days. Today is Fri Aug 7. */
 const FIRST_WEEKDAY = 6; // 0 = Sunday
@@ -42,6 +42,48 @@ export default function CalendarPage() {
           Your service calendar: what&apos;s booked, what&apos;s pending, and what it pays.
         </p>
       </header>
+
+      {/* work performance — the private professional dashboard */}
+      <section className="card-money p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Work Performance</h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-0.5 text-[11px] font-bold text-lime-300">
+            🟢 Reliable Creator
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+          {[
+            [`${reliability.onTimeRate}%`, "on-time"],
+            [`${reliability.completed}`, "completed"],
+            [`${reliability.onTime}`, "on time"],
+            [`${reliability.extensions}`, "extension"],
+            [`${reliability.rating}★`, "client rating"],
+            [`${reliability.responseRate}%`, "response rate"],
+          ].map(([v, k]) => (
+            <div key={k as string}>
+              <p className="text-lg font-extrabold tabular-nums tracking-tight text-zinc-50">{v}</p>
+              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">{k}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3.5 border-t border-line-soft pt-3">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+            how deadlines are recorded — communication protects your record
+          </p>
+          <div className="mt-2 grid gap-1.5 text-[11px] text-zinc-400 sm:grid-cols-2">
+            <span>🟢 On time — no problem</span>
+            <span>🟡 Extension requested &amp; approved — no penalty</span>
+            <span>🟠 Late, communicated — noted, not punished like silence</span>
+            <span>🔴 Late, no communication — affects standing &amp; visibility</span>
+          </div>
+        </div>
+        <p className="mt-3 border-t border-line-soft pt-2.5 text-[10px] leading-relaxed text-zinc-600">
+          This record is private to you. Publicly, clients only see the summary: 🟢 Reliable
+          Creator · {reliability.onTimeRate}% on time. Reliability adjusts visibility and access
+          to higher-value work — it never brands anyone. Clients build reliability too: repeated
+          cancellations, scope changes, or refused deliveries affect their standing the same way.
+        </p>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_1fr]">
         {/* ------- month grid: money DNA, this is where income lives ------- */}
