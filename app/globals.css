@@ -1,4 +1,5 @@
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/syne";
 
 @tailwind base;
@@ -7,8 +8,9 @@
 
 :root {
   color-scheme: dark;
-  --font-inter: "Inter Variable", system-ui, sans-serif;
-  --font-display: "Syne Variable", "Inter Variable", sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-display: "Syne Variable", "Plus Jakarta Sans Variable", sans-serif;
 }
 
 html {

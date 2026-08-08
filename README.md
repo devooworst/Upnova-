@@ -53,7 +53,10 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 
 ## Visual identity
 
-- Background `#0A0A0F`, cards `#111111`, zinc borders. Display face: **Syne** (headings/logo). Body: Inter. Distances & budgets set in monospace.
+- Background `#0A0A0F`, cards `#111111`, zinc borders. One UI family: **Plus Jakarta Sans**
+  (weight/size/tracking carry all hierarchy — every page title is `text-2xl` bold tight).
+  **JetBrains Mono** is the data voice: distances, budgets, receipt lines, overlines.
+  **Syne** appears exactly once, as the UpNova wordmark.
 - Accent colors have **jobs**, so the eye learns the language:
   - **lime** = money & opportunity (budgets, Apply, Hire, Open to Work, revenue)
   - **violet** = people & community (follow, join, messages, online, likes)
