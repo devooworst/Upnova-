@@ -1168,7 +1168,7 @@ export default function EditProfile() {
                 </li>
               )}
             </ul>
-            <Link href="/services" className="btn-ghost mt-2 inline-flex px-3 py-1.5 text-xs">
+            <Link href="/services/new" className="btn-ghost mt-2 inline-flex px-3 py-1.5 text-xs">
               <FolderPlus className="h-3.5 w-3.5" /> Create Service
             </Link>
 

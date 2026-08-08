@@ -6,6 +6,8 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser } from "@/lib/server/demo";
+import { parseConfig, travelFeeFor } from "@/lib/servicePolicies";
+import { haversineMi } from "@/lib/server/feed";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,7 @@ export async function GET() {
           location: b.location,
           status: b.status,
           paymentStatus: payment?.status ?? null,
+          travelFee: b.travelFee,
           conversationId: b.conversationId,
           myRole: b.clientId === user.id ? "client" : "provider",
           with: publicUser(otherUser, otherProfile),
@@ -88,8 +91,51 @@ export async function POST(req: NextRequest) {
     if (isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now())
       throw new ApiError(400, "Pick a future time");
 
+    // the creator's config drives duration, radius, limits, and travel
+    const config = parseConfig(service.config);
+    const providerProfileFull = db
+      .select()
+      .from(tables.profiles)
+      .where(eq(tables.profiles.userId, service.ownerId))
+      .get()!;
+    const distanceMi =
+      user.profile.lat != null && providerProfileFull.lat != null
+        ? Math.round(haversineMi(user.profile.lat, user.profile.lng!, providerProfileFull.lat, providerProfileFull.lng!) * 10) / 10
+        : null;
+
+    // service radius: outside the area → refused up front, never a surprise
+    if (
+      ["client_location", "both"].includes(config.locationMode) &&
+      config.travel.radiusMi &&
+      distanceMi != null &&
+      distanceMi > config.travel.radiusMi
+    )
+      throw new ApiError(409, `Outside ${providerProfileFull.displayName}'s service area (${config.travel.radiusMi} mi)`);
+
+    const travelFee = travelFeeFor(config.travel, distanceMi).fee;
+
+    // booking limits: the creator caps their own day
+    if (config.scheduling.maxPerDay) {
+      const dayStart = new Date(body.startsAt);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart.getTime() + 86400_000);
+      const sameDay = db
+        .select()
+        .from(tables.bookings)
+        .where(eq(tables.bookings.providerId, service.ownerId))
+        .all()
+        .filter(
+          (x) =>
+            ["pending", "accepted", "confirmed", "reschedule_requested"].includes(x.status) &&
+            x.startsAt >= dayStart &&
+            x.startsAt < dayEnd
+        ).length;
+      if (sameDay >= config.scheduling.maxPerDay)
+        throw new ApiError(409, `${providerProfileFull.displayName} is fully booked that day (max ${config.scheduling.maxPerDay}/day)`);
+    }
+
     // the calendar is the source of truth: no double-booking a taken slot
-    const durationMin = Math.min(480, Math.max(15, Number(body.durationMin) || 60));
+    const durationMin = config.scheduling.durationMin || Math.min(480, Math.max(15, Number(body.durationMin) || 60));
     const conflicts = db
       .select()
       .from(tables.bookings)
@@ -116,6 +162,7 @@ export async function POST(req: NextRequest) {
         startsAt,
         durationMin,
         price: service.price,
+        travelFee,
         location: String(body.location || "").slice(0, 120),
         conversationId: body.conversationId ? String(body.conversationId) : null,
       })

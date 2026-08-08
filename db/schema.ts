@@ -347,6 +347,11 @@ export const services = sqliteTable("services", {
   // "appointment" (hair, nails, photo sessions, events → time slots)
   // "project"     (design, production, builds → project request/quote)
   fulfillment: text("fulfillment").notNull().default("project"),
+  // creator-defined business rules (JSON — see lib/servicePolicies.ts):
+  // location mode, travel fees, service radius, scheduling limits, and
+  // cancellation/reschedule/late/no-show policies. UpNova provides the
+  // infrastructure; the creator decides how their business operates.
+  config: text("config").notNull().default("{}"),
   active: bool("active", true),
   paused: bool("paused", false),
   isSeed: seed(),
@@ -480,6 +485,9 @@ export const bookings = sqliteTable(
     durationMin: integer("duration_min").notNull().default(60),
     price: integer("price").notNull(),
     location: text("location").notNull().default(""),
+    // travel fee computed server-side from the service's travel config and
+    // the real distance between client and provider — disclosed before pay
+    travelFee: integer("travel_fee").notNull().default(0),
     // lifecycle: pending (requested, awaiting creator) → accepted (payment
     // pending) → confirmed (payment secured) → completed · cancelled ·
     // reschedule_requested (proposedStartsAt holds the new time)

@@ -8,6 +8,8 @@ import { publicUser } from "@/lib/server/serialize";
 export const dynamic = "force-dynamic";
 
 import { ctaFor } from "@/lib/server/cta";
+import { parseConfig, travelFeeFor, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
+import { haversineMi } from "@/lib/server/feed";
 
 /** GET /api/services — active marketplace listings with real owners. */
 export async function GET() {
@@ -23,7 +25,16 @@ export async function GET() {
       .filter((r) => r.service.active && !r.service.paused && r.user.status === "active");
 
     return {
-      services: rows.map((r) => ({
+      services: rows.map((r) => {
+        const config = parseConfig(r.service.config);
+        // per-viewer travel estimate from real profile distances —
+        // disclosed here, recomputed server-side at booking time
+        const distanceMi =
+          viewer?.profile.lat != null && r.profile.lat != null
+            ? Math.round(haversineMi(viewer.profile.lat, viewer.profile.lng!, r.profile.lat, r.profile.lng!) * 10) / 10
+            : null;
+        const travel = travelFeeFor(config.travel, distanceMi);
+        return {
         id: r.service.id,
         title: r.service.title,
         description: r.service.description,
@@ -36,7 +47,12 @@ export async function GET() {
         reach: r.service.reach,
         owner: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.service.ownerId,
-      })),
+        config,
+        distanceMi,
+        travelEstimate: travel.fee,
+        travelNote: travel.note,
+        };
+      }),
     };
   });
 }
@@ -57,6 +73,49 @@ export async function POST(req: NextRequest) {
     if (HIGH_TRUST.includes(category) && user.profile.trustLevel !== "high-trust")
       throw new ApiError(403, "This category requires High-Trust verification before publishing");
 
+    // the creator's config IS the product — sanitize and store it
+    const inC = (body.config ?? {}) as Partial<ServiceConfig>;
+    const num = (v: unknown, max = 10_000) =>
+      Number.isFinite(Number(v)) ? Math.min(max, Math.max(0, Math.round(Number(v)))) : undefined;
+    const config: ServiceConfig = {
+      locationMode: ["my_location", "client_location", "both", "remote", "flexible"].includes(inC.locationMode as string)
+        ? (inC.locationMode as ServiceConfig["locationMode"])
+        : "flexible",
+      travel: {
+        mode: ["none", "free", "flat", "per_mile", "quote"].includes(inC.travel?.mode as string)
+          ? (inC.travel!.mode as ServiceConfig["travel"]["mode"])
+          : "none",
+        flatFee: num(inC.travel?.flatFee, 500),
+        perMile: num(inC.travel?.perMile, 50),
+        freeMiles: num(inC.travel?.freeMiles, 100),
+        radiusMi: num(inC.travel?.radiusMi, 500),
+      },
+      scheduling: {
+        durationMin: num(inC.scheduling?.durationMin, 480) ?? 60,
+        maxPerDay: num(inC.scheduling?.maxPerDay, 20),
+      },
+      policies: {
+        cancellation: ["anytime", "free_24h", "partial_48h", "custom"].includes(inC.policies?.cancellation as string)
+          ? (inC.policies!.cancellation as ServiceConfig["policies"]["cancellation"])
+          : DEFAULT_CONFIG.policies.cancellation,
+        cancellationNote: String(inC.policies?.cancellationNote ?? "").slice(0, 160) || undefined,
+        reschedule: ["free", "one_free", "fee", "approval"].includes(inC.policies?.reschedule as string)
+          ? (inC.policies!.reschedule as ServiceConfig["policies"]["reschedule"])
+          : "free",
+        rescheduleFee: num(inC.policies?.rescheduleFee, 200),
+        lateGraceMin: num(inC.policies?.lateGraceMin, 120) ?? 15,
+        lateFee: num(inC.policies?.lateFee, 200) ?? 0,
+        noShow: ["none", "partial", "full"].includes(inC.policies?.noShow as string)
+          ? (inC.policies!.noShow as ServiceConfig["policies"]["noShow"])
+          : "none",
+      },
+      requirements: Array.isArray(inC.requirements)
+        ? inC.requirements.slice(0, 8).map((r) => String(r).slice(0, 60))
+        : [],
+    };
+
+    const fulfillment = ["appointment", "project", "quote"].includes(body.fulfillment) ? body.fulfillment : "project";
+
     const id = randomBytes(12).toString("hex");
     db.insert(tables.services)
       .values({
@@ -66,6 +125,8 @@ export async function POST(req: NextRequest) {
         description: String(body.description || "").slice(0, 1000),
         price,
         category,
+        fulfillment,
+        config: JSON.stringify(config),
         aiPolicy: ["no-ai", "disclosure", "assisted", "client-decides"].includes(body.aiPolicy)
           ? body.aiPolicy
           : "client-decides",

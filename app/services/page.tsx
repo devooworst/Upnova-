@@ -10,7 +10,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, ShoppingBag, Zap, X, Bookmark, CalendarDays } from "lucide-react";
+import { Search, ShoppingBag, Zap, X, Bookmark, CalendarDays, Plus } from "lucide-react";
+import { policyLines, travelLabel, type ServiceConfig } from "@/lib/servicePolicies";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useSession } from "@/lib/session";
@@ -23,8 +24,12 @@ interface ServiceItem {
   category: string;
   aiPolicy: string;
   trustRequired: string;
-  fulfillment?: string; // appointment | project
+  fulfillment?: string; // appointment | project | quote
   cta?: string; // from the listing's fulfillment configuration
+  config?: ServiceConfig;
+  distanceMi?: number | null;
+  travelEstimate?: number;
+  travelNote?: string | null;
   reach: string;
   owner: {
     id: string;
@@ -113,17 +118,20 @@ export default function ServicesPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10">
           <ShoppingBag className="h-5 w-5 text-lime-400" />
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Services</h1>
           <p className="text-sm text-zinc-400">
             Creators who are available now. Their listed price is their payout — the 5% platform fee is
             added at checkout.
           </p>
         </div>
+        <Link href="/services/new" className="btn-lime shrink-0 px-4 py-1.5 text-xs sm:text-sm">
+          <Plus className="h-4 w-4" /> Create service
+        </Link>
       </div>
 
       {/* search + categories */}
@@ -263,12 +271,15 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
   const [convId, setConvId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const durationMin = DEFAULT_DURATION[service.category] ?? 60;
+  // duration comes from the creator's scheduling config when set
+  const durationMin = service.config?.scheduling.durationMin ?? DEFAULT_DURATION[service.category] ?? 60;
+  const travelFee = service.travelEstimate ?? 0;
 
   const fmtHour = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
   const startDate = date && hour != null ? new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`) : null;
   const endDate = startDate ? new Date(startDate.getTime() + durationMin * 60_000) : null;
-  const fee = Math.round(service.price * 5) / 100;
+  const subtotal = service.price + travelFee;
+  const fee = Math.round(subtotal * 5) / 100;
 
   /* step 3 → create the shared record: conversation + booking */
   const request = async () => {
@@ -405,11 +416,32 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
               <div className="flex justify-between"><dt className="text-zinc-500">Date</dt><dd className="text-zinc-200">{startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</dd></div>
               <div className="flex justify-between"><dt className="text-zinc-500">Time</dt><dd className="font-mono text-xs tracking-[0.08em] text-zinc-200">{startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</dd></div>
               <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${service.price}</dd></div>
+              {travelFee > 0 && service.distanceMi != null && (
+                <div className="flex justify-between"><dt className="text-zinc-500">Travel ({service.distanceMi} mi)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${travelFee}</dd></div>
+              )}
             </dl>
-            <p className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2 text-[11px] text-zinc-500">
-              Free cancellation up to 24 hours before the appointment. Payment is secured up front and
-              released to {firstName} after completion.
-            </p>
+            {/* the creator's actual policies — before any commitment */}
+            <div className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">{firstName}&apos;s policies</p>
+              <ul className="mt-1 space-y-0.5 text-[11px] text-zinc-400">
+                {service.config && (
+                  <li className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-600" /> {travelLabel(service.config.travel)}
+                  </li>
+                )}
+                {(service.config ? policyLines(service.config) : []).map((l) => (
+                  <li key={l} className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-600" /> {l}
+                  </li>
+                ))}
+                <li className="flex items-center gap-1.5">
+                  <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-600" /> Payment secured up front, released after completion
+                </li>
+              </ul>
+            </div>
+            {service.travelNote && (
+              <p className="text-[11px] text-amber-300">{service.travelNote}</p>
+            )}
             {error && (
               <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
@@ -434,8 +466,11 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
             <dl className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
               <div className="flex justify-between"><dt className="text-zinc-500">Service</dt><dd className="text-zinc-200">{service.title}</dd></div>
               <div className="flex justify-between"><dt className="text-zinc-500">Creator payout</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${service.price.toFixed(2)}</dd></div>
+              {travelFee > 0 && (
+                <div className="flex justify-between"><dt className="text-zinc-500">Travel{service.distanceMi != null ? ` (${service.distanceMi} mi)` : ""}</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${travelFee.toFixed(2)}</dd></div>
+              )}
               <div className="flex justify-between"><dt className="text-zinc-500">UpNova fee (5%)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${fee.toFixed(2)}</dd></div>
-              <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold"><dt className="text-zinc-200">Total</dt><dd className="font-mono tracking-[0.08em] text-lime-300">${(service.price + fee).toFixed(2)}</dd></div>
+              <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold"><dt className="text-zinc-200">Total</dt><dd className="font-mono tracking-[0.08em] text-lime-300">${(subtotal + fee).toFixed(2)}</dd></div>
             </dl>
             {error && (
               <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
@@ -443,7 +478,7 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
               </p>
             )}
             <button onClick={pay} disabled={busy} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
-              {busy ? "Processing…" : `Pay $${(service.price + fee).toFixed(2)}`}
+              {busy ? "Processing…" : `Pay $${(subtotal + fee).toFixed(2)}`}
             </button>
           </div>
         )}
@@ -457,7 +492,7 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
             <div>
               <h4 className="text-sm font-bold text-lime-300">Payment secured</h4>
               <p className="mx-auto mt-1 max-w-[260px] text-xs leading-relaxed text-zinc-400">
-                Your payment is held securely until the booking is completed. You&apos;re confirmed
+                ${(subtotal + fee).toFixed(2)} secured{travelFee > 0 ? ` (incl. $${travelFee} travel)` : ""} until the booking is completed. You&apos;re confirmed
                 {startDate && ` for ${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })}`}.
               </p>
             </div>

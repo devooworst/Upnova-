@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 import { seedConfirmsBookingPayment } from "@/lib/server/demo";
+import { parseConfig, cancellationLabel } from "@/lib/servicePolicies";
 import { randomBytes as rb } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     } else if (action === "pay") {
       if (!isClient) throw new ApiError(403, "Only the client pays");
       if (b.status !== "accepted") throw new ApiError(409, `Cannot pay from ${b.status}`);
-      const amountCents = b.price * 100;
+      // total = service + creator-defined travel fee, both disclosed pre-pay
+      const amountCents = (b.price + b.travelFee) * 100;
       db.insert(tables.payments)
         .values({
           id: randomBytes(12).toString("hex"),
@@ -72,21 +74,40 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         })
         .run();
       set({ status: "confirmed" });
-      sys(`Booking confirmed — ${b.title} · ${when(b.startsAt)}. Payment secured: $${(b.price * 1.05).toFixed(2)}.`);
+      sys(`Booking confirmed — ${b.title} · ${when(b.startsAt)}. Payment secured: $${((b.price + b.travelFee) * 1.05).toFixed(2)}${b.travelFee ? ` (incl. $${b.travelFee} travel)` : ""}.`);
       notify({ userId: other, actorId: user.id, type: "payment", title: `Booking confirmed — payment secured`, body: `${b.title} · ${when(b.startsAt)} · $${b.price}`, href: "/calendar", category: "payments" });
       // demo mode: the seed provider confirms in chat right away
       seedConfirmsBookingPayment(b.id);
     } else if (action === "cancel") {
       if (!["pending", "accepted", "confirmed", "reschedule_requested"].includes(b.status))
         throw new ApiError(409, `Cannot cancel from ${b.status}`);
-      // secured payment refunds in full on cancellation
+      // refunds follow the CREATOR'S cancellation policy — which the
+      // client saw before paying. Provider-initiated cancels always
+      // refund in full.
+      const svc = b.serviceId ? db.select().from(tables.services).where(eq(tables.services.id, b.serviceId)).get() : null;
+      const policy = parseConfig(svc?.config).policies;
+      const hoursOut = (b.startsAt.getTime() - Date.now()) / 3600_000;
+      const fullRefund =
+        isProvider ||
+        policy.cancellation === "anytime" ||
+        (policy.cancellation === "free_24h" && hoursOut >= 24) ||
+        (policy.cancellation === "partial_48h" && hoursOut >= 48) ||
+        policy.cancellation === "custom";
       db.update(tables.payments)
-        .set({ status: "refunded" })
+        .set({ status: fullRefund ? "refunded" : "released" })
         .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
         .run();
+      const hadPayment = b.status === "confirmed";
       set({ status: "cancelled", proposedStartsAt: null });
-      sys(`${actorName} cancelled the booking — ${b.title}.${b.status === "confirmed" ? " Payment refunded in full." : ""}`);
-      notify({ userId: other, actorId: user.id, type: "booking", title: `${actorName} cancelled ${b.title}`, body: b.status === "confirmed" ? "Payment refunded in full" : when(b.startsAt), href: "/calendar" });
+      sys(
+        `${actorName} cancelled the booking — ${b.title}.` +
+          (hadPayment
+            ? fullRefund
+              ? " Payment refunded in full."
+              : ` Late cancellation — per the policy (${cancellationLabel(policy)}), the payment was released to the provider.`
+            : "")
+      );
+      notify({ userId: other, actorId: user.id, type: "booking", title: `${actorName} cancelled ${b.title}`, body: hadPayment ? (fullRefund ? "Payment refunded in full" : "Late cancellation — payment released per policy") : when(b.startsAt), href: "/calendar" });
     } else if (action === "reschedule_request") {
       if (!["accepted", "confirmed"].includes(b.status)) throw new ApiError(409, `Cannot reschedule from ${b.status}`);
       const newStart = new Date(body.newStartsAt);

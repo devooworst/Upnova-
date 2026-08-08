@@ -364,6 +364,45 @@ function seed() {
     const serviceId = id();
     sid[`${s.owner}:${s.title}`] = serviceId;
     const cat = (s as { category?: string }).category ?? "creative";
+    // creator-defined business rules — each provider operates differently
+    const CONFIGS: Record<string, object> = {
+      "imani:Gel Nail Set": {
+        locationMode: "my_location",
+        travel: { mode: "none" },
+        scheduling: { durationMin: 90, maxPerDay: 4 },
+        policies: { cancellation: "free_24h", reschedule: "one_free", lateGraceMin: 15, lateFee: 10, noShow: "partial" },
+        requirements: ["Photos"],
+      },
+      "nia:Dog Walking": {
+        locationMode: "client_location",
+        travel: { mode: "free", radiusMi: 10 },
+        scheduling: { durationMin: 60, maxPerDay: 6 },
+        policies: { cancellation: "anytime", reschedule: "free", lateGraceMin: 10, lateFee: 0, noShow: "none" },
+        requirements: ["Special instructions"],
+      },
+      "ava:Event Photography": {
+        locationMode: "both",
+        travel: { mode: "per_mile", perMile: 2, freeMiles: 5, radiusMi: 25 },
+        scheduling: { durationMin: 180, maxPerDay: 2 },
+        policies: { cancellation: "partial_48h", reschedule: "one_free", lateGraceMin: 15, lateFee: 25, noShow: "partial" },
+        requirements: ["References", "Special instructions"],
+      },
+      "tj:Event DJ — 4 Hours": {
+        locationMode: "client_location",
+        travel: { mode: "flat", flatFee: 25, radiusMi: 40 },
+        scheduling: { durationMin: 240, maxPerDay: 1 },
+        policies: { cancellation: "partial_48h", reschedule: "approval", lateGraceMin: 0, lateFee: 0, noShow: "full" },
+        requirements: ["Special instructions"],
+      },
+      "omar:Portrait Session": {
+        locationMode: "both",
+        travel: { mode: "free", radiusMi: 15 },
+        scheduling: { durationMin: 45, maxPerDay: 5 },
+        policies: { cancellation: "free_24h", reschedule: "free", lateGraceMin: 10, lateFee: 0, noShow: "none" },
+        requirements: [],
+      },
+    };
+    const cfg = CONFIGS[`${s.owner}:${s.title}`];
     db.insert(t.services)
       .values({
         id: serviceId, ownerId: uid[s.owner], title: s.title, description: s.desc,
@@ -373,6 +412,7 @@ function seed() {
         // hair/nails/pet care/photo sessions/DJ sets book time slots;
         // design/production/builds stay project requests
         fulfillment: ["care", "beauty", "events", "photography", "education"].includes(cat) ? "appointment" : "project",
+        config: cfg ? JSON.stringify(cfg) : "{}",
         isSeed: true,
       })
       .run();

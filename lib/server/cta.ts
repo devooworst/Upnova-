@@ -2,6 +2,7 @@
    derivation, used by every surface that renders a service button. */
 
 export function ctaFor(s: { fulfillment: string; category: string; price: number }): string {
+  if (s.fulfillment === "quote") return "Request Quote";
   if (s.fulfillment === "appointment") {
     if (["care", "beauty"].includes(s.category)) return "Book Appointment";
     if (["photography", "education"].includes(s.category)) return "Book Session";

@@ -279,6 +279,19 @@ never "escrow", which is a specific legal service UpNova does not claim to provi
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
+**Creator-defined policies** — one configurable service engine, never 50 systems.
+`/services/new` asks seven questions (offer · fulfillment · location · travel & radius ·
+scheduling · policies · customer requirements) and stores them as the listing's config
+(`lib/servicePolicies.ts`). UpNova compiles the config into the customer flow: travel fees are
+computed from real profile distances ($2/mi after 5 mi → calculated automatically), service
+radius rejects out-of-area bookings, maxPerDay caps the creator's calendar, duration comes from
+their scheduling rules, and cancellation/reschedule/late/no-show policies are shown IN the
+booking review before payment — no surprise fees, ever. Refunds honor the creator's cancellation
+policy server-side (provider-initiated cancels always refund in full). Each seed provider
+operates differently on purpose: Imani (no travel, 15-min grace + $10 late fee, 4/day), Nia
+(free travel within 10 mi, cancel anytime), Ava (per-mile travel, 48h partial policy), TJ (flat
+$25 travel, 1 booking/day, no-show full charge).
+
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
 gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /

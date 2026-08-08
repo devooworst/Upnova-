@@ -38,6 +38,7 @@ interface Booking {
   location: string;
   status: string;
   paymentStatus: string | null;
+  travelFee?: number;
   myRole: "client" | "provider";
   with: { handle: string; displayName: string; avatarUrl: string | null };
 }
@@ -492,6 +493,9 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
             <div className="flex justify-between"><dt className="text-zinc-500">Location</dt><dd className="flex items-center gap-1 text-zinc-200"><MapPin className="h-3 w-3 text-zinc-500" />{b.location}</dd></div>
           )}
           <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${b.price}</dd></div>
+          {(b.travelFee ?? 0) > 0 && (
+            <div className="flex justify-between"><dt className="text-zinc-500">Travel fee</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${b.travelFee}</dd></div>
+          )}
           <div className="flex justify-between">
             <dt className="text-zinc-500">Payment</dt>
             <dd className={`flex items-center gap-1.5 text-xs font-semibold ${b.paymentStatus === "held" ? "text-lime-300" : b.paymentStatus === "released" ? "text-lime-300" : b.paymentStatus === "refunded" ? "text-zinc-400" : "text-zinc-500"}`}>
@@ -528,7 +532,7 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
           )}
           {b.status === "accepted" && b.myRole === "client" && (
             <button disabled={busy} onClick={() => act("pay")} className="btn-lime w-full justify-center py-2 text-sm">
-              Pay ${(b.price * 1.05).toFixed(2)} — secures the booking
+              Pay ${((b.price + (b.travelFee ?? 0)) * 1.05).toFixed(2)} — secures the booking
             </button>
           )}
           {b.status === "accepted" && b.myRole === "provider" && (
