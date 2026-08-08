@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Briefcase } from "lucide-react";
+import { ArrowRight, Briefcase, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
 import { opportunities, creators, events, type RadiusId } from "@/lib/data";
 
@@ -166,8 +166,10 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                     <span className="block truncate text-sm font-semibold text-zinc-100 group-hover:text-amber-300">
                       {e.title}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-zinc-500">
-                      {e.time} · {e.location.split(",")[0]} · {e.attending} going
+                    <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500">
+                      {e.time} ·
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      {e.location.split(",")[0]} · {e.attending} going
                     </span>
                   </span>
                   <span className="mr-3 hidden shrink-0 self-center rounded-full border border-amber-400/40 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-amber-300 opacity-0 transition group-hover:opacity-100 sm:block">
