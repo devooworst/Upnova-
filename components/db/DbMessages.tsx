@@ -42,6 +42,7 @@ interface Conv {
   unread: number;
   projectId: string | null;
   projectState: string | null;
+  booking: { id: string; title: string; startsAt: string; status: string; price: number } | null;
 }
 
 interface Msg {
@@ -322,6 +323,36 @@ export default function DbMessages() {
                 <Flag className="h-4 w-4" />
               </button>
             </div>
+
+            {/* booking context — the conversation and the booking are one record */}
+            {active.booking && (
+              <div className="flex items-center gap-2.5 border-b border-line-soft px-4 py-2">
+                <span
+                  className={`h-6 w-1 shrink-0 rounded-full ${
+                    active.booking.status === "confirmed"
+                      ? "bg-lime-400"
+                      : ["pending", "accepted"].includes(active.booking.status)
+                        ? "bg-amber-400"
+                        : active.booking.status === "reschedule_requested"
+                          ? "bg-violet-400"
+                          : active.booking.status === "completed"
+                            ? "bg-zinc-500"
+                            : "bg-rose-400"
+                  }`}
+                />
+                <p className="min-w-0 flex-1 truncate text-xs text-zinc-300">
+                  <span className="font-semibold text-zinc-100">{active.booking.title}</span>
+                  <span className="text-zinc-500">
+                    {" "}· {new Date(active.booking.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} ·{" "}
+                    {new Date(active.booking.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} ·{" "}
+                  </span>
+                  <span className="font-medium capitalize text-zinc-300">{active.booking.status.replace("_", " ")}</span>
+                </p>
+                <Link href="/calendar" className="shrink-0 text-[11px] font-semibold text-lime-300 hover:underline">
+                  View Booking →
+                </Link>
+              </div>
+            )}
 
             {/* project stepper strip */}
             {project && (

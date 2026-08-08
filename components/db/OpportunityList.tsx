@@ -156,7 +156,7 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
                 </span>
               ) : (
                 <button onClick={() => setApplying(o)} className="btn-lime px-4 py-1.5 text-xs">
-                  Apply Now
+                  {o.budget == null ? "Express Interest" : "Apply Now"}
                 </button>
               )}
             </div>

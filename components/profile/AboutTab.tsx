@@ -192,9 +192,9 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
                     Edit Service
                   </Link>
                 ) : (
-                  <a href="/messages" className="btn-lime mt-3 w-full py-1.5 text-xs">
+                  <a href="/services" className="btn-lime mt-3 w-full py-1.5 text-xs">
                     <Zap className="h-3.5 w-3.5" />
-                    Hire Me
+                    Book or Request
                   </a>
                 )}
               </article>

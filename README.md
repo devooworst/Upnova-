@@ -279,6 +279,20 @@ never "escrow", which is a specific legal service UpNova does not claim to provi
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
+**Dynamic CTAs & Demo Mode** — "Hire Me" is gone platform-wide. The CTA comes from the
+listing's fulfillment configuration (`ctaFor` in the services API): Book Appointment
+(hair/nails/care) · Book Session (photo/tutoring) · Book Time (studio/DJ) · Book Me (fixed
+creative) · Request Project · Request Quote (≥ $500) · Apply / Express Interest (opportunities /
+collabs). The appointment flow is a four-step wizard — slot → details (with the cancellation
+rule) → itemized demo payment (payout + 5% fee + total) → "Payment secured" with View Booking /
+Message. Demo Mode is explicit (navbar chip + labels on every payment screen): seed providers
+accept booking requests instantly, confirm in chat after payment, and past confirmed
+appointments auto-complete with the payout released — the full lifecycle plays through solo,
+through the same APIs real users would hit. Bookings carry a conversationId: booking events post
+as system messages in the thread and the conversation header shows the live booking strip
+(title · date · status · View Booking) — Service → Booking → Payment → Messages reference ONE
+record.
+
 **Bookings** — calendar-first scheduling dashboard (no "Engagements"). Monthly Mon-first
 calendar with thin status bars (lime confirmed · amber pending · violet reschedule · zinc
 completed · rose cancelled — always paired with labels in the legend), click a day → that day's

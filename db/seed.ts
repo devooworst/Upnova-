@@ -372,7 +372,7 @@ function seed() {
         trustRequired: (s as { trust?: string }).trust ?? "standard",
         // hair/nails/pet care/photo sessions/DJ sets book time slots;
         // design/production/builds stay project requests
-        fulfillment: ["care", "beauty", "events", "photography"].includes(cat) ? "appointment" : "project",
+        fulfillment: ["care", "beauty", "events", "photography", "education"].includes(cat) ? "appointment" : "project",
         isSeed: true,
       })
       .run();

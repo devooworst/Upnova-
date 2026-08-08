@@ -24,6 +24,7 @@ interface ServiceItem {
   aiPolicy: string;
   trustRequired: string;
   fulfillment?: string; // appointment | project
+  cta?: string; // from the listing's fulfillment configuration
   reach: string;
   owner: {
     id: string;
@@ -177,6 +178,10 @@ export default function ServicesPage() {
               <p className="mt-2 flex items-center gap-1.5 text-[10px] text-zinc-500">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> {AI_LABEL[s.aiPolicy]}
                 <span aria-hidden>·</span> {s.reach}
+                <span aria-hidden>·</span>
+                <span className="font-medium text-zinc-400">
+                  {s.fulfillment === "appointment" ? "Appointment" : s.price >= 500 ? "Quote" : "Project"}
+                </span>
               </p>
 
               <div className="mt-3 flex items-center gap-2 border-t border-dashed border-line pt-3">
@@ -211,14 +216,11 @@ export default function ServicesPage() {
                     </button>
                     <button onClick={() => hire(s)} className="btn-lime px-3.5 py-1.5 text-xs">
                       {s.fulfillment === "appointment" ? (
-                        <>
-                          <CalendarDays className="h-3.5 w-3.5" /> Book
-                        </>
+                        <CalendarDays className="h-3.5 w-3.5" />
                       ) : (
-                        <>
-                          <Zap className="h-3.5 w-3.5" /> Hire Me
-                        </>
+                        <Zap className="h-3.5 w-3.5" />
                       )}
+                      {s.cta ?? "Request Project"}
                     </button>
                   </span>
                 )}
@@ -252,37 +254,52 @@ const DEFAULT_DURATION: Record<string, number> = {
 function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () => void }) {
   const router = useRouter();
   const firstName = service.owner.displayName.split(" ")[0];
+  const [step, setStep] = useState<"slot" | "review" | "pay" | "done" | "requested">("slot");
   const [date, setDate] = useState("");
   const [hour, setHour] = useState<number | null>(null);
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [convId, setConvId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const durationMin = DEFAULT_DURATION[service.category] ?? 60;
 
-  const fmtHour = (h: number) =>
-    new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
+  const fmtHour = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
+  const startDate = date && hour != null ? new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`) : null;
+  const endDate = startDate ? new Date(startDate.getTime() + durationMin * 60_000) : null;
+  const fee = Math.round(service.price * 5) / 100;
 
-  const submit = async () => {
-    if (!date || hour == null) {
-      setError("Pick a date and time");
-      return;
-    }
+  /* step 3 → create the shared record: conversation + booking */
+  const request = async () => {
+    if (!startDate) return;
     setBusy(true);
     setError(null);
-    const startsAt = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`);
-    // the request rides with a conversation so details stay in one thread
-    if (note.trim()) {
-      await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toHandle: service.owner.handle, firstMessage: `Booking request — ${service.title}: ${note.trim()}` }),
-      });
+    const convRes = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        toHandle: service.owner.handle,
+        firstMessage: `Hi ${firstName}! I'd like to book ${service.title} for ${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${fmtHour(hour!)}.${note.trim() ? ` ${note.trim()}` : ""}`,
+      }),
+    });
+    const conv = await convRes.json();
+    if (!convRes.ok) {
+      setBusy(false);
+      setError(conv.error || "Could not reach the provider");
+      return;
     }
+    setConvId(conv.conversationId);
     const res = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceId: service.id, startsAt: startsAt.toISOString(), durationMin, location }),
+      body: JSON.stringify({
+        serviceId: service.id,
+        startsAt: startDate.toISOString(),
+        durationMin,
+        location,
+        conversationId: conv.conversationId,
+      }),
     });
     const d = await res.json();
     setBusy(false);
@@ -290,83 +307,182 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
       setError(d.error || "Could not book");
       return;
     }
-    router.push("/calendar");
+    setBookingId(d.id);
+    // demo providers accept instantly → straight to payment; real
+    // providers leave the request pending
+    setStep(d.status === "accepted" ? "pay" : "requested");
+  };
+
+  const pay = async () => {
+    if (!bookingId) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/bookings/${bookingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "pay" }),
+    });
+    const d = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(d.error || "Payment failed");
+      return;
+    }
+    setStep("done");
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => !busy && onClose()}>
       <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Book a time</p>
-            <h3 className="mt-1 text-sm font-bold text-zinc-100">{service.owner.displayName} — {service.title}</h3>
-            <p className="font-mono text-xs font-medium tracking-[0.08em] text-lime-300">
-              ${service.price} · {durationMin >= 60 ? `${durationMin / 60} hr${durationMin > 60 ? "s" : ""}` : `${durationMin} min`}
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              {step === "slot" ? "Choose appointment" : step === "review" ? "Booking details" : step === "pay" ? "Demo payment" : step === "done" ? "Confirmed" : "Request sent"}
             </p>
+            <h3 className="mt-1 text-sm font-bold text-zinc-100">{service.title}</h3>
+            <p className="text-xs text-zinc-500">{service.owner.displayName}</p>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mt-4 space-y-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Date</p>
-            <input
-              type="date"
-              value={date}
-              min={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
-            />
-          </div>
-          {date && (
+        {/* ------------------------- 1 · slot ------------------------- */}
+        {step === "slot" && (
+          <div className="mt-4 space-y-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Time</p>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                {SLOT_HOURS.map((h) => (
-                  <button
-                    key={h}
-                    onClick={() => setHour(h)}
-                    className={`rounded-lg border px-2 py-1.5 font-mono text-xs tracking-[0.05em] transition ${
-                      hour === h ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
-                    }`}
-                  >
-                    {fmtHour(h)}
-                  </button>
-                ))}
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Select a date</p>
+              <input
+                type="date"
+                value={date}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
+              />
+            </div>
+            {date && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Available times</p>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  {SLOT_HOURS.map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => setHour(h)}
+                      className={`rounded-lg border px-2 py-1.5 font-mono text-xs tracking-[0.05em] transition ${
+                        hour === h ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
+                      }`}
+                    >
+                      {fmtHour(h)}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] text-zinc-600">Taken slots are rejected automatically at booking.</p>
               </div>
-              <p className="mt-1 text-[10px] text-zinc-600">
-                Slots are confirmed at booking — taken times are rejected automatically.
+            )}
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Location (optional)"
+              className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+            />
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder={`Anything ${firstName} should know? (optional)`}
+              className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+            />
+            <button onClick={() => setStep("review")} disabled={!date || hour == null} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+              Continue
+            </button>
+          </div>
+        )}
+
+        {/* ------------------------ 2 · review ------------------------ */}
+        {step === "review" && startDate && endDate && (
+          <div className="mt-4 space-y-3">
+            <dl className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
+              <div className="flex justify-between"><dt className="text-zinc-500">Date</dt><dd className="text-zinc-200">{startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</dd></div>
+              <div className="flex justify-between"><dt className="text-zinc-500">Time</dt><dd className="font-mono text-xs tracking-[0.08em] text-zinc-200">{startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</dd></div>
+              <div className="flex justify-between"><dt className="text-zinc-500">Price</dt><dd className="font-mono font-medium tracking-[0.08em] text-lime-300">${service.price}</dd></div>
+            </dl>
+            <p className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2 text-[11px] text-zinc-500">
+              Free cancellation up to 24 hours before the appointment. Payment is secured up front and
+              released to {firstName} after completion.
+            </p>
+            {error && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setStep("slot")} className="btn-ghost px-4 py-2 text-xs">Back</button>
+              <button onClick={request} disabled={busy} className="btn-lime flex-1 justify-center py-2 text-sm disabled:opacity-40">
+                {busy ? "Requesting…" : "Continue to Payment"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------- 3 · payment ------------------------- */}
+        {step === "pay" && (
+          <div className="mt-4 space-y-3">
+            <p className="rounded-lg border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] text-zinc-400">
+              <span className="font-bold text-violet-300">Demo payment.</span> This is a simulated
+              transaction — no real money is charged. {firstName} accepted your request.
+            </p>
+            <dl className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
+              <div className="flex justify-between"><dt className="text-zinc-500">Service</dt><dd className="text-zinc-200">{service.title}</dd></div>
+              <div className="flex justify-between"><dt className="text-zinc-500">Creator payout</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${service.price.toFixed(2)}</dd></div>
+              <div className="flex justify-between"><dt className="text-zinc-500">UpNova fee (5%)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${fee.toFixed(2)}</dd></div>
+              <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold"><dt className="text-zinc-200">Total</dt><dd className="font-mono tracking-[0.08em] text-lime-300">${(service.price + fee).toFixed(2)}</dd></div>
+            </dl>
+            {error && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+              </p>
+            )}
+            <button onClick={pay} disabled={busy} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+              {busy ? "Processing…" : `Pay $${(service.price + fee).toFixed(2)}`}
+            </button>
+          </div>
+        )}
+
+        {/* ------------------------- 4 · secured ------------------------- */}
+        {step === "done" && (
+          <div className="mt-4 space-y-3 text-center">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-lime-400/40 bg-lime-400/10">
+              <CalendarDays className="h-6 w-6 text-lime-300" />
+            </span>
+            <div>
+              <h4 className="text-sm font-bold text-lime-300">Payment secured</h4>
+              <p className="mx-auto mt-1 max-w-[260px] text-xs leading-relaxed text-zinc-400">
+                Your payment is held securely until the booking is completed. You&apos;re confirmed
+                {startDate && ` for ${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })}`}.
               </p>
             </div>
-          )}
-          <input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Location (optional — their studio, your place, campus…)"
-            className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
-          />
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            placeholder={`Anything ${firstName} should know? (optional — starts the conversation)`}
-            className="w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
-          />
-          <p className="text-[10px] leading-relaxed text-zinc-600">
-            How it works: {firstName} accepts your request, you pay ${(service.price * 1.05).toFixed(2)} (incl. 5% fee)
-            to lock the slot, and payment releases after the booking is completed.
-          </p>
-          {error && (
-            <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
+            <div className="flex gap-2">
+              <button onClick={() => router.push("/calendar")} className="btn-lime flex-1 justify-center py-2 text-xs">View Booking</button>
+              <button onClick={() => router.push(convId ? `/messages?c=${convId}` : "/messages")} className="btn-ghost flex-1 justify-center py-2 text-xs">
+                Message {firstName}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------- request sent (real provider) --------------------- */}
+        {step === "requested" && (
+          <div className="mt-4 space-y-3 text-center">
+            <h4 className="text-sm font-bold text-zinc-100">Request sent</h4>
+            <p className="mx-auto max-w-[260px] text-xs leading-relaxed text-zinc-400">
+              {firstName} has to accept before you pay. You&apos;ll get a notification the moment they respond.
             </p>
-          )}
-          <button onClick={submit} disabled={busy || !date || hour == null} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
-            {busy ? "Requesting…" : "Request booking"}
-          </button>
-        </div>
+            <div className="flex gap-2">
+              <button onClick={() => router.push("/calendar")} className="btn-lime flex-1 justify-center py-2 text-xs">View in Bookings</button>
+              <button onClick={() => router.push(convId ? `/messages?c=${convId}` : "/messages")} className="btn-ghost flex-1 justify-center py-2 text-xs">Open conversation</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

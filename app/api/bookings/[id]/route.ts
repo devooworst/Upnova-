@@ -4,6 +4,8 @@ import { eq, and } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
+import { seedConfirmsBookingPayment } from "@/lib/server/demo";
+import { randomBytes as rb } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +36,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const set = (patch: Partial<typeof tables.bookings.$inferInsert>) =>
       db.update(tables.bookings).set(patch).where(eq(tables.bookings.id, b.id)).run();
 
+    // booking events post into the shared conversation, like project events
+    const sys = (text: string) => {
+      if (!b.conversationId) return;
+      db.insert(tables.messages)
+        .values({ id: rb(12).toString("hex"), conversationId: b.conversationId, senderId: user.id, body: text, kind: "system" })
+        .run();
+      db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, b.conversationId)).run();
+    };
+
     if (action === "accept") {
       if (!isProvider) throw new ApiError(403, "Only the provider accepts requests");
       if (b.status !== "pending") throw new ApiError(409, `Cannot accept from ${b.status}`);
       set({ status: "accepted" });
+      sys(`${actorName} accepted the booking request — ${b.title} · ${when(b.startsAt)}. Payment locks it in.`);
       notify({ userId: other, actorId: user.id, type: "booking", title: `${actorName} accepted your booking`, body: `${b.title} · ${when(b.startsAt)} — payment pending`, href: "/calendar" });
     } else if (action === "decline") {
       if (!isProvider) throw new ApiError(403, "Only the provider declines requests");
@@ -60,7 +72,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         })
         .run();
       set({ status: "confirmed" });
+      sys(`Booking confirmed — ${b.title} · ${when(b.startsAt)}. Payment secured: $${(b.price * 1.05).toFixed(2)}.`);
       notify({ userId: other, actorId: user.id, type: "payment", title: `Booking confirmed — payment secured`, body: `${b.title} · ${when(b.startsAt)} · $${b.price}`, href: "/calendar", category: "payments" });
+      // demo mode: the seed provider confirms in chat right away
+      seedConfirmsBookingPayment(b.id);
     } else if (action === "cancel") {
       if (!["pending", "accepted", "confirmed", "reschedule_requested"].includes(b.status))
         throw new ApiError(409, `Cannot cancel from ${b.status}`);
@@ -70,6 +85,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
         .run();
       set({ status: "cancelled", proposedStartsAt: null });
+      sys(`${actorName} cancelled the booking — ${b.title}.${b.status === "confirmed" ? " Payment refunded in full." : ""}`);
       notify({ userId: other, actorId: user.id, type: "booking", title: `${actorName} cancelled ${b.title}`, body: b.status === "confirmed" ? "Payment refunded in full" : when(b.startsAt), href: "/calendar" });
     } else if (action === "reschedule_request") {
       if (!["accepted", "confirmed"].includes(b.status)) throw new ApiError(409, `Cannot reschedule from ${b.status}`);
@@ -99,6 +115,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
         .run();
       set({ status: "completed" });
+      sys(`${b.title} completed — payout of $${b.price} released to ${actorName}.`);
       notify({ userId: other, actorId: user.id, type: "payment", title: `${b.title} completed — $${b.price} released`, body: "", href: "/calendar", category: "payments" });
     } else {
       throw new ApiError(400, "Unknown action");

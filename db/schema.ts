@@ -478,6 +478,8 @@ export const bookings = sqliteTable(
     // reschedule_requested (proposedStartsAt holds the new time)
     status: text("status").notNull().default("pending"),
     proposedStartsAt: integer("proposed_starts_at", { mode: "timestamp_ms" }),
+    // bookings and their conversation reference the same transaction
+    conversationId: text("conversation_id"),
     isSeed: seed(),
     createdAt: ts("created_at"),
   },

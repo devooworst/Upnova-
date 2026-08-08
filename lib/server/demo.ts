@@ -135,6 +135,31 @@ export function seedDeliversAfterExtensionDecision(projectId: string) {
   }
 }
 
+/* --------------------------- booking behavior --------------------------- */
+
+/** Seed providers respond to booking requests immediately — no waiting. */
+export function seedAcceptsBooking(bookingId: string) {
+  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b || b.status !== "pending" || !isSeedUser(b.providerId)) return;
+  db.update(tables.bookings).set({ status: "accepted" }).where(eq(tables.bookings.id, bookingId)).run();
+  if (b.conversationId) {
+    sendAs(
+      b.conversationId,
+      b.providerId,
+      `Absolutely — I have that time available. I've accepted your booking request for ${b.title}; once payment is in, you're locked in.`
+    );
+  }
+}
+
+/** Seed provider confirms in chat after the client pays. */
+export function seedConfirmsBookingPayment(bookingId: string) {
+  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b || !isSeedUser(b.providerId) || !b.conversationId) return;
+  const when = b.startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const time = b.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  sendAs(b.conversationId, b.providerId, `Got it — your payment is secured. You're confirmed for ${when} at ${time}. See you then!`);
+}
+
 /** After the real user reviews a completed project: the seed side reviews back. */
 export function seedReviewsBack(projectId: string, realUserId: string) {
   const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();

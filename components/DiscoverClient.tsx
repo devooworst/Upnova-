@@ -138,7 +138,7 @@ export default function DiscoverClient() {
                           Starting at{" "}
                           <span className="text-base font-bold text-lime-400">${svc.startingAt}</span>
                         </p>
-                        <a href="/messages" className="btn-lime px-4 py-1.5 text-xs">Hire Me</a>
+                        <a href="/services" className="btn-lime px-4 py-1.5 text-xs">Book or Request</a>
                       </div>
                     </article>
                   );

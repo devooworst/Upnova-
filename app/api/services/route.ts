@@ -7,6 +7,19 @@ import { publicUser } from "@/lib/server/serialize";
 
 export const dynamic = "force-dynamic";
 
+/* The CTA comes from the listing's fulfillment configuration — never a
+   universal "Hire Me". Creators pick a fulfillment type; wording follows. */
+function ctaFor(s: { fulfillment: string; category: string; price: number }): string {
+  if (s.fulfillment === "appointment") {
+    if (["care", "beauty"].includes(s.category)) return "Book Appointment";
+    if (["photography", "education"].includes(s.category)) return "Book Session";
+    return "Book Time"; // studio / production / events
+  }
+  if (s.price >= 500) return "Request Quote"; // pricing needs a conversation
+  if (["music", "creative"].includes(s.category) && s.price <= 250) return "Book Me"; // fixed creative
+  return "Request Project";
+}
+
 /** GET /api/services — active marketplace listings with real owners. */
 export async function GET() {
   return guarded(() => {
@@ -30,6 +43,7 @@ export async function GET() {
         aiPolicy: r.service.aiPolicy,
         trustRequired: r.service.trustRequired,
         fulfillment: r.service.fulfillment,
+        cta: ctaFor(r.service),
         reach: r.service.reach,
         owner: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.service.ownerId,

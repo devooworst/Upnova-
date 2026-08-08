@@ -143,9 +143,9 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
                   </a>
                 )}
                 {canHire && (
-                  <a href="/messages" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
+                  <a href="/services" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
                     <Zap className="h-4 w-4" />
-                    Hire Me
+                    Book or Request
                   </a>
                 )}
               </>

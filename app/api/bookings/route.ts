@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
-import { asc, eq, or } from "drizzle-orm";
+import { asc, and, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
+import { seedAcceptsBooking, isSeedUser } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,28 @@ export async function GET() {
       .where(or(eq(tables.bookings.clientId, user.id), eq(tables.bookings.providerId, user.id)))
       .orderBy(asc(tables.bookings.startsAt))
       .all();
+
+    // demo mode: when a seed provider's confirmed appointment time has
+    // passed, the appointment "happened" — completed, payout released
+    for (const b of rows) {
+      if (b.status === "confirmed" && b.startsAt.getTime() < Date.now() && isSeedUser(b.providerId)) {
+        db.update(tables.bookings).set({ status: "completed" }).where(eq(tables.bookings.id, b.id)).run();
+        db.update(tables.payments)
+          .set({ status: "released" })
+          .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
+          .run();
+        b.status = "completed";
+        notify({
+          userId: b.clientId,
+          actorId: b.providerId,
+          type: "payment",
+          title: `${b.title} completed`,
+          body: `Payout processed — $${b.price} released to the provider`,
+          href: "/calendar",
+          category: "payments",
+        });
+      }
+    }
 
     const payRows = db.select().from(tables.payments).all().filter((p) => p.bookingId);
     return {
@@ -36,6 +59,7 @@ export async function GET() {
           location: b.location,
           status: b.status,
           paymentStatus: payment?.status ?? null,
+          conversationId: b.conversationId,
           myRole: b.clientId === user.id ? "client" : "provider",
           with: publicUser(otherUser, otherProfile),
         };
@@ -93,6 +117,7 @@ export async function POST(req: NextRequest) {
         durationMin,
         price: service.price,
         location: String(body.location || "").slice(0, 120),
+        conversationId: body.conversationId ? String(body.conversationId) : null,
       })
       .run();
 
@@ -104,6 +129,11 @@ export async function POST(req: NextRequest) {
       body: `${service.title} · $${service.price}`,
       href: "/calendar",
     });
-    return { id };
+
+    // demo mode: seed providers respond immediately — the flow never stalls
+    seedAcceptsBooking(id);
+
+    const fresh = db.select().from(tables.bookings).where(eq(tables.bookings.id, id)).get()!;
+    return { id, status: fresh.status };
   });
 }

@@ -159,9 +159,9 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
                 <span className="hidden sm:inline">Message</span>
               </button>
               {user.hiringEnabled && services.length > 0 && (
-                <button onClick={message} className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
-                  <Zap className="h-4 w-4" /> Hire Me
-                </button>
+                <Link href="/services" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
+                  <Zap className="h-4 w-4" /> Book or Request
+                </Link>
               )}
             </div>
           )}
@@ -234,9 +234,9 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
                 <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
                 <p className="mt-2 text-[10px] text-zinc-500">{s.reach}</p>
                 {!isMe && me && (
-                  <button onClick={message} className="btn-lime mt-3 w-full py-1.5 text-xs">
-                    <Zap className="h-3.5 w-3.5" /> Hire Me
-                  </button>
+                  <Link href="/services" className="btn-lime mt-3 w-full justify-center py-1.5 text-xs">
+                    <Zap className="h-3.5 w-3.5" /> View on Services
+                  </Link>
                 )}
               </article>
             ))}

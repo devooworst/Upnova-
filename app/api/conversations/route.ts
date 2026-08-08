@@ -51,6 +51,12 @@ export async function GET() {
         .where(eq(tables.projects.conversationId, id))
         .orderBy(desc(tables.projects.updatedAt))
         .get();
+      const booking = db
+        .select()
+        .from(tables.bookings)
+        .where(eq(tables.bookings.conversationId, id))
+        .orderBy(desc(tables.bookings.createdAt))
+        .get();
       return {
         id,
         with: other ? publicUser(other.user, other.profile) : null,
@@ -58,6 +64,9 @@ export async function GET() {
         unread,
         projectId: project?.id ?? null,
         projectState: project?.state ?? null,
+        booking: booking
+          ? { id: booking.id, title: booking.title, startsAt: booking.startsAt.toISOString(), status: booking.status, price: booking.price }
+          : null,
       };
     });
 
