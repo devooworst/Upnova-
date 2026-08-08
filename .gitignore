@@ -36,3 +36,8 @@ next-env.d.ts
 prisma/dev.db
 prisma/dev.db-journal
 .env
+
+# drizzle sqlite dev db
+db/upnova.dev.db
+db/upnova.dev.db-shm
+db/upnova.dev.db-wal
