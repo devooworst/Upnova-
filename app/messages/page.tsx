@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { Send, ChevronLeft, Briefcase, Paperclip } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import { conversations } from "@/lib/data";
+import ProjectFlow from "@/components/ProjectFlow";
+import { conversations, creators } from "@/lib/data";
 
 export default function MessagesPage() {
   const [activeId, setActiveId] = useState<string>(conversations[0].id);
   const [draft, setDraft] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const ava = creators.find((c) => c.id === "ava")!;
   const active = conversations.find((c) => c.id === activeId);
 
   return (
@@ -71,7 +74,11 @@ export default function MessagesPage() {
               {active.role} • {active.online ? <span className="text-lime-400">online</span> : "offline"}
             </p>
           </div>
-          <button className="btn-ghost px-3 py-1.5 text-xs" title="Turn this conversation into a project">
+          <button
+            onClick={() => active.id === "ava" && setCreateOpen(true)}
+            className="btn-ghost px-3 py-1.5 text-xs"
+            title="Turn this conversation into a project"
+          >
             <Briefcase className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Create Project</span>
           </button>
@@ -98,6 +105,18 @@ export default function MessagesPage() {
               </div>
             </div>
           ))}
+          {active.id === "ava" && (
+            <ProjectFlow
+              creatorName={ava.name}
+              creatorAvatar={ava.avatar}
+              creatorInitials={ava.initials}
+              creatorGradient={ava.gradient}
+              service="Event Photography"
+              startingAt={ava.startingAt ?? 250}
+              openCreate={createOpen}
+              onCreateHandled={() => setCreateOpen(false)}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-2 border-t border-line-soft p-3">
