@@ -86,16 +86,16 @@ export default function EventCard({ id }: { id: string }) {
             className={
               going
                 ? "inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-400/40 px-5 py-2 text-sm font-semibold text-amber-300"
-                : "inline-flex items-center justify-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-amber-300 active:scale-[0.98]"
+                : "inline-flex items-center justify-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-amber-300 hover:shadow-glow-amber active:scale-[0.98]"
             }
           >
             {going ? (
               <>
-                <Check className="h-4 w-4" /> You&apos;re going
+                <Check className="h-4 w-4" /> You&apos;re in
               </>
             ) : (
               <>
-                <Ticket className="h-4 w-4" /> Get Tickets
+                <Ticket className="h-4 w-4" /> Claim a spot
               </>
             )}
           </button>

@@ -87,23 +87,23 @@ export default function OpportunityCard({ id }: { id: string }) {
             className={
               applied
                 ? "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-lime-400/40 px-5 py-2 text-sm font-semibold text-lime-300 sm:flex-none"
-                : "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-lime-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98] sm:flex-none"
+                : "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-lime-400 px-5 py-2 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 hover:shadow-glow active:scale-[0.98] sm:flex-none"
             }
           >
             {applied ? (
               <>
                 <Check className="h-4 w-4" />
-                Applied
+                Pitch sent
               </>
             ) : (
               <>
-                Apply Now
+                Pitch for this
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
           <p className="hidden text-xs text-zinc-500 sm:block">
-            {opp.applicants + (applied ? 1 : 0)} people have applied
+            {opp.applicants + (applied ? 1 : 0)} creators already pitched
           </p>
         </div>
       </div>

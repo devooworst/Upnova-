@@ -30,6 +30,8 @@ const config: Config = {
       },
       boxShadow: {
         glow: "0 0 24px -6px rgba(163, 230, 53, 0.35)",
+        "glow-violet": "0 0 24px -6px rgba(167, 139, 250, 0.35)",
+        "glow-amber": "0 0 24px -6px rgba(251, 191, 36, 0.35)",
         card: "0 1px 0 0 rgba(255,255,255,0.02) inset, 0 8px 24px -16px rgba(0,0,0,0.8)",
       },
       keyframes: {

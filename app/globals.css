@@ -51,7 +51,12 @@ body {
   }
 
   .btn-lime {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-lime-300 hover:shadow-glow active:scale-[0.98];
+  }
+
+  /* purposeful micro-interaction: clickable cards lift slightly */
+  .card-lift {
+    @apply transition duration-200 hover:-translate-y-0.5;
   }
 
   .btn-ghost {

@@ -10,7 +10,7 @@ export default function CommunityCard({ community }: { community: Community }) {
   const [joined, setJoined] = useState(!!community.joined);
 
   return (
-    <article id={community.id} className="card-people flex flex-col overflow-hidden transition hover:border-zinc-600">
+    <article id={community.id} className="card-people card-lift flex flex-col overflow-hidden hover:border-zinc-600">
       <div
         className={`relative h-24 overflow-hidden ${
           community.image

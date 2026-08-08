@@ -62,6 +62,10 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   - **violet** = people & community (follow, join, messages, online, likes)
   - **amber** = events & energy (tickets, deadlines, trending, ratings)
   - **white/neutral** = navigation, active states, verified trust marks, locality
+- **Signature motif: the ticket perforation.** A dashed rule with punched edges runs
+  through the brand — money cards, event stubs, the receipt total, the home masthead.
+  The thesis: everything near you is a ticket you can tear off (a gig, an event, a
+  person to meet).
 - Card **shapes** carry the category too — no two categories share the same DNA:
   - **money** = receipt/ticket: sharp corners, lime top rule, mono figures, dashed
     perforation with punched edges, a "posted in range" receipt total in the sidebar

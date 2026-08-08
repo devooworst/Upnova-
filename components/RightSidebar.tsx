@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Briefcase } from "lucide-react";
 import Avatar from "./Avatar";
 import { opportunities, creators, events, type RadiusId } from "@/lib/data";
 
@@ -51,18 +51,24 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                 className="group -mx-2 block rounded-md px-2 py-3 transition hover:bg-card-raised"
               >
                 <p className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-sm font-semibold text-zinc-100 group-hover:text-lime-300">
-                    {o.title.split("—")[0].trim()}
+                  <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-zinc-100 group-hover:text-lime-300">
+                    <Briefcase className="h-3 w-3 shrink-0 text-lime-400/70" />
+                    <span className="truncate">{o.title.split("—")[0].trim()}</span>
                   </span>
                   <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-lime-400">
                     {o.budget}
                   </span>
                 </p>
-                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
-                  {o.distanceMi !== undefined && o.distanceMi <= 25
-                    ? `${o.distanceMi} mi`
-                    : "remote"}{" "}
-                  · {o.roles} · due {o.deadline}
+                <p className="mt-0.5 flex items-baseline justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+                  <span className="truncate">
+                    {o.distanceMi !== undefined && o.distanceMi <= 25
+                      ? `${o.distanceMi} mi`
+                      : "remote"}{" "}
+                    · {o.roles} · due {o.deadline}
+                  </span>
+                  <span className="shrink-0 font-semibold text-lime-400 opacity-0 transition group-hover:opacity-100">
+                    pitch →
+                  </span>
                 </p>
               </Link>
             </li>
@@ -92,7 +98,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
           href="/opportunities"
           className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-lime-400/30 py-2 font-mono text-[11px] font-semibold uppercase tracking-widest text-lime-300 transition hover:border-lime-400/60 hover:bg-lime-400/5"
         >
-          all openings <ArrowRight className="h-3 w-3" />
+          see all paid work <ArrowRight className="h-3 w-3" />
         </Link>
       </section>
 
@@ -127,7 +133,7 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                 className={
                   followed[c.id]
                     ? "rounded-full border border-violet-400/40 px-3.5 py-1.5 text-xs font-semibold text-violet-300"
-                    : "rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300"
+                    : "rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
                 }
               >
                 {followed[c.id] ? "Following" : "Follow"}
@@ -163,6 +169,9 @@ export default function RightSidebar({ radius }: { radius: RadiusId }) {
                     <span className="mt-0.5 block truncate text-xs text-zinc-500">
                       {e.time} · {e.location.split(",")[0]} · {e.attending} going
                     </span>
+                  </span>
+                  <span className="mr-3 hidden shrink-0 self-center rounded-full border border-amber-400/40 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-amber-300 opacity-0 transition group-hover:opacity-100 sm:block">
+                    rsvp
                   </span>
                 </Link>
               </li>

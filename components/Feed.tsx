@@ -105,15 +105,15 @@ export default function Feed({ radius }: { radius: RadiusId }) {
       </div>
 
       {filter !== "For You" ? (
-        <div className="space-y-5">{flat.map(renderItem)}</div>
+        <div key={filter} className="animate-fade-up space-y-5">{flat.map(renderItem)}</div>
       ) : (
-        <div className="space-y-8">
+        <div key={radius} className="animate-fade-up space-y-8">
           {sections.map(
             (s) =>
               s.items.length > 0 && (
                 <section key={s.label}>
                   <header className="mb-3 flex items-baseline gap-2.5">
-                    <h2 className="text-sm font-bold tracking-tight text-zinc-200">
+                    <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">
                       {s.label.split("•")[0].trim()}
                     </h2>
                     <span className="font-mono text-[10px] tabular-nums text-zinc-500">

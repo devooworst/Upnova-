@@ -43,7 +43,7 @@ export default function NearbyNow() {
       initials: "D",
       gradient: currentUser.gradient,
       distance: "here",
-      line: "Share what's happening",
+      line: "Put something out there",
       role: "self",
     },
     ...near.map((c: Creator) => ({
@@ -83,7 +83,7 @@ export default function NearbyNow() {
         {tiles.map((t) => (
           <button
             key={t.id}
-            className={`group w-56 shrink-0 border p-3 text-left transition ${roleShape[t.role]}`}
+            className={`group card-lift w-56 shrink-0 border p-3 text-left ${roleShape[t.role]}`}
           >
             <span className="flex items-center gap-2.5">
               {t.role === "self" ? (

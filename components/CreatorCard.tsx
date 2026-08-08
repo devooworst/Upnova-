@@ -15,7 +15,7 @@ const availabilityStyle: Record<Creator["availability"], string> = {
 
 export default function CreatorCard({ creator }: { creator: Creator }) {
   return (
-    <article className="card-people flex flex-col p-5 transition hover:border-zinc-600">
+    <article className="card-people card-lift flex flex-col p-5 hover:border-zinc-600">
       <div className="flex items-start gap-3">
         <Avatar src={creator.avatar} initials={creator.initials} gradient={creator.gradient} size="lg" />
         <div className="min-w-0 flex-1">
