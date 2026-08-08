@@ -349,9 +349,11 @@ function seed() {
     { owner: "maya", title: "Topline Writing", price: 160, desc: "Melody and lyrics written to your beat, demo vocal included.", reach: "Remote", ai: "no-ai", category: "music" },
     { owner: "kofi", title: "Custom Beat — Exclusive", price: 250, desc: "Made-to-order beat, exclusive license, stems included.", reach: "Remote", ai: "disclosure", category: "music", promoted: true },
     { owner: "kofi", title: "Drum Kit — Producer Pack", price: 40, desc: "300 originals: drums, 808s, textures. Royalty-free.", reach: "Remote", ai: "disclosure", category: "music" },
+    { owner: "sofia", title: "Custom Crochet Pieces", price: 85, desc: "Made-to-order crochet tops, bags, and accessories. Two-week turnaround.", reach: "Baltimore · ships", ai: "no-ai", category: "crochet" },
     { owner: "sofia", title: "Shoot Styling", price: 220, desc: "Full wardrobe styling for your shoot — pull, fit, on-set.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
     { owner: "sofia", title: "Custom Piece", price: 350, desc: "One-of-one garment designed and made for your event or video.", reach: "Baltimore · 20 mi", ai: "no-ai", category: "fashion" },
     { owner: "tj", title: "Event DJ — 4 Hours", price: 400, desc: "Open format, full rig, MC-ready. Books 2 weeks out.", reach: "DMV · 40 mi", ai: "no-ai", category: "events" },
+    { owner: "imani", title: "Acrylic Full Set", price: 45, desc: "Classic acrylic full set. Retired — see Gel Nail Set for current bookings.", reach: "Bowie · 5 mi", ai: "no-ai", category: "beauty", inactive: true },
     { owner: "imani", title: "Gel Nail Set", price: 55, desc: "Full gel set with custom design. On campus or nearby.", reach: "Bowie · 5 mi", ai: "no-ai", category: "beauty" },
     { owner: "imani", title: "Loc Retwist", price: 60, desc: "Full retwist for locs. Includes retwisting and basic styling — build your visit with add-ons and packages.", reach: "Bowie · 5 mi", ai: "no-ai", category: "beauty" },
     { owner: "darius", title: "Creator Website", price: 300, desc: "One-page site: portfolio, booking link, socials. Live in 10 days.", reach: "Remote", ai: "assisted", category: "design" },
@@ -458,6 +460,8 @@ function seed() {
         fulfillment: ["care", "beauty", "events", "photography", "education"].includes(cat) ? "appointment" : "project",
         config: cfg ? JSON.stringify(cfg) : "{}",
         promoted: !!(s as { promoted?: boolean }).promoted,
+        // deactivated seed service — proves history is kept, not erased
+        active: !(s as { inactive?: boolean }).inactive,
         isSeed: true,
       })
       .run();

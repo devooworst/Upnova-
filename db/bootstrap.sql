@@ -396,7 +396,7 @@ CREATE TABLE IF NOT EXISTS `services` (
 	`active` integer DEFAULT true NOT NULL,
 	`paused` integer DEFAULT false NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, visibility text NOT NULL DEFAULT 'public',
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `sessions` (

@@ -65,6 +65,12 @@ export default function ServicesPage() {
   const [booking, setBooking] = useState<ServiceItem | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
 
+  // category deep links: /services?category=beauty acts as the category page
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("category");
+    if (c) setCategory(c);
+  }, []);
+
   useEffect(() => {
     fetch("/api/services", { cache: "no-store" })
       .then((r) => r.json())

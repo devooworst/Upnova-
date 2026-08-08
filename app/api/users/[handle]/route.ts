@@ -31,12 +31,30 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
           .get()
       : false;
 
-    const services = db
+    // one canonical record per service — the profile simply shows what the
+    // creator's visibility choice allows this viewer to see. Unlisted stays
+    // off the profile (it lives on its link); drafts are owner-only.
+    const viewerFollows = viewer
+      ? !!db
+          .select()
+          .from(tables.follows)
+          .where(and(eq(tables.follows.followerId, viewer.id), eq(tables.follows.followingId, user.id)))
+          .get()
+      : false;
+    const visibleToViewer = (s: { visibility: string }) =>
+      isOwner ||
+      s.visibility === "public" ||
+      (s.visibility === "followers" && viewerFollows);
+    const allServices = db
       .select()
       .from(tables.services)
-      .where(and(eq(tables.services.ownerId, user.id), eq(tables.services.active, true)))
+      .where(eq(tables.services.ownerId, user.id))
       .all()
-      .filter((s) => isOwner || !s.paused);
+      .filter((s) => (isOwner ? true : s.visibility !== "unlisted" && s.visibility !== "draft") && visibleToViewer(s));
+    const services = allServices.filter((s) => s.active && (isOwner || !s.paused));
+    // deactivated services remain part of the public record — history,
+    // not erasure (their share pages still resolve, unbookable)
+    const pastServices = allServices.filter((s) => !s.active);
 
     const experience = db.select().from(tables.experiences).where(eq(tables.experiences.userId, user.id)).all();
 
@@ -122,7 +140,15 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         paused: s.paused,
         category: s.category,
         fulfillment: s.fulfillment,
+        visibility: s.visibility,
         cta: ctaFor(s),
+      })),
+      // history, not erasure — deactivated listings the viewer could see
+      pastServices: pastServices.map((s) => ({
+        id: s.id,
+        title: s.title,
+        category: s.category,
+        since: s.createdAt.toISOString(),
       })),
       experience,
       portfolio,

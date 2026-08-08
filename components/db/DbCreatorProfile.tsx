@@ -57,6 +57,7 @@ interface PublicProfile {
     rating: number | null;
   };
   services: { id: string; title: string; description: string; price: number; reach: string; category?: string; cta?: string }[];
+  pastServices?: { id: string; title: string; category: string; since: string }[];
   experience: { id: string; position: string; organization: string; start: string; end: string; description: string }[];
   reviews?: { rating: number; body: string; createdAt: string }[];
 }
@@ -318,7 +319,9 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {services.map((s) => (
               <article key={s.id} className="card-money flex flex-col p-4">
-                <h3 className="text-sm font-bold text-zinc-100">{s.title}</h3>
+                <h3 className="text-sm font-bold text-zinc-100">
+                  <Link href={`/services/${s.id}`} className="transition hover:text-lime-300">{s.title}</Link>
+                </h3>
                 <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">From ${s.price}</p>
                 <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
                 <p className="mt-2 text-[10px] text-zinc-500">{s.reach}</p>
@@ -330,6 +333,24 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
               </article>
             ))}
           </div>
+          {/* deactivated services stay part of the record — history, not erasure */}
+          {(data.pastServices ?? []).length > 0 && (
+            <div className="mt-4 border-t border-line-soft pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Past services</p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {data.pastServices!.map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      href={`/services/${s.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
+                    >
+                      {s.title} <span className="text-zinc-700">· {s.category}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 

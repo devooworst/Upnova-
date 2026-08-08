@@ -24,6 +24,7 @@ interface Overview {
   reportsOpen: number;
   grossVolumeCents: number;
   feesCents: number;
+  customCategories?: { name: string; services: number }[];
 }
 
 interface AdminUser {
@@ -169,6 +170,21 @@ export default function AdminPage() {
               <p className="text-[11px] text-zinc-500">{m.l}</p>
             </div>
           ))}
+          {/* custom categories in use — promotion candidates, tracked live */}
+          {(overview.customCategories?.length ?? 0) > 0 && (
+            <div className="card col-span-full px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                Custom categories in use — promote frequent ones to official
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {overview.customCategories!.map((c) => (
+                  <span key={c.name} className="rounded-full border border-line px-2.5 py-1 font-mono text-[11px] tracking-[0.05em] text-zinc-300">
+                    {c.name} <span className="text-zinc-600">×{c.services}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

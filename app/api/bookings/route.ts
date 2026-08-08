@@ -80,6 +80,17 @@ export async function POST(req: NextRequest) {
     const user = requireUser();
     const service = db.select().from(tables.services).where(eq(tables.services.id, String(body.serviceId))).get();
     if (!service || !service.active) throw new ApiError(404, "Service not found");
+    // visibility is enforced where money happens, not just in the UI:
+    // drafts aren't published; followers-only requires actually following
+    if (service.visibility === "draft") throw new ApiError(404, "Service not found");
+    if (service.visibility === "followers") {
+      const follows = !!db
+        .select()
+        .from(tables.follows)
+        .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, service.ownerId)))
+        .get();
+      if (!follows) throw new ApiError(403, "This service is only available to followers");
+    }
     if (service.ownerId === user.id) throw new ApiError(400, "You can't book your own service");
     const providerProfile = db
       .select()

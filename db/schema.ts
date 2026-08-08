@@ -369,6 +369,14 @@ export const services = sqliteTable("services", {
   // promoted listings are labeled and slotted separately — they NEVER
   // enter the organic ranking
   promoted: bool("promoted", false),
+  // who can see the listing:
+  //   public    — directory, category pages, search, feed, profile
+  //   followers — profile + directory for followers only
+  //   unlisted  — reachable ONLY via the share link (/services/<id>)
+  //   draft     — owner only, not published anywhere
+  visibility: text("visibility").notNull().default("public"),
+  // active=false = deactivated: unbookable but PRESERVED — it stays in the
+  // creator's public history instead of being erased
   active: bool("active", true),
   paused: bool("paused", false),
   isSeed: seed(),

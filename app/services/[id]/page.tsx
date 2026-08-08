@@ -60,6 +60,8 @@ interface ServiceDetail {
   };
   recentReviews: { rating: number; body: string; createdAt: string }[];
   isMine: boolean;
+  deactivated?: boolean;
+  visibility?: string;
 }
 
 export default function ServicePage() {
@@ -239,7 +241,11 @@ export default function ServicePage() {
 
         {/* CTA — the conversion moment comes AFTER they've seen everything */}
         <div className="mt-5 border-t border-dashed border-line pt-4">
-          {svc.isMine ? (
+          {svc.deactivated ? (
+            <p className="rounded-xl border border-line px-4 py-2.5 text-center text-sm text-zinc-500">
+              This service is no longer offered — kept as part of {svc.owner.displayName.split(" ")[0]}&apos;s history.
+            </p>
+          ) : svc.isMine ? (
             <Link href="/profile/edit" className="btn-ghost w-full justify-center py-2.5 text-sm">Manage this listing</Link>
           ) : svc.paused ? (
             <p className="rounded-xl border border-line px-4 py-2.5 text-center text-sm text-zinc-500">

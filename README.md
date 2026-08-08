@@ -354,6 +354,26 @@ in the shared conversation. Seed example: Imani's **Loc Retwist** carries the fu
 same-day fee, three packages); her Gel Nail Set and Ava's Event Photography have their own,
 differently-shaped menus.
 
+**Publishing: one canonical record, creator-controlled reach.** Publishing a service creates ONE
+record that automatically surfaces everywhere it belongs — the creator's profile, the Services
+directory, category filters (`/services?category=…` deep links), search, and the For You feed,
+where the recommendation engine now places one ORGANIC "Suggested service" card (ranked with
+reasons shown — separate from and never mixed with the labeled Promoted slot). No duplicate
+records per surface. *Categories*: official ones give smart defaults; **+ Add category** lets a
+creator type their own (normalized, works immediately for filtering/search/profile) without
+becoming a global category — the admin overview tracks custom-category usage live ("crochet ×3")
+so frequent ones can be promoted to official later. *Visibility* (enforced server-side at read
+AND at booking): **Public** · **Followers only** (directory/profile/share page require actually
+following — verified 403s) · **Unlisted/link only** (the share link works for anyone, listed
+nowhere) · **Private draft** (owner-only, 404 to everyone else). *Lifecycle*: the profile's
+service manager (`/api/me/services`) shows every state — draft/unlisted/followers/paused/
+deactivated — with per-service booking history (upcoming · completed · cancelled · $ earned) and
+controls for pause, visibility, deactivate, reactivate. **Deactivate is history, not erasure**:
+the listing leaves the directory but stays on the creator's public record under "Past services",
+its share page still resolves ("no longer offered"), and one click reactivates it. Seed world:
+Sofia's "Custom Crochet Pieces" (custom category) and Imani's retired "Acrylic Full Set"
+(deactivated, in history).
+
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
 gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /

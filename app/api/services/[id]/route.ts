@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { requireServiceOwner } from "@/lib/server/authz";
@@ -26,8 +26,26 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.services.id, params.id))
       .get();
-    if (!row || !row.service.active || row.user.status !== "active") throw new ApiError(404, "Service not found");
+    if (!row || row.user.status !== "active") throw new ApiError(404, "Service not found");
     const { service, user, profile } = row;
+    const isOwner = viewer?.id === service.ownerId;
+
+    // ---- visibility, enforced server-side ----
+    // draft: owner only (a 404 — its existence is private)
+    if (service.visibility === "draft" && !isOwner) throw new ApiError(404, "Service not found");
+    // followers-only: the owner's followers (unlisted/public pass through —
+    // an unlisted link is MEANT to work for anyone who has it)
+    if (service.visibility === "followers" && !isOwner) {
+      const follows = viewer
+        ? !!db
+            .select()
+            .from(tables.follows)
+            .where(and(eq(tables.follows.followerId, viewer.id), eq(tables.follows.followingId, service.ownerId)))
+            .get()
+        : false;
+      if (!follows) throw new ApiError(403, "This service is only visible to followers");
+    }
+    // deactivated services stay viewable as history — unbookable, never erased
 
     const config = parseConfig(service.config);
     const distanceMi =
@@ -67,6 +85,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         cta: ctaFor(service),
         reach: service.reach,
         paused: service.paused,
+        visibility: service.visibility,
+        deactivated: !service.active,
         promoted: service.promoted,
         media: (() => { try { return JSON.parse(service.media); } catch { return []; } })(),
         config,
@@ -103,6 +123,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       patch.price = price;
     }
     if (typeof body.paused === "boolean") patch.paused = body.paused;
+    // visibility + reactivation are owner controls — a deactivated service
+    // can come back; its history never left
+    if (["public", "followers", "unlisted", "draft"].includes(body.visibility)) patch.visibility = body.visibility;
+    if (typeof body.active === "boolean") patch.active = body.active;
     if (typeof body.description === "string") patch.description = body.description.slice(0, 1000);
     if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 80);
 

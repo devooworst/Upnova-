@@ -81,6 +81,15 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
     cta: string;
     owner: { handle: string; displayName: string; avatarUrl: string | null };
   } | null>(null);
+  const [suggested, setSuggested] = useState<{
+    id: string;
+    title: string;
+    price: number;
+    category: string;
+    cta: string;
+    owner: { handle: string; displayName: string; avatarUrl: string | null };
+    reasons: string[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -107,6 +116,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       setPosts(data.items ?? []);
       setGuestTotal(data.totalPublic ?? 0);
       setPromoted(data.promoted ?? null);
+      setSuggested(data.suggestedService ?? null);
       // passive view signals for what actually rendered (deduped server-side)
       // — members only; guests have no interaction log to write to
       const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
@@ -186,6 +196,27 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                 savedInitial={savedPosts.has(p.id)}
                 onHidden={(id) => setPosts((cur) => (cur ?? []).filter((x) => x.id !== id))}
               />
+              {/* organic service suggestion — ranked by the same engine as
+                  everything else, with its reasons shown. NOT promoted. */}
+              {i === 5 && suggested && (
+                <aside className="card flex flex-wrap items-center gap-3 p-4">
+                  <span className="w-full font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    Suggested service{suggested.reasons.length ? ` · ${suggested.reasons.join(" · ")}` : ""}
+                  </span>
+                  <Avatar src={suggested.owner.avatarUrl} initials={suggested.owner.displayName.charAt(0)} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-zinc-100">{suggested.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {suggested.owner.displayName} ·{" "}
+                      <span className="font-mono tracking-[0.08em] text-lime-300">from ${suggested.price}</span>
+                      <span className="capitalize"> · {suggested.category}</span>
+                    </p>
+                  </div>
+                  <Link href={`/services/${suggested.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">
+                    {suggested.cta}
+                  </Link>
+                </aside>
+              )}
               {/* promoted slot — labeled, separate from organic ranking */}
               {i === 2 && promoted && (
                 <aside className="card flex flex-wrap items-center gap-3 border-line p-4">

@@ -31,12 +31,16 @@ import {
   priceLabel,
   availabilityLabel,
   DAY_LABELS,
+  OFFICIAL_CATEGORIES,
+  normalizeCategory,
+  VISIBILITY_OPTIONS,
+  type ServiceVisibility,
 } from "@/lib/servicePolicies";
 
 const inputCls =
   "w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-lime-400/50";
 
-const CATEGORIES = ["creative", "music", "photography", "video", "design", "beauty", "care", "fashion", "events", "education"];
+const CATEGORIES = [...OFFICIAL_CATEGORIES];
 
 /* category → sensible defaults. Suggestions only — never a different system. */
 const CATEGORY_DEFAULTS: Record<string, { fulfillment: "appointment" | "project" | "quote"; durationMin: number }> = {
@@ -98,6 +102,9 @@ export default function NewServicePage() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("creative");
+  const [customMode, setCustomMode] = useState(false);
+  const [customCat, setCustomCat] = useState("");
+  const [visibility, setVisibility] = useState<ServiceVisibility>("public");
   const [fulfillment, setFulfillment] = useState<"appointment" | "project" | "quote">("project");
   const [config, setConfig] = useState<ServiceConfig>(JSON.parse(JSON.stringify(DEFAULT_CONFIG)));
   const [media, setMedia] = useState<string[]>([]);
@@ -140,6 +147,8 @@ export default function NewServicePage() {
   };
 
   const pickCategory = (c: string) => {
+    setCustomMode(false);
+    setCustomCat("");
     setCategory(c);
     const d = CATEGORY_DEFAULTS[c];
     if (d) {
@@ -159,6 +168,10 @@ export default function NewServicePage() {
     setError(null);
     if (stepName === "Service" && (!title.trim() || !description.trim())) {
       setError("Give it a name and tell clients what they'll receive");
+      return;
+    }
+    if (stepName === "Service" && customMode && !normalizeCategory(customCat)) {
+      setError("Name your custom category (or pick an existing one)");
       return;
     }
     if (stepName === "Pricing & policies" && fulfillment !== "quote" && !price) {
@@ -186,6 +199,7 @@ export default function NewServicePage() {
         price: fulfillment === "quote" ? Number(price) || 1 : Number(price),
         category,
         fulfillment,
+        visibility,
         reach: config.travel.radiusMi ? `${config.travel.radiusMi} mi radius` : config.locationMode === "remote" ? "Remote" : "Local",
         config,
         media,
@@ -224,20 +238,53 @@ export default function NewServicePage() {
 
   /* ------------------------------ live screen ------------------------------ */
   if (liveId) {
+    const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/services/${liveId}` : `/services/${liveId}`;
     return (
       <div className="mx-auto max-w-md space-y-4 py-10 text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-lime-400/40 bg-lime-400/10">
           <Check className="h-6 w-6 text-lime-300" />
         </span>
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-50">Your service is live</h1>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-50">
+            {visibility === "draft" ? "Draft saved" : "Your service is live"}
+          </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            <span className="font-semibold text-zinc-200">{title}</span> is now available for{" "}
-            {fulfillment === "appointment" ? "booking" : "requests"}.
+            {visibility === "draft" ? (
+              <>
+                <span className="font-semibold text-zinc-200">{title}</span> is private — only you can see it.
+                Publish it anytime from your profile.
+              </>
+            ) : visibility === "unlisted" ? (
+              <>
+                <span className="font-semibold text-zinc-200">{title}</span> is unlisted — share the link and
+                anyone with it can view and book. It won&apos;t appear in the directory or on your profile.
+              </>
+            ) : visibility === "followers" ? (
+              <>
+                <span className="font-semibold text-zinc-200">{title}</span> is visible to your followers on
+                your profile and in their directory.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-zinc-200">{title}</span> is now available for{" "}
+                {fulfillment === "appointment" ? "booking" : "requests"} — on your profile, in Services, in
+                search, and eligible for the feed.
+              </>
+            )}
           </p>
         </div>
 
-        {!posted ? (
+        {visibility !== "draft" && (
+          <button
+            onClick={() => navigator.clipboard?.writeText(shareUrl)}
+            className="btn-ghost mx-auto px-4 py-2 text-xs"
+            title="Anyone with the link can view it — no account needed"
+          >
+            Copy share link — /services/{liveId.slice(0, 8)}…
+          </button>
+        )}
+
+        {visibility === "public" && !posted ? (
           <div className="card p-4 text-left">
             <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Want to tell people?</p>
             <p className="mt-1 text-[11px] text-zinc-500">Edit the draft, then share it to your feed and profile grid.</p>
@@ -256,7 +303,7 @@ export default function NewServicePage() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : posted ? (
           <div className="space-y-3">
             <p className="rounded-xl border border-lime-400/30 bg-lime-400/5 px-4 py-3 text-sm text-lime-300">
               Posted — it&apos;s in the feed and on your profile grid.
@@ -265,6 +312,13 @@ export default function NewServicePage() {
               <Link href="/services" className="btn-lime px-5 py-2 text-sm">View on Services</Link>
               <Link href="/profile" className="btn-ghost px-5 py-2 text-sm">Your profile</Link>
             </div>
+          </div>
+        ) : (
+          <div className="flex justify-center gap-2">
+            {visibility !== "draft" && (
+              <Link href={`/services/${liveId}`} className="btn-lime px-5 py-2 text-sm">View service page</Link>
+            )}
+            <Link href="/profile/edit" className="btn-ghost px-5 py-2 text-sm">Manage in profile</Link>
           </div>
         )}
       </div>
@@ -313,11 +367,41 @@ export default function NewServicePage() {
             <p className="text-[11px] text-zinc-600">Sets smart defaults — you can change everything after.</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {CATEGORIES.map((c) => (
-                <Chip key={c} on={category === c} onClick={() => pickCategory(c)}>
+                <Chip key={c} on={!customMode && category === c} onClick={() => pickCategory(c)}>
                   <span className="capitalize">{c}</span>
                 </Chip>
               ))}
+              {/* custom category — works immediately for THIS service;
+                  frequent ones get promoted to official later, never silently */}
+              <Chip
+                on={customMode}
+                onClick={() => {
+                  setCustomMode(true);
+                  if (customCat) setCategory(normalizeCategory(customCat));
+                }}
+              >
+                + Add category
+              </Chip>
             </div>
+            {customMode && (
+              <div className="mt-2">
+                <input
+                  value={customCat}
+                  onChange={(e) => {
+                    setCustomCat(e.target.value);
+                    setCategory(normalizeCategory(e.target.value) || "creative");
+                  }}
+                  placeholder="Your category — e.g. Crochet, Tattoo, Car Detailing"
+                  maxLength={24}
+                  autoFocus
+                  className={inputCls}
+                />
+                <p className="mt-1 text-[11px] text-zinc-600">
+                  Custom categories work right away for your service — they filter and organize it everywhere.
+                  Popular ones can become official categories later.
+                </p>
+              </div>
+            )}
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Describe your service</p>
@@ -846,6 +930,27 @@ export default function NewServicePage() {
               {user?.profile.city && <p>Serving {user.profile.city}, {user.profile.state}</p>}
             </div>
           </article>
+
+          {/* who can see it — publishing is a visibility choice, not a fork:
+              ONE canonical record either way */}
+          <div className="card space-y-1.5 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Who can see this?</p>
+            {VISIBILITY_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => setVisibility(o.id)}
+                className={`flex w-full items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${
+                  visibility === o.id ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"
+                }`}
+              >
+                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${visibility === o.id ? "bg-lime-400" : "bg-zinc-700"}`} />
+                <span>
+                  <span className={`block text-sm font-semibold ${visibility === o.id ? "text-lime-300" : "text-zinc-200"}`}>{o.label}</span>
+                  <span className="block text-xs text-zinc-500">{o.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </section>
       )}
 
@@ -866,7 +971,7 @@ export default function NewServicePage() {
           </button>
         ) : (
           <button onClick={publish} disabled={busy || (needsHighTrust && !trustOk)} className="btn-lime px-6 py-2 text-sm disabled:opacity-40">
-            {busy ? "Publishing…" : "Publish Service"}
+            {busy ? "Publishing…" : visibility === "draft" ? "Save Draft" : "Publish Service"}
           </button>
         )}
       </div>

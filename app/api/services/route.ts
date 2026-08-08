@@ -8,7 +8,7 @@ import { publicUser } from "@/lib/server/serialize";
 export const dynamic = "force-dynamic";
 
 import { ctaFor } from "@/lib/server/cta";
-import { parseConfig, travelFeeFor, normalizeMenu, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
+import { parseConfig, travelFeeFor, normalizeMenu, normalizeCategory, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
 import { haversineMi } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
@@ -16,6 +16,12 @@ import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 export async function GET() {
   return guarded(() => {
     const viewer = getSessionUser();
+    // followers-only listings appear for people who actually follow the owner
+    const followingIds = viewer
+      ? new Set(
+          db.select().from(tables.follows).where(eq(tables.follows.followerId, viewer.id)).all().map((f) => f.followingId)
+        )
+      : new Set<string>();
     const rows = db
       .select({ service: tables.services, user: tables.users, profile: tables.profiles })
       .from(tables.services)
@@ -23,7 +29,16 @@ export async function GET() {
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.services.createdAt))
       .all()
-      .filter((r) => r.service.active && !r.service.paused && r.user.status === "active");
+      .filter((r) => r.service.active && !r.service.paused && r.user.status === "active")
+      // ONE canonical record per service — the directory shows it or it
+      // doesn't, based on the creator's visibility choice. Unlisted and
+      // drafts never enter the directory (unlisted lives on its link;
+      // owners manage drafts from their profile, not the marketplace).
+      .filter(
+        (r) =>
+          r.service.visibility === "public" ||
+          (r.service.visibility === "followers" && (viewer?.id === r.service.ownerId || followingIds.has(r.service.ownerId)))
+      );
 
     // organic ordering from the recommendation engine (viewer's taste);
     // promoted listings are pinned first and labeled — never mixed in
@@ -76,6 +91,7 @@ export async function GET() {
         owner: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.service.ownerId,
         promoted: r.service.promoted,
+        visibility: r.service.visibility,
         media: (() => {
           try {
             return JSON.parse(r.service.media);
@@ -104,10 +120,18 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(price) || price < 1) throw new ApiError(400, "Price must be at least $1");
 
     // trust gate: high-trust categories can't be published without verification
-    const category = String(body.category || "creative");
+    // Category is free-form: pick an official one or add your own. Custom
+    // categories work immediately for THIS service (filters/search/profile)
+    // and are tracked for possible promotion — they never silently become
+    // global categories for everyone.
+    const category = normalizeCategory(body.category) || "creative";
     const HIGH_TRUST = ["childcare", "petcare", "home", "transportation", "assistance", "care"];
     if (HIGH_TRUST.includes(category) && user.profile.trustLevel !== "high-trust")
       throw new ApiError(403, "This category requires High-Trust verification before publishing");
+
+    const visibility = ["public", "followers", "unlisted", "draft"].includes(body.visibility)
+      ? body.visibility
+      : "public";
 
     // the creator's config IS the product — sanitize and store it
     const inC = (body.config ?? {}) as Partial<ServiceConfig>;
@@ -178,6 +202,7 @@ export async function POST(req: NextRequest) {
         price,
         category,
         fulfillment,
+        visibility,
         config: JSON.stringify(config),
         media: JSON.stringify(
           Array.isArray(body.media)

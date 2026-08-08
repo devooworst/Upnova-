@@ -316,6 +316,11 @@ export default function EditProfile() {
     title: string;
     price: number;
     paused: boolean;
+    active: boolean;
+    visibility: string;
+    category: string;
+    fulfillment: string;
+    bookings: { upcoming: number; completed: number; cancelled: number; earned: number };
   }
   const [myServices, setMyServices] = useState<MyService[]>([]);
   interface CompletedProject {
@@ -362,18 +367,11 @@ export default function EditProfile() {
     loadWork();
   };
   const loadServices = async () => {
-    const res = await fetch("/api/services", { cache: "no-store" });
+    // the management view: EVERY canonical record — drafts, unlisted,
+    // followers-only, paused, and deactivated history included
+    const res = await fetch("/api/me/services", { cache: "no-store" });
     const data = await res.json();
-    setMyServices(
-      (data.services ?? [])
-        .filter((s: { isMine: boolean }) => s.isMine)
-        .map((s: { id: string; title: string; price: number; paused?: boolean }) => ({
-          id: s.id,
-          title: s.title,
-          price: s.price,
-          paused: !!s.paused,
-        }))
-    );
+    setMyServices(data.services ?? []);
   };
   useEffect(() => {
     loadServices();
@@ -386,6 +384,7 @@ export default function EditProfile() {
     });
     loadServices();
   };
+  // deactivate = history, not erasure; reactivate brings it right back
   const svcRemove = async (id: string) => {
     await fetch(`/api/services/${id}`, { method: "DELETE" });
     loadServices();
@@ -1100,16 +1099,31 @@ export default function EditProfile() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
                         {s.title}
-                        {s.paused && (
+                        {!s.active && (
+                          <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+                            Deactivated — kept in history
+                          </span>
+                        )}
+                        {s.active && s.paused && (
                           <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
                             Paused
                           </span>
                         )}
+                        {s.active && s.visibility !== "public" && (
+                          <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-300">
+                            {s.visibility === "draft" ? "Draft" : s.visibility === "unlisted" ? "Unlisted" : "Followers only"}
+                          </span>
+                        )}
                       </p>
                       <p className="font-mono text-[11px] tracking-[0.08em] text-lime-300">
-                        Starting at ${s.price}
+                        Starting at ${s.price} <span className="text-zinc-500">· {s.category}</span>
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                        {s.bookings.upcoming} upcoming · {s.bookings.completed} completed
+                        {s.bookings.earned > 0 ? ` · $${s.bookings.earned} earned` : ""}
+                        {s.bookings.cancelled > 0 ? ` · ${s.bookings.cancelled} cancelled` : ""}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
@@ -1129,12 +1143,22 @@ export default function EditProfile() {
                         {s.paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
                         {s.paused ? "Resume" : "Pause"}
                       </button>
-                      <button
-                        onClick={() => svcRemove(s.id)}
-                        className="rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300"
-                      >
-                        Remove
-                      </button>
+                      {s.active ? (
+                        <button
+                          onClick={() => svcRemove(s.id)}
+                          title="Deactivates the listing — it stays in your history and can be reactivated"
+                          className="rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300"
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => svcPatch(s.id, { active: true })}
+                          className="btn-lime px-2.5 py-1 text-[11px]"
+                        >
+                          Reactivate
+                        </button>
+                      )}
                     </div>
                   </div>
                   {editingService === s.id && (
@@ -1158,6 +1182,19 @@ export default function EditProfile() {
                       <span className="text-[11px] text-zinc-500">
                         Your listed price is your payout — the buyer pays the 5% platform fee on top.
                       </span>
+                      <label className="ml-auto flex items-center gap-1.5 text-[11px] text-zinc-500">
+                        Visibility
+                        <select
+                          value={s.visibility}
+                          onChange={(e) => svcPatch(s.id, { visibility: e.target.value })}
+                          className={`${inputCls} w-auto py-1 text-xs`}
+                        >
+                          <option value="public">Public</option>
+                          <option value="followers">Followers only</option>
+                          <option value="unlisted">Unlisted / link only</option>
+                          <option value="draft">Private draft</option>
+                        </select>
+                      </label>
                     </div>
                   )}
                 </li>

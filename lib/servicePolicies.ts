@@ -13,6 +13,38 @@ export type CancellationPolicy = "anytime" | "free_24h" | "partial_48h" | "custo
 export type ReschedulePolicy = "free" | "one_free" | "fee" | "approval";
 export type NoShowPolicy = "none" | "partial" | "full";
 
+/* ----------------------------- categories ----------------------------- */
+/* Official categories provide smart defaults and site-wide organization.
+   Creators can add a CUSTOM category when nothing fits — it works
+   immediately for their service (filters, search, profile) but does NOT
+   become a global category. Usage of custom categories is tracked in the
+   admin overview so frequent ones can be promoted to official later. */
+
+export const OFFICIAL_CATEGORIES = [
+  "creative", "music", "photography", "video", "design",
+  "beauty", "care", "fashion", "events", "education",
+] as const;
+
+export function normalizeCategory(raw: unknown): string {
+  return String(raw ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9 &+-]/g, "")
+    .replace(/\s+/g, " ")
+    .slice(0, 24);
+}
+
+/* ----------------------------- visibility ----------------------------- */
+
+export type ServiceVisibility = "public" | "followers" | "unlisted" | "draft";
+
+export const VISIBILITY_OPTIONS: { id: ServiceVisibility; label: string; hint: string }[] = [
+  { id: "public", label: "Public", hint: "Directory, category pages, search, feed, and your profile." },
+  { id: "followers", label: "Followers only", hint: "Only people who follow you see it on your profile and in the directory." },
+  { id: "unlisted", label: "Unlisted / link only", hint: "Anyone with the link can view and book — it isn't listed anywhere." },
+  { id: "draft", label: "Private draft", hint: "Only you. Publish it later from your profile." },
+];
+
 /* ----------------------------- service menu ----------------------------- */
 /* The creator builds their own menu — UpNova never forces one price on a
    business that actually sells "Retwist $60 · Wash +$10 · Style +$20".

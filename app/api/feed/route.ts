@@ -177,6 +177,60 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return { items: items.slice(0, 60), reasons, promoted, guest: !user, totalPublic: mapped.length };
+    // ---- organic service suggestion: RANKED by the same engine, clearly
+    // labeled, never paid placement. Public listings only — a published
+    // service is feed-eligible automatically, no re-posting required. ----
+    let suggestedService: object | null = null;
+    if (tab === "for-you" && user && taste) {
+      const candidates = db
+        .select({ service: tables.services, profile: tables.profiles, u: tables.users })
+        .from(tables.services)
+        .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
+        .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+        .all()
+        .filter(
+          (r) =>
+            r.service.active &&
+            !r.service.paused &&
+            !r.service.promoted &&
+            r.service.visibility === "public" &&
+            r.service.ownerId !== user.id &&
+            r.u.status === "active" &&
+            !taste.hiddenTargets.has(r.service.id)
+        );
+      const rankedSvc = ranker.rank(
+        candidates.map((r) => ({
+          item: r,
+          scorable: {
+            id: r.service.id,
+            type: "service",
+            authorId: r.service.ownerId,
+            category: r.service.category,
+            tags: [r.service.category, r.service.title],
+            lat: r.profile.lat,
+            lng: r.profile.lng,
+            locationOk: r.profile.locationVisibility !== "hidden",
+            sameCity: !!user.profile.city && r.profile.city === user.profile.city,
+            createdAt: r.service.createdAt,
+            engagement: 0,
+          } as Scorable,
+        })),
+        taste
+      );
+      const top = rankedSvc[0];
+      if (top) {
+        suggestedService = {
+          id: top.item.service.id,
+          title: top.item.service.title,
+          price: top.item.service.price,
+          category: top.item.service.category,
+          cta: ctaFor(top.item.service),
+          owner: publicUser(top.item.u, top.item.profile),
+          reasons: top.reasons,
+        };
+      }
+    }
+
+    return { items: items.slice(0, 60), reasons, promoted, suggestedService, guest: !user, totalPublic: mapped.length };
   });
 }
