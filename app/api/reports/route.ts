@@ -3,10 +3,14 @@ import { randomBytes } from "crypto";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { recordInteraction, TARGET_TYPES, type TargetType } from "@/lib/server/recsys";
+import { computeRiskSignals } from "@/lib/server/trust";
 
 export const dynamic = "force-dynamic";
 
-/** POST /api/reports — file a report against any record type. */
+/** POST /api/reports — file a report against any record type.
+ *  Reports enter the moderation queue for HUMAN review — filing one never
+ *  auto-accuses, auto-labels, or auto-bans anyone. Automated risk signals
+ *  are attached as advisory context only. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
@@ -15,8 +19,18 @@ export async function POST(req: NextRequest) {
     const category = String(body.category || "");
     if (!["user", "post", "message", "service", "opportunity", "community", "project"].includes(targetType))
       throw new ApiError(400, "Invalid target type");
-    if (!["payment", "creator", "creative-integrity", "safety", "emergency"].includes(category))
+    if (
+      ![
+        // legacy general categories
+        "payment", "creator", "creative-integrity", "safety", "emergency",
+        // trust & authenticity reasons (lib/trust.ts REPORT_REASONS)
+        "stolen_work", "impersonation", "false_service_claim", "copyright", "other",
+      ].includes(category)
+    )
       throw new ApiError(400, "Invalid category");
+
+    // advisory signals for the moderator — never proof, never automatic action
+    const signals = computeRiskSignals(targetType, String(body.targetId || ""));
 
     const id = randomBytes(12).toString("hex");
     db.insert(tables.reports)
@@ -27,6 +41,7 @@ export async function POST(req: NextRequest) {
         targetId: String(body.targetId || "").slice(0, 64),
         category,
         details: String(body.details || "").slice(0, 2000),
+        signals: JSON.stringify(signals),
       })
       .run();
     if (TARGET_TYPES.includes(targetType as TargetType) && body.targetId)

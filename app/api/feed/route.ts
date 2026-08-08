@@ -5,6 +5,7 @@ import { getSessionUser, guarded } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
+import { postTrustMap } from "@/lib/server/trust";
 import { parseConfig } from "@/lib/servicePolicies";
 import { ctaFor } from "@/lib/server/cta";
 
@@ -86,6 +87,9 @@ export async function GET(req: NextRequest) {
     };
 
     const scoped = ctx ? rows.filter((r) => inScope(scope, ctx, r.profile, campusMap.get(r.post.authorId))) : rows;
+    // trust chips are computed server-side in one pass — Verified Work and
+    // Client Confirmed can't be self-declared through the API
+    const trustMap = postTrustMap(scoped.map((r) => r.post), user?.id);
     const mapped = scoped.map((r) => {
       const likes = likesByPost.get(r.post.id) ?? 0;
       const commentsCount = commentsByPost.get(r.post.id) ?? 0;
@@ -116,6 +120,7 @@ export async function GET(req: NextRequest) {
         comments: commentsCount,
         likedByMe: likedByMe.has(r.post.id),
         isMine: !!user && r.post.authorId === user.id,
+        trust: trustMap.get(r.post.id),
       };
       return { item, scorable };
     });

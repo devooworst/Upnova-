@@ -405,6 +405,31 @@ existing materials, deadline, budget ranges), and care for trust services (date,
 who's being cared for, special requirements, provider verification banner). Progressive
 disclosure throughout: minimum first, details after the provider responds.
 
+**Trust & Authenticity** — a layer separate from BOTH subscriptions and standard auth, built on
+one principle: show what has actually been verified, never tell users who to trust. The registry
+(`lib/trust.ts`) defines the signals; adding a new one is a new entry, not a new system.
+*Account badges* (earned, never purchasable — Pro/Business grant zero of these): Identity
+Verified (from High-Trust verification), Business Verified, Student Verified (from campus
+verification rows). *Content signals per post*: **Verified Work** — exists ONLY when the server
+validated a link between the post and a completed UpNova project/booking the poster actually
+participated in (`lib/server/trust.ts` — client sends ids, server 403/404/409s anything else);
+**Client Confirmed** — set only by the linked counterparty via `POST /api/posts/[id]/confirm`
+(the poster and third parties get 403, verified live); **Creator Attested** — the creator's
+recorded claim of publishing rights, explicitly labeled as a claim, not verification. The bare
+"Original Work" declaration is replaced by a *content disclosure*: original / AI-assisted /
+AI-generated / credited (with a name) / unspecified — set in the composer, rendered as chips
+(`components/TrustChips.tsx`) in the feed and profile grid. The composer's trust panel appears
+progressively (work posts / photos), offers "link to completed UpNova work" from `/api/me/work`,
+and the linked client is notified to confirm (seed counterparties confirm instantly in Demo
+Mode). Profiles get a computed **Trust & authenticity** panel: badges + completed transactions,
+verified-work posts, client confirmations, and review history — all derived from records, none
+self-reported. Reporting: "Someone is using my work / impersonating me / claiming work they
+didn't perform / copyright / other" from any post's menu (`components/TrustReportModal.tsx`)
+into the existing human moderation queue — filing never auto-accuses or auto-bans. Automated
+checks (exact duplicate-image hash across accounts, account age, prior unresolved reports) are
+attached to reports as **advisory risk signals**, displayed to the admin under an explicit
+"advisory only, not proof" banner — similarity is never treated as evidence of theft.
+
 **Location privacy** — users pick the most precise level shown publicly: City · County · State ·
 Country · Don't show. `locationLabel` is computed server-side (`lib/server/serialize.ts`) and is
 the only location string public surfaces render; exact addresses and coordinates are never public

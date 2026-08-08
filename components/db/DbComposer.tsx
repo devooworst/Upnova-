@@ -5,10 +5,11 @@
    announcement, a promotion. Category/subcategory are optional and
    creator-defined — they become the filters on your profile grid. */
 
-import { useRef, useState } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, X, ShieldCheck } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
+import { DISCLOSURES, type DisclosureType } from "@/lib/trust";
 import { FEED_EVENT } from "./DbFeed";
 
 const KINDS = [
@@ -48,8 +49,23 @@ export default function DbComposer() {
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  // trust & authenticity — disclosure replaces a bare "original work" claim
+  const [disclosure, setDisclosure] = useState<string>("unspecified");
+  const [credit, setCredit] = useState("");
+  const [attested, setAttested] = useState(false);
+  const [workLink, setWorkLink] = useState(""); // "project:id" | "booking:id"
+  const [myWork, setMyWork] = useState<{ kind: string; id: string; title: string; with: string }[] | null>(null);
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // fetch completed transactions once the trust panel becomes relevant
+  const showTrustPanel = kind === "work" || !!image;
+  useEffect(() => {
+    if (open && showTrustPanel && myWork === null)
+      fetch("/api/me/work", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { work: [] }))
+        .then((d) => setMyWork(d.work ?? []));
+  }, [open, showTrustPanel, myWork]);
 
   if (!user) return null;
 
@@ -60,16 +76,32 @@ export default function DbComposer() {
     setCategory("");
     setSubcategory("");
     setImage(null);
+    setDisclosure("unspecified");
+    setCredit("");
+    setAttested(false);
+    setWorkLink("");
   };
 
   const submit = async () => {
     const text = body.trim();
     if (!text || busy) return;
     setBusy(true);
+    const [linkKind, linkId] = workLink.split(":");
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: text, kind, category, subcategory, imageUrl: image }),
+      body: JSON.stringify({
+        body: text,
+        kind,
+        category,
+        subcategory,
+        imageUrl: image,
+        disclosure,
+        credit,
+        attested,
+        projectId: linkKind === "project" ? linkId : undefined,
+        bookingId: linkKind === "booking" ? linkId : undefined,
+      }),
     });
     setBusy(false);
     if (res.ok) {
@@ -165,6 +197,70 @@ export default function DbComposer() {
                 >
                   <X className="h-3 w-3" />
                 </button>
+              </div>
+            )}
+
+            {/* ---- trust & context — appears when you're showing work ---- */}
+            {showTrustPanel && (
+              <div className="mt-2 rounded-xl border border-line-soft bg-card-raised/50 p-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+                  <ShieldCheck className="h-3 w-3" /> Content disclosure
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {(Object.keys(DISCLOSURES) as DisclosureType[]).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDisclosure(d)}
+                      title={DISCLOSURES[d].hint}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                        disclosure === d
+                          ? "border-violet-400/50 bg-violet-400/10 text-violet-300"
+                          : "border-line text-zinc-500 hover:border-zinc-600"
+                      }`}
+                    >
+                      {DISCLOSURES[d].label}
+                    </button>
+                  ))}
+                </div>
+                {disclosure === "credited" && (
+                  <input
+                    value={credit}
+                    onChange={(e) => setCredit(e.target.value)}
+                    placeholder="Who made it? (e.g. Photography: Ava Chen)"
+                    maxLength={80}
+                    className="mt-2 w-full rounded-full border border-line bg-card px-3 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50"
+                  />
+                )}
+
+                <label className="mt-2.5 flex items-start gap-2 text-[11px] leading-relaxed text-zinc-400">
+                  <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} className="mt-0.5 accent-lime-400" />
+                  <span>
+                    I have the right to publish this and I&apos;m not presenting someone else&apos;s work as my
+                    own. <span className="text-zinc-600">Shown as &quot;Creator Attested&quot; — your claim, labeled as one.</span>
+                  </span>
+                </label>
+
+                {myWork && myWork.length > 0 && (
+                  <div className="mt-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Link to completed UpNova work (optional)</p>
+                    <select
+                      value={workLink}
+                      onChange={(e) => setWorkLink(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-400/50"
+                    >
+                      <option value="">No link</option>
+                      {myWork.map((w) => (
+                        <option key={`${w.kind}:${w.id}`} value={`${w.kind}:${w.id}`}>
+                          {w.title} — with {w.with}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+                      Adds a <span className="text-lime-300">Verified Work</span> label (UpNova checked the
+                      transaction). {workLink ? "The client will be asked to confirm it happened — that adds Client Confirmed." : ""}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

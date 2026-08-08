@@ -21,6 +21,7 @@ import { randomBytes } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { transition, requestExtension, addReview } from "./projects";
+import { notify } from "./notify";
 
 const id = () => randomBytes(12).toString("hex");
 
@@ -158,6 +159,23 @@ export function seedConfirmsBookingPayment(bookingId: string) {
   const when = b.startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
   const time = b.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   sendAs(b.conversationId, b.providerId, `Got it — your payment is secured. You're confirmed for ${when} at ${time}. See you then!`);
+}
+
+/** Seed counterparty confirms a linked work post ("Client Confirmed"). */
+export function seedClientConfirmsWork(postId: string, counterpartyId: string) {
+  if (!isSeedUser(counterpartyId)) return;
+  const post = db.select().from(tables.posts).where(eq(tables.posts.id, postId)).get();
+  if (!post || post.clientConfirmed) return;
+  db.update(tables.posts).set({ clientConfirmed: true }).where(eq(tables.posts.id, postId)).run();
+  const confirmer = db.select().from(tables.profiles).where(eq(tables.profiles.userId, counterpartyId)).get();
+  notify({
+    userId: post.authorId,
+    actorId: counterpartyId,
+    type: "post",
+    title: `${confirmer?.displayName ?? "Your client"} confirmed your work`,
+    body: "The post now carries a Client Confirmed label.",
+    href: "/profile",
+  });
 }
 
 /** After the real user reviews a completed project: the seed side reviews back. */

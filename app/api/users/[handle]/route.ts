@@ -4,6 +4,7 @@ import { db, tables } from "@/db";
 import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { ctaFor } from "@/lib/server/cta";
+import { postTrustMap } from "@/lib/server/trust";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,37 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
             .filter((i) => isOwner || i.visible)
         : [];
 
+    /* ---- Trust & Authenticity summary (lib/trust.ts) ----
+       Everything here is COMPUTED from records, never self-reported:
+       badges from actual verification rows, work counts from server-
+       validated post links, confirmations from counterparties. */
+    const studentVerified = !!db
+      .select()
+      .from(tables.campusVerifications)
+      .where(and(eq(tables.campusVerifications.userId, user.id), eq(tables.campusVerifications.status, "verified")))
+      .get();
+    const myPosts = db.select().from(tables.posts).where(eq(tables.posts.authorId, user.id)).all();
+    const myTrust = Array.from(postTrustMap(myPosts).values());
+    const completedBookings = db
+      .select()
+      .from(tables.bookings)
+      .where(eq(tables.bookings.providerId, user.id))
+      .all()
+      .filter((b) => b.status === "completed").length;
+    const trust = {
+      badges: {
+        identityVerified: profile.trustLevel === "high-trust",
+        businessVerified: user.businessVerified,
+        studentVerified,
+      },
+      completedProjects,
+      completedBookings,
+      verifiedWorkPosts: myTrust.filter((t) => t.verifiedWork).length,
+      clientConfirmedPosts: myTrust.filter((t) => t.clientConfirmed).length,
+      reviewsCount: reviewsReceived.length,
+      rating,
+    };
+
     return {
       user: publicUser(user, profile, { viewerIsOwner: isOwner }),
       joined: user.createdAt.toISOString(),
@@ -79,6 +111,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         approvedExtensions,
       },
       reviews: reviewsReceived.slice(0, 6).map((r) => ({ rating: r.rating, body: r.body, createdAt: r.createdAt.toISOString() })),
+      trust,
       followedByMe,
       services: services.map((s) => ({
         id: s.id,

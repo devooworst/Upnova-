@@ -153,6 +153,18 @@ export const posts = sqliteTable(
     // filters from whatever categories this creator actually uses
     category: text("category").notNull().default(""),
     subcategory: text("subcategory").notNull().default(""),
+    /* ---- Trust & Authenticity (lib/trust.ts) ----
+       Disclosure replaces a bare "Original Work" claim; attestation is the
+       creator's recorded claim (labeled as such, never as proof); the
+       project/booking link is validated server-side at post time and is the
+       ONLY path to a "Verified Work" chip; client_confirmed is set only by
+       the linked counterparty. */
+    disclosure: text("disclosure").notNull().default("unspecified"), // original | ai_assisted | ai_generated | credited | unspecified
+    attested: bool("attested", false),
+    credit: text("credit").notNull().default(""), // who made it, when disclosure=credited
+    projectId: text("project_id"), // completed UpNova project this work came from
+    bookingId: text("booking_id"), // completed UpNova booking this work came from
+    clientConfirmed: bool("client_confirmed", false),
     isSeed: seed(),
     createdAt: ts("created_at"),
   },
@@ -616,8 +628,12 @@ export const reports = sqliteTable("reports", {
     .references(() => users.id),
   targetType: text("target_type").notNull(), // user | post | message | service | opportunity | community | project
   targetId: text("target_id").notNull(),
-  category: text("category").notNull(), // payment | creator | creative-integrity | safety | emergency
+  category: text("category").notNull(), // payment | creator | creative-integrity | safety | emergency | stolen_work | impersonation | false_service_claim | copyright | other
   details: text("details").notNull().default(""),
+  // automated RISK SIGNALS computed at filing time (duplicate-image match,
+  // account age, prior reports). Advisory context for the human moderator —
+  // NEVER treated as proof, never triggers automatic action.
+  signals: text("signals").notNull().default("[]"),
   status: text("status").notNull().default("open"), // open | reviewing | resolved | dismissed
   createdAt: ts("created_at"),
 });

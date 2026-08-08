@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
+import { postTrustMap } from "@/lib/server/trust";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
     const ids = posts.map((p) => p.id);
     const likes = ids.length ? db.select().from(tables.likes).all().filter((l) => ids.includes(l.postId)) : [];
     const comments = ids.length ? db.select().from(tables.comments).all().filter((c) => ids.includes(c.postId)) : [];
+    const trustMap = postTrustMap(posts, viewer?.id);
 
     return {
       posts: posts.map((p) => ({
@@ -36,6 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         likes: likes.filter((l) => l.postId === p.id).length,
         comments: comments.filter((c) => c.postId === p.id).length,
         likedByMe: viewer ? likes.some((l) => l.postId === p.id && l.userId === viewer.id) : false,
+        trust: trustMap.get(p.id),
       })),
     };
   });

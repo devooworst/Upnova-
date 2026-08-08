@@ -21,6 +21,8 @@ export async function GET() {
         targetId: r.report.targetId,
         category: r.report.category,
         details: r.report.details,
+        // advisory context for the human reviewer — never proof
+        signals: (() => { try { return JSON.parse(r.report.signals); } catch { return []; } })(),
         status: r.report.status,
         reporter: r.reporter.displayName,
         createdAt: r.report.createdAt.toISOString(),

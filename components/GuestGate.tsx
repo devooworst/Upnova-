@@ -37,6 +37,7 @@ export type JoinAction =
   | "create"
   | "tickets"
   | "personalize"
+  | "report"
   | "explore";
 
 const JOIN_EVENT = "upnova:join-prompt";
@@ -92,6 +93,10 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
   personalize: {
     title: "Create an account to shape your feed",
     body: "Hide, Not Interested, and For You ranking are built from your own activity — they need an account to belong to.",
+  },
+  report: {
+    title: "Create an account to report",
+    body: "Reports go to human review and need an accountable reporter — that protects the people being reported too.",
   },
   explore: {
     title: "You're exploring UpNova as a guest",

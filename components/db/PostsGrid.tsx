@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, MessageCircle, X, FileText, Zap } from "lucide-react";
+import TrustChips from "@/components/TrustChips";
+import type { PostTrust } from "@/lib/trust";
 
 export interface GridPost {
   id: string;
@@ -27,6 +29,7 @@ export interface GridPost {
   likes: number;
   comments: number;
   likedByMe: boolean;
+  trust?: PostTrust | null;
 }
 
 export interface RelatedService {
@@ -251,6 +254,8 @@ function PostModal({
               </span>
             )}
           </div>
+          {/* trust & context labels — verified vs claimed, same chips as the feed */}
+          <TrustChips trust={post.trust} postId={post.id} />
           <div className="mt-3 flex items-center gap-5 border-t border-line-soft pt-2.5 text-xs text-zinc-500">
             <button onClick={toggleLike} className={`flex items-center gap-1.5 transition ${liked ? "text-rose-400" : "hover:text-zinc-300"}`}>
               <Heart className={`h-4 w-4 ${liked ? "fill-rose-400" : ""}`} /> {likes} like{likes === 1 ? "" : "s"}

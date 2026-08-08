@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MapPin, MessageSquare, Zap, Lock, Star } from "lucide-react";
+import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck } from "lucide-react";
+import { ACCOUNT_BADGES } from "@/lib/trust";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
@@ -46,6 +47,15 @@ interface PublicProfile {
     approvedExtensions: number;
   };
   followedByMe: boolean;
+  trust?: {
+    badges: { identityVerified: boolean; businessVerified: boolean; studentVerified: boolean };
+    completedProjects: number;
+    completedBookings: number;
+    verifiedWorkPosts: number;
+    clientConfirmedPosts: number;
+    reviewsCount: number;
+    rating: number | null;
+  };
   services: { id: string; title: string; description: string; price: number; reach: string; category?: string; cta?: string }[];
   experience: { id: string; position: string; organization: string; start: string; end: string; description: string }[];
   reviews?: { rating: number; body: string; createdAt: string }[];
@@ -237,6 +247,59 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           </div>
         )}
       </header>
+
+      {/* ---- Trust & authenticity — what's actually verified, computed from
+           records. UpNova shows the evidence; it doesn't tell you who to
+           trust. Badges are earned, never part of any subscription. ---- */}
+      {data.trust && (
+        <section className="card p-5">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold text-zinc-100">
+            <ShieldCheck className="h-4 w-4 text-lime-400" /> Trust &amp; authenticity
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {data.trust.badges.identityVerified && (
+              <span title={ACCOUNT_BADGES.identity_verified.description} className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-300">
+                <BadgeCheck className="h-3 w-3" /> Identity Verified
+              </span>
+            )}
+            {data.trust.badges.businessVerified && (
+              <span title={ACCOUNT_BADGES.business_verified.description} className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-300">
+                <BadgeCheck className="h-3 w-3" /> Business Verified
+              </span>
+            )}
+            {data.trust.badges.studentVerified && (
+              <span title={ACCOUNT_BADGES.student_verified.description} className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-300">
+                <BadgeCheck className="h-3 w-3" /> Student Verified
+              </span>
+            )}
+            {!data.trust.badges.identityVerified && !data.trust.badges.businessVerified && !data.trust.badges.studentVerified && (
+              <span className="text-xs text-zinc-500">No verifications yet — badges are earned, never bought.</span>
+            )}
+          </div>
+          <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-line-soft pt-3 text-xs text-zinc-400 sm:grid-cols-4">
+            <li>
+              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
+                {data.trust.completedProjects + data.trust.completedBookings}
+              </span>
+              Completed on UpNova
+            </li>
+            <li>
+              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-lime-300">{data.trust.verifiedWorkPosts}</span>
+              Verified work posts
+            </li>
+            <li>
+              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-violet-300">{data.trust.clientConfirmedPosts}</span>
+              Client confirmations
+            </li>
+            <li>
+              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
+                {data.trust.rating != null ? `${data.trust.rating.toFixed(1)}` : "—"}
+              </span>
+              {data.trust.reviewsCount} review{data.trust.reviewsCount === 1 ? "" : "s"}
+            </li>
+          </ul>
+        </section>
+      )}
 
       <section className="card p-5">
         <h2 className="text-sm font-bold text-zinc-100">Posts</h2>

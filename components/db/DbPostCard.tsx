@@ -9,6 +9,10 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import { BadgeCheck } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
+import TrustChips from "@/components/TrustChips";
+import TrustReportModal from "@/components/TrustReportModal";
+import type { PostTrust } from "@/lib/trust";
+import { Flag } from "lucide-react";
 
 export interface FeedAuthor {
   id: string;
@@ -38,6 +42,7 @@ export interface FeedPost {
   comments: number;
   likedByMe: boolean;
   isMine: boolean;
+  trust?: PostTrust | null;
 }
 
 interface CommentItem {
@@ -74,6 +79,7 @@ export default function DbPostCard({
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<CommentItem[] | null>(null);
   const [draft, setDraft] = useState("");
+  const [reporting, setReporting] = useState(false);
 
   const toggleLike = async () => {
     if (guest) return promptJoin("like"); // UX only — the API 401s regardless
@@ -208,6 +214,20 @@ export default function DbPostCard({
                       </span>
                     </span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (guest) return promptJoin("report");
+                      setReporting(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 border-t border-line-soft px-3.5 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-card-raised"
+                  >
+                    <Flag className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>
+                      Report
+                      <span className="block text-[10px] text-zinc-600">Stolen work, impersonation, false claims</span>
+                    </span>
+                  </button>
                 </div>
               </>
             )}
@@ -242,6 +262,9 @@ export default function DbPostCard({
           )}
         </div>
       )}
+
+      {/* trust & context labels — what's verified vs what's claimed */}
+      <TrustChips trust={post.trust} postId={post.id} />
 
       {/* actions */}
       <div className="mt-3 flex items-center gap-5 border-t border-line-soft pt-2.5 text-xs text-zinc-500">
@@ -294,6 +317,14 @@ export default function DbPostCard({
             </button>
           </div>
         </div>
+      )}
+      {reporting && (
+        <TrustReportModal
+          targetType="post"
+          targetId={post.id}
+          targetLabel={`post by ${a.displayName}`}
+          onClose={() => setReporting(false)}
+        />
       )}
     </article>
   );

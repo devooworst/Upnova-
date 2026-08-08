@@ -46,6 +46,7 @@ interface AdminReport {
   targetId: string;
   category: string;
   details: string;
+  signals?: string[];
   status: string;
   reporter: string;
   createdAt: string;
@@ -240,7 +241,7 @@ export default function AdminPage() {
                 {r.category === "emergency" && (
                   <span className="rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[9px] font-bold uppercase text-rose-300">Emergency</span>
                 )}
-                {r.targetType} · {r.category}
+                {r.targetType} · {r.category.replace(/_/g, " ")}
                 <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${
                   r.status === "open" ? "border-amber-400/40 text-amber-300" : "border-line text-zinc-500"
                 }`}>
@@ -248,6 +249,20 @@ export default function AdminPage() {
                 </span>
               </p>
               <p className="mt-1 text-xs text-zinc-400">{r.details || "No details provided."}</p>
+              {(r.signals?.length ?? 0) > 0 && (
+                <div className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-2">
+                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-300">
+                    Automated risk signals — advisory only, not proof
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[11px] text-zinc-400">
+                    {r.signals!.map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400/60" /> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p className="mt-1 text-[10px] text-zinc-600">
                 Reported by {r.reporter} · {new Date(r.createdAt).toLocaleString()} · target {r.targetId || "n/a"}
               </p>
