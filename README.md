@@ -105,6 +105,16 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   isn't the source of truth; the email is never public). College ends at the
   verified graduation date; everything the student built stays theirs, with a
   natural transition to Pro.
+- **The Create system: no generic forms.** Each creation type has its own
+  purpose-specific form, fields, validation, and resulting feed card. Post = social
+  (media, post type, audience, community, tags). Opportunity = a project listing
+  builder (roles × counts, paid/unpaid/negotiable/royalty, payment structure,
+  requirements, location + reach, deadlines, response method). Service = a
+  professional listing (deliverables, pricing model, turnaround, availability,
+  portfolio, original-work flag). Poll = duration, voter scope, add-own-options,
+  results visibility. Event routes to the full Event Setup (it's an experience, not
+  a popup). Live = title, category, watch scope, chat/reactions → Go Live. Shared
+  controls only where shared: audience/reach, community, tags.
 - **Communities are creator-controlled spaces, not group chats.** Create Community
   is a setup wizard: type (15 categories), access (public / private / invite-only /
   verified-only), reach (5 mi → global, or a specific school), rules (members can be
