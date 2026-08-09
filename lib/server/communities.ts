@@ -470,6 +470,7 @@ export function serializeCommunity(
     whoCanInvite: c.whoCanInvite,
     identityModes: parse(c.identityModes),
     campusId: c.campusId,
+    audience: c.audience,
     createdAt: c.createdAt,
     members: opts.counts?.members ?? 0,
     activeMembers: opts.counts?.active ?? 0,

@@ -86,14 +86,18 @@ CREATE TABLE IF NOT EXISTS "campus_listings" (
 	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS `campus_verifications` (
+CREATE TABLE IF NOT EXISTS "campus_verifications" (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`campus_id` text NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
+	`affiliation` text DEFAULT 'current_student' NOT NULL,
 	`evidence_ref` text,
 	`program` text DEFAULT '' NOT NULL,
 	`grad_year` text DEFAULT '' NOT NULL,
+	`show_school` integer DEFAULT true NOT NULL,
+	`show_grad_year` integer DEFAULT false NOT NULL,
+	`show_program` integer DEFAULT false NOT NULL,
 	`verified_at` integer,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
@@ -141,7 +145,7 @@ CREATE TABLE IF NOT EXISTS "communities" (
 	`campus_id` text,
 	`created_by_id` text NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, audience text NOT NULL DEFAULT 'everyone',
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`created_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );

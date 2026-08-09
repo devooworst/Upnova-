@@ -299,9 +299,26 @@ function seed() {
     .run();
   for (const [handle, program] of [["devin", "Cybersecurity"], ["nia", "Communications"], ["imani", "Business"], ["omar", "Mathematics"]] as const) {
     db.insert(t.campusVerifications)
-      .values({ id: id(), userId: uid[handle], campusId, status: "verified", program, gradYear: "2027", verifiedAt: new Date() })
+      .values({
+        id: id(), userId: uid[handle], campusId, status: "verified", program, gradYear: "2027",
+        affiliation: "current_student",
+        // nia opted into showing her class year + major — visibility is the
+        // member's choice, the verification is stored either way
+        showGradYear: handle === "nia", showProgram: handle === "nia",
+        verifiedAt: new Date(),
+      })
       .run();
   }
+
+  // tj graduated in 2022 — verified ALUMNI: the alumni environment is his,
+  // student-only areas (Marketplace, Student Groups) are not
+  db.insert(t.campusVerifications)
+    .values({
+      id: id(), userId: uid["tj"], campusId, status: "verified", affiliation: "alumni",
+      program: "Music Technology", gradYear: "2022", showGradYear: true, showProgram: true,
+      verifiedAt: new Date(),
+    })
+    .run();
 
   /* ------------------------------ follows ------------------------------ */
   const followPairs: [string, string][] = [
@@ -322,7 +339,7 @@ function seed() {
   const communityDefs: {
     slug: string; name: string; desc: string; owner: string; category: string;
     access?: string; modes: string[]; rules?: string[]; campus?: boolean;
-    kind?: string; joinApproval?: boolean;
+    kind?: string; joinApproval?: boolean; audience?: string;
   }[] = [
     { slug: "baltimore-creators", name: "Baltimore Creators", desc: "Creators building in and around Baltimore.", owner: "devin", category: "General", modes: ["real", "alias"], rules: ["Keep it constructive", "No spam or self-promo floods"] },
     { slug: "music-producers", name: "Music Producers", desc: "Production, mixing, placements, and feedback.", owner: "jordanmiles", category: "Music", modes: ["real"], rules: ["Feedback stays about the work, not the person"] },
@@ -343,6 +360,12 @@ function seed() {
       slug: "bowie-anime", name: "Bowie State Anime Community",
       desc: "Seasonal watchlists, manga trades, and watch parties in the student center.",
       owner: "nia", category: "Anime", modes: ["real", "alias"], campus: true,
+    },
+    {
+      slug: "bowie-alumni-network", name: "Bowie State Alumni Network",
+      desc: "Alumni careers, referrals, homecoming plans, and giving back. Verified Bowie State alumni.",
+      owner: "tj", category: "Career", modes: ["real"], campus: true, audience: "alumni",
+      rules: ["Referrals and intros are the whole point — make them generously"],
     },
     {
       slug: "lenas-design-lab", name: "Lena's Design Lab — Inner Circle",
@@ -382,6 +405,7 @@ function seed() {
         access: c.access ?? "public", category: c.category, kind: c.kind ?? "standard",
         identityModes: JSON.stringify(c.modes), rules: JSON.stringify(c.rules ?? []),
         joinApproval: !!c.joinApproval, campusId: c.campus ? campusId : null,
+        audience: c.audience ?? "everyone",
         mode: c.kind === "campus_questions" ? "qa" : "discussion",
         createdById: uid[c.owner], isSeed: true,
       })

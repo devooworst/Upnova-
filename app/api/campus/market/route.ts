@@ -6,7 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import { publicUser } from "@/lib/server/serialize";
 import { createLinkedPost } from "@/lib/server/publish";
 import { LISTING_TYPES, CAMPUS_CATEGORIES } from "@/lib/campusMarket";
-import { requireCampus } from "@/lib/server/campus";
+import { requireCurrentStudent } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +16,17 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return guarded(() => {
     const viewer = getSessionUser();
-    const myCampus = viewer
+    // marketplace membership = CURRENT STUDENTS. Alumni/faculty browse the
+    // same limited public slice as everyone else — their campus, alumni
+    // communities, and events stay open elsewhere.
+    const verif = viewer
       ? db
           .select()
           .from(tables.campusVerifications)
           .where(and(eq(tables.campusVerifications.userId, viewer.id), eq(tables.campusVerifications.status, "verified")))
-          .get()?.campusId ?? null
+          .get() ?? null
       : null;
+    const myCampus = verif && verif.affiliation === "current_student" ? verif.campusId : null;
 
     const campuses = new Map(db.select().from(tables.campuses).all().map((c) => [c.id, c.name]));
     let rows = db
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
-    const campusId = requireCampus(user.id);
+    const campusId = requireCurrentStudent(user.id);
 
     const title = String(body.title || "").trim().slice(0, 80);
     if (!title) throw new ApiError(400, "Give it a title");

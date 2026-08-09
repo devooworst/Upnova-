@@ -64,6 +64,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .get();
       if (!v || v.campusId !== c.campusId)
         throw new ApiError(403, "This is a campus community — verify your school in Your Campus first");
+      // audience gates NEW joins only — existing memberships survive the
+      // Student → Alumni transition untouched
+      if (c.audience === "students" && v.affiliation !== "current_student")
+        throw new ApiError(403, "This room is for current students — alumni communities and events stay open to you");
+      if (c.audience === "alumni" && v.affiliation === "current_student")
+        throw new ApiError(403, "This is the alumni network — it opens when you graduate");
     }
 
     let existing = getMembership(c.id, user.id);

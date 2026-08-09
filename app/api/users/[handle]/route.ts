@@ -124,6 +124,26 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
 
     return {
       user: publicUser(user, profile, { viewerIsOwner: isOwner }),
+      // verified academic identity — exactly what the member chose to show.
+      // "Class of 2027" is a profile ATTRIBUTE, never a community.
+      academic: (() => {
+        const v = db
+          .select({ v: tables.campusVerifications, c: tables.campuses })
+          .from(tables.campusVerifications)
+          .innerJoin(tables.campuses, eq(tables.campusVerifications.campusId, tables.campuses.id))
+          .where(eq(tables.campusVerifications.userId, user.id))
+          .all()
+          .find((r) => r.v.status === "verified");
+        if (!v) return null;
+        if (!v.v.showSchool && !isOwner) return null;
+        return {
+          school: v.c.name,
+          affiliation: v.v.affiliation,
+          classOf: (v.v.showGradYear || isOwner) && v.v.gradYear ? v.v.gradYear : null,
+          program: (v.v.showProgram || isOwner) && v.v.program ? v.v.program : null,
+          verified: true,
+        };
+      })(),
       joined: user.createdAt.toISOString(),
       stats: {
         followers: isOwner || profile.showFollowers ? followers : null,

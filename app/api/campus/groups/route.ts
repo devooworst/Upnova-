@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
-import { requireCampus } from "@/lib/server/campus";
+import { requireCurrentStudent } from "@/lib/server/campus";
 import { getMembership, communityCounts, serializeCommunity } from "@/lib/server/communities";
 import { STUDENT_GROUP_CATEGORIES, isStudentGroup } from "@/lib/communityIdentity";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return guarded(() => {
     const user = requireUser();
-    const campusId = requireCampus(user.id);
+    const campusId = requireCurrentStudent(user.id);
     const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get()!;
 
     const groups = db

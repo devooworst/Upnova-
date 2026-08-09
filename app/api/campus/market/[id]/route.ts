@@ -6,7 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { conversationBetween } from "@/lib/server/oppFlow";
-import { requireCampus } from "@/lib/server/campus";
+import { requireCurrentStudent } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
-    requireCampus(user.id);
+    requireCurrentStudent(user.id);
     const row = getListing(params.id);
     settleAuction(row.l);
     const l = row.l;

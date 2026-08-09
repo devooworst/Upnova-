@@ -118,16 +118,24 @@ export default function CampusPage() {
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [affiliation, setAffiliation] = useState("current_student");
+  const [vGradYear, setVGradYear] = useState("");
+  const [vProgram, setVProgram] = useState("");
   const verifyCollege = async () => {
     setVerifyBusy(true);
     const res = await fetch("/api/campus/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ affiliation, gradYear: vGradYear, program: vProgram }),
     });
     if (res.status === 401) window.location.href = "/login";
     invalidateSession();
     setVerifyBusy(false);
+  };
+  const graduate = async () => {
+    if (!window.confirm("Switch your status to Alumni? Everything you built stays — connections, messages, portfolio, history. Student-only areas (Marketplace, Student Groups) close; the alumni environment opens.")) return;
+    await fetch("/api/campus/verify", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "graduate" }) });
+    invalidateSession();
   };
 
   const ava = creators.find((c) => c.id === "ava")!;
@@ -146,19 +154,38 @@ export default function CampusPage() {
           Your campus network is waiting
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
-          Communities, campus services, opportunities, organizations, and events — verified
-          students only.
+          Your Campus is a private, verified environment. Prove your school affiliation once —
+          student, alumni, or faculty — and it unlocks. No plan, Free or Pro, can buy its way in.
         </p>
+        <div className="mx-auto mt-5 max-w-sm space-y-2 text-left">
+          {[
+            { id: "current_student", label: "Current Student" },
+            { id: "alumni", label: "Alumni" },
+            { id: "faculty_staff", label: "Faculty / Staff" },
+          ].map((a) => (
+            <label key={a.id} className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 text-sm transition ${affiliation === a.id ? "border-violet-400/50 bg-violet-400/5 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
+              <input type="radio" checked={affiliation === a.id} onChange={() => setAffiliation(a.id)} className="accent-violet-400" />
+              {a.label}
+            </label>
+          ))}
+          {affiliation !== "faculty_staff" && (
+            <div className="grid grid-cols-2 gap-2">
+              <input value={vGradYear} onChange={(e) => setVGradYear(e.target.value)} placeholder={affiliation === "alumni" ? "Class of (e.g. 2022)" : "Class of (optional)"} className="rounded-lg border border-line bg-card-raised px-3 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50" />
+              <input value={vProgram} onChange={(e) => setVProgram(e.target.value)} placeholder="Major (optional)" className="rounded-lg border border-line bg-card-raised px-3 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50" />
+            </div>
+          )}
+        </div>
         <button
           onClick={verifyCollege}
           disabled={verifyBusy}
-          className="mt-5 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
+          className="mt-4 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
         >
-          <GraduationCap className="h-4 w-4" /> {verifyBusy ? "Verifying…" : "Verify College — Free"}
+          <GraduationCap className="h-4 w-4" /> {verifyBusy ? "Verifying…" : "Verify affiliation — Free"}
         </button>
         <p className="mt-3 text-[10px] text-zinc-600">
-          The network is never paywalled: verification, campus chat, and applying cost $0.
-          College+ is an optional exposure upgrade. Alumni keep their community after graduation.
+          Verification is always free — Free vs Pro controls platform features, never campus access.
+          Class year and major are optional profile attributes you control; they are never turned into
+          automatic communities.
         </p>
       </div>
     );
@@ -174,12 +201,24 @@ export default function CampusPage() {
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user?.campus?.name ?? "Your Campus"}</h1>
-            <p className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+            <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+              <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-violet-300">
+                {user?.campus?.affiliation === "alumni" ? "Alumni" : user?.campus?.affiliation === "faculty_staff" ? "Faculty / Staff" : "Current Student"}
+                {user?.campus?.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
+              </span>
               <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> 2,841 verified students</span>
               <span className="flex items-center gap-1 text-violet-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" /> 116 online
               </span>
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <AcademicProfileCard />
+            {user?.campus?.affiliation !== "alumni" && user?.campus?.affiliation !== "faculty_staff" && (
+              <button onClick={graduate} className="btn-ghost px-3.5 py-1.5 text-xs" title="Student → Alumni: nothing is deleted; student-only areas close, the alumni environment opens">
+                I graduated
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -188,13 +227,20 @@ export default function CampusPage() {
       <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Campus sections">
         {/* Marketplace is real and important enough to lead — a live link,
             not a static module */}
-        <Link
-          href="/campus/market"
-          className="rounded-lg border border-lime-400/40 bg-lime-400/5 p-2.5 text-left transition hover:bg-lime-400/10"
-        >
-          <p className="text-sm font-semibold text-lime-300">Marketplace</p>
-          <p className="mt-0.5 truncate text-[10px] text-zinc-500">Buy · sell · free · trade · auction · borrow</p>
-        </Link>
+        {user?.campus?.affiliation === "current_student" || !user?.campus?.affiliation ? (
+          <Link
+            href="/campus/market"
+            className="rounded-lg border border-lime-400/40 bg-lime-400/5 p-2.5 text-left transition hover:bg-lime-400/10"
+          >
+            <p className="text-sm font-semibold text-lime-300">Marketplace</p>
+            <p className="mt-0.5 truncate text-[10px] text-zinc-500">Buy · sell · free · trade · auction · borrow</p>
+          </Link>
+        ) : (
+          <div className="rounded-lg border border-line p-2.5 text-left opacity-60" title="Student-to-student trading is for current students. Your communities, events, and alumni network stay open.">
+            <p className="text-sm font-semibold text-zinc-500">Marketplace</p>
+            <p className="mt-0.5 truncate text-[10px] text-zinc-600">Current students only</p>
+          </div>
+        )}
         {sections.map((s) => (
           <button
             key={s.id}
@@ -698,6 +744,95 @@ function CampusGroups() {
         Looking for broader conversations — music, photo, late-night talk? Those live in{" "}
         <a href="/communities" className="font-semibold text-violet-300 hover:text-violet-200">Communities</a>.
       </p>
+    </div>
+  );
+}
+
+
+/* Academic profile & privacy — the MEMBER controls what their public
+   profile shows. The verification itself stays stored for trust and
+   eligibility regardless. "Class of" is an attribute, never a community. */
+function AcademicProfileCard() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<{
+    campusName: string; affiliation: string; gradYear: string; program: string;
+    showSchool: boolean; showGradYear: boolean; showProgram: boolean;
+  } | null>(null);
+
+  const load = async () => {
+    const res = await fetch("/api/campus/verify");
+    if (res.ok) {
+      const j = await res.json();
+      if (j.verified) setData(j);
+    }
+  };
+  useEffect(() => {
+    if (open && !data) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const patch = async (body: Record<string, unknown>) => {
+    await fetch("/api/campus/verify", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    void load();
+  };
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((v) => !v)} className="btn-ghost px-3.5 py-1.5 text-xs">
+        Academic profile
+      </button>
+      {open && data && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-line bg-card p-4 shadow-card">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              Academic profile & visibility
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="text-xs text-zinc-400">
+                <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-600">Class of</span>
+                <input
+                  defaultValue={data.gradYear}
+                  onBlur={(e) => e.target.value !== data.gradYear && void patch({ gradYear: e.target.value })}
+                  placeholder="2027"
+                  className="w-full rounded-lg border border-line bg-card-raised px-2.5 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50"
+                />
+              </label>
+              <label className="text-xs text-zinc-400">
+                <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-600">Major / program</span>
+                <input
+                  defaultValue={data.program}
+                  onBlur={(e) => e.target.value !== data.program && void patch({ program: e.target.value })}
+                  placeholder="Cybersecurity"
+                  className="w-full rounded-lg border border-line bg-card-raised px-2.5 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50"
+                />
+              </label>
+            </div>
+            <div className="mt-3 space-y-1.5">
+              {([
+                ["showSchool", "Show my school & status on my profile"],
+                ["showGradYear", "Show my class year publicly"],
+                ["showProgram", "Show my major publicly"],
+              ] as const).map(([key, label]) => (
+                <label key={key} className="flex cursor-pointer items-center justify-between gap-3 text-xs text-zinc-300">
+                  {label}
+                  <input
+                    type="checkbox"
+                    checked={data[key]}
+                    onChange={(e) => void patch({ [key]: e.target.checked })}
+                    className="accent-violet-400"
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="mt-3 border-t border-line-soft pt-2.5 text-[10px] leading-relaxed text-zinc-600">
+              Your verification stays securely stored for trust and eligibility either way — these
+              toggles only control what OTHER people see. Class year is a profile attribute and a
+              discovery filter, never an automatic community.
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

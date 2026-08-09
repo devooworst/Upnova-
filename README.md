@@ -812,6 +812,30 @@ identity modes, and optional pricing per **weekly / monthly / yearly / custom-da
   price/period, and rules are public; member content behind paid communities is locked with
   an honest join prompt.
 
+### Campus verification & academic identity (two layers)
+
+**UpNova — everybody participates. Your Campus — verified people of that institution.**
+Access is VERIFICATION-BASED, never subscription-based: Free vs Pro gates platform
+features; belonging to a school is proven (locked state on /campus explains it), not
+purchased.
+
+- Verification stores the institution + **affiliation**: Current Student · Alumni ·
+  Faculty/Staff, plus optional academic profile (Class of, major/program).
+- **Visibility is the member's choice** (`showSchool`/`showGradYear`/`showProgram`,
+  default: school on, year/major off). The verification stays securely stored for
+  trust/eligibility regardless; the public profile shows exactly what was opted into.
+- **"Class of 2027" is an attribute, never a community**: it renders on the profile and
+  works as a privacy-respecting discovery filter (`/api/users?classOf=&campus=` matches
+  only members who chose to show their year). No auto-created class communities — ever.
+- **Student → Alumni is a one-field transition**: account, connections, messages,
+  portfolio, history, bookmarks, and community memberships all survive (verified
+  before/after). Student-to-student areas (Marketplace, Student Groups) close for new
+  activity; the shared campus, campus events, existing memberships, and the alumni
+  environment (communities with `audience: "alumni"`, seeded: Bowie State Alumni Network)
+  open up.
+- Campus communities can scope their audience: everyone-verified / current students /
+  alumni — gating NEW joins only; existing memberships survive affiliation changes.
+
 ### Audit — still on static demo data (next passes)
 
 - Campus page CONTENT sections other than Marketplace/Questions/Events (the campus gate +

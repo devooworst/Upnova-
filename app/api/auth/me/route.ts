@@ -27,7 +27,13 @@ export async function GET() {
       ...ownProfile(user, session.profile),
       experience,
       campus: verification
-        ? { name: verification.c.name, slug: verification.c.slug, program: verification.v.program }
+        ? {
+            name: verification.c.name,
+            slug: verification.c.slug,
+            program: verification.v.program,
+            affiliation: verification.v.affiliation,
+            gradYear: verification.v.gradYear,
+          }
         : null,
     },
   });

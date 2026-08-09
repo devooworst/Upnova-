@@ -59,7 +59,7 @@ export interface SessionUser {
   accountType?: string;
   businessVerified?: boolean;
   profile: SessionProfile;
-  campus?: { name: string; slug: string; program: string } | null;
+  campus?: { name: string; slug: string; program: string; affiliation?: string; gradYear?: string } | null;
 }
 
 export const SESSION_EVENT = "upnova:session-changed";

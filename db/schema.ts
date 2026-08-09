@@ -317,6 +317,10 @@ export const communities = sqliteTable("communities", {
   graceDays: integer("grace_days").notNull().default(3), // unpaid grace before access pauses
   paused: bool("paused"), // pause NEW memberships; existing members unaffected
   campusId: text("campus_id").references(() => campuses.id, { onDelete: "set null" }),
+  // campus rooms can scope WHO on campus may join: everyone verified at the
+  // school, current students only, or alumni. Existing memberships survive
+  // affiliation changes — audience gates NEW joins.
+  audience: text("audience").notNull().default("everyone"), // everyone | students | alumni
   createdById: text("created_by_id")
     .notNull()
     .references(() => users.id),
@@ -518,9 +522,20 @@ export const campusVerifications = sqliteTable(
     // table or returned by any API. In production, evidenceRef points at a
     // private object-store key readable only by the verification service.
     status: text("status").notNull().default("pending"), // pending | verified | rejected
+    // verified relationship with the institution. Student -> Alumni is a
+    // TRANSITION, never a new account: connections, messages, portfolio,
+    // history, and memberships all stay.
+    affiliation: text("affiliation").notNull().default("current_student"), // current_student | alumni | faculty_staff
     evidenceRef: text("evidence_ref"),
+    // optional academic profile. "Class of 2027" is an ATTRIBUTE (display +
+    // discovery filter), never an auto-created community or group chat.
     program: text("program").notNull().default(""),
     gradYear: text("grad_year").notNull().default(""),
+    // the member controls what the public profile shows; the verification
+    // itself stays stored for trust/eligibility either way
+    showSchool: integer("show_school", { mode: "boolean" }).notNull().default(true),
+    showGradYear: integer("show_grad_year", { mode: "boolean" }).notNull().default(false),
+    showProgram: integer("show_program", { mode: "boolean" }).notNull().default(false),
     verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
     createdAt: ts("created_at"),
   },

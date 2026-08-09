@@ -38,6 +38,13 @@ interface PublicProfile {
     accountType?: string;
     businessVerified?: boolean;
   };
+  academic?: {
+    school: string;
+    affiliation: string;
+    classOf: string | null;
+    program: string | null;
+    verified: boolean;
+  } | null;
   stats: {
     followers: number | null;
     following: number | null;
@@ -157,6 +164,25 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
                 )}
               </h1>
               <p className="mt-0.5 text-sm font-medium text-zinc-400">{user.roleLine || `@${user.handle}`}</p>
+              {data.academic && (
+                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-violet-300">
+                  <span>{data.academic.school}</span>
+                  <span className="text-zinc-600">·</span>
+                  <span>{data.academic.affiliation === "current_student" ? "Student" : data.academic.affiliation === "alumni" ? "Alumni" : "Faculty/Staff"}</span>
+                  {data.academic.classOf && (
+                    <>
+                      <span className="text-zinc-600">·</span>
+                      <span>Class of {data.academic.classOf}</span>
+                    </>
+                  )}
+                  {data.academic.program && (
+                    <>
+                      <span className="text-zinc-600">·</span>
+                      <span>{data.academic.program}</span>
+                    </>
+                  )}
+                </p>
+              )}
               {user.locationLabel && (
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
                   <MapPin className="h-3.5 w-3.5 text-lime-400" />
