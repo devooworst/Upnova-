@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { hashPassword, createSession, SESSION_COOKIE, sessionCookieOptions, rememberDemoSession, guarded, ApiError } from "@/lib/server/auth";
+import { hashPassword, createSession, SESSION_COOKIE, sessionCookieOptions, rememberDemoSession, signDemoToken, guarded, ApiError } from "@/lib/server/auth";
 import { rateLimit } from "@/lib/server/ratelimit";
 import { validatePassword, HANDLE_RE, HANDLE_RULE } from "@/lib/passwordPolicy";
 import { ownProfile } from "@/lib/server/serialize";
@@ -58,6 +58,10 @@ export async function POST(req: NextRequest) {
 
     const user = db.select().from(tables.users).where(eq(tables.users.id, userId)).get()!;
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get()!;
-    return { ...ownProfile(user, profile), sessionToken: token, cookieless };
+    return {
+      ...ownProfile(user, profile),
+      sessionToken: process.env.UPNOVA_DEMO_STICKY_SESSION === "1" ? signDemoToken(user.handle) : token,
+      cookieless,
+    };
   });
 }

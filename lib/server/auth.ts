@@ -32,7 +32,49 @@ import { join } from "path";
    create one, sign-out really ends it. Single-user demo sandboxes only;
    NEVER set in production (any visitor would resume the demo session).  */
 const STICKY_FILE = join(process.cwd(), "db", ".demo-session");
+const SIGNOUT_FILE = join(process.cwd(), "db", ".demo-signout.json");
 const stickyOn = () => process.env.UPNOVA_DEMO_STICKY_SESSION === "1";
+
+/* Signed demo token — the transport that survives BOTH storage-blocked
+   embeddings and preview-instance swaps. Format:
+     demo.<handle>.<issuedAtMs>.<hmac-sha256(handle|iat, SESSION_SECRET)>
+   Obtained ONLY through a real password check at login; verified
+   cryptographically on every request; resolved to the account BY HANDLE
+   (seed identities are deterministic across instances); revoked by
+   sign-out via a per-handle issued-before cutoff. Demo-only (flag). */
+import { createHmac } from "crypto";
+const demoSecret = () => process.env.SESSION_SECRET || "upnova-dev";
+
+export function signDemoToken(handle: string): string {
+  const iat = Date.now();
+  const sig = createHmac("sha256", demoSecret()).update(`${handle}|${iat}`).digest("hex");
+  return `demo.${handle}.${iat}.${sig}`;
+}
+
+function signoutCutoffs(): Record<string, number> {
+  try { return JSON.parse(readFileSync(SIGNOUT_FILE, "utf8")); } catch { return {}; }
+}
+
+export function revokeDemoTokens(handle: string) {
+  try {
+    const m = signoutCutoffs();
+    m[handle] = Date.now();
+    writeFileSync(SIGNOUT_FILE, JSON.stringify(m), "utf8");
+  } catch {}
+}
+
+export function verifyDemoToken(token: string): string | null {
+  if (!stickyOn()) return null;
+  const m = /^demo\.([a-z0-9_]+)\.(\d+)\.([a-f0-9]{64})$/.exec(token);
+  if (!m) return null;
+  const [, handle, iatStr, sig] = m;
+  const expect = createHmac("sha256", demoSecret()).update(`${handle}|${iatStr}`).digest("hex");
+  if (sig !== expect) return null;
+  const iat = Number(iatStr);
+  if (Date.now() - iat > 30 * 86400_000) return null; // 30-day expiry
+  if (iat <= (signoutCutoffs()[handle] ?? 0)) return null; // signed out after issue
+  return handle;
+}
 
 export function rememberDemoSession(token: string) {
   if (!stickyOn()) return;
@@ -143,6 +185,28 @@ export function getSessionUser(): SessionUser | null {
     if (!token) token = readDemoSession() ?? undefined;
   }
   if (!token) return null;
+
+  // signed demo token? verify cryptographically + resolve BY HANDLE —
+  // works on ANY preview instance, no shared state needed
+  if (token.startsWith("demo.")) {
+    const handle = verifyDemoToken(token);
+    if (!handle) return null;
+    const row = db
+      .select({ user: tables.users, profile: tables.profiles })
+      .from(tables.users)
+      .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+      .where(eq(tables.users.handle, handle))
+      .get();
+    if (!row || row.user.status !== "active") return null;
+    return {
+      id: row.user.id,
+      email: row.user.email,
+      handle: row.user.handle,
+      role: row.user.role,
+      plan: row.user.plan,
+      profile: row.profile,
+    };
+  }
 
   const rows = db
     .select({ session: tables.sessions, user: tables.users, profile: tables.profiles })

@@ -90,7 +90,7 @@ const storageLayers: { get: () => string | null; set: (v: string | null) => void
   {
     // JS-readable token cookie. Partitioned (CHIPS) so it survives even
     // when third-party cookies are blocked in the embedding (Chrome).
-    get: () => document.cookie.match(new RegExp(`(?:^|; )${TOKEN_KEY}=([a-f0-9]+)`))?.[1] ?? null,
+    get: () => document.cookie.match(new RegExp(`(?:^|; )${TOKEN_KEY}=([A-Za-z0-9_.-]+)`))?.[1] ?? null,
     set: (v) => {
       const base = `${TOKEN_KEY}=${v ?? ""}; path=/; SameSite=None; Secure; Partitioned`;
       document.cookie = v ? `${base}; max-age=2592000` : `${base}; max-age=0`;
@@ -104,7 +104,7 @@ const storageLayers: { get: () => string | null; set: (v: string | null) => void
     // subject to storage/cookie blocking — the layer of last resort.
     // Demo-only: cleared on sign-out with everything else.
     get: () => {
-      const m = /^upnova-token:([a-f0-9]+)$/.exec(window.name || "");
+      const m = /^upnova-token:([A-Za-z0-9_.-]+)$/.exec(window.name || "");
       return m ? m[1] : null;
     },
     set: (v) => {
@@ -114,7 +114,7 @@ const storageLayers: { get: () => string | null; set: (v: string | null) => void
   },
 ];
 
-const TOKEN_SHAPE = /^[a-f0-9]{32,128}$/; // opaque hex token — anything else is corrupt
+const TOKEN_SHAPE = /^([a-f0-9]{32,128}|demo\.[a-z0-9_]+\.\d+\.[a-f0-9]{64})$/; // opaque hex OR signed demo token
 
 export function getFallbackToken(): string | null {
   if (memoryToken) return memoryToken;

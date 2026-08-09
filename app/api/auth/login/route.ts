@@ -10,6 +10,7 @@ import {
   SESSION_COOKIE,
   sessionCookieOptions,
   rememberDemoSession,
+  signDemoToken,
   guarded,
   ApiError,
 } from "@/lib/server/auth";
@@ -73,6 +74,12 @@ export async function POST(req: NextRequest) {
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
     // sessionToken lets the client fall back to Bearer transport if the
     // browser refuses the cookie (embedded previews) — same session row
-    return { ...ownProfile(user, profile), sessionToken: token, cookieless };
+    return {
+      ...ownProfile(user, profile),
+      // the client stores THIS in its persistence layers: in demo mode a
+      // SIGNED token any instance can verify; otherwise the opaque token
+      sessionToken: process.env.UPNOVA_DEMO_STICKY_SESSION === "1" ? signDemoToken(user.handle) : token,
+      cookieless,
+    };
   });
 }
