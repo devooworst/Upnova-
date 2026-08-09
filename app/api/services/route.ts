@@ -11,6 +11,7 @@ import { ctaFor } from "@/lib/server/cta";
 import { parseConfig, travelFeeFor, normalizeMenu, normalizeCategory, DEFAULT_CONFIG, type ServiceConfig } from "@/lib/servicePolicies";
 import { haversineMi } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
+import { createLinkedPost } from "@/lib/server/publish";
 
 /** GET /api/services — active marketplace listings with real owners. */
 export async function GET() {
@@ -217,6 +218,18 @@ export async function POST(req: NextRequest) {
         reach: String(body.reach || "Remote").slice(0, 60),
       })
       .run();
+    // publishing = feed presence: public services get ONE linked post so
+    // they surface in For You and on the profile (shareToFeed opts out)
+    if (visibility === "public" && body.shareToFeed !== false) {
+      createLinkedPost({
+        userId: user.id,
+        refType: "service",
+        refId: id,
+        body: `${title} — now ${fulfillment === "appointment" ? "taking bookings" : "accepting requests"}.\n${config.pricing?.type === "quote" ? "Custom quotes" : `From $${price}`}${user.profile.city ? ` · ${user.profile.city}, ${user.profile.state}` : ""}`,
+        category: category.charAt(0).toUpperCase() + category.slice(1),
+        imageUrl: Array.isArray(body.media) && typeof body.media[0] === "string" && body.media[0].startsWith("data:image/") ? body.media[0] : null,
+      });
+    }
     return { id };
   });
 }

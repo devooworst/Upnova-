@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { normalizeLicenseOptions, WORK_KINDS } from "@/lib/licensing";
+import { createLinkedPost } from "@/lib/server/publish";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,16 @@ export async function POST(req: NextRequest) {
         licenseOptions: JSON.stringify(options),
       })
       .run();
+    // one canonical work + one linked feed post (License opens the work)
+    const priced = options.filter((o) => o.price != null && o.price > 0).sort((a, b) => a.price! - b.price!)[0];
+    createLinkedPost({
+      userId: user.id,
+      refType: "work",
+      refId: id,
+      body: `${title}\n${priced ? `Licenses from $${priced.price}` : options.some((o) => o.price === 0) ? "Free license available" : "Custom licensing"}`,
+      category: "Work",
+      imageUrl: typeof body.coverUrl === "string" && body.coverUrl.startsWith("data:image/") ? body.coverUrl : null,
+    });
     return { id };
   });
 }

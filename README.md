@@ -434,6 +434,20 @@ with reasons shown. Seed: Kofi's "Midnight Run" beat with a five-tier license la
 playable demo-tone preview (a generated WAV standing in for the tagged clip), Maya's vocal pack,
 Ava's editorial photo, and TJ's completed $75 commercial lease on record.
 
+**Publishing = feed presence (linked posts).** One canonical object, ONE linked feed post
+(`posts.refType/refId`, `lib/server/publish.ts`): publishing an Opportunity, Service (Share to
+feed, default ON, opt-out), Product, or Work automatically creates a post that flows through the
+same ranked For You feed and lands on the creator's profile grid instantly — the card carries a
+typed banner (OPPORTUNITY · Apply, SERVICE · Book/Request, PRODUCT · Buy, WORK · License) whose
+CTA opens the REAL object. Never duplicate copies; the post is a pointer. Reusable machinery —
+the same function publishes a photographer's session, a producer's beat, a brand's casting call.
+The opportunity form also got marketplace-grade money handling: Openings inputs are real text
+fields (clearable, retypable, min 1 on submit), and **live budget validation** — total
+compensation = Σ pay × openings recalculated on every keystroke against the Max budget, with
+"Over budget by $X" blocking publish (and the SERVER enforces the same rule: over-budget posts
+are 400'd, verified). Freelance opportunities fund through UpNova (secured before work, released
+on completion); external employment stays labeled and outside — unchanged and re-verified.
+
 **Products & Orders — "buy this", staged honestly.** PRODUCT is the sixth entity (Post = share ·
 Service = offer · Booking = scheduled · Project = paid work · Opportunity = asking for people ·
 Product = SELL), on the same configurable listing system: photos, price, quantity (qty 1 = a

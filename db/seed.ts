@@ -557,6 +557,14 @@ function seed() {
     amountCents: 7500, feeCents: 375, status: "released",
   }).run();
 
+  // linked feed posts — ONE canonical object each, the post is its feed
+  // presence (CTA opens the real thing). Same machinery every category.
+  db.insert(t.posts).values({
+    id: id(), authorId: uid["kofi"], kind: "announcement", category: "Work",
+    body: '"Midnight Run" is up — 140bpm dark trap.\nLicenses from $30, exclusive available.',
+    refType: "work", refId: workBeat, isSeed: true, createdAt: hoursAgo(8),
+  }).run();
+
   /* -------------------------------- products -------------------------------- */
   // PRODUCT = "buy this" — the sixth entity. UpNova checkout listings,
   // a one-time sale, a digital good, and an HONEST external listing.
@@ -599,6 +607,11 @@ function seed() {
   db.insert(t.payments).values({
     id: id(), orderId: orderNia, payerId: uid["nia"], payeeId: uid["sofia"],
     amountCents: 2800, feeCents: 140, status: "released",
+  }).run();
+  db.insert(t.posts).values({
+    id: id(), authorId: uid["sofia"], kind: "announcement", category: "Product",
+    body: "Hand-dyed canvas totes are live — $28, three colorways, small batches.",
+    refType: "product", refId: prodTote, isSeed: true, createdAt: hoursAgo(12),
   }).run();
 
   /* ---------- ongoing engagement: the "hire an editor" demo ---------- */
@@ -668,6 +681,11 @@ function seed() {
   shootApp("tj", "model", "submitted", "New to modeling but very comfortable on camera.");
   shootApp("imani", "mua", "selected", "Beauty is my whole business — bridal and editorial kits ready.");
   shootApp("lena", "stylist", "submitted", "I art-direct brand identities — styling the racks would be fun.");
+  db.insert(t.posts).values({
+    id: id(), authorId: uid["sofia"], kind: "announcement", category: "Opportunity",
+    body: "Building a small team for a clothing brand shoot — photographer, 3 models, MUA, stylist. Paid.\n$1,500 total · Baltimore, MD",
+    refType: "opportunity", refId: shootId, isSeed: true, createdAt: hoursAgo(10),
+  }).run();
 
   // applications to Ava's opportunity → powers the applicant-review screen
   db.insert(t.applications).values({

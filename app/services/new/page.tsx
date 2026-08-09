@@ -111,8 +111,9 @@ export default function NewServicePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [liveId, setLiveId] = useState<string | null>(null);
-  const [postDraft, setPostDraft] = useState("");
-  const [posted, setPosted] = useState(false);
+  // publishing IS the feed presence — one canonical service, one linked
+  // post (Share to feed, default ON; the CTA opens the real listing)
+  const [shareToFeed, setShareToFeed] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const setTravel = (patch: Partial<ServiceConfig["travel"]>) => setConfig((c) => ({ ...c, travel: { ...c.travel, ...patch } }));
@@ -203,6 +204,7 @@ export default function NewServicePage() {
         reach: config.travel.radiusMi ? `${config.travel.radiusMi} mi radius` : config.locationMode === "remote" ? "Remote" : "Local",
         config,
         media,
+        shareToFeed,
       }),
     });
     const d = await res.json();
@@ -213,27 +215,6 @@ export default function NewServicePage() {
       return;
     }
     setLiveId(d.id);
-    setPostDraft(
-      `${title} ${fulfillment === "appointment" ? "appointments are open" : "requests are open"}.\n` +
-        `${fulfillment === "appointment" ? "I have openings this week — book" : "Send your request"} through UpNova.\n` +
-        `${priceLabel(config, Number(price) || 0)}${user?.profile.city ? ` · ${user.profile.city}, ${user.profile.state}` : ""}`
-    );
-  };
-
-  const shareAsPost = async () => {
-    setBusy(true);
-    const res = await fetch("/api/posts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        body: postDraft,
-        kind: "announcement",
-        category: category.charAt(0).toUpperCase() + category.slice(1),
-        imageUrl: media[0] ?? null,
-      }),
-    });
-    setBusy(false);
-    if (res.ok) setPosted(true);
   };
 
   /* ------------------------------ live screen ------------------------------ */
@@ -284,43 +265,19 @@ export default function NewServicePage() {
           </button>
         )}
 
-        {visibility === "public" && !posted ? (
-          <div className="card p-4 text-left">
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Want to tell people?</p>
-            <p className="mt-1 text-[11px] text-zinc-500">Edit the draft, then share it to your feed and profile grid.</p>
-            <textarea
-              value={postDraft}
-              onChange={(e) => setPostDraft(e.target.value)}
-              rows={4}
-              className={`${inputCls} mt-2 resize-none text-xs leading-relaxed`}
-            />
-            <div className="mt-2 flex gap-2">
-              <button onClick={shareAsPost} disabled={busy || !postDraft.trim()} className="btn-lime flex-1 justify-center py-2 text-xs disabled:opacity-40">
-                Create a Post
-              </button>
-              <button onClick={() => router.push("/services")} className="btn-ghost px-4 py-2 text-xs">
-                Skip
-              </button>
-            </div>
-          </div>
-        ) : posted ? (
-          <div className="space-y-3">
-            <p className="rounded-xl border border-lime-400/30 bg-lime-400/5 px-4 py-3 text-sm text-lime-300">
-              Posted — it&apos;s in the feed and on your profile grid.
-            </p>
-            <div className="flex justify-center gap-2">
-              <Link href="/services" className="btn-lime px-5 py-2 text-sm">View on Services</Link>
-              <Link href="/profile" className="btn-ghost px-5 py-2 text-sm">Your profile</Link>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center gap-2">
-            {visibility !== "draft" && (
-              <Link href={`/services/${liveId}`} className="btn-lime px-5 py-2 text-sm">View service page</Link>
-            )}
-            <Link href="/profile/edit" className="btn-ghost px-5 py-2 text-sm">Manage in profile</Link>
-          </div>
+        {visibility === "public" && shareToFeed && (
+          <p className="rounded-xl border border-lime-400/30 bg-lime-400/5 px-4 py-3 text-sm text-lime-300">
+            It&apos;s in the For You feed and on your profile grid — one listing, one feed card, and the
+            card&apos;s CTA opens this exact service.
+          </p>
         )}
+        <div className="flex justify-center gap-2">
+          {visibility !== "draft" && (
+            <Link href={`/services/${liveId}`} className="btn-lime px-5 py-2 text-sm">View service page</Link>
+          )}
+          <Link href="/" className="btn-ghost px-5 py-2 text-sm">See it in your feed</Link>
+          <Link href="/profile/edit" className="btn-ghost px-5 py-2 text-sm">Manage</Link>
+        </div>
       </div>
     );
   }
@@ -935,6 +892,15 @@ export default function NewServicePage() {
               ONE canonical record either way */}
           <div className="card space-y-1.5 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Who can see this?</p>
+            {visibility === "public" && (
+              <label className="mb-1.5 flex items-center justify-between gap-3 rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2">
+                <span className="text-xs text-zinc-300">
+                  Share to feed
+                  <span className="block text-[10px] text-zinc-600">One linked feed card — its CTA opens this listing. Default on.</span>
+                </span>
+                <input type="checkbox" checked={shareToFeed} onChange={(e) => setShareToFeed(e.target.checked)} className="accent-lime-400" />
+              </label>
+            )}
             {VISIBILITY_OPTIONS.map((o) => (
               <button
                 key={o.id}

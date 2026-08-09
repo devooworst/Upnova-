@@ -12,7 +12,17 @@ import { promptJoin } from "@/components/GuestGate";
 import TrustChips from "@/components/TrustChips";
 import TrustReportModal from "@/components/TrustReportModal";
 import type { PostTrust } from "@/lib/trust";
-import { Flag } from "lucide-react";
+import { Flag, ArrowUpRight } from "lucide-react";
+
+/* linked feed items: the post is a POINTER to one canonical object —
+   the CTA opens the real thing (book/apply/buy/license), never a copy */
+const REF_META: Record<string, { label: string; cta: string; tone: string; href: (id: string) => string }> = {
+  service: { label: "Service", cta: "Book / Request", tone: "bg-lime-400", href: (id) => `/services/${id}` },
+  opportunity: { label: "Opportunity", cta: "Apply", tone: "bg-amber-400", href: (id) => `/opportunities/${id}` },
+  product: { label: "Product", cta: "Buy", tone: "bg-lime-400", href: (id) => `/shop/${id}` },
+  work: { label: "Work", cta: "License", tone: "bg-lime-400", href: (id) => `/works/${id}` },
+  event: { label: "Event", cta: "View Event", tone: "bg-amber-400", href: (id) => `/events/${id}` },
+};
 
 export interface FeedAuthor {
   id: string;
@@ -43,6 +53,8 @@ export interface FeedPost {
   likedByMe: boolean;
   isMine: boolean;
   trust?: PostTrust | null;
+  refType?: string | null;
+  refId?: string | null;
 }
 
 interface CommentItem {
@@ -261,6 +273,23 @@ export default function DbPostCard({
             <Image src={post.imageUrl} alt="" fill sizes="(max-width: 768px) 100vw, 640px" className="object-cover" />
           )}
         </div>
+      )}
+
+      {/* linked object banner — this post IS the feed presence of one
+          canonical Service/Opportunity/Product/Work; the CTA opens it */}
+      {post.refType && post.refId && REF_META[post.refType] && (
+        <Link
+          href={REF_META[post.refType].href(post.refId)}
+          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-card-raised/60 px-3.5 py-2.5 transition hover:border-zinc-600"
+        >
+          <span className="flex items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            <span className={`h-1.5 w-1.5 rounded-full ${REF_META[post.refType].tone}`} />
+            {REF_META[post.refType].label}
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-lime-300">
+            {REF_META[post.refType].cta} <ArrowUpRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
       )}
 
       {/* trust & context labels — what's verified vs what's claimed */}

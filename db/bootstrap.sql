@@ -316,7 +316,7 @@ CREATE TABLE IF NOT EXISTS "posts" (
 	`booking_id` text,
 	`client_confirmed` integer DEFAULT false NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, ref_type text, ref_id text,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS "products" (

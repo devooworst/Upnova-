@@ -7,6 +7,7 @@ import { publicUser } from "@/lib/server/serialize";
 import { normalizeRoles, parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 import { seedApplicantsApplyToRoles } from "@/lib/server/demo";
 import { normalizeEngagement, parseEngagement } from "@/lib/engagement";
+import { createLinkedPost } from "@/lib/server/publish";
 import { FeedScope, inScope, viewerContext, verifiedCampusMap } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
@@ -141,6 +142,14 @@ export async function POST(req: NextRequest) {
     const title = String(body.title || "").trim();
     if (!title) throw new ApiError(400, "Title is required");
 
+    // budget guard, enforced SERVER-side: total role compensation
+    // (pay × openings) can never exceed the stated maximum budget
+    const roleList = normalizeRoles(body.roles);
+    const budgetNum = Number.isFinite(Number(body.budget)) && Number(body.budget) > 0 ? Math.round(Number(body.budget)) : null;
+    const totalComp = roleList.reduce((s, r) => s + (r.pay ?? 0) * r.count, 0);
+    if (budgetNum != null && roleList.length > 0 && totalComp > budgetNum)
+      throw new ApiError(400, `Over budget by $${totalComp - budgetNum} — total role compensation is $${totalComp}, budget is $${budgetNum}`);
+
     const id = randomBytes(12).toString("hex");
     db.insert(tables.opportunities)
       .values({
@@ -148,7 +157,7 @@ export async function POST(req: NextRequest) {
         posterId: user.id,
         title,
         description: String(body.description || "").slice(0, 2000),
-        budget: Number.isFinite(Number(body.budget)) && Number(body.budget) > 0 ? Math.round(Number(body.budget)) : null,
+        budget: budgetNum ?? (totalComp > 0 ? totalComp : null),
         type: ["gig", "collab", "event", "campus"].includes(body.type) ? body.type : "gig",
         location: String(body.location || "").slice(0, 80),
         remote: !!body.remote,
@@ -165,13 +174,25 @@ export async function POST(req: NextRequest) {
         }),
         // TEAM & OPENINGS — roles are configuration of the universal
         // system, never a separate casting/job board
-        roles: JSON.stringify(normalizeRoles(body.roles)),
+        roles: JSON.stringify(roleList),
         // engagement type is CONFIGURATION — one-time or ongoing, same system
         engagement: JSON.stringify(body.engagement ? normalizeEngagement(body.engagement) ?? {} : {}),
         lat: user.profile.lat,
         lng: user.profile.lng,
       })
       .run();
+    // ONE canonical opportunity + ONE linked feed post — it appears in
+    // For You (ranked) and on the poster's profile immediately
+    const rolesLine = roleList.length
+      ? roleList.map((r) => `${r.title} ×${r.count}${r.pay ? ` · $${r.pay}` : ""}`).join(" · ")
+      : "";
+    createLinkedPost({
+      userId: user.id,
+      refType: "opportunity",
+      refId: id,
+      body: `${title}\n${rolesLine || String(body.description || "").slice(0, 140)}${budgetNum ?? totalComp ? `\n$${budgetNum ?? totalComp}${roleList.length ? " total" : ""}` : ""} · ${body.remote ? "Remote" : String(body.location || "").slice(0, 40)}`,
+      category: "Opportunity",
+    });
     // demo mode: seed locals apply to each role right away so the poster
     // can walk review → select → team → payment immediately
     seedApplicantsApplyToRoles(id);

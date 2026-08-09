@@ -121,6 +121,8 @@ export async function GET(req: NextRequest) {
         likedByMe: likedByMe.has(r.post.id),
         isMine: !!user && r.post.authorId === user.id,
         trust: trustMap.get(r.post.id),
+        refType: r.post.refType,
+        refId: r.post.refId,
       };
       return { item, scorable };
     });

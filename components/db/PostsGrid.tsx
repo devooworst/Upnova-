@@ -30,6 +30,8 @@ export interface GridPost {
   comments: number;
   likedByMe: boolean;
   trust?: PostTrust | null;
+  refType?: string | null;
+  refId?: string | null;
 }
 
 export interface RelatedService {
@@ -254,6 +256,23 @@ function PostModal({
               </span>
             )}
           </div>
+          {post.refType && post.refId && (
+            <Link
+              href={
+                post.refType === "service" ? `/services/${post.refId}`
+                : post.refType === "opportunity" ? `/opportunities/${post.refId}`
+                : post.refType === "product" ? `/shop/${post.refId}`
+                : post.refType === "work" ? `/works/${post.refId}`
+                : `/events/${post.refId}`
+              }
+              className="mt-2.5 flex items-center justify-between rounded-xl border border-line bg-card-raised/60 px-3.5 py-2 text-xs transition hover:border-zinc-600"
+            >
+              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500 capitalize">{post.refType}</span>
+              <span className="font-semibold text-lime-300">
+                {post.refType === "service" ? "Book / Request" : post.refType === "opportunity" ? "Apply" : post.refType === "product" ? "Buy" : post.refType === "work" ? "License" : "View"}
+              </span>
+            </Link>
+          )}
           {/* trust & context labels — verified vs claimed, same chips as the feed */}
           <TrustChips trust={post.trust} postId={post.id} />
           <div className="mt-3 flex items-center gap-5 border-t border-line-soft pt-2.5 text-xs text-zinc-500">

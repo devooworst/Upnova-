@@ -159,6 +159,13 @@ export const posts = sqliteTable(
        project/booking link is validated server-side at post time and is the
        ONLY path to a "Verified Work" chip; client_confirmed is set only by
        the linked counterparty. */
+    // LINKED feed item: when a Service/Opportunity/Product/Work/Event is
+    // published, ONE canonical record is created in its own table and ONE
+    // post points at it (refType/refId). The post is the feed presence;
+    // clicking opens the REAL object (book/apply/buy/license). Never a
+    // duplicate copy of the content.
+    refType: text("ref_type"), // service | opportunity | product | work | event
+    refId: text("ref_id"),
     disclosure: text("disclosure").notNull().default("unspecified"), // original | ai_assisted | ai_generated | credited | unspecified
     attested: bool("attested", false),
     credit: text("credit").notNull().default(""), // who made it, when disclosure=credited

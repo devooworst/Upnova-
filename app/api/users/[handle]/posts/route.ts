@@ -39,6 +39,8 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         comments: comments.filter((c) => c.postId === p.id).length,
         likedByMe: viewer ? likes.some((l) => l.postId === p.id && l.userId === viewer.id) : false,
         trust: trustMap.get(p.id),
+        refType: p.refType,
+        refId: p.refId,
       })),
     };
   });

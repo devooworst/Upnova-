@@ -6,6 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import { publicUser } from "@/lib/server/serialize";
 import { normalizeCategory } from "@/lib/servicePolicies";
 import { parseVariants, parseFulfillment } from "@/lib/products";
+import { createLinkedPost } from "@/lib/server/publish";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,15 @@ export async function POST(req: NextRequest) {
         externalUrl,
       })
       .run();
+    // one canonical product + one linked feed post (Buy opens the product)
+    createLinkedPost({
+      userId: user.id,
+      refType: "product",
+      refId: id,
+      body: `${title} — $${price}${externalUrl ? " · sold on the seller's website" : ""}`,
+      category: "Product",
+      imageUrl: Array.isArray(body.media) && typeof body.media[0] === "string" && body.media[0].startsWith("data:image/") ? body.media[0] : null,
+    });
     return { id };
   });
 }

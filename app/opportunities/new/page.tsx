@@ -31,8 +31,11 @@ export default function NewOpportunityPage() {
   // applicant requirements — poster-controlled
   const [requireMessage, setRequireMessage] = useState(true);
   const [question, setQuestion] = useState("");
-  // TEAM & OPENINGS — roles are configuration, not a separate system
-  const [roles, setRoles] = useState<OppRole[]>([]);
+  // TEAM & OPENINGS — roles are configuration, not a separate system.
+  // Form rows keep count/pay as STRINGS so the inputs behave like real
+  // text fields (clearable, retypable); they're sanitized on submit.
+  interface RoleRow { id: string; title: string; count: string; pay: string; description?: string }
+  const [roles, setRoles] = useState<RoleRow[]>([]);
   const [selection, setSelection] = useState<"manual" | "shortlist">("manual");
   const [notifyUnselected, setNotifyUnselected] = useState(true);
   // ENGAGEMENT — one-time or ongoing relationship, same universal system
@@ -48,11 +51,17 @@ export default function NewOpportunityPage() {
   const [interviewMode, setInterviewMode] = useState<"none" | "upnova" | "external">("none");
   const ongoing = engType !== "one_time";
   const newRole = () =>
-    setRoles((r) => [...r, { id: Math.random().toString(36).slice(2, 10), title: "", count: 1, pay: null }]);
-  const patchRole = (id: string, patch: Partial<OppRole>) =>
+    setRoles((r) => [...r, { id: Math.random().toString(36).slice(2, 10), title: "", count: "1", pay: "" }]);
+  const patchRole = (id: string, patch: Partial<RoleRow>) =>
     setRoles((r) => r.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const rmRole = (id: string) => setRoles((r) => r.filter((x) => x.id !== id));
-  const totalComp = roles.reduce((sum, r) => sum + (r.pay ?? 0) * r.count, 0);
+  // live math: total compensation = Σ pay × openings, recalculated on
+  // every keystroke; compared against the maximum budget in real time
+  const countOf = (r: RoleRow) => Math.max(1, Number(r.count) || 1);
+  const payOf = (r: RoleRow) => Math.max(0, Number(r.pay) || 0);
+  const totalComp = roles.reduce((sum, r) => sum + payOf(r) * countOf(r), 0);
+  const budgetNum = budget ? Number(budget) : null;
+  const overBudget = paid && budgetNum != null && roles.some((r) => r.title.trim()) && totalComp > budgetNum;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -61,13 +70,19 @@ export default function NewOpportunityPage() {
       setError("Give it a title");
       return;
     }
-    const activeRoles = roles.filter((r) => r.title.trim());
+    const activeRoles: OppRole[] = roles
+      .filter((r) => r.title.trim())
+      .map((r) => ({ id: r.id, title: r.title.trim(), count: countOf(r), pay: r.pay === "" ? null : payOf(r), description: r.description }));
     if (roles.some((r) => !r.title.trim())) {
       setError("Every role needs a title — or remove the empty row");
       return;
     }
     if (paid && activeRoles.length === 0 && (!budget || Number(budget) < 1)) {
       setError("Set the budget — or switch to Collaboration");
+      return;
+    }
+    if (overBudget) {
+      setError(`Over budget by $${totalComp - budgetNum!} — raise the budget or reduce compensation`);
       return;
     }
     setBusy(true);
@@ -149,7 +164,7 @@ export default function NewOpportunityPage() {
           {paid && (
             <div className="relative w-32">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
-              <input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Budget" className={`${inputCls} py-1.5 pl-7`} />
+              <input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Max budget" className={`${inputCls} py-1.5 pl-7`} />
             </div>
           )}
         </div>
@@ -307,7 +322,9 @@ export default function NewOpportunityPage() {
                   Openings
                   <input
                     value={r.count}
-                    onChange={(e) => patchRole(r.id, { count: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) })}
+                    inputMode="numeric"
+                    onChange={(e) => patchRole(r.id, { count: e.target.value.replace(/[^0-9]/g, "").slice(0, 3) })}
+                    onBlur={() => { if (!r.count || Number(r.count) < 1) patchRole(r.id, { count: "1" }); }}
                     className={`${inputCls} w-14 py-1.5 text-center text-xs`}
                   />
                 </label>
@@ -315,8 +332,9 @@ export default function NewOpportunityPage() {
                   <label className="flex items-center gap-1 text-xs text-zinc-400">
                     $
                     <input
-                      value={r.pay ?? ""}
-                      onChange={(e) => patchRole(r.id, { pay: e.target.value ? Number(e.target.value.replace(/[^0-9]/g, "")) || 0 : null })}
+                      value={r.pay}
+                      inputMode="numeric"
+                      onChange={(e) => patchRole(r.id, { pay: e.target.value.replace(/[^0-9]/g, "").slice(0, 6) })}
                       placeholder="each"
                       className={`${inputCls} w-20 py-1.5 text-xs`}
                     />
@@ -338,10 +356,33 @@ export default function NewOpportunityPage() {
           <button onClick={newRole} className="btn-ghost w-full justify-center py-2 text-xs">
             <Plus className="h-3.5 w-3.5" /> Add {roles.length ? "another role" : "a role"}
           </button>
-          {paid && roles.some((r) => r.title.trim()) && totalComp > 0 && (
-            <p className="text-right font-mono text-xs tracking-[0.08em] text-lime-300">
-              Total compensation: ${totalComp}
-            </p>
+          {paid && roles.some((r) => r.title.trim()) && (
+            <div className={`rounded-xl border px-3.5 py-2.5 ${overBudget ? "border-rose-400/40 bg-rose-400/5" : "border-lime-400/25 bg-lime-400/5"}`}>
+              <p className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-zinc-400">
+                  Total compensation{" "}
+                  <span className="font-mono tracking-[0.05em] text-zinc-200">
+                    {roles.filter((r) => r.title.trim()).map((r) => `$${payOf(r)}×${countOf(r)}`).join(" + ")} = <span className={overBudget ? "text-rose-300" : "text-lime-300"}>${totalComp}</span>
+                  </span>
+                </span>
+                {budgetNum != null ? (
+                  overBudget ? (
+                    <span className="font-semibold text-rose-300">Over budget by ${totalComp - budgetNum}</span>
+                  ) : (
+                    <span className="font-semibold text-lime-300">
+                      Within budget{budgetNum - totalComp > 0 ? ` — $${budgetNum - totalComp} remaining` : " — exactly at budget"}
+                    </span>
+                  )
+                ) : (
+                  <span className="text-zinc-500">Set the budget above to check it live</span>
+                )}
+              </p>
+              {overBudget && (
+                <p className="mt-1 text-[11px] text-rose-300/80">
+                  Publishing is blocked — raise the budget or reduce role compensation.
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -426,8 +467,8 @@ export default function NewOpportunityPage() {
 
       <div className="flex justify-end gap-2 pb-8">
         <Link href="/opportunities" className="btn-ghost px-4 py-2 text-sm">Cancel</Link>
-        <button onClick={submit} disabled={busy} className="btn-lime px-5 py-2 text-sm disabled:opacity-50">
-          {busy ? "Posting…" : "Post opportunity"}
+        <button onClick={submit} disabled={busy || overBudget} className="btn-lime px-5 py-2 text-sm disabled:opacity-50" title={overBudget ? "Over budget — fix compensation first" : undefined}>
+          {busy ? "Posting…" : overBudget ? "Over budget" : "Post opportunity"}
         </button>
       </div>
     </div>
