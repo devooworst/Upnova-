@@ -15,7 +15,7 @@
 import { randomBytes } from "crypto";
 import { db, tables } from "@/db";
 
-export type RefType = "service" | "opportunity" | "product" | "work" | "event";
+export type RefType = "service" | "opportunity" | "product" | "work" | "event" | "campus";
 
 export const REF_META: Record<RefType, { label: string; cta: string; href: (id: string) => string }> = {
   service: { label: "Service", cta: "Book / Request", href: (id) => `/services/${id}` },
@@ -23,6 +23,7 @@ export const REF_META: Record<RefType, { label: string; cta: string; href: (id: 
   product: { label: "Product", cta: "Buy", href: (id) => `/shop/${id}` },
   work: { label: "Work", cta: "License", href: (id) => `/works/${id}` },
   event: { label: "Event", cta: "View Event", href: (id) => `/events/${id}` },
+  campus: { label: "Campus Market", cta: "View Listing", href: (id) => `/campus/market/${id}` },
 };
 
 export function createLinkedPost(input: {

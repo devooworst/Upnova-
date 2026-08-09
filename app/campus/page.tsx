@@ -186,6 +186,15 @@ export default function CampusPage() {
 
       {/* section nav — conversation, discovery, and commerce are separate layers */}
       <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Campus sections">
+        {/* Marketplace is real and important enough to lead — a live link,
+            not a static module */}
+        <Link
+          href="/campus/market"
+          className="rounded-lg border border-lime-400/40 bg-lime-400/5 p-2.5 text-left transition hover:bg-lime-400/10"
+        >
+          <p className="text-sm font-semibold text-lime-300">Marketplace</p>
+          <p className="mt-0.5 truncate text-[10px] text-zinc-500">Buy · sell · free · trade · auction · borrow</p>
+        </Link>
         {sections.map((s) => (
           <button
             key={s.id}

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const user = requireUser();
     const targetType = String(body.targetType || "");
     const category = String(body.category || "");
-    if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product", "work", "license"].includes(targetType))
+    if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product", "work", "license", "campus_listing", "loan"].includes(targetType))
       throw new ApiError(400, "Invalid target type");
     if (
       ![
@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
         // licensing disputes (lib/licensing.ts) — license records are the
         // evidence; a human resolves, nothing automatic
         "unauthorized_use", "license_violation",
+        // campus marketplace safety (lib/campusMarket.ts)
+        "scam", "prohibited_item", "counterfeit", "harassment", "unsafe_transaction",
       ].includes(category)
     )
       throw new ApiError(400, "Invalid category");

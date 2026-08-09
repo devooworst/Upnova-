@@ -263,6 +263,7 @@ function PostModal({
                 : post.refType === "opportunity" ? `/opportunities/${post.refId}`
                 : post.refType === "product" ? `/shop/${post.refId}`
                 : post.refType === "work" ? `/works/${post.refId}`
+                : post.refType === "campus" ? `/campus/market/${post.refId}`
                 : `/events/${post.refId}`
               }
               className="mt-2.5 flex items-center justify-between rounded-xl border border-line bg-card-raised/60 px-3.5 py-2 text-xs transition hover:border-zinc-600"

@@ -738,6 +738,110 @@ export const licenses = sqliteTable(
   (t) => [index("licenses_work").on(t.workId), index("licenses_creator").on(t.creatorId, t.createdAt)]
 );
 
+/* ----------------------------- campus marketplace ----------------------------- */
+/* Students helping students — a campus-scoped marketplace, SEPARATE from
+   the worldwide Shop. One configurable listing, six transaction types:
+   fixed price | free | negotiable (OBO) | trade | auction | borrow — plus
+   "need to borrow" requests. FREE means you keep it; BORROW means it
+   stays the owner's property and comes back. Verified campus members
+   transact; guests browse a limited slice. */
+
+export const campusListings = sqliteTable(
+  "campus_listings",
+  {
+    id: id(),
+    sellerId: text("seller_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    campusId: text("campus_id")
+      .notNull()
+      .references(() => campuses.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    category: text("category").notNull().default("other"),
+    // fixed | free | negotiable | trade | auction | borrow | need_borrow
+    type: text("type").notNull().default("fixed"),
+    price: integer("price"), // fixed/negotiable ask; auction starting price
+    condition: text("condition").notNull().default(""), // new | like_new | good | fair
+    media: text("media").notNull().default("[]"),
+    quantity: integer("quantity").notNull().default(1),
+    claimed: integer("claimed").notNull().default(0),
+    // pickup | campus_delivery | shipping | flexible (JSON array)
+    fulfillment: text("fulfillment").notNull().default('["pickup"]'),
+    // general meeting area only — NEVER a private address
+    meetSpot: text("meet_spot").notNull().default(""),
+    firstCome: bool("first_come", true),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    // free items: Claim → Reserved → Completed
+    claimedById: text("claimed_by_id"),
+    // auctions (optional — never the default)
+    auctionEndsAt: integer("auction_ends_at", { mode: "timestamp_ms" }),
+    reservePrice: integer("reserve_price"),
+    bidIncrement: integer("bid_increment").notNull().default(1),
+    // borrow config: $0 by default — this is resource sharing, not rental
+    maxBorrowDays: integer("max_borrow_days"),
+    allowExtensions: bool("allow_extensions", true),
+    deposit: integer("deposit"), // optional REFUNDABLE security deposit
+    status: text("status").notNull().default("active"), // active | reserved | completed | expired | archived
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("campus_listings_campus").on(t.campusId, t.createdAt)]
+);
+
+export const bids = sqliteTable(
+  "bids",
+  {
+    id: id(),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => campusListings.id, { onDelete: "cascade" }),
+    bidderId: text("bidder_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("bids_listing").on(t.listingId, t.amount)]
+);
+
+/* ---------------------------------- loans ---------------------------------- */
+/* The whole loan is tracked: Requested → Approved → Borrowed → Return
+   claimed → Completed (+ overdue flags, extensions, and BEFORE/AFTER
+   condition records so "it was already cracked" has an answer). */
+
+export const loans = sqliteTable(
+  "loans",
+  {
+    id: id(),
+    listingId: text("listing_id").references(() => campusListings.id, { onDelete: "set null" }),
+    lenderId: text("lender_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    borrowerId: text("borrower_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemTitle: text("item_title").notNull(),
+    message: text("message").notNull().default(""),
+    // requested → approved → borrowed → return_claimed → completed ·
+    // declined · cancelled · returned_disputed (damage/missing reported)
+    status: text("status").notNull().default("requested"),
+    startAt: integer("start_at", { mode: "timestamp_ms" }),
+    dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(),
+    // {note, photos[]} — recorded at handoff / at return
+    conditionBefore: text("condition_before").notNull().default("{}"),
+    conditionAfter: text("condition_after").notNull().default("{}"),
+    extensionUntil: integer("extension_until", { mode: "timestamp_ms" }), // pending request
+    dueSoonNotified: bool("due_soon_notified", false),
+    overdueNotified: bool("overdue_notified", false),
+    deposit: integer("deposit"), // refundable, held via payments when set
+    conversationId: text("conversation_id"),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("loans_lender").on(t.lenderId, t.dueAt), index("loans_borrower").on(t.borrowerId, t.dueAt)]
+);
+
 /* --------------------------------- disputes --------------------------------- */
 /* Two-sided, evidence-based. Opening one FREEZES funds; nobody wins by
    default. kind "problem" (delivery/item disputes) or "return" (policy

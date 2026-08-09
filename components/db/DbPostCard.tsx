@@ -22,6 +22,7 @@ const REF_META: Record<string, { label: string; cta: string; tone: string; href:
   product: { label: "Product", cta: "Buy", tone: "bg-lime-400", href: (id) => `/shop/${id}` },
   work: { label: "Work", cta: "License", tone: "bg-lime-400", href: (id) => `/works/${id}` },
   event: { label: "Event", cta: "View Event", tone: "bg-amber-400", href: (id) => `/events/${id}` },
+  campus: { label: "Campus Market", cta: "View Listing", tone: "bg-violet-400", href: (id) => `/campus/market/${id}` },
 };
 
 export interface FeedAuthor {

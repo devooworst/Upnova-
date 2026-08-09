@@ -695,6 +695,35 @@ function seed() {
     }).run();
   }
 
+  /* --------------------------- campus marketplace --------------------------- */
+  // Students helping students at Bowie State: sale, free (FCFS), auction,
+  // borrowable calculator, and a "need to borrow" request — plus one LIVE
+  // loan (Omar has Devin's calculator, due soon → reminder demo).
+  const bowieId = db.select().from(t.campuses).all().find((c) => c.name.includes("Bowie"))!.id;
+  const mkListing = (v: Record<string, unknown>) => {
+    const lid = id();
+    db.insert(t.campusListings).values({ id: lid, campusId: bowieId, isSeed: true, ...v } as never).run();
+    return lid;
+  };
+  mkListing({ sellerId: uid["omar"], title: "Calc I & II Textbook (Stewart, 9th ed.)", type: "fixed", price: 25, category: "textbooks", condition: "good", description: "Highlighting in ch. 3-5, otherwise clean. Campus pickup at the library.", meetSpot: "Thurgood Marshall Library lobby" });
+  mkListing({ sellerId: uid["imani"], title: "Mini fridge — moving out", type: "free", price: null, category: "dorm & housing", condition: "good", description: "Works perfectly, just can't take it home. First come first served.", meetSpot: "Towers Hall front desk" });
+  const auctionId = mkListing({ sellerId: uid["omar"], title: "Dorm futon, barely used", type: "auction", price: 20, category: "dorm & housing", condition: "like_new", description: "Folds flat, dark gray. Auction ends this week — pickup only.", bidIncrement: 5, auctionEndsAt: daysFromNow(3), meetSpot: "Christa McAuliffe Hall" });
+  db.insert(t.bids).values({ id: id(), listingId: auctionId, bidderId: uid["nia"], amount: 20, createdAt: hoursAgo(10) }).run();
+  db.insert(t.bids).values({ id: id(), listingId: auctionId, bidderId: uid["imani"], amount: 25, createdAt: hoursAgo(4) }).run();
+  const calcListing = mkListing({ sellerId: uid["devin"], title: "TI-84 Plus CE — available to borrow", type: "borrow", price: null, category: "electronics", condition: "like_new", description: "Exam season special: borrow it, pass, bring it back. Charger included.", maxBorrowDays: 7, meetSpot: "Student Center" });
+  mkListing({ sellerId: uid["nia"], title: "MacBook charger (USB-C) for tonight", type: "need_borrow", price: null, category: "electronics", description: "Mine died and my essay is due at midnight. Need it just for tonight — I'll return it first thing tomorrow." });
+  // live loan: Omar borrowed Devin's calculator, due in ~20h → due-soon
+  // reminder fires on the next loans fetch
+  db.insert(t.loans).values({
+    id: id(), listingId: calcListing, lenderId: uid["devin"], borrowerId: uid["omar"],
+    itemTitle: "TI-84 Plus CE", message: "Calc II midterm Thursday — lifesaver.",
+    status: "borrowed", startAt: hoursAgo(28), dueAt: new Date(Date.now() + 20 * 3600_000),
+    conditionBefore: JSON.stringify({ note: "Like new, small scuff on the back, charger + case included.", photos: [], at: hoursAgo(28).toISOString() }),
+    conversationId: makeConversation("devin", "omar", [
+      ["omar", "Picked up the calculator — thanks again! Back to you Thursday after the exam.", 27],
+    ]), isSeed: true, createdAt: hoursAgo(30),
+  }).run();
+
   /* -------- role opportunity: TEAM & OPENINGS, the flagship demo -------- */
   // Sofia's clothing-brand shoot: one opportunity, four roles. Marcus is
   // CONFIRMED as photographer (accepted -> booking on both calendars),

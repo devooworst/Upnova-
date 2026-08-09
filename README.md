@@ -512,6 +512,28 @@ carries an append-only private audit log — created, paid, shipped (+evidence s
 delivered, protection, disputes, evidence, decisions, releases — visible to the two parties and
 review only. The normal path stays simple: Buy → Track → Receive → confirm or just wait.
 
+**Campus Marketplace + Borrowing — students helping students.** `/campus/market` (led from the
+Your Campus nav) is a campus-scoped marketplace, SEPARATE from the worldwide Shop: one listing
+system, six transaction types — **For Sale** (straight into protected orders: held funds,
+protection window, disputes) · **Free** (Claim → Reserved → Completed, first-come-first-served,
+server-enforced) · **Negotiable/OBO** and **Trade** (the conversation is the negotiation) ·
+**Auction** (optional, never the default: starting price, hidden reserve, increments, bid
+history, outbid notifications, lazy settlement — winner gets a 48h payment-pending order, no
+qualifying bid simply expires) · **Borrow** and **Need to Borrow**. The line the UI never blurs:
+FREE means you keep it, BORROW means it comes back. *Borrowing is $0 by design* — resource
+sharing, not a rental business (optional refundable deposit disclosed for high-value items).
+The whole loan is tracked (`loans`): Requested → Approved → Borrowed (condition documented at
+handoff) → Return claimed → Completed (condition at return; "damage/missing" opens a moderation
+case with both condition records as evidence). Extensions are requested and owner-decided, never
+automatic; due-soon and overdue reminders notify BOTH parties; max borrow period server-enforced.
+"Need to Borrow" flips the direction — post the request, a neighbor taps **I Can Lend Mine**.
+Gating: guests browse a limited slice (no meeting spots); transacting requires verified campus
+status (403 verified); meet spots are general areas — never private addresses. Listings publish
+linked feed posts (CAMPUS MARKET · View Listing) and seller cards show campus-verified status +
+computed transaction/loan history. Seed: Bowie State ships with a textbook sale, a FCFS mini
+fridge, a live futon auction, Devin's borrowable TI-84 (with an active loan due soon — the
+reminder fires), and Nia's charger request.
+
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
 gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /

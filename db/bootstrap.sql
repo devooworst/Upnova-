@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `applications` (
 	FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`applicant_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS bids (id text PRIMARY KEY NOT NULL, listing_id text NOT NULL REFERENCES campus_listings(id) ON DELETE CASCADE, bidder_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount integer NOT NULL, created_at integer NOT NULL);
 CREATE TABLE IF NOT EXISTS `bookings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`service_id` text,
@@ -44,6 +45,36 @@ CREATE TABLE IF NOT EXISTS `bookmarks` (
 	`created_at` integer NOT NULL,
 	PRIMARY KEY(`user_id`, `target_type`, `target_id`),
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS "campus_listings" (
+	`id` text PRIMARY KEY NOT NULL,
+	`seller_id` text NOT NULL,
+	`campus_id` text NOT NULL,
+	`title` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`category` text DEFAULT 'other' NOT NULL,
+	`type` text DEFAULT 'fixed' NOT NULL,
+	`price` integer,
+	`condition` text DEFAULT '' NOT NULL,
+	`media` text DEFAULT '[]' NOT NULL,
+	`quantity` integer DEFAULT 1 NOT NULL,
+	`claimed` integer DEFAULT 0 NOT NULL,
+	`fulfillment` text DEFAULT '["pickup"]' NOT NULL,
+	`meet_spot` text DEFAULT '' NOT NULL,
+	`first_come` integer DEFAULT true NOT NULL,
+	`expires_at` integer,
+	`claimed_by_id` text,
+	`auction_ends_at` integer,
+	`reserve_price` integer,
+	`bid_increment` integer DEFAULT 1 NOT NULL,
+	`max_borrow_days` integer,
+	`allow_extensions` integer DEFAULT true NOT NULL,
+	`deposit` integer,
+	`status` text DEFAULT 'active' NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `campus_verifications` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -216,6 +247,7 @@ CREATE TABLE IF NOT EXISTS `likes` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS loans (id text PRIMARY KEY NOT NULL, listing_id text REFERENCES campus_listings(id) ON DELETE SET NULL, lender_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, borrower_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, item_title text NOT NULL, message text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'requested', start_at integer, due_at integer NOT NULL, condition_before text NOT NULL DEFAULT '{}', condition_after text NOT NULL DEFAULT '{}', extension_until integer, due_soon_notified integer NOT NULL DEFAULT 0, overdue_notified integer NOT NULL DEFAULT 0, deposit integer, conversation_id text, is_seed integer NOT NULL DEFAULT 0, created_at integer NOT NULL);
 CREATE TABLE IF NOT EXISTS `messages` (
 	`id` text PRIMARY KEY NOT NULL,
 	`conversation_id` text NOT NULL,
@@ -538,7 +570,9 @@ CREATE TABLE IF NOT EXISTS `works` (
 	FOREIGN KEY (`creator_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE UNIQUE INDEX IF NOT EXISTS `app_opp_applicant` ON `applications` (`opportunity_id`,`applicant_id`);
+CREATE INDEX IF NOT EXISTS bids_listing ON bids (listing_id, amount);
 CREATE INDEX IF NOT EXISTS `bookings_provider_starts` ON `bookings` (`provider_id`,`starts_at`);
+CREATE INDEX IF NOT EXISTS `campus_listings_campus` ON `campus_listings` (`campus_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campus_verif_user_campus` ON `campus_verifications` (`user_id`,`campus_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campuses_slug_unique` ON `campuses` (`slug`);
 CREATE INDEX IF NOT EXISTS `comments_post` ON `comments` (`post_id`);
@@ -551,6 +585,8 @@ CREATE INDEX IF NOT EXISTS `interactions_target` ON `interactions` (`target_type
 CREATE INDEX IF NOT EXISTS `interactions_user` ON `interactions` (`user_id`,`action`);
 CREATE INDEX IF NOT EXISTS `licenses_creator` ON `licenses` (`creator_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `licenses_work` ON `licenses` (`work_id`);
+CREATE INDEX IF NOT EXISTS loans_borrower ON loans (borrower_id, due_at);
+CREATE INDEX IF NOT EXISTS loans_lender ON loans (lender_id, due_at);
 CREATE INDEX IF NOT EXISTS `messages_conv_created` ON `messages` (`conversation_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_created` ON `notifications` (`user_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_read` ON `notifications` (`user_id`,`read_at`);
