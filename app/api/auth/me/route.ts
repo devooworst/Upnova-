@@ -1,13 +1,13 @@
 import { eq, asc } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { db, tables } from "@/db";
-import { getSessionUser, verifyDemoToken, readDemoSession, SESSION_COOKIE } from "@/lib/server/auth";
+import { getSessionUser, verifyDemoToken, readDemoSession, isDemoMode, SESSION_COOKIE } from "@/lib/server/auth";
 import { ownProfile } from "@/lib/server/serialize";
 
 /* demo-only diagnostics: classify WHY a request is unauthenticated.
    Reasons only — token values never leave the server. */
 function whyUnauthenticated(): string {
-  if (process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS !== "1") return "";
+  if (!isDemoMode()) return "";
   let token = cookies().get(SESSION_COOKIE)?.value;
   let via = "httpOnly cookie";
   if (!token) {

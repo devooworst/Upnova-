@@ -1,7 +1,7 @@
 import { existsSync } from "fs";
 import { join } from "path";
 import { db, tables } from "@/db";
-import { guarded, ApiError } from "@/lib/server/auth";
+import { guarded, isDemoMode, ApiError } from "@/lib/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  *  No secrets: counts and booleans, never tokens or emails. */
 export async function GET() {
   return guarded(() => {
-    if (process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS !== "1") throw new ApiError(404, "Not found");
+    if (!isDemoMode()) throw new ApiError(404, "Not found");
     return {
       serverTime: new Date().toISOString(),
       sessionsInDb: db.select().from(tables.sessions).all().length,
