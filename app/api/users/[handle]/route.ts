@@ -102,7 +102,13 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
       .where(eq(tables.bookings.providerId, user.id))
       .all()
       .filter((b) => b.status === "completed").length;
+    const licensesIssued = db
+      .select()
+      .from(tables.licenses)
+      .where(eq(tables.licenses.creatorId, user.id))
+      .all().length;
     const trust = {
+      licensesIssued,
       badges: {
         identityVerified: profile.trustLevel === "high-trust",
         businessVerified: user.businessVerified,

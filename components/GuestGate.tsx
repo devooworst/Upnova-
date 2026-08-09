@@ -36,6 +36,7 @@ export type JoinAction =
   | "message"
   | "create"
   | "buy"
+  | "license"
   | "tickets"
   | "personalize"
   | "report"
@@ -95,6 +96,10 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
   buy: {
     title: "Create an account to buy",
     body: "Orders, payments, tracking, and the seller conversation live on your account — with funds held until delivery.",
+  },
+  license: {
+    title: "Create an account to license",
+    body: "Your license record — terms, permitted usage, price, transaction ID — lives on your account permanently.",
   },
   tickets: {
     title: "Create an account to get tickets",

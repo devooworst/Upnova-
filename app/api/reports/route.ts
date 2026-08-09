@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const user = requireUser();
     const targetType = String(body.targetType || "");
     const category = String(body.category || "");
-    if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product"].includes(targetType))
+    if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product", "work", "license"].includes(targetType))
       throw new ApiError(400, "Invalid target type");
     if (
       ![
@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
         // order problems (lib/products.ts ORDER_REPORT_REASONS) — open a
         // dispute for human review; never an automatic refund or accusation
         "item_not_shipped", "not_received", "wrong_item", "not_as_described", "damaged", "seller_unresponsive",
+        // licensing disputes (lib/licensing.ts) — license records are the
+        // evidence; a human resolves, nothing automatic
+        "unauthorized_use", "license_violation",
       ].includes(category)
     )
       throw new ApiError(400, "Invalid category");

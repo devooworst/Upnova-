@@ -91,6 +91,14 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
     owner: { handle: string; displayName: string; avatarUrl: string | null };
     reasons: string[];
   } | null>(null);
+  const [suggestedWork, setSuggestedWork] = useState<{
+    id: string; title: string; kind: string; from: number | null; hasFree: boolean; coverUrl: string | null;
+    owner: { handle: string; displayName: string; avatarUrl: string | null }; reasons: string[];
+  } | null>(null);
+  const [suggestedOpp, setSuggestedOpp] = useState<{
+    id: string; title: string; budget: number | null; location: string;
+    owner: { handle: string; displayName: string; avatarUrl: string | null }; reasons: string[];
+  } | null>(null);
   const [suggested, setSuggested] = useState<{
     id: string;
     title: string;
@@ -128,6 +136,8 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       setPromoted(data.promoted ?? null);
       setSuggested(data.suggestedService ?? null);
       setSuggestedProduct(data.suggestedProduct ?? null);
+      setSuggestedWork(data.suggestedWork ?? null);
+      setSuggestedOpp(data.suggestedOpportunity ?? null);
       // passive view signals for what actually rendered (deduped server-side)
       // — members only; guests have no interaction log to write to
       const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
@@ -226,6 +236,49 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                   <Link href={`/services/${suggested.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">
                     {suggested.cta}
                   </Link>
+                </aside>
+              )}
+              {/* WORK card — License is the action */}
+              {i === 3 && suggestedWork && (
+                <aside className="card flex flex-wrap items-center gap-3 p-4">
+                  <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Work · License
+                    {suggestedWork.reasons.length ? ` · ${suggestedWork.reasons.join(" · ")}` : ""}
+                  </span>
+                  {suggestedWork.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={suggestedWork.coverUrl} alt="" className="h-12 w-12 rounded-xl border border-line object-cover" />
+                  ) : (
+                    <Avatar src={suggestedWork.owner.avatarUrl} initials={suggestedWork.owner.displayName.charAt(0)} size="md" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-zinc-100">{suggestedWork.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {suggestedWork.owner.displayName} ·{" "}
+                      <span className="font-mono tracking-[0.08em] text-lime-300">
+                        {suggestedWork.from != null ? `licenses from $${suggestedWork.from}` : suggestedWork.hasFree ? "free option" : "custom licensing"}
+                      </span>
+                    </p>
+                  </div>
+                  <Link href={`/works/${suggestedWork.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">License</Link>
+                </aside>
+              )}
+              {/* OPPORTUNITY card — Apply is the action */}
+              {i === 9 && suggestedOpp && (
+                <aside className="card flex flex-wrap items-center gap-3 p-4">
+                  <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Opportunity · Apply
+                    {suggestedOpp.reasons.length ? ` · ${suggestedOpp.reasons.join(" · ")}` : ""}
+                  </span>
+                  <Avatar src={suggestedOpp.owner.avatarUrl} initials={suggestedOpp.owner.displayName.charAt(0)} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-zinc-100">{suggestedOpp.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {suggestedOpp.owner.displayName} · {suggestedOpp.location}
+                      {suggestedOpp.budget != null && <span className="font-mono tracking-[0.08em] text-lime-300"> · ${suggestedOpp.budget}</span>}
+                    </p>
+                  </div>
+                  <Link href={`/opportunities/${suggestedOpp.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">Apply</Link>
                 </aside>
               )}
               {/* PRODUCT card — the feed knows a product is not a post */}

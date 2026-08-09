@@ -282,6 +282,75 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, guest: !user, totalPublic: mapped.length };
+    // ---- WORK card (License) + OPPORTUNITY card (Apply): the feed is a
+    // discovery-and-action surface, every type distinct and labeled ----
+    let suggestedWork: object | null = null;
+    let suggestedOpportunity: object | null = null;
+    if (tab === "for-you" && user && taste) {
+      const workRows = db
+        .select({ work: tables.works, profile: tables.profiles, u: tables.users })
+        .from(tables.works)
+        .innerJoin(tables.users, eq(tables.works.creatorId, tables.users.id))
+        .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+        .all()
+        .filter((r) => r.work.status === "active" && !r.work.exclusiveLicenseId && r.work.creatorId !== user.id && r.u.status === "active" && !taste.hiddenTargets.has(r.work.id));
+      const rankedW = ranker.rank(
+        workRows.map((r) => ({
+          item: r,
+          scorable: {
+            id: r.work.id, type: "service", authorId: r.work.creatorId,
+            category: r.work.kind, tags: [r.work.kind, r.work.title],
+            lat: r.profile.lat, lng: r.profile.lng,
+            locationOk: r.profile.locationVisibility !== "hidden",
+            sameCity: !!user.profile.city && r.profile.city === user.profile.city,
+            createdAt: r.work.createdAt, engagement: 0,
+          } as Scorable,
+        })),
+        taste
+      );
+      if (rankedW[0]) {
+        const t = rankedW[0].item;
+        const opts = (() => { try { return JSON.parse(t.work.licenseOptions) as { price: number | null }[]; } catch { return []; } })();
+        const priced = opts.filter((o) => o.price != null && o.price > 0).sort((a, b) => a.price! - b.price!)[0];
+        suggestedWork = {
+          id: t.work.id, title: t.work.title, kind: t.work.kind,
+          from: priced?.price ?? null, hasFree: opts.some((o) => o.price === 0),
+          coverUrl: t.work.coverUrl,
+          owner: publicUser(t.u, t.profile), reasons: rankedW[0].reasons,
+        };
+      }
+
+      const oppRows = db
+        .select({ opp: tables.opportunities, profile: tables.profiles, u: tables.users })
+        .from(tables.opportunities)
+        .innerJoin(tables.users, eq(tables.opportunities.posterId, tables.users.id))
+        .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+        .all()
+        .filter((r) => r.opp.status === "open" && r.opp.posterId !== user.id && r.u.status === "active" && !taste.hiddenTargets.has(r.opp.id));
+      const rankedO = ranker.rank(
+        oppRows.map((r) => ({
+          item: r,
+          scorable: {
+            id: r.opp.id, type: "opportunity", authorId: r.opp.posterId,
+            category: r.opp.type, tags: [r.opp.title, r.opp.type],
+            lat: r.opp.lat, lng: r.opp.lng,
+            locationOk: r.profile.locationVisibility !== "hidden",
+            sameCity: !!user.profile.city && r.profile.city === user.profile.city,
+            createdAt: r.opp.createdAt, engagement: 0,
+          } as Scorable,
+        })),
+        taste
+      );
+      if (rankedO[0]) {
+        const t = rankedO[0].item;
+        suggestedOpportunity = {
+          id: t.opp.id, title: t.opp.title, budget: t.opp.budget,
+          location: t.opp.remote ? "Remote" : t.opp.location,
+          owner: publicUser(t.u, t.profile), reasons: rankedO[0].reasons,
+        };
+      }
+    }
+
+    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, suggestedWork, suggestedOpportunity, guest: !user, totalPublic: mapped.length };
   });
 }

@@ -410,6 +410,30 @@ employer outside UpNova, refuses UpNova payment cycles (409, verified), and crea
 records. Seed: Devin's "Ongoing Video Editor — 2 videos/week" (weekly $150, UpNova interviews)
 with three applicants ready for the full hiring demo.
 
+**Works & Licensing — showcase safely, license on the creator's terms.** WORK is the seventh
+entity: beats, tracks, sample packs, photos, designs (`works`, `lib/licensing.ts`). Protection is
+honest by design — UpNova never claims content can't be recorded or stolen. The stack is:
+**streaming previews** instead of source files (creator-configured length + watermark/tag
+labeling; original files are delivered after licensing, in the conversation), **creator-defined
+license options** (free / non-commercial / commercial / exclusive / custom — each with the
+creator's own name, price or quote, attribution requirement, permitted usage, and restrictions;
+presets are starting points, nobody is forced into a standard model), **permanent license
+records** (`licenses`: creator, purchaser, work, type, permitted usage, restrictions,
+attribution, price, date, transaction ID — frozen snapshots, listed under Works → My licenses for
+both parties), and a **dispute lane** ("my work is used without a license / a licensee exceeds
+their terms / re-uploaded as theirs" → the human moderation queue, where those records are the
+evidence). Priced licenses run through the real machinery: expectedTotal auth (tampered → 409),
+payment held → creator delivers → licensee confirms → released. **Exclusive sales stop all
+further licensing** (server-enforced 409, and the feed stops suggesting the work). Free licenses
+still create the record; quote options open the negotiation conversation. Licensing history
+feeds the Trust & authenticity panel ("N licenses issued") — evidence, never a guarantee. The
+**For You feed is now a discovery-and-action surface**: every card type is distinct and labeled
+with its action — posts (Follow/Book via profile), ● WORK · License, ● OPPORTUNITY · Apply,
+● PRODUCT · Buy, SERVICE · Book, and the separate Promoted slot — all ranked by the same engine
+with reasons shown. Seed: Kofi's "Midnight Run" beat with a five-tier license ladder and a
+playable demo-tone preview (a generated WAV standing in for the tagged clip), Maya's vocal pack,
+Ava's editorial photo, and TJ's completed $75 commercial lease on record.
+
 **Products & Orders — "buy this", staged honestly.** PRODUCT is the sixth entity (Post = share ·
 Service = offer · Booking = scheduled · Project = paid work · Opportunity = asking for people ·
 Product = SELL), on the same configurable listing system: photos, price, quantity (qty 1 = a

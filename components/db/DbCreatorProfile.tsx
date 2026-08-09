@@ -48,6 +48,7 @@ interface PublicProfile {
   };
   followedByMe: boolean;
   trust?: {
+    licensesIssued?: number;
     badges: { identityVerified: boolean; businessVerified: boolean; studentVerified: boolean };
     completedProjects: number;
     completedBookings: number;
@@ -298,6 +299,12 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
               </span>
               {data.trust.reviewsCount} review{data.trust.reviewsCount === 1 ? "" : "s"}
             </li>
+            {(data.trust.licensesIssued ?? 0) > 0 && (
+              <li>
+                <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">{data.trust.licensesIssued}</span>
+                Licenses issued
+              </li>
+            )}
           </ul>
         </section>
       )}

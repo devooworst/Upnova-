@@ -658,6 +658,69 @@ export const orders = sqliteTable(
   (t) => [index("orders_buyer").on(t.buyerId, t.createdAt), index("orders_seller").on(t.sellerId, t.createdAt)]
 );
 
+/* ---------------------------------- works ---------------------------------- */
+/* Licensable creative WORK — beats, tracks, packs, photos, designs. The
+   seventh entity: showcased safely (configurable preview, creator-controlled
+   watermark labeling) and licensed on the CREATOR's terms. UpNova never
+   claims content can't be recorded or stolen — the protection is clear
+   terms, preserved license records, and a dispute lane with evidence. */
+
+export const works = sqliteTable("works", {
+  id: id(),
+  creatorId: text("creator_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  kind: text("kind").notNull().default("beat"), // beat | track | sample_pack | photo | design | video | other
+  description: text("description").notNull().default(""),
+  coverUrl: text("cover_url"), // image data-URL
+  // streaming preview instead of handing everyone the original file:
+  previewUrl: text("preview_url"), // audio/image data-URL or path
+  previewLength: integer("preview_length").notNull().default(30), // seconds
+  watermarked: bool("watermarked", true), // creator-controlled tag on previews
+  // creator-configured license OPTIONS (JSON, lib/licensing.ts) — free,
+  // non-commercial, commercial, exclusive, custom; their prices, their terms
+  licenseOptions: text("license_options").notNull().default("[]"),
+  // set when an EXCLUSIVE license is sold — further licensing stops
+  exclusiveLicenseId: text("exclusive_license_id"),
+  status: text("status").notNull().default("active"), // active | archived
+  isSeed: seed(),
+  createdAt: ts("created_at"),
+});
+
+/* --------------------------------- licenses --------------------------------- */
+/* The transaction/license RECORD — who licensed what, on which terms, when,
+   for how much. Frozen at purchase; the raw material of dispute resolution. */
+
+export const licenses = sqliteTable(
+  "licenses",
+  {
+    id: id(), // the license / transaction ID shown to both parties
+    workId: text("work_id").references(() => works.id, { onDelete: "set null" }),
+    creatorId: text("creator_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    licenseeId: text("licensee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // snapshot of the agreed terms — survives later edits to the work
+    workTitle: text("work_title").notNull(),
+    licenseType: text("license_type").notNull(), // free | non_commercial | commercial | exclusive | custom
+    optionName: text("option_name").notNull(),
+    permittedUsage: text("permitted_usage").notNull().default(""),
+    restrictions: text("restrictions").notNull().default(""),
+    attribution: bool("attribution", false),
+    price: integer("price").notNull().default(0), // creator payout dollars
+    // issued (payment secured, delivery pending) → completed (released);
+    // free licenses complete immediately
+    status: text("status").notNull().default("issued"),
+    conversationId: text("conversation_id"),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("licenses_work").on(t.workId), index("licenses_creator").on(t.creatorId, t.createdAt)]
+);
+
 /* --------------------------- reviews / payments --------------------------- */
 
 export const reviews = sqliteTable(
@@ -685,6 +748,7 @@ export const payments = sqliteTable("payments", {
   projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
   bookingId: text("booking_id"),
   orderId: text("order_id"), // product purchase this payment secures
+  licenseId: text("license_id"), // creative-work license this payment secures
   payerId: text("payer_id")
     .notNull()
     .references(() => users.id),

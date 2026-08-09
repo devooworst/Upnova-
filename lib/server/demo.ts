@@ -304,3 +304,24 @@ export function seedSellerFulfills(orderId: string) {
     notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Seller is preparing your order`, body: `${o.title} — arrange the ${o.fulfillment} in Messages`, href: "/orders", priority: "normal" });
   }
 }
+
+/* ------------------------------ licensing ------------------------------ */
+
+/** Seed creator delivers licensed files instantly in chat — the licensee's
+ *  "confirm delivery" moment always arrives without waiting. */
+export function seedCreatorDeliversLicense(licenseId: string) {
+  const lic = db.select().from(tables.licenses).where(eq(tables.licenses.id, licenseId)).get();
+  if (!lic || lic.status !== "issued" || !isSeedUser(lic.creatorId)) return;
+  if (lic.conversationId)
+    sendAs(
+      lic.conversationId,
+      lic.creatorId,
+      `Files sent! Untagged ${lic.workTitle} + stems are in your inbox. Confirm delivery when you've got everything and the license completes.`
+    );
+  notify({
+    userId: lic.licenseeId, actorId: lic.creatorId, type: "order",
+    title: `Files delivered — ${lic.workTitle}`,
+    body: "Confirm delivery to complete the license and release the payout.",
+    href: "/works?licenses=1",
+  });
+}

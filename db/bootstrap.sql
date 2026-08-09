@@ -169,6 +169,26 @@ CREATE TABLE IF NOT EXISTS `interactions` (
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS "licenses" (
+	`id` text PRIMARY KEY NOT NULL,
+	`work_id` text,
+	`creator_id` text NOT NULL,
+	`licensee_id` text NOT NULL,
+	`work_title` text NOT NULL,
+	`license_type` text NOT NULL,
+	`option_name` text NOT NULL,
+	`permitted_usage` text DEFAULT '' NOT NULL,
+	`restrictions` text DEFAULT '' NOT NULL,
+	`attribution` integer DEFAULT false NOT NULL,
+	`price` integer DEFAULT 0 NOT NULL,
+	`status` text DEFAULT 'issued' NOT NULL,
+	`conversation_id` text,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`work_id`) REFERENCES `works`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`creator_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`licensee_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `likes` (
 	`post_id` text NOT NULL,
 	`user_id` text NOT NULL,
@@ -263,7 +283,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
 	`status` text DEFAULT 'pending' NOT NULL,
 	`provider` text DEFAULT 'stripe_connect' NOT NULL,
 	`provider_ref` text,
-	`created_at` integer NOT NULL, order_id text,
+	`created_at` integer NOT NULL, order_id text, license_id text,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`payer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`payee_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
@@ -461,6 +481,23 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
 );
+CREATE TABLE IF NOT EXISTS "works" (
+	`id` text PRIMARY KEY NOT NULL,
+	`creator_id` text NOT NULL,
+	`title` text NOT NULL,
+	`kind` text DEFAULT 'beat' NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`cover_url` text,
+	`preview_url` text,
+	`preview_length` integer DEFAULT 30 NOT NULL,
+	`watermarked` integer DEFAULT true NOT NULL,
+	`license_options` text DEFAULT '[]' NOT NULL,
+	`exclusive_license_id` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`creator_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE UNIQUE INDEX IF NOT EXISTS `app_opp_applicant` ON `applications` (`opportunity_id`,`applicant_id`);
 CREATE INDEX IF NOT EXISTS `bookings_provider_starts` ON `bookings` (`provider_id`,`starts_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campus_verif_user_campus` ON `campus_verifications` (`user_id`,`campus_id`);
@@ -472,6 +509,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS `events_slug_unique` ON `events` (`slug`);
 CREATE INDEX IF NOT EXISTS `ext_project_status` ON `extension_requests` (`project_id`,`status`);
 CREATE INDEX IF NOT EXISTS `interactions_target` ON `interactions` (`target_type`,`target_id`);
 CREATE INDEX IF NOT EXISTS `interactions_user` ON `interactions` (`user_id`,`action`);
+CREATE INDEX IF NOT EXISTS `licenses_creator` ON `licenses` (`creator_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `licenses_work` ON `licenses` (`work_id`);
 CREATE INDEX IF NOT EXISTS `messages_conv_created` ON `messages` (`conversation_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_created` ON `notifications` (`user_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_read` ON `notifications` (`user_id`,`read_at`);

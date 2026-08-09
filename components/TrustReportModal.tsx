@@ -19,7 +19,7 @@ export default function TrustReportModal({
   reasons,
   onClose,
 }: {
-  targetType: "post" | "user" | "service" | "opportunity" | "order" | "product";
+  targetType: "post" | "user" | "service" | "opportunity" | "order" | "product" | "work" | "license";
   targetId: string;
   targetLabel: string;
   /** custom reason set (e.g. order problems) — defaults to trust reasons */
