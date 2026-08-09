@@ -56,6 +56,6 @@ export async function POST(req: NextRequest) {
 
     const user = db.select().from(tables.users).where(eq(tables.users.id, userId)).get()!;
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get()!;
-    return ownProfile(user, profile);
+    return { ...ownProfile(user, profile), sessionToken: token };
   });
 }

@@ -64,6 +64,46 @@ export interface SessionUser {
 
 export const SESSION_EVENT = "upnova:session-changed";
 
+/* ---------------- demo fallback transport (cookie-blocked iframes) ----------------
+   If the browser refuses the session cookie (embedded previews), the login
+   flow stores the SAME opaque session token here and every /api request
+   carries it as Authorization: Bearer. The server validates it against the
+   same sessions table. Cleared on logout. When cookies work, this never
+   activates. */
+const TOKEN_KEY = "upnova-session-token";
+
+export function getFallbackToken(): string | null {
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+export function setFallbackToken(token: string | null) {
+  try {
+    if (token) window.localStorage.setItem(TOKEN_KEY, token);
+    else window.localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+}
+
+if (typeof window !== "undefined" && !(window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim) {
+  (window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim = true;
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    // only OUR api, only relative same-origin paths, only when a token exists
+    if (url.startsWith("/api/")) {
+      const token = getFallbackToken();
+      if (token) {
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        if (!headers.has("authorization")) headers.set("authorization", `Bearer ${token}`);
+        return realFetch(input, { ...init, headers });
+      }
+    }
+    return realFetch(input, init);
+  };
+}
+
 let cached: SessionUser | null | undefined; // undefined = not loaded yet
 let inflight: Promise<SessionUser | null> | null = null;
 
@@ -92,7 +132,8 @@ export function invalidateSession() {
 }
 
 export async function logout() {
-  await fetch("/api/auth/logout", { method: "POST" });
+  await fetch("/api/auth/logout", { method: "POST" }); // shim attaches Bearer if needed
+  setFallbackToken(null); // fallback transport dies with the session
   cached = null;
   // per-user client caches must not leak into the next session
   for (const k of ["upnova-plan", "upnova-trust", "upnova-student-verified", "upnova-notif-read", "upnova-following"]) {

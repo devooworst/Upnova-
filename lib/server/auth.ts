@@ -93,7 +93,19 @@ export type SessionUser = {
 
 /** Resolve the authenticated user from the request cookie. Null when logged out. */
 export function getSessionUser(): SessionUser | null {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  let token = cookies().get(SESSION_COOKIE)?.value;
+  if (!token) {
+    // DEV/DEMO fallback transport: embedded previews can block third-party
+    // cookies entirely. The client then presents the SAME opaque session
+    // token as a Bearer header; it is validated against the same sessions
+    // table and dies with the same logout. Nothing is mocked.
+    try {
+      const auth = headers().get("authorization") ?? "";
+      if (auth.startsWith("Bearer ")) token = auth.slice(7).trim() || undefined;
+    } catch {
+      /* outside request scope */
+    }
+  }
   if (!token) return null;
 
   const rows = db

@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
     });
 
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
-    return ownProfile(user, profile);
+    // sessionToken lets the client fall back to Bearer transport if the
+    // browser refuses the cookie (embedded previews) — same session row
+    return { ...ownProfile(user, profile), sessionToken: token };
   });
 }

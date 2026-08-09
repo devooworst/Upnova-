@@ -11,7 +11,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchSession } from "@/lib/session";
+import { fetchSession, setFallbackToken } from "@/lib/session";
 import { ShieldCheck } from "lucide-react";
 import PasswordField from "@/components/PasswordField";
 import { PASSWORD_MIN, HANDLE_RULE, validatePassword } from "@/lib/passwordPolicy";
@@ -75,16 +75,21 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return;
     }
     // CONFIRM the session actually persisted before navigating anywhere —
-    // never pretend to be logged in. If the server authenticated us but
-    // the browser refused the session cookie (some browsers block all
-    // third-party cookies inside embedded views), say exactly that and
-    // offer the first-party escape hatch.
+    // never pretend to be logged in.
     setBusy(true);
-    const who = await fetchSession(true);
+    let who = await fetchSession(true);
+    if (!who && data.sessionToken) {
+      // the browser refused the cookie (embedded previews block third-party
+      // cookies) — switch to the Bearer fallback transport: SAME session
+      // token, validated server-side on every request, dies on logout
+      setFallbackToken(data.sessionToken);
+      who = await fetchSession(true);
+    }
     setBusy(false);
     if (!who) {
+      setFallbackToken(null);
       setError(
-        "Signed in, but your browser didn't keep the session cookie — this happens in embedded previews when third-party cookies are blocked. Open UpNova in its own tab and sign in there."
+        "Signed in, but this browser kept neither the session cookie nor the fallback session. Open UpNova in its own tab and sign in there."
       );
       setShowOpenTab(true);
       return;
