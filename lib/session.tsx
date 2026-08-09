@@ -114,7 +114,7 @@ const storageLayers: { get: () => string | null; set: (v: string | null) => void
   },
 ];
 
-const TOKEN_SHAPE = /^([a-f0-9]{32,128}|demo\.[a-z0-9_]+\.\d+\.[a-f0-9]{64})$/; // opaque hex OR signed demo token
+const TOKEN_SHAPE = /^([a-f0-9]{32,128}|demo\.[a-z0-9_]+\.\d+\.([a-f0-9]{8}\.)?[a-f0-9]{64})$/; // opaque hex OR signed demo token
 
 export function getFallbackToken(): string | null {
   if (memoryToken) return memoryToken;

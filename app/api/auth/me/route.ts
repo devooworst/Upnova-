@@ -1,7 +1,7 @@
 import { eq, asc } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { db, tables } from "@/db";
-import { getSessionUser, verifyDemoToken, readDemoSession, isDemoMode, SESSION_COOKIE } from "@/lib/server/auth";
+import { getSessionUser, verifyDemoTokenDetailed, readDemoSession, isDemoMode, SESSION_COOKIE } from "@/lib/server/auth";
 import { ownProfile } from "@/lib/server/serialize";
 
 /* demo-only diagnostics: classify WHY a request is unauthenticated.
@@ -18,7 +18,8 @@ function whyUnauthenticated(): string {
   if (!token) { token = readDemoSession() ?? undefined; via = "server sticky marker"; }
   if (!token) return "no_credentials_presented";
   if (token.startsWith("demo.")) {
-    return verifyDemoToken(token) ? "demo_token_valid_but_user_missing" : `demo_token_rejected (revoked, expired, or bad signature; via ${via})`;
+    const v = verifyDemoTokenDetailed(token);
+    return v.handle ? `demo_token_valid_but_handle_not_in_db (@${v.handle}; via ${via})` : `demo_token_rejected: ${v.reason} (via ${via})`;
   }
   const row = db.select().from(tables.sessions).where(eq(tables.sessions.token, token)).get();
   if (!row) return `stale_opaque_token: no session row on THIS server (via ${via}) — issued before a server reset/wipe; sign in again to get a portable signed token`;

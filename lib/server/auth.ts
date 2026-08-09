@@ -55,10 +55,26 @@ const demoSecret = () => "upnova-demo-signing-key-NOT-FOR-PRODUCTION";
 
 export const isDemoMode = () => demoModeOn();
 
+/* per-machine instance id: revocation cutoffs only apply to tokens minted
+   on the SAME machine — comparing an issued-at from machine A against a
+   sign-out timestamp from machine B is meaningless under clock skew, and
+   was capable of rejecting a token seconds after login. */
+const INSTANCE_FILE = join(process.cwd(), "db", ".instance-id");
+function instanceId(): string {
+  try {
+    const v = readFileSync(INSTANCE_FILE, "utf8").trim();
+    if (v) return v;
+  } catch {}
+  const v = randomBytes(4).toString("hex");
+  try { writeFileSync(INSTANCE_FILE, v, "utf8"); } catch {}
+  return v;
+}
+
 export function signDemoToken(handle: string): string {
   const iat = Date.now();
-  const sig = createHmac("sha256", demoSecret()).update(`${handle}|${iat}`).digest("hex");
-  return `demo.${handle}.${iat}.${sig}`;
+  const inst = instanceId();
+  const sig = createHmac("sha256", demoSecret()).update(`${handle}|${iat}|${inst}`).digest("hex");
+  return `demo.${handle}.${iat}.${inst}.${sig}`;
 }
 
 function signoutCutoffs(): Record<string, number> {
@@ -73,17 +89,32 @@ export function revokeDemoTokens(handle: string) {
   } catch {}
 }
 
-export function verifyDemoToken(token: string): string | null {
-  if (!demoModeOn()) return null;
-  const m = /^demo\.([a-z0-9_]+)\.(\d+)\.([a-f0-9]{64})$/.exec(token);
-  if (!m) return null;
-  const [, handle, iatStr, sig] = m;
-  const expect = createHmac("sha256", demoSecret()).update(`${handle}|${iatStr}`).digest("hex");
-  if (sig !== expect) return null;
+/** Verify a signed demo token. Returns the handle, or a rejection reason
+ *  prefixed with "!" so /api/auth/me can name the exact sub-case. */
+export function verifyDemoTokenDetailed(token: string): { handle: string | null; reason?: string } {
+  if (!demoModeOn()) return { handle: null, reason: "demo_mode_off_on_this_instance" };
+  // v2: demo.<handle>.<iat>.<instance>.<sig> — v1 (no instance) still accepted
+  const v2 = /^demo\.([a-z0-9_]+)\.(\d+)\.([a-f0-9]{8})\.([a-f0-9]{64})$/.exec(token);
+  const v1 = v2 ? null : /^demo\.([a-z0-9_]+)\.(\d+)\.([a-f0-9]{64})$/.exec(token);
+  if (!v2 && !v1) return { handle: null, reason: "bad_token_format" };
+  const handle = (v2 ?? v1)![1];
+  const iatStr = (v2 ?? v1)![2];
+  const inst = v2 ? v2[3] : null;
+  const sig = v2 ? v2[4] : v1![3];
+  const payload = v2 ? `${handle}|${iatStr}|${inst}` : `${handle}|${iatStr}`;
+  const expect = createHmac("sha256", demoSecret()).update(payload).digest("hex");
+  if (sig !== expect) return { handle: null, reason: "bad_signature" };
   const iat = Number(iatStr);
-  if (Date.now() - iat > 30 * 86400_000) return null; // 30-day expiry
-  if (iat <= (signoutCutoffs()[handle] ?? 0)) return null; // signed out after issue
-  return handle;
+  if (Date.now() - iat > 30 * 86400_000) return { handle: null, reason: "token_expired_30d" };
+  // revocation: ONLY comparable when the cutoff and the token came from
+  // THIS machine — cross-machine clock comparisons caused false rejections
+  if ((inst === null || inst === instanceId()) && iat <= (signoutCutoffs()[handle] ?? 0))
+    return { handle: null, reason: "revoked_by_signout" };
+  return { handle };
+}
+
+export function verifyDemoToken(token: string): string | null {
+  return verifyDemoTokenDetailed(token).handle;
 }
 
 export function rememberDemoSession(token: string) {
