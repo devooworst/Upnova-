@@ -4,6 +4,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { canMessage } from "@/lib/server/authz";
+import { blockedEitherWay } from "@/lib/server/communities";
 import { publicUser } from "@/lib/server/serialize";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +97,10 @@ export async function POST(req: NextRequest) {
     if (target.id === user.id) throw new ApiError(400, "You can't message yourself");
     const targetProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, target.id)).get()!;
     if (!canMessage(targetProfile, user.id))
+      throw new ApiError(403, "This creator isn't accepting messages from you");
+    // blocks work both ways — same neutral message either direction, so the
+    // response never reveals who blocked whom
+    if (blockedEitherWay(user.id, target.id))
       throw new ApiError(403, "This creator isn't accepting messages from you");
 
     // find existing 1:1 conversation

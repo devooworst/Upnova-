@@ -61,3 +61,18 @@ export async function POST(req: NextRequest) {
     return { status: "verified", campus: campus.name };
   });
 }
+
+/** GET — my campus verification status (for campus-linked features). */
+export async function GET() {
+  return guarded(() => {
+    const user = requireUser();
+    const v = db
+      .select({ v: tables.campusVerifications, c: tables.campuses })
+      .from(tables.campusVerifications)
+      .innerJoin(tables.campuses, eq(tables.campusVerifications.campusId, tables.campuses.id))
+      .where(eq(tables.campusVerifications.userId, user.id))
+      .all()
+      .find((r) => r.v.status === "verified");
+    return v ? { verified: true, campusId: v.c.id, campusName: v.c.name } : { verified: false };
+  });
+}

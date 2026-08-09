@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const user = requireUser();
     const targetType = String(body.targetType || "");
     const category = String(body.category || "");
-    if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product", "work", "license", "campus_listing", "loan"].includes(targetType))
+    if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product", "work", "license", "campus_listing", "loan", "community_post", "community_comment"].includes(targetType))
       throw new ApiError(400, "Invalid target type");
     if (
       ![

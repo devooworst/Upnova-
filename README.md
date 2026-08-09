@@ -703,17 +703,58 @@ work when you pay, request one honest extension, deliver after you decide it, an
 after completion. Everything goes through the same state machine and notification paths a real
 user would use; none of it runs for non-seed accounts. Delete that module for production.
 
+### Communities & the identity system (DB-backed)
+
+Communities are real: creation (`/communities/create`), discovery with categories/search/counts,
+public/private/invite access, join approval, invitations, and a full discussion layer
+(posts, threads, reactions, mentions, attached UpNova links, in-community search).
+
+**Identity is per-post, not per-account.** Each community's creator chooses which modes it
+permits — real profile, alias, anonymous — and every post/reply carries the identity it was
+written under. The composer's "Post as:" selector remembers your last choice per community.
+
+- **Anonymous ≠ untraceable.** Masking happens server-side in ONE place
+  (`lib/server/communities.ts::maskAuthor`): an alias/anonymous post never carries a userId in
+  any API response, URL, notification, or page source. UpNova retains the account on every row
+  for moderation, safety, and legal compliance — anonymous to the crowd, accountable to the
+  platform.
+- **Stable anon codes.** "Anonymous • 482" is per-member per-community (random, no
+  cross-community correlation) so conversations stay followable without becoming identifiable.
+- **Aliases** are community-specific with server-side anti-impersonation (no taking another
+  user's handle or display name, no "Anonymous" lookalikes, unique per community).
+- **Private reveals — gradual trust.** Request Reveal on any masked post → the author sees
+  "«masked label» would like to reveal identities with you" → Accept / Decline / Don't ask again.
+  Accepting is mutual and PRIVATE: you see each other's profiles (follow/message/connect), the
+  community keeps seeing the masks. "Don't ask again" makes future requests silently
+  undeliverable (no signal to farm). A per-user setting governs whether revealed peers see your
+  identity on masked posts: keep me anonymous (default) / show to connections (mutual follow
+  required) / always show to people I've revealed to.
+- **Moderation.** Owners appoint mods; remove/pin/lock/mute/ban/approve — all appended to
+  `community_mod_log`. The member roster is mod-only (a public roster would let anyone correlate
+  masked posts with membership). Revealing a masked author is owner/platform-admin only, requires
+  an OPEN REPORT on that content, and is itself logged.
+- **Anti-abuse.** Anonymous posting is rate-limited (3/day for accounts under 72h old, 20/day
+  after); blocks work from masked content without revealing who you blocked, hide their community
+  content, kill reveal requests both ways, and close DMs with a neutral message either direction.
+- **Identity rules by area.** Communities and Campus Questions allow all three modes (per
+  community settings); Events, Organizations, Opportunities, Services, Marketplace, and Messages
+  always use profile identity — social conversation can be anonymous, professional/transactional
+  activity cannot.
+- **Campus Questions** is now a per-campus community (`kind: campus_questions`, seeded for Bowie
+  State) — the Campus page section links into it. Popular public-community posts surface in
+  For You as labeled COMMUNITY cards (masked exactly as inside the room, click through to source).
+
 ### Audit — still on static demo data (next passes)
 
-- Communities pages and Campus page CONTENT (the campus gate + verification are real; the
-  sections inside are demo data) — models and APIs are ready, UI still reads `lib/data`.
+- Campus page CONTENT sections other than Marketplace/Questions (the campus gate + verification
+  are real; orgs/events/services sections inside are demo data).
 - Event DETAIL pages (`/events/[slug]` ticketing/QR/manage) — the events list, "This week"
   widget, and event bookmarks are DB-backed; the rich detail experience is still demo.
 - Analytics, Discover, Resolution Center demo case, Settings.
 - Legacy components no longer mounted anywhere but kept in the tree: `components/Feed.tsx`
   (type exports only), `MessagesClient`, `NotificationBell`, `NearbyNow`, `CreatePost`,
   `HireModal`, `lib/follow.tsx`, `lib/notifications.ts`.
-- Username/handle change, notification delivery channels, community feeds.
+- Username/handle change, notification delivery channels.
 
 Everything on the user's own profile is now real: verified projects, applications, listings,
 portfolio items (`portfolio_items` via /api/me/portfolio), computed reliability chip (only shown

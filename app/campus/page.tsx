@@ -218,6 +218,15 @@ export default function CampusPage() {
 
       {/* ================= COMMUNITIES — for talking ================= */}
       {section === "communities" && (
+        <a href="/communities?category=Campus%20Social" className="card-people mb-3 block p-4 transition hover:border-violet-400/40 animate-fade-up">
+          <p className="text-sm font-semibold text-zinc-100">Real campus communities are live</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Create your own, set the rules, and choose which identity modes it allows — real name, alias, or anonymous.
+          </p>
+          <span className="mt-2 inline-block font-mono text-[10px] tracking-[0.1em] text-violet-300">OPEN COMMUNITIES →</span>
+        </a>
+      )}
+      {section === "communities" && (
         <div className="card-people flex h-[480px] overflow-hidden animate-fade-up">
           <nav className="hidden w-56 shrink-0 overflow-y-auto border-r border-line-soft p-2 sm:block" aria-label="Interest communities">
             {interestCommunities.map((c) => (
@@ -436,23 +445,22 @@ export default function CampusPage() {
         </div>
       )}
 
-      {/* ================= 📚 CAMPUS QUESTIONS ================= */}
+      {/* ================= 📚 CAMPUS QUESTIONS — lives in Communities ================= */}
       {section === "questions" && (
         <div className="space-y-3 animate-fade-up">
-          <div className="flex justify-end">
-            <button className="btn-ghost px-4 py-1.5 text-xs"><Plus className="h-3.5 w-3.5" /> Ask a question</button>
-          </div>
-          <div className="card-people divide-y divide-line-soft overflow-hidden">
-            {campusQuestions.map((q) => (
-              <button key={q.q} className="flex w-full items-start gap-3 p-4 text-left transition hover:bg-card-raised">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-zinc-100">{q.q}</span>
-                  <span className="mt-0.5 block text-xs text-zinc-500">{q.by} · {q.answers} answers · {q.time} ago</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <a href="/communities/bowie-campus-questions" className="card-people block p-5 transition hover:border-violet-400/40">
+            <p className="text-sm font-semibold text-zinc-100">Campus Questions is now a community</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+              Ask with your profile, an alias, or anonymously — the community decides nothing about who you are, and
+              moderators keep it safe. Your question, your visibility level.
+            </p>
+            <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-400 px-4 py-1.5 text-xs font-bold text-zinc-950">
+              Open Campus Questions →
+            </span>
+          </a>
+          <p className="px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-600">
+            Real name · alias · anonymous — anonymous to the community, always accountable to UpNova
+          </p>
         </div>
       )}
 

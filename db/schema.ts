@@ -120,6 +120,9 @@ export const profiles = sqliteTable("profiles", {
   // contact + privacy
   whoCanMessage: text("who_can_message").notNull().default("everyone"),
   visibility: text("visibility").notNull().default("public"),
+  // "How should people I've revealed myself to see me in communities?"
+  // keep_anonymous (default) | show_to_connections | always_profile
+  revealIdentityMode: text("reveal_identity_mode").notNull().default("keep_anonymous"),
   showLocation: bool("show_location", true),
   showEducation: bool("show_education", true),
   showFollowers: bool("show_followers", true),
@@ -288,9 +291,21 @@ export const communities = sqliteTable("communities", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
-  access: text("access").notNull().default("public"), // public | private | invite | verified
+  access: text("access").notNull().default("public"), // public | private | invite
   mode: text("mode").notNull().default("discussion"), // discussion | announcements | broadcast | collaboration | qa
+  // standard | campus_questions (the system Q&A community every campus gets)
+  kind: text("kind").notNull().default("standard"),
+  category: text("category").notNull().default("general"),
   avatarUrl: text("avatar_url"),
+  coverUrl: text("cover_url"),
+  rules: text("rules").notNull().default("[]"), // JSON string[]
+  joinApproval: integer("join_approval", { mode: "boolean" }).notNull().default(false),
+  whoCanPost: text("who_can_post").notNull().default("members"), // members | mods
+  whoCanInvite: text("who_can_invite").notNull().default("mods"), // mods | members
+  // JSON subset of ["real","alias","anonymous"] — the creator decides which
+  // identity modes this community permits. Server-enforced on every post.
+  identityModes: text("identity_modes").notNull().default('["real"]'),
+  campusId: text("campus_id").references(() => campuses.id, { onDelete: "set null" }),
   createdById: text("created_by_id")
     .notNull()
     .references(() => users.id),
@@ -308,9 +323,156 @@ export const communityMembers = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").notNull().default("member"), // member | moderator | owner
+    status: text("status").notNull().default("active"), // active | pending | invited | banned
+    // community-specific alias. Other members never get a link from the
+    // alias back to the profile.
+    alias: text("alias"),
+    // stable per-community anonymous code ("Anonymous • 482") so a
+    // conversation's participants are distinguishable without being
+    // identifiable. Random per community — no cross-community correlation.
+    anonCode: text("anon_code"),
+    lastIdentity: text("last_identity").notNull().default("real"), // remembered composer default
+    mutedUntil: integer("muted_until", { mode: "timestamp_ms" }),
     joinedAt: ts("joined_at"),
   },
   (t) => [primaryKey({ columns: [t.communityId, t.userId] })]
+);
+
+/* Community discussion. authorId is NEVER serialized when identity is
+   alias/anonymous — masking happens in lib/server/communities.ts, the only
+   serializer for this content. */
+export const communityPosts = sqliteTable(
+  "community_posts",
+  {
+    id: id(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    identity: text("identity").notNull().default("real"), // real | alias | anonymous
+    body: text("body").notNull(),
+    media: text("media").notNull().default("[]"),
+    // optional link to another UpNova record (service, opportunity, event,
+    // campus listing, product, work) — source preserved, never copied
+    refType: text("ref_type"),
+    refId: text("ref_id"),
+    pinned: bool("pinned"),
+    locked: bool("locked"),
+    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+    removedById: text("removed_by_id"),
+    removedReason: text("removed_reason").notNull().default(""),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("community_posts_comm_created").on(t.communityId, t.createdAt)]
+);
+
+export const communityComments = sqliteTable(
+  "community_comments",
+  {
+    id: id(),
+    postId: text("post_id")
+      .notNull()
+      .references(() => communityPosts.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    identity: text("identity").notNull().default("real"),
+    body: text("body").notNull(),
+    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+    removedById: text("removed_by_id"),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("community_comments_post").on(t.postId, t.createdAt)]
+);
+
+export const communityReactions = sqliteTable(
+  "community_reactions",
+  {
+    postId: text("post_id")
+      .notNull()
+      .references(() => communityPosts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: ts("created_at"),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })]
+);
+
+/* Append-only moderation log. Every mod action — including any identity
+   reveal — leaves a permanent record. */
+export const communityModLog = sqliteTable(
+  "community_mod_log",
+  {
+    id: id(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => users.id),
+    action: text("action").notNull(), // remove_post | remove_comment | pin | unpin | lock | unlock | mute | unmute | ban | remove_member | approve_join | decline_join | promote | demote | reveal_author
+    targetType: text("target_type").notNull().default(""), // post | comment | member
+    targetId: text("target_id").notNull().default(""),
+    note: text("note").notNull().default(""),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("community_mod_log_comm").on(t.communityId, t.createdAt)]
+);
+
+/* Private identity reveals — anonymous to the crowd, not to everyone.
+   A pair state, independent of either party's public community identity:
+   pending → accepted | declined | never ("don't ask again").
+   The requester is shown to the target under their MASKED community
+   identity; accepting reveals both sides to each other only. */
+export const identityReveals = sqliteTable(
+  "identity_reveals",
+  {
+    id: id(),
+    requesterId: text("requester_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    communityId: text("community_id").references(() => communities.id, { onDelete: "set null" }),
+    // what the target saw when the request arrived (masked label snapshot)
+    requesterLabel: text("requester_label").notNull().default(""),
+    // what the requester was looking at when they asked (for their own list)
+    targetLabel: text("target_label").notNull().default(""),
+    status: text("status").notNull().default("pending"), // pending | accepted | declined | never
+    respondedAt: integer("responded_at", { mode: "timestamp_ms" }),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [
+    uniqueIndex("identity_reveals_pair").on(t.requesterId, t.targetId),
+    index("identity_reveals_target").on(t.targetId, t.status),
+  ]
+);
+
+/* Blocks. viaLabel preserves what the blocker was looking at (possibly a
+   masked identity) so the block list never de-anonymizes anyone. */
+export const blocks = sqliteTable(
+  "blocks",
+  {
+    id: id(),
+    blockerId: text("blocker_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    blockedId: text("blocked_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    viaLabel: text("via_label").notNull().default(""),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [uniqueIndex("blocks_pair").on(t.blockerId, t.blockedId)]
 );
 
 /* --------------------------------- campus --------------------------------- */

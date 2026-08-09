@@ -12,7 +12,7 @@
 
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import path from "path";
@@ -70,8 +70,10 @@ function wipe() {
       .map(([cid]) => cid);
     if (convIds.length) db.delete(t.conversations).where(inArray(t.conversations.id, convIds)).run();
 
-    // communities must go before their seed creators (createdById has no cascade)
+    // communities must go before their seed creators (createdById has no
+    // cascade) — including non-seed communities a seed user created
     db.delete(t.communities).where(eq(t.communities.isSeed, true)).run();
+    db.delete(t.communities).where(inArray(t.communities.createdById, ids)).run();
 
     db.delete(t.users).where(inArray(t.users.id, ids)).run();
   } else {
@@ -313,26 +315,159 @@ function seed() {
     db.insert(t.follows).values({ followerId: uid[a], followingId: uid[b] }).run();
 
   /* ----------------------------- communities ----------------------------- */
-  const communityDefs = [
-    { slug: "baltimore-creators", name: "Baltimore Creators", desc: "Creators building in and around Baltimore.", owner: "devin" },
-    { slug: "music-producers", name: "Music Producers", desc: "Production, mixing, placements, and feedback.", owner: "jordanmiles" },
-    { slug: "photo-video", name: "Photo & Video", desc: "Shoots, gear, edits, and collabs.", owner: "ava" },
+  /* Identity modes are per-community: social rooms can allow alias/anonymous
+     participation; professional rooms stay real-name. Aliases and anon codes
+     live on the membership — random per community, never correlated. */
+  const communityDefs: {
+    slug: string; name: string; desc: string; owner: string; category: string;
+    access?: string; modes: string[]; rules?: string[]; campus?: boolean;
+    kind?: string; joinApproval?: boolean;
+  }[] = [
+    { slug: "baltimore-creators", name: "Baltimore Creators", desc: "Creators building in and around Baltimore.", owner: "devin", category: "General", modes: ["real", "alias"], rules: ["Keep it constructive", "No spam or self-promo floods"] },
+    { slug: "music-producers", name: "Music Producers", desc: "Production, mixing, placements, and feedback.", owner: "jordanmiles", category: "Music", modes: ["real"], rules: ["Feedback stays about the work, not the person"] },
+    { slug: "photo-video", name: "Photo & Video", desc: "Shoots, gear, edits, and collabs.", owner: "ava", category: "Photography", modes: ["real"] },
+    {
+      slug: "late-night-conversations", name: "Late Night Conversations",
+      desc: "The stuff you actually think about after midnight. Say it however you're comfortable — profile, alias, or anonymous.",
+      owner: "imani", category: "Campus Social", modes: ["real", "alias", "anonymous"], campus: true,
+      rules: ["Be kind — someone trusted this room enough to be honest in it", "No screenshots, no guessing who anonymous posters are", "Harassment gets you removed, anonymous or not"],
+    },
+    {
+      slug: "bowie-cybersecurity-study-group", name: "Bowie State Cybersecurity Study Group",
+      desc: "Weekly problem sets, cert prep, and lecture notes. Real names or aliases — we study together.",
+      owner: "devin", category: "Study Groups", access: "private", modes: ["real", "alias"], campus: true, joinApproval: true,
+      rules: ["Members share notes, not exam answers"],
+    },
+    {
+      slug: "bowie-anime", name: "Bowie State Anime Community",
+      desc: "Seasonal watchlists, manga trades, and watch parties in the student center.",
+      owner: "nia", category: "Anime", modes: ["real", "alias"], campus: true,
+    },
+    {
+      slug: "bowie-campus-questions", name: "Campus Questions — Bowie State",
+      desc: "Questions, advice & info for Bowie State. Ask with your profile, an alias, or anonymously.",
+      owner: "devin", category: "Academic", modes: ["real", "alias", "anonymous"], campus: true, kind: "campus_questions",
+      rules: ["Answers > dunks — help people out", "Anonymous questions are welcome; anonymous harassment is not"],
+    },
   ];
   const cid: Record<string, string> = {};
   for (const c of communityDefs) {
     const communityId = id();
     cid[c.slug] = communityId;
     db.insert(t.communities)
-      .values({ id: communityId, slug: c.slug, name: c.name, description: c.desc, createdById: uid[c.owner], isSeed: true })
+      .values({
+        id: communityId, slug: c.slug, name: c.name, description: c.desc,
+        access: c.access ?? "public", category: c.category, kind: c.kind ?? "standard",
+        identityModes: JSON.stringify(c.modes), rules: JSON.stringify(c.rules ?? []),
+        joinApproval: !!c.joinApproval, campusId: c.campus ? campusId : null,
+        mode: c.kind === "campus_questions" ? "qa" : "discussion",
+        createdById: uid[c.owner], isSeed: true,
+      })
       .run();
-    db.insert(t.communityMembers).values({ communityId, userId: uid[c.owner], role: "owner" }).run();
+    db.insert(t.communityMembers).values({ communityId, userId: uid[c.owner], role: "owner", status: "active" }).run();
   }
   const memberships: [string, string][] = [
     ["baltimore-creators", "ava"], ["baltimore-creators", "nia"], ["baltimore-creators", "marcusj"],
     ["music-producers", "devin"], ["photo-video", "devin"], ["photo-video", "marcusj"],
+    // campus rooms — campus-verified members only (devin, nia, imani, omar)
+    ["late-night-conversations", "devin"], ["late-night-conversations", "nia"], ["late-night-conversations", "omar"],
+    ["bowie-cybersecurity-study-group", "omar"], ["bowie-cybersecurity-study-group", "imani"],
+    ["bowie-anime", "devin"], ["bowie-anime", "imani"], ["bowie-anime", "omar"],
+    ["bowie-campus-questions", "nia"], ["bowie-campus-questions", "imani"], ["bowie-campus-questions", "omar"],
   ];
   for (const [slug, handle] of memberships)
-    db.insert(t.communityMembers).values({ communityId: cid[slug], userId: uid[handle] }).run();
+    db.insert(t.communityMembers).values({ communityId: cid[slug], userId: uid[handle], status: "active" }).run();
+
+  // nia asked to join the private study group — a pending request for the
+  // protagonist (owner) to approve
+  db.insert(t.communityMembers).values({ communityId: cid["bowie-cybersecurity-study-group"], userId: uid["nia"], status: "pending" }).run();
+
+  // per-community aliases + anon codes (random per community — imani is 482
+  // in Late Night and a different number anywhere else)
+  const setMember = (slug: string, handle: string, patch: Record<string, unknown>) =>
+    db.update(t.communityMembers)
+      .set(patch)
+      .where(and(eq(t.communityMembers.communityId, cid[slug]), eq(t.communityMembers.userId, uid[handle])))
+      .run();
+  setMember("late-night-conversations", "nia", { alias: "CampusQueen", lastIdentity: "alias" });
+  setMember("late-night-conversations", "imani", { anonCode: "482", lastIdentity: "anonymous" });
+  setMember("late-night-conversations", "omar", { anonCode: "917", lastIdentity: "anonymous" });
+  setMember("late-night-conversations", "devin", { anonCode: "358" });
+  setMember("bowie-anime", "nia", { alias: "CampusQueen" });
+  setMember("bowie-campus-questions", "imani", { anonCode: "274" });
+
+  /* ---- community discussion (identity chosen per post) ---- */
+  const cpid: Record<string, string> = {};
+  const communityPostDefs: { key: string; slug: string; author: string; identity: string; body: string; hoursAgo: number; pinned?: boolean }[] = [
+    { key: "lonely", slug: "late-night-conversations", author: "omar", identity: "anonymous", hoursAgo: 20,
+      body: "Does anybody else feel lonely at this school? Feels like everyone already has their friend group locked and it's only October." },
+    { key: "biol", slug: "late-night-conversations", author: "nia", identity: "alias", hoursAgo: 8,
+      body: "Anybody else struggling with BIOL 101 this semester? The pacing is genuinely brutal." },
+    { key: "notes", slug: "bowie-cybersecurity-study-group", author: "omar", identity: "real", hoursAgo: 30,
+      body: "Dropping my notes from the cryptography lecture in here tonight — the Diffie-Hellman walkthrough finally clicked." },
+    { key: "anime", slug: "bowie-anime", author: "nia", identity: "real", hoursAgo: 12,
+      body: "What anime are y'all watching this semester? Building the watch-party schedule for the student center." },
+    { key: "braids", slug: "bowie-campus-questions", author: "nia", identity: "real", hoursAgo: 26,
+      body: "Does anybody know a good place to get braids near campus?" },
+    { key: "professor", slug: "bowie-campus-questions", author: "imani", identity: "anonymous", hoursAgo: 15,
+      body: "Has anyone else had a bad experience with a certain intro-stats professor? Thinking about switching sections before the drop deadline." },
+    { key: "print", slug: "bowie-campus-questions", author: "omar", identity: "real", hoursAgo: 5,
+      body: "Where can I print something after 10 PM?" },
+  ];
+  for (const p of communityPostDefs) {
+    const pId = id();
+    cpid[p.key] = pId;
+    db.insert(t.communityPosts)
+      .values({
+        id: pId, communityId: cid[p.slug], authorId: uid[p.author], identity: p.identity,
+        body: p.body, pinned: !!p.pinned, isSeed: true,
+        createdAt: new Date(Date.now() - p.hoursAgo * 3_600_000),
+      })
+      .run();
+  }
+  const communityCommentDefs: { post: string; author: string; identity: string; body: string; hoursAgo: number }[] = [
+    { post: "lonely", author: "imani", identity: "anonymous", hoursAgo: 18, body: "You're definitely not the only one. Half this room is probably in the same boat — that's kind of why it exists." },
+    { post: "lonely", author: "nia", identity: "real", hoursAgo: 16, body: "Game night in the student center Thursdays is lowkey the easiest place to meet people. Come through." },
+    { post: "biol", author: "omar", identity: "anonymous", hoursAgo: 6, body: "Office hours Tuesday saved my grade. Go early, the line gets long." },
+    { post: "anime", author: "imani", identity: "alias", hoursAgo: 10, body: "Frieren rewatch, no contest. Would show up to a watch party for that." },
+    { post: "braids", author: "imani", identity: "real", hoursAgo: 24, body: "Crown & Glory on Route 197 — ask for Tasha, tell her you're a student." },
+    { post: "print", author: "imani", identity: "real", hoursAgo: 4, body: "Library first floor is 24/7 with your student ID. The lab printers upstairs close at 10." },
+  ];
+  for (const cdef of communityCommentDefs) {
+    // seed aliases need to exist for alias comments
+    if (cdef.identity === "alias" && cdef.author === "imani")
+      setMember("bowie-anime", "imani", { alias: "MoonlitPages" });
+    db.insert(t.communityComments)
+      .values({
+        id: id(), postId: cpid[cdef.post], authorId: uid[cdef.author], identity: cdef.identity,
+        body: cdef.body, isSeed: true, createdAt: new Date(Date.now() - cdef.hoursAgo * 3_600_000),
+      })
+      .run();
+  }
+  // reactions so the For You surfacing has something popular to pick
+  for (const [post, who] of [["lonely", "nia"], ["lonely", "devin"], ["anime", "devin"], ["anime", "omar"], ["print", "nia"]] as const)
+    db.insert(t.communityReactions).values({ postId: cpid[post], userId: uid[who] }).run();
+
+  /* ---- identity reveals: gradual trust, demonstrated ----
+     · Anonymous • 482 (imani) asked DEVIN to reveal — pending, his call.
+     · devin ↔ omar already revealed; omar's setting is "always show to
+       people I've revealed to", so devin privately sees who Anonymous • 917
+       is on omar's masked posts. The rest of the room still sees the mask. */
+  db.insert(t.identityReveals)
+    .values({
+      id: id(), requesterId: uid["imani"], targetId: uid["devin"], communityId: cid["late-night-conversations"],
+      requesterLabel: "Anonymous • 482", targetLabel: "Anonymous • 358", status: "pending", isSeed: true,
+      createdAt: new Date(Date.now() - 3 * 3_600_000),
+    })
+    .run();
+  db.insert(t.identityReveals)
+    .values({
+      id: id(), requesterId: uid["devin"], targetId: uid["omar"], communityId: cid["late-night-conversations"],
+      requesterLabel: "Anonymous • 358", targetLabel: "Anonymous • 917", status: "accepted", isSeed: true,
+      respondedAt: new Date(Date.now() - 40 * 3_600_000), createdAt: new Date(Date.now() - 42 * 3_600_000),
+    })
+    .run();
+  db.update(t.profiles).set({ revealIdentityMode: "always_profile" }).where(eq(t.profiles.userId, uid["omar"])).run();
 
   /* ------------------------------ services ------------------------------ */
   const serviceDefs = [

@@ -1,330 +1,216 @@
 "use client";
 
-import { useState } from "react";
+/* ------------------------------------------------------------------ */
+/*  Create a community — the creator decides visibility, who can post   */
+/*  and invite, the rules, and WHICH IDENTITY MODES the room permits    */
+/*  (real profile / alias / anonymous). Campus linking requires         */
+/*  verified campus status; server-enforced.                            */
+/* ------------------------------------------------------------------ */
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Check, Copy, PartyPopper, Users } from "lucide-react";
-import {
-  communityAccessInfo,
-  communityModeInfo,
-  type CommunityAccess,
-  type CommunityMode,
-} from "@/lib/data";
-
-/* ------------------------------------------------------------------ */
-/* Create Community: a setup wizard, not an instant group chat.        */
-/* The creator decides how open, how local, how interactive, and how   */
-/* moderated their space is — within UpNova's platform rules.          */
-/* ------------------------------------------------------------------ */
-
-const types = [
-  "General", "School / Campus", "Organization", "Creative", "Music",
-  "Fashion", "Technology", "Gaming", "Sports", "Professional",
-  "Neighborhood / Local", "Faith / Inspiration", "Support / Interest", "Lifestyle", "Other",
-];
-
-const reaches = ["5 miles", "25 miles", "City", "State", "Nationwide", "Global", "School"];
-
-const defaultRules = [
-  "Respect everyone.",
-  "No harassment.",
-  "No spam.",
-  "No scams.",
-  "No unauthorized advertising.",
-  "Keep posts relevant.",
-  "Follow UpNova's Terms and Safety Rules.",
-];
-
-const colors = [
-  ["Lime", "from-lime-500/70 to-emerald-900"],
-  ["Violet", "from-violet-600/70 to-purple-950"],
-  ["Amber", "from-amber-500/70 to-orange-950"],
-  ["Sky", "from-sky-500/70 to-blue-950"],
-  ["Rose", "from-rose-500/70 to-pink-950"],
-  ["Zinc", "from-zinc-600 to-zinc-900"],
-] as const;
+import { ArrowLeft, Users, GraduationCap } from "lucide-react";
+import { useSession } from "@/lib/session";
+import { COMMUNITY_ACCESS, COMMUNITY_CATEGORIES, IDENTITY_MODES } from "@/lib/communityIdentity";
 
 export default function CreateCommunityPage() {
-  const [published, setPublished] = useState(false);
+  const { user } = useSession();
+  const router = useRouter();
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("✦");
-  const [type, setType] = useState(types[3]);
-  const [access, setAccess] = useState<CommunityAccess>("public");
-  const [reach, setReach] = useState("25 miles");
-  const [school, setSchool] = useState("Bowie State University");
-  const [mode, setMode] = useState<CommunityMode>("discussion");
-  const [rules, setRules] = useState(defaultRules.join("\n"));
-  const [requireAgree, setRequireAgree] = useState(true);
-  const [color, setColor] = useState<string>(colors[1][1]);
-  const [settings, setSettings] = useState({
-    promotion: true,
-    opportunities: true,
-    events: true,
-    links: true,
-    approval: false,
-  });
-  const toggleSetting = (k: keyof typeof settings) =>
-    setSettings((s) => ({ ...s, [k]: !s[k] }));
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("General");
+  const [access, setAccess] = useState("public");
+  const [joinApproval, setJoinApproval] = useState(false);
+  const [whoCanPost, setWhoCanPost] = useState("members");
+  const [whoCanInvite, setWhoCanInvite] = useState("mods");
+  const [modes, setModes] = useState<string[]>(["real"]);
+  const [rules, setRules] = useState<string[]>([]);
+  const [ruleDraft, setRuleDraft] = useState("");
+  const [campus, setCampus] = useState<{ campusId: string; campusName: string } | null>(null);
+  const [linkCampus, setLinkCampus] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const isSchool = reach === "School";
+  useEffect(() => {
+    if (!user) return;
+    void fetch("/api/campus/verify").then(async (r) => {
+      if (r.ok) {
+        const j = await r.json();
+        if (j.verified) setCampus({ campusId: j.campusId, campusName: j.campusName });
+      }
+    });
+  }, [user]);
 
-  if (published) {
-    return (
-      <div className="mx-auto max-w-md pt-10 text-center">
-        <PartyPopper className="mx-auto h-10 w-10 text-violet-400" />
-        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">
-          {emoji} {name || "Your community"} is live
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-          {communityAccessInfo[access].label} · {communityModeInfo[mode].label} ·{" "}
-          {isSchool ? school : reach}. You&apos;re the Owner — add Admins and Moderators as it grows.
-        </p>
-        {(access === "invite" || access === "private") && (
-          <div className="mx-auto mt-4 flex max-w-xs items-center gap-2 rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">
-            <span className="truncate font-mono">upnova.app/i/{(name || "community").toLowerCase().replace(/\s+/g, "-").slice(0, 18)}-x7f2</span>
-            <button className="ml-auto flex shrink-0 items-center gap-1 text-violet-300 hover:text-violet-200">
-              <Copy className="h-3 w-3" /> Copy
-            </button>
-          </div>
-        )}
-        <div className="mt-5 flex justify-center gap-2">
-          <Link href="/communities" className="rounded-md bg-violet-400 px-5 py-2 text-xs font-bold text-zinc-950 transition hover:bg-violet-300">
-            See it on Communities
-          </Link>
-          <button onClick={() => setPublished(false)} className="btn-ghost px-5 py-2 text-xs">
-            Edit setup
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const toggleMode = (m: string) =>
+    setModes((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+
+  const submit = async () => {
+    setErr(null);
+    setBusy(true);
+    const res = await fetch("/api/communities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        description,
+        category,
+        access,
+        joinApproval,
+        whoCanPost,
+        whoCanInvite,
+        identityModes: modes,
+        rules,
+        campusId: linkCampus && campus ? campus.campusId : undefined,
+      }),
+    });
+    const j = await res.json();
+    setBusy(false);
+    if (!res.ok) return setErr(j.error || "Couldn't create the community");
+    router.push(`/communities/${j.slug}`);
+  };
+
+  const input =
+    "w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-violet-400/40";
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <header>
-        <Link href="/communities" className="flex w-fit items-center gap-1.5 text-xs text-zinc-500 transition hover:text-zinc-300">
-          <ArrowLeft className="h-3.5 w-3.5" /> Communities
+      <header className="px-1">
+        <Link href="/communities" className="mb-2 inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.1em] text-zinc-500 hover:text-violet-300">
+          <ArrowLeft className="h-3 w-3" /> COMMUNITIES
         </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-50">Create a Community</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          A customizable space, not just a group chat. You decide how open, how local, how
-          interactive, and how moderated it is.
-        </p>
+        <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-zinc-50">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-400/10">
+            <Users className="h-5 w-5 text-violet-400" />
+          </span>
+          Create a community
+        </h1>
       </header>
 
-      {/* 1 · type */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">1 · What kind of community?</h2>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {types.map((t) => (
-            <button
-              key={t}
-              onClick={() => setType(t)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                type === t ? "border-violet-400/60 bg-violet-400/10 text-violet-200" : "border-line text-zinc-400 hover:border-zinc-600"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </section>
+      {err && <div className="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">{err}</div>}
 
-      {/* 2 · access */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">2 · Who can join?</h2>
-        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-          {(Object.keys(communityAccessInfo) as CommunityAccess[]).map((a) => (
-            <button
-              key={a}
-              onClick={() => setAccess(a)}
-              className={`rounded-md border p-3 text-left transition ${
-                access === a ? "border-violet-400/50 bg-violet-400/5" : "border-line hover:border-zinc-600"
-              }`}
-            >
-              <p className="text-sm font-semibold text-zinc-100">{communityAccessInfo[a].label}</p>
-              <p className="mt-0.5 text-xs text-zinc-500">{communityAccessInfo[a].desc}</p>
-            </button>
-          ))}
+      <section className="card-people space-y-4 p-4">
+        <div>
+          <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">NAME</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Late Night Conversations" className={input} />
         </div>
-        {access === "verified" && (
-          <p className="mt-2.5 text-xs text-zinc-500">
-            e.g. Bowie State students, or verified members of an organization.
-          </p>
-        )}
-      </section>
-
-      {/* 3 · reach */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">3 · Who is this community for?</h2>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {reaches.map((r) => (
-            <button
-              key={r}
-              onClick={() => setReach(r)}
-              className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
-                reach === r ? "border-white/50 bg-white/10 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
+        <div>
+          <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">DESCRIPTION</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What is this community about? Who is it for?" className={input} />
         </div>
-        {isSchool && (
-          <div className="mt-3">
-            <select value={school} onChange={(e) => setSchool(e.target.value)} className="input-dark max-w-xs">
-              <option>Bowie State University</option>
-              <option>Morgan State University</option>
-              <option>University of Maryland</option>
-              <option>Towson University</option>
-            </select>
-            <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
-              Official-school designation requires UpNova verification — typing a school&apos;s
-              name doesn&apos;t grant a verified badge.
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* 4 · rules */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">4 · Community rules</h2>
-        <textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={7} className="input-dark mt-3 resize-none text-xs leading-relaxed" />
-        <label className="mt-2.5 flex cursor-pointer items-center gap-2.5 text-xs text-zinc-400">
-          <input type="checkbox" checked={requireAgree} onChange={(e) => setRequireAgree(e.target.checked)} className="accent-violet-400" />
-          Members must agree to the rules when joining
-        </label>
-        <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
-          Your rules run your space — they never override UpNova&apos;s safety policies.
-        </p>
-      </section>
-
-      {/* 5 · interaction mode */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">5 · How can people interact?</h2>
-        <div className="mt-3 space-y-1.5">
-          {(Object.keys(communityModeInfo) as CommunityMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`flex w-full items-start gap-3 rounded-md border p-3 text-left transition ${
-                mode === m ? "border-violet-400/50 bg-violet-400/5" : "border-line hover:border-zinc-600"
-              }`}
-            >
-              <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${mode === m ? "border-violet-400 bg-violet-400/20" : "border-zinc-600"}`}>
-                {mode === m && <Check className="h-2.5 w-2.5 text-violet-400" />}
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-zinc-100">{communityModeInfo[m].label}</span>
-                <span className="block text-xs text-zinc-500">{communityModeInfo[m].desc}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-        {mode === "broadcast" && (
-          <p className="mt-2.5 rounded-md border border-amber-400/25 bg-amber-400/5 p-2.5 text-xs text-zinc-400">
-            Perfect for inspirational, motivational, or announcement communities — members react
-            and save, but can&apos;t flood the space.
-          </p>
-        )}
-      </section>
-
-      {/* 6 · appearance */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">6 · Appearance</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-[4rem_1fr]">
-          <div>
-            <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Icon</label>
-            <input value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} className="input-dark mt-1.5 text-center text-lg" />
-          </div>
-          <div>
-            <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Community name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="DMV Music Producers" className="input-dark mt-1.5" />
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Description</label>
-          <textarea rows={2} placeholder="What is this space for, and who is it for?" className="input-dark mt-1.5 resize-none" />
-        </div>
-        <div className="mt-3">
-          <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Community color</label>
-          <div className="mt-2 flex gap-2">
-            {colors.map(([label, grad]) => (
+        <div>
+          <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">CATEGORY</label>
+          <div className="flex flex-wrap gap-1.5">
+            {COMMUNITY_CATEGORIES.map((c) => (
               <button
-                key={label}
-                onClick={() => setColor(grad)}
-                title={label}
-                aria-label={`${label} theme`}
-                className={`h-8 w-8 rounded-lg bg-gradient-to-br ${grad} ${color === grad ? "ring-2 ring-white" : "opacity-70 hover:opacity-100"}`}
-              />
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em] transition ${category === c ? "bg-violet-400 font-bold text-zinc-950" : "border border-zinc-800 text-zinc-400 hover:border-violet-400/40"}`}
+              >
+                {c.toUpperCase()}
+              </button>
             ))}
           </div>
         </div>
-        {/* live preview */}
-        <div className="mt-4 overflow-hidden rounded-xl border border-line">
-          <div className={`flex h-16 items-center justify-center bg-gradient-to-br text-3xl ${color}`}>{emoji}</div>
-          <div className="p-3">
-            <p className="text-sm font-bold text-zinc-100">{name || "Your community"}</p>
-            <p className="text-xs text-zinc-500">
-              {communityAccessInfo[access].label} · {communityModeInfo[mode].label} · {isSchool ? school : reach}
-            </p>
+      </section>
+
+      <section className="card-people space-y-3 p-4">
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Visibility</h2>
+        {COMMUNITY_ACCESS.map((a) => (
+          <label key={a.id} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition ${access === a.id ? "border-violet-400/50 bg-violet-400/5" : "border-zinc-800 hover:border-zinc-700"}`}>
+            <input type="radio" checked={access === a.id} onChange={() => setAccess(a.id)} className="mt-0.5 accent-violet-400" />
+            <span>
+              <span className="block text-sm font-semibold text-zinc-200">{a.label}</span>
+              <span className="block text-xs text-zinc-500">{a.desc}</span>
+            </span>
+          </label>
+        ))}
+        {access === "public" && (
+          <label className="flex cursor-pointer items-center gap-2 px-1 text-sm text-zinc-300">
+            <input type="checkbox" checked={joinApproval} onChange={(e) => setJoinApproval(e.target.checked)} className="accent-violet-400" />
+            Require approval to join
+          </label>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">WHO CAN POST</label>
+            <select value={whoCanPost} onChange={(e) => setWhoCanPost(e.target.value)} className={input}>
+              <option value="members">All members</option>
+              <option value="mods">Moderators only</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">WHO CAN INVITE</label>
+            <select value={whoCanInvite} onChange={(e) => setWhoCanInvite(e.target.value)} className={input}>
+              <option value="mods">Moderators only</option>
+              <option value="members">All members</option>
+            </select>
           </div>
         </div>
       </section>
 
-      {/* 7 · permissions */}
-      <section className="card-people p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-violet-400">7 · What can members do?</h2>
-        <div className="mt-3 space-y-1">
-          {(
-            [
-              ["promotion", "Allow members to promote services"],
-              ["opportunities", "Allow members to post opportunities"],
-              ["events", "Allow event promotion"],
-              ["links", "Allow external links"],
-              ["approval", "Require approval before posts appear"],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} className="flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-2 text-sm text-zinc-300 transition hover:bg-card-raised">
-              {label}
-              <input
-                type="checkbox"
-                checked={settings[key]}
-                onChange={() => toggleSetting(key)}
-                className="accent-violet-400"
-              />
-            </label>
-          ))}
-        </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
-          One owner might want &ldquo;no advertising&rdquo;; another wants &ldquo;everybody show me
-          what you&apos;re selling.&rdquo; Your space, your call.
+      <section className="card-people space-y-3 p-4">
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Identity modes allowed</h2>
+        <p className="text-xs text-zinc-500">
+          You decide how members can appear here. Anonymity is to the community — UpNova always retains the account behind every post
+          for moderation and safety.
         </p>
+        {IDENTITY_MODES.map((m) => (
+          <label key={m.id} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition ${modes.includes(m.id) ? "border-violet-400/50 bg-violet-400/5" : "border-zinc-800 hover:border-zinc-700"}`}>
+            <input type="checkbox" checked={modes.includes(m.id)} onChange={() => toggleMode(m.id)} className="mt-0.5 accent-violet-400" />
+            <span>
+              <span className="block text-sm font-semibold text-zinc-200">{m.label}</span>
+              <span className="block text-xs text-zinc-500">{m.desc}</span>
+            </span>
+          </label>
+        ))}
       </section>
 
-      {/* roles note */}
-      <section className="rounded-xl border border-line p-4 text-xs text-zinc-500">
-        <p className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-          <Users className="h-4 w-4 text-violet-400" /> Roles
-        </p>
-        <p className="mt-1.5 leading-relaxed">
-          You start as <span className="font-semibold text-zinc-300">Owner</span> (full control).
-          Add <span className="font-semibold text-zinc-300">Admins</span> (manage the community) and{" "}
-          <span className="font-semibold text-zinc-300">Moderators</span> (remove posts, mute /
-          remove / ban members, lock comments, approve posts) once people join. Every community
-          stays subject to UpNova&apos;s platform rules.
-        </p>
+      <section className="card-people space-y-3 p-4">
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Community rules</h2>
+        {rules.map((r, i) => (
+          <div key={i} className="flex items-center gap-2 text-sm text-zinc-300">
+            <span className="font-mono text-[10px] text-zinc-600">{i + 1}.</span>
+            <span className="flex-1">{r}</span>
+            <button onClick={() => setRules(rules.filter((_, j) => j !== i))} className="text-zinc-600 hover:text-red-400">✕</button>
+          </div>
+        ))}
+        <div className="flex gap-2">
+          <input
+            value={ruleDraft}
+            onChange={(e) => setRuleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && ruleDraft.trim()) {
+                setRules([...rules, ruleDraft.trim()]);
+                setRuleDraft("");
+              }
+            }}
+            placeholder="Add a rule and press Enter"
+            className={input}
+          />
+        </div>
       </section>
+
+      {campus && (
+        <section className="card-people p-4">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input type="checkbox" checked={linkCampus} onChange={(e) => setLinkCampus(e.target.checked)} className="mt-0.5 accent-amber-400" />
+            <span>
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-200">
+                <GraduationCap className="h-4 w-4 text-amber-400" /> Link to {campus.campusName}
+              </span>
+              <span className="block text-xs text-zinc-500">Only verified {campus.campusName} members will be able to join.</span>
+            </span>
+          </label>
+        </section>
+      )}
 
       <button
-        onClick={() => setPublished(true)}
-        disabled={!name.trim()}
-        className={`w-full rounded-full py-3 text-sm font-bold transition ${
-          name.trim()
-            ? "bg-violet-400 text-zinc-950 hover:bg-violet-300 hover:shadow-glow-violet"
-            : "cursor-not-allowed bg-card-raised text-zinc-600"
-        }`}
+        disabled={busy || name.trim().length < 3 || !modes.length}
+        onClick={() => void submit()}
+        className="w-full rounded-full bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 disabled:opacity-40"
       >
-        Create Community
+        {busy ? "Creating…" : "Create community"}
       </button>
     </div>
   );

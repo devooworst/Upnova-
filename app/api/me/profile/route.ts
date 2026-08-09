@@ -50,6 +50,9 @@ export async function PATCH(req: NextRequest) {
           ? body.whoCanMessage
           : p.whoCanMessage,
         visibility: ["public", "members", "private"].includes(body.visibility) ? body.visibility : p.visibility,
+        revealIdentityMode: ["keep_anonymous", "show_to_connections", "always_profile"].includes(body.revealIdentityMode)
+          ? body.revealIdentityMode
+          : p.revealIdentityMode,
         showLocation: b(body.showLocation, p.showLocation),
         showEducation: b(body.showEducation, p.showEducation),
         showFollowers: b(body.showFollowers, p.showFollowers),

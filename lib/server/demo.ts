@@ -333,3 +333,101 @@ export function seedCreatorDeliversLicense(licenseId: string) {
     href: "/works?licenses=1",
   });
 }
+
+/* ----------------------------- communities ----------------------------- */
+
+/** Seed members reply once to a fresh post by a REAL (or protagonist) user
+ *  in a seed community, so the discussion feels alive. Replies respect the
+ *  community's identity modes: in anonymous-friendly rooms seed members
+ *  answer masked, exactly like a real shy member would. */
+export function seedRespondsInCommunity(communityId: string) {
+  const c = db.select().from(tables.communities).where(eq(tables.communities.id, communityId)).get();
+  if (!c || !c.isSeed) return;
+
+  const cutoff = new Date(Date.now() - 7 * 86_400_000);
+  const posts = db
+    .select()
+    .from(tables.communityPosts)
+    .where(eq(tables.communityPosts.communityId, communityId))
+    .all()
+    .filter((p) => !p.isSeed && !p.removedAt && p.createdAt > cutoff);
+
+  let modes: string[] = ["real"];
+  try {
+    modes = JSON.parse(c.identityModes || '["real"]');
+  } catch {}
+
+  for (const post of posts) {
+    const existing = db
+      .select()
+      .from(tables.communityComments)
+      .where(eq(tables.communityComments.postId, post.id))
+      .all();
+    if (existing.some((cm) => cm.isSeed)) continue; // one seed reply per post
+
+    // pick an active seed member who isn't the author (and never the admin)
+    const members = db
+      .select({ m: tables.communityMembers, u: tables.users })
+      .from(tables.communityMembers)
+      .innerJoin(tables.users, eq(tables.communityMembers.userId, tables.users.id))
+      .where(eq(tables.communityMembers.communityId, communityId))
+      .all()
+      .filter((r) => r.m.status === "active" && r.u.isSeed && r.u.role !== "admin" && r.u.id !== post.authorId);
+    if (!members.length) continue;
+    const replier = members[Math.floor(Math.random() * members.length)];
+
+    const identity = modes.includes("anonymous") ? "anonymous" : modes.includes("alias") && replier.m.alias ? "alias" : "real";
+    if (identity === "anonymous" && !replier.m.anonCode) {
+      // stable code, same as the real path
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      require("./communities").ensureAnonCode(communityId, replier.u.id);
+    }
+
+    const lines = [
+      "Was just thinking about this — glad somebody said it.",
+      "Same here honestly. Following this thread.",
+      "Good question. Somebody in here definitely knows.",
+      "This community delivers again. Watching this one.",
+      "Felt this. Thanks for posting it.",
+    ];
+    db.insert(tables.communityComments)
+      .values({
+        id: id(),
+        postId: post.id,
+        authorId: replier.u.id,
+        identity,
+        body: lines[Math.floor(Math.random() * lines.length)],
+        isSeed: true,
+      })
+      .run();
+  }
+}
+
+/** Seed accounts answer pending reveal requests so the full
+ *  request → accept → connection loop can be demonstrated solo.
+ *  The protagonist admin account never auto-answers — that decision
+ *  belongs to the human driving it. */
+export function seedAcceptsReveal(forUserId: string) {
+  const pending = db
+    .select()
+    .from(tables.identityReveals)
+    .where(eq(tables.identityReveals.status, "pending"))
+    .all()
+    .filter((r) => r.requesterId === forUserId && isSeedUser(r.targetId));
+  for (const r of pending) {
+    const target = db.select().from(tables.users).where(eq(tables.users.id, r.targetId)).get();
+    if (!target || target.role === "admin") continue;
+    db.update(tables.identityReveals)
+      .set({ status: "accepted", respondedAt: new Date() })
+      .where(eq(tables.identityReveals.id, r.id))
+      .run();
+    notify({
+      userId: r.requesterId,
+      actorId: r.targetId,
+      type: "community",
+      title: `${r.targetLabel || "They"} accepted your reveal request`,
+      body: "You can now see each other's profiles — privately. The community still sees your masked identities.",
+      href: "/communities?tab=reveals",
+    });
+  }
+}

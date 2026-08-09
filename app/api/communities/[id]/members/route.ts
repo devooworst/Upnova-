@@ -1,0 +1,119 @@
+import { NextRequest } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { db, tables } from "@/db";
+import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { findCommunity, getMembership, isMod, logMod, requireActiveMember } from "@/lib/server/communities";
+import { notify } from "@/lib/server/notify";
+
+export const dynamic = "force-dynamic";
+
+/** GET — the member roster. Moderators only: in communities that allow
+ *  alias/anonymous participation, a public member list would let anyone
+ *  correlate "who's in here" with masked posts, so membership stays a
+ *  moderation surface (regular members see counts, not names). */
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  return guarded(() => {
+    const user = requireUser();
+    const c = findCommunity(params.id);
+    if (!c) throw new ApiError(404, "Community not found");
+    const me = requireActiveMember(c.id, user.id);
+    if (!isMod(me)) throw new ApiError(403, "Member management is a moderator tool");
+
+    const rows = db
+      .select({ m: tables.communityMembers, u: tables.users, p: tables.profiles })
+      .from(tables.communityMembers)
+      .innerJoin(tables.users, eq(tables.communityMembers.userId, tables.users.id))
+      .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+      .where(eq(tables.communityMembers.communityId, c.id))
+      .all();
+
+    return {
+      members: rows.map((r) => ({
+        userId: r.u.id,
+        handle: r.u.handle,
+        displayName: r.p.displayName,
+        avatarUrl: r.p.avatarUrl,
+        role: r.m.role,
+        status: r.m.status,
+        mutedUntil: r.m.mutedUntil,
+        joinedAt: r.m.joinedAt,
+        // aliases/anon codes deliberately NOT included — moderation does not
+        // need to browse identity mappings; reveals go through the audited
+        // reveal-author flow tied to reports
+      })),
+    };
+  });
+}
+
+/** POST — moderation actions on a member: approve | decline | remove |
+ *  ban | mute | unmute | promote | demote. Every action lands in the
+ *  append-only mod log. */
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  return guarded(async () => {
+    const user = requireUser();
+    const c = findCommunity(params.id);
+    if (!c) throw new ApiError(404, "Community not found");
+    const me = requireActiveMember(c.id, user.id);
+    if (!isMod(me)) throw new ApiError(403, "Moderator tools need a moderator role");
+
+    const body = await req.json().catch(() => ({}));
+    const action = String(body.action || "");
+    const targetId = String(body.userId || "");
+    const target = getMembership(c.id, targetId);
+    if (!target) throw new ApiError(404, "That user isn't part of this community");
+    if (targetId === user.id) throw new ApiError(400, "You can't moderate yourself");
+    if (target.role === "owner") throw new ApiError(403, "The owner can't be moderated");
+    if (target.role === "moderator" && me.role !== "owner")
+      throw new ApiError(403, "Only the owner can moderate moderators");
+
+    const where = and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.userId, targetId));
+    const set = (patch: Record<string, unknown>) => db.update(tables.communityMembers).set(patch).where(where).run();
+
+    switch (action) {
+      case "approve": {
+        if (target.status !== "pending") throw new ApiError(409, "No pending request from that user");
+        set({ status: "active", joinedAt: new Date() });
+        notify({ userId: targetId, actorId: user.id, type: "community", title: `Welcome to ${c.name}`, body: "Your join request was approved", href: `/communities/${c.slug}` });
+        break;
+      }
+      case "decline": {
+        if (target.status !== "pending") throw new ApiError(409, "No pending request from that user");
+        db.delete(tables.communityMembers).where(where).run();
+        break;
+      }
+      case "remove": {
+        db.delete(tables.communityMembers).where(where).run();
+        break;
+      }
+      case "ban": {
+        set({ status: "banned" });
+        break;
+      }
+      case "mute": {
+        const days = Math.min(30, Math.max(1, Number(body.days) || 1));
+        set({ mutedUntil: new Date(Date.now() + days * 86_400_000) });
+        break;
+      }
+      case "unmute": {
+        set({ mutedUntil: null });
+        break;
+      }
+      case "promote": {
+        if (me.role !== "owner") throw new ApiError(403, "Only the owner appoints moderators");
+        set({ role: "moderator" });
+        notify({ userId: targetId, actorId: user.id, type: "community", title: `${c.name}`, body: "You're now a moderator", href: `/communities/${c.slug}` });
+        break;
+      }
+      case "demote": {
+        if (me.role !== "owner") throw new ApiError(403, "Only the owner appoints moderators");
+        set({ role: "member" });
+        break;
+      }
+      default:
+        throw new ApiError(400, "Unknown action");
+    }
+
+    logMod({ communityId: c.id, actorId: user.id, action: action === "mute" ? `mute_${body.days || 1}d` : action, targetType: "member", targetId, note: String(body.note || "") });
+    return { ok: true };
+  });
+}

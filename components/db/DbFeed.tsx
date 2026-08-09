@@ -108,6 +108,12 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
     owner: { handle: string; displayName: string; avatarUrl: string | null };
     reasons: string[];
   } | null>(null);
+  const [suggestedCommunity, setSuggestedCommunity] = useState<{
+    postId: string; body: string;
+    author: { kind: string; label?: string; user?: { displayName: string } | null };
+    community: { slug: string; name: string; members: number };
+    reactions: number; comments: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -138,6 +144,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       setSuggestedProduct(data.suggestedProduct ?? null);
       setSuggestedWork(data.suggestedWork ?? null);
       setSuggestedOpp(data.suggestedOpportunity ?? null);
+      setSuggestedCommunity(data.suggestedCommunityPost ?? null);
       // passive view signals for what actually rendered (deduped server-side)
       // — members only; guests have no interaction log to write to
       const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
@@ -279,6 +286,32 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                     </p>
                   </div>
                   <Link href={`/opportunities/${suggestedOpp.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">Apply</Link>
+                </aside>
+              )}
+              {/* COMMUNITY card — a popular public-community post, author
+                  masked exactly as inside the community; click through to
+                  the original source */}
+              {i === 5 && suggestedCommunity && (
+                <aside className="card flex flex-wrap items-center gap-3 p-4">
+                  <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> Community · {suggestedCommunity.community.name}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm leading-snug text-zinc-200">&ldquo;{suggestedCommunity.body}&rdquo;</p>
+                    <p className="mt-1 font-mono text-[10px] tracking-[0.06em] text-zinc-500">
+                      {suggestedCommunity.author.kind === "real"
+                        ? suggestedCommunity.author.user?.displayName ?? "A member"
+                        : suggestedCommunity.author.label}
+                      {" · "}
+                      {suggestedCommunity.reactions} reactions · {suggestedCommunity.comments} replies · {suggestedCommunity.community.members} members
+                    </p>
+                  </div>
+                  <Link
+                    href={`/communities/${suggestedCommunity.community.slug}?post=${suggestedCommunity.postId}`}
+                    className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs"
+                  >
+                    Open
+                  </Link>
                 </aside>
               )}
               {/* PRODUCT card — the feed knows a product is not a post */}

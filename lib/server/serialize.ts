@@ -106,6 +106,7 @@ export function ownProfile(user: User, profile: Profile) {
       acceptCollabs: profile.acceptCollabs,
       whoCanMessage: profile.whoCanMessage,
       visibility: profile.visibility,
+      revealIdentityMode: profile.revealIdentityMode,
       showLocation: profile.showLocation,
       showEducation: profile.showEducation,
       showFollowers: profile.showFollowers,

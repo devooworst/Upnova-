@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { buildAuthorCtx, maskAuthor, communityCounts } from "@/lib/server/communities";
 import { getSessionUser, guarded } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
@@ -353,6 +354,45 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, suggestedWork, suggestedOpportunity, guest: !user, totalPublic: mapped.length };
+    // ---- COMMUNITY card: a popular recent post from a PUBLIC community
+    // surfaces in For You with its author masked exactly as inside the
+    // community — the reader clicks through to the original source ----
+    let suggestedCommunityPost: object | null = null;
+    if (tab === "for-you" && user) {
+      const publics = db.select().from(tables.communities).all().filter((c) => c.access === "public");
+      const pubIds = new Set(publics.map((c) => c.id));
+      const cutoffC = new Date(Date.now() - 14 * 86_400_000);
+      const cposts = db
+        .select()
+        .from(tables.communityPosts)
+        .all()
+        .filter((p) => pubIds.has(p.communityId) && !p.removedAt && p.createdAt > cutoffC && p.authorId !== user.id);
+      if (cposts.length) {
+        const reactions = db.select().from(tables.communityReactions).all();
+        const rcount = new Map<string, number>();
+        for (const r of reactions) rcount.set(r.postId, (rcount.get(r.postId) ?? 0) + 1);
+        const ccomments = db.select({ postId: tables.communityComments.postId }).from(tables.communityComments).all();
+        const ccount = new Map<string, number>();
+        for (const r of ccomments) ccount.set(r.postId, (ccount.get(r.postId) ?? 0) + 1);
+        cposts.sort(
+          (a, b) =>
+            (rcount.get(b.id) ?? 0) + 2 * (ccount.get(b.id) ?? 0) - ((rcount.get(a.id) ?? 0) + 2 * (ccount.get(a.id) ?? 0)) ||
+            b.createdAt.getTime() - a.createdAt.getTime()
+        );
+        const top = cposts[0];
+        const community = publics.find((c) => c.id === top.communityId)!;
+        const ctxC = buildAuthorCtx([top.authorId], community.id, user.id);
+        suggestedCommunityPost = {
+          postId: top.id,
+          body: top.body.slice(0, 220),
+          author: maskAuthor(top.authorId, top.identity, ctxC),
+          community: { id: community.id, slug: community.slug, name: community.name, members: communityCounts([community.id]).get(community.id)?.members ?? 0 },
+          reactions: rcount.get(top.id) ?? 0,
+          comments: ccount.get(top.id) ?? 0,
+        };
+      }
+    }
+
+    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, suggestedWork, suggestedOpportunity, suggestedCommunityPost, guest: !user, totalPublic: mapped.length };
   });
 }

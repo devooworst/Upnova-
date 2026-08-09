@@ -17,6 +17,16 @@ CREATE TABLE IF NOT EXISTS `applications` (
 	FOREIGN KEY (`applicant_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS bids (id text PRIMARY KEY NOT NULL, listing_id text NOT NULL REFERENCES campus_listings(id) ON DELETE CASCADE, bidder_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount integer NOT NULL, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS `blocks` (
+	`id` text PRIMARY KEY NOT NULL,
+	`blocker_id` text NOT NULL,
+	`blocked_id` text NOT NULL,
+	`via_label` text DEFAULT '' NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`blocker_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`blocked_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `bookings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`service_id` text,
@@ -106,26 +116,89 @@ CREATE TABLE IF NOT EXISTS `comments` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS `communities` (
+CREATE TABLE IF NOT EXISTS "communities" (
 	`id` text PRIMARY KEY NOT NULL,
 	`slug` text NOT NULL,
 	`name` text NOT NULL,
 	`description` text DEFAULT '' NOT NULL,
 	`access` text DEFAULT 'public' NOT NULL,
 	`mode` text DEFAULT 'discussion' NOT NULL,
+	`kind` text DEFAULT 'standard' NOT NULL,
+	`category` text DEFAULT 'general' NOT NULL,
 	`avatar_url` text,
+	`cover_url` text,
+	`rules` text DEFAULT '[]' NOT NULL,
+	`join_approval` integer DEFAULT false NOT NULL,
+	`who_can_post` text DEFAULT 'members' NOT NULL,
+	`who_can_invite` text DEFAULT 'mods' NOT NULL,
+	`identity_modes` text DEFAULT '["real"]' NOT NULL,
+	`campus_id` text,
 	`created_by_id` text NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
+	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`created_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+CREATE TABLE IF NOT EXISTS `community_comments` (
+	`id` text PRIMARY KEY NOT NULL,
+	`post_id` text NOT NULL,
+	`author_id` text NOT NULL,
+	`identity` text DEFAULT 'real' NOT NULL,
+	`body` text NOT NULL,
+	`removed_at` integer,
+	`removed_by_id` text,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`post_id`) REFERENCES `community_posts`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `community_members` (
 	`community_id` text NOT NULL,
 	`user_id` text NOT NULL,
 	`role` text DEFAULT 'member' NOT NULL,
-	`joined_at` integer NOT NULL,
+	`joined_at` integer NOT NULL, status text NOT NULL DEFAULT 'active', alias text, anon_code text, last_identity text NOT NULL DEFAULT 'real', muted_until integer,
 	PRIMARY KEY(`community_id`, `user_id`),
 	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `community_mod_log` (
+	`id` text PRIMARY KEY NOT NULL,
+	`community_id` text NOT NULL,
+	`actor_id` text NOT NULL,
+	`action` text NOT NULL,
+	`target_type` text DEFAULT '' NOT NULL,
+	`target_id` text DEFAULT '' NOT NULL,
+	`note` text DEFAULT '' NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`actor_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+CREATE TABLE IF NOT EXISTS `community_posts` (
+	`id` text PRIMARY KEY NOT NULL,
+	`community_id` text NOT NULL,
+	`author_id` text NOT NULL,
+	`identity` text DEFAULT 'real' NOT NULL,
+	`body` text NOT NULL,
+	`media` text DEFAULT '[]' NOT NULL,
+	`ref_type` text,
+	`ref_id` text,
+	`pinned` integer DEFAULT false NOT NULL,
+	`locked` integer DEFAULT false NOT NULL,
+	`removed_at` integer,
+	`removed_by_id` text,
+	`removed_reason` text DEFAULT '' NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `community_reactions` (
+	`post_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`created_at` integer NOT NULL,
+	PRIMARY KEY(`post_id`, `user_id`),
+	FOREIGN KEY (`post_id`) REFERENCES `community_posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `conversation_members` (
@@ -209,6 +282,20 @@ CREATE TABLE IF NOT EXISTS `follows` (
 	FOREIGN KEY (`follower_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`following_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS `identity_reveals` (
+	`id` text PRIMARY KEY NOT NULL,
+	`requester_id` text NOT NULL,
+	`target_id` text NOT NULL,
+	`community_id` text,
+	`requester_label` text DEFAULT '' NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`responded_at` integer,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL, target_label text NOT NULL DEFAULT '',
+	FOREIGN KEY (`requester_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`target_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE set null
+);
 CREATE TABLE IF NOT EXISTS `interactions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -247,7 +334,29 @@ CREATE TABLE IF NOT EXISTS `likes` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS loans (id text PRIMARY KEY NOT NULL, listing_id text REFERENCES campus_listings(id) ON DELETE SET NULL, lender_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, borrower_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, item_title text NOT NULL, message text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'requested', start_at integer, due_at integer NOT NULL, condition_before text NOT NULL DEFAULT '{}', condition_after text NOT NULL DEFAULT '{}', extension_until integer, due_soon_notified integer NOT NULL DEFAULT 0, overdue_notified integer NOT NULL DEFAULT 0, deposit integer, conversation_id text, is_seed integer NOT NULL DEFAULT 0, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS "loans" (
+	`id` text PRIMARY KEY NOT NULL,
+	`listing_id` text,
+	`lender_id` text NOT NULL,
+	`borrower_id` text NOT NULL,
+	`item_title` text NOT NULL,
+	`message` text DEFAULT '' NOT NULL,
+	`status` text DEFAULT 'requested' NOT NULL,
+	`start_at` integer,
+	`due_at` integer NOT NULL,
+	`condition_before` text DEFAULT '{}' NOT NULL,
+	`condition_after` text DEFAULT '{}' NOT NULL,
+	`extension_until` integer,
+	`due_soon_notified` integer DEFAULT false NOT NULL,
+	`overdue_notified` integer DEFAULT false NOT NULL,
+	`deposit` integer,
+	`conversation_id` text,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`listing_id`) REFERENCES `campus_listings`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`lender_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`borrower_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `messages` (
 	`id` text PRIMARY KEY NOT NULL,
 	`conversation_id` text NOT NULL,
@@ -450,7 +559,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`show_availability` integer DEFAULT true NOT NULL,
 	`links` text DEFAULT '[]' NOT NULL,
 	`education` text DEFAULT '[]' NOT NULL,
-	`trust_level` text DEFAULT 'standard' NOT NULL,
+	`trust_level` text DEFAULT 'standard' NOT NULL, reveal_identity_mode text NOT NULL DEFAULT 'keep_anonymous',
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `project_milestones` (
@@ -571,22 +680,28 @@ CREATE TABLE IF NOT EXISTS `works` (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS `app_opp_applicant` ON `applications` (`opportunity_id`,`applicant_id`);
 CREATE INDEX IF NOT EXISTS bids_listing ON bids (listing_id, amount);
+CREATE UNIQUE INDEX IF NOT EXISTS `blocks_pair` ON `blocks` (`blocker_id`,`blocked_id`);
 CREATE INDEX IF NOT EXISTS `bookings_provider_starts` ON `bookings` (`provider_id`,`starts_at`);
 CREATE INDEX IF NOT EXISTS `campus_listings_campus` ON `campus_listings` (`campus_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campus_verif_user_campus` ON `campus_verifications` (`user_id`,`campus_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campuses_slug_unique` ON `campuses` (`slug`);
 CREATE INDEX IF NOT EXISTS `comments_post` ON `comments` (`post_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `communities_slug_unique` ON `communities` (`slug`);
+CREATE INDEX IF NOT EXISTS `community_comments_post` ON `community_comments` (`post_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `community_mod_log_comm` ON `community_mod_log` (`community_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `community_posts_comm_created` ON `community_posts` (`community_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `conv_members_user` ON `conversation_members` (`user_id`);
 CREATE INDEX IF NOT EXISTS `disputes_order` ON `disputes` (`order_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `events_slug_unique` ON `events` (`slug`);
 CREATE INDEX IF NOT EXISTS `ext_project_status` ON `extension_requests` (`project_id`,`status`);
+CREATE UNIQUE INDEX IF NOT EXISTS `identity_reveals_pair` ON `identity_reveals` (`requester_id`,`target_id`);
+CREATE INDEX IF NOT EXISTS `identity_reveals_target` ON `identity_reveals` (`target_id`,`status`);
 CREATE INDEX IF NOT EXISTS `interactions_target` ON `interactions` (`target_type`,`target_id`);
 CREATE INDEX IF NOT EXISTS `interactions_user` ON `interactions` (`user_id`,`action`);
 CREATE INDEX IF NOT EXISTS `licenses_creator` ON `licenses` (`creator_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `licenses_work` ON `licenses` (`work_id`);
-CREATE INDEX IF NOT EXISTS loans_borrower ON loans (borrower_id, due_at);
-CREATE INDEX IF NOT EXISTS loans_lender ON loans (lender_id, due_at);
+CREATE INDEX IF NOT EXISTS `loans_borrower` ON `loans` (`borrower_id`,`due_at`);
+CREATE INDEX IF NOT EXISTS `loans_lender` ON `loans` (`lender_id`,`due_at`);
 CREATE INDEX IF NOT EXISTS `messages_conv_created` ON `messages` (`conversation_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_created` ON `notifications` (`user_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_read` ON `notifications` (`user_id`,`read_at`);
