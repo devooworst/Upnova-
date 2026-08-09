@@ -52,10 +52,11 @@ export async function POST(req: NextRequest) {
       .run();
 
     const { token, expiresAt } = createSession(userId);
-    cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
+    const cookieless = process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1";
+    if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     const user = db.select().from(tables.users).where(eq(tables.users.id, userId)).get()!;
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get()!;
-    return { ...ownProfile(user, profile), sessionToken: token };
+    return { ...ownProfile(user, profile), sessionToken: token, cookieless };
   });
 }

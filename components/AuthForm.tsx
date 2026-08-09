@@ -77,6 +77,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
     // CONFIRM the session actually persisted before navigating anywhere —
     // never pretend to be logged in.
     setBusy(true);
+    if (data.cookieless && data.sessionToken) setFallbackToken(data.sessionToken);
     let who = await fetchSession(true);
     if (!who && data.sessionToken) {
       // the browser refused the cookie (embedded previews block third-party

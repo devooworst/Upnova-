@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { token, expiresAt } = createSession(user.id);
-    cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
+    const cookieless = process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1";
+    if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     // security notification: every new sign-in is visible to the account
     notify({
@@ -70,6 +71,6 @@ export async function POST(req: NextRequest) {
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
     // sessionToken lets the client fall back to Bearer transport if the
     // browser refuses the cookie (embedded previews) — same session row
-    return { ...ownProfile(user, profile), sessionToken: token };
+    return { ...ownProfile(user, profile), sessionToken: token, cookieless };
   });
 }
