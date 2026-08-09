@@ -17,6 +17,7 @@ export async function GET() {
       stickyMarkerPresent: existsSync(join(process.cwd(), "db", ".demo-session")),
       cookielessMode: process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1",
       sandbox: process.env.E2B_SANDBOX_ID ?? null,
+      serverBuildCommit: process.env.NEXT_PUBLIC_BUILD_COMMIT ?? "unknown",
     };
   });
 }

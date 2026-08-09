@@ -85,7 +85,7 @@ export default function SessionDebugPage() {
       out.push({ name: "JS cookies", ok, detail: ok ? "accepted" : "REFUSED (third-party blocking)" });
     } catch { out.push({ name: "JS cookies", ok: false, detail: "REFUSED" }); }
     out.push({ name: "embedded in iframe", ok: null, detail: window.top === window.self ? "no — first-party context" : "YES — third-party cookie rules apply" });
-    out.push({ name: "fallback token present", ok: !!getFallbackToken(), detail: getFallbackToken() ? "yes (stored client-side)" : "no" });
+    out.push({ name: "session token (client copy)", ok: !!getFallbackToken(), detail: getFallbackToken() ? "present — ONE credential, multiple transports (not a second auth system)" : "none" });
     out.push({ name: "saved user snapshot", ok: null, detail: (() => { try { return window.localStorage.getItem("upnova-session-user") ? "present" : "absent"; } catch { return "unreadable"; } })() });
 
     // the server's answer — the source of truth
@@ -112,6 +112,10 @@ export default function SessionDebugPage() {
   return (
     <div className="mx-auto max-w-xl space-y-4 py-8">
       <h1 className="text-xl font-bold tracking-tight text-zinc-50">Session self-test</h1>
+      <p className="font-mono text-[11px] text-zinc-500">
+        build <span className="text-lime-300">{process.env.NEXT_PUBLIC_BUILD_COMMIT ?? "unknown"}</span> — if this
+        doesn&apos;t match the latest commit, the preview is serving STALE CODE and no fix can reach you here.
+      </p>
       <p className="text-xs text-zinc-500">
         Dev-only diagnostics. Screenshot this page when reporting a login/refresh problem — it shows exactly which
         persistence layer your browser permits and what the server thinks.
