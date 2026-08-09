@@ -47,9 +47,25 @@ export const COMMUNITY_CATEGORIES = [
   "Career",
   "Hobbies",
   "Student Organizations",
+  "Academic Groups",
+  "Interest Groups",
   "Campus Social",
   "General",
 ] as const;
+
+/* Student Groups — a campus community in one of these categories belongs
+   to the STUDENT GROUPS area of Your Campus, not the general Communities
+   directory. General communities stay for broader social/interest
+   conversation (Music Producers, Photo & Video, Late Night Conversations…). */
+export const STUDENT_GROUP_CATEGORIES = [
+  "Study Groups",
+  "Student Organizations",
+  "Academic Groups",
+  "Interest Groups",
+] as const;
+
+export const isStudentGroup = (c: { campusId: string | null; kind: string; category: string }) =>
+  !!c.campusId && c.kind === "standard" && (STUDENT_GROUP_CATEGORIES as readonly string[]).includes(c.category);
 
 /* Alias rules — anti-impersonation is server-enforced on top of this:
    an alias may not match another user's handle or display name. */

@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { GraduationCap, Plus, Clock, Check, RotateCcw, MessageSquare, HandHeart } from "lucide-react";
+import { GraduationCap, Plus, Clock, Check, RotateCcw, MessageSquare, HandHeart, ArrowLeft } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
 import { LISTING_TYPES, LOAN_STATUS_LABEL, typeLabel } from "@/lib/campusMarket";
@@ -89,6 +89,12 @@ export default function CampusMarketPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <Link
+        href="/campus"
+        className="mb-2 inline-flex items-center gap-1 px-1 font-mono text-[11px] tracking-[0.1em] text-zinc-500 transition hover:text-violet-300"
+      >
+        <ArrowLeft className="h-3 w-3" /> BACK TO YOUR CAMPUS
+      </Link>
       <div className="flex flex-wrap items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-400/10">
           <GraduationCap className="h-5 w-5 text-violet-400" />

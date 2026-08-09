@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { communityCounts, serializeCommunity } from "@/lib/server/communities";
-import { COMMUNITY_CATEGORIES } from "@/lib/communityIdentity";
+import { COMMUNITY_CATEGORIES, isStudentGroup } from "@/lib/communityIdentity";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +39,10 @@ export async function GET(req: NextRequest) {
 
     const discover = all
       .filter((c) => !mByCommunity.get(c.id) || mByCommunity.get(c.id)!.status === "banned")
+      // student groups (campus + Study Groups / Student Organizations /
+      // Academic Groups / Interest Groups) live in Your Campus → Student
+      // Groups, not in the general directory
+      .filter((c) => !isStudentGroup(c))
       .map((c) => serializeCommunity(c, { membership: null, counts: counts.get(c.id) }));
 
     return { guest: !viewer, mine, discover, categories: COMMUNITY_CATEGORIES };

@@ -344,6 +344,22 @@ function seed() {
       owner: "nia", category: "Anime", modes: ["real", "alias"], campus: true,
     },
     {
+      slug: "bsu-digital-media-association", name: "Digital Media Student Association",
+      desc: "Bowie State's student org for video, design, and content careers. Meetings every other Wednesday.",
+      owner: "nia", category: "Student Organizations", modes: ["real"], campus: true,
+      rules: ["Meetings are member-led — sign up to present"],
+    },
+    {
+      slug: "bsu-math-tutoring-circle", name: "Math Tutoring Circle",
+      desc: "Peer tutoring for calc, stats, and linear algebra. Bring problems, leave with answers.",
+      owner: "omar", category: "Academic Groups", modes: ["real", "alias"], campus: true,
+    },
+    {
+      slug: "bsu-chess-board-games", name: "Chess & Board Games Club",
+      desc: "Casual games in the student center every Friday. All skill levels.",
+      owner: "imani", category: "Interest Groups", modes: ["real", "alias"], campus: true,
+    },
+    {
       slug: "bowie-campus-questions", name: "Campus Questions — Bowie State",
       desc: "Questions, advice & info for Bowie State. Ask with your profile, an alias, or anonymously.",
       owner: "devin", category: "Academic", modes: ["real", "alias", "anonymous"], campus: true, kind: "campus_questions",
@@ -374,6 +390,9 @@ function seed() {
     ["bowie-cybersecurity-study-group", "omar"], ["bowie-cybersecurity-study-group", "imani"],
     ["bowie-anime", "devin"], ["bowie-anime", "imani"], ["bowie-anime", "omar"],
     ["bowie-campus-questions", "nia"], ["bowie-campus-questions", "imani"], ["bowie-campus-questions", "omar"],
+    ["bsu-digital-media-association", "devin"], ["bsu-digital-media-association", "imani"],
+    ["bsu-math-tutoring-circle", "nia"],
+    ["bsu-chess-board-games", "omar"], ["bsu-chess-board-games", "nia"],
   ];
   for (const [slug, handle] of memberships)
     db.insert(t.communityMembers).values({ communityId: cid[slug], userId: uid[handle], status: "active" }).run();

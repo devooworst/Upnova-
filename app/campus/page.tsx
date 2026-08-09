@@ -34,6 +34,7 @@ import { creators, campusOrgs } from "@/lib/data";
 
 const sections = [
   { id: "communities", emoji: "💬", label: "Communities", desc: "Interest-based conversations" },
+  { id: "groups", emoji: "📚", label: "Student Groups", desc: "Study groups, orgs & clubs" },
   { id: "services", emoji: "🛍️", label: "Campus Services", desc: "Find students who offer services" },
   { id: "opps", emoji: "💰", label: "Opportunities", desc: "Jobs, gigs & collaborations" },
   { id: "orgs", emoji: "🏛️", label: "Organizations", desc: "Student organizations & groups" },
@@ -436,6 +437,9 @@ export default function CampusPage() {
         </div>
       )}
 
+      {/* ================= 📚 STUDENT GROUPS — campus communities ================= */}
+      {section === "groups" && <CampusGroups />}
+
       {/* ================= 🎉 EVENTS — strictly campus ================= */}
       {section === "events" && <CampusEvents />}
 
@@ -562,6 +566,137 @@ function CampusEvents() {
       <p className="px-1 text-[11px] text-zinc-600">
         Looking for off-campus parties, concerts, and city events? Those live in{" "}
         <a href="/events" className="font-semibold text-amber-300 hover:text-amber-200">Events</a> — the wider world.
+      </p>
+    </div>
+  );
+}
+
+
+/* Student Groups — this campus's communities in the Study Groups /
+   Student Organizations / Academic Groups / Interest Groups categories.
+   They live HERE, not in the general Communities directory; broader
+   social/interest communities stay in Communities. Cards reuse the
+   existing community join/detail flows — nothing is duplicated. */
+function CampusGroups() {
+  const [data, setData] = useState<{
+    campusName: string;
+    categories: string[];
+    groups: {
+      id: string; slug: string; name: string; description: string; access: string;
+      category: string; members: number; activeMembers: number; rules: string[];
+      identityModes: string[];
+      viewer: { status: string } | null;
+    }[];
+  } | null>(null);
+  const [cat, setCat] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+
+  const load = async () => {
+    const res = await fetch("/api/campus/groups", { cache: "no-store" });
+    if (res.ok) setData(await res.json());
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const join = async (g: { id: string; name: string }) => {
+    const res = await fetch(`/api/communities/${g.id}/join`, { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) setNote(j.error || "Couldn't join");
+    else setNote(j.status === "pending" ? `Request sent — ${g.name}'s moderators will review it.` : `Welcome to ${g.name}.`);
+    void load();
+  };
+
+  const shown = data ? data.groups.filter((g) => !cat || g.category === cat) : [];
+
+  return (
+    <div className="space-y-3 animate-fade-up">
+      <div className="flex items-center justify-between px-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+          Study groups, student orgs, academic & interest groups
+        </p>
+        <a href="/communities/create" className="btn-ghost px-4 py-1.5 text-xs">+ Create student group</a>
+      </div>
+
+      {note && (
+        <div className="rounded-xl border border-violet-400/30 bg-violet-400/10 px-4 py-2.5 text-sm text-violet-200">
+          {note}
+          <button onClick={() => setNote(null)} className="float-right text-violet-300/60 hover:text-violet-200">✕</button>
+        </div>
+      )}
+
+      {data && (
+        <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1">
+          <button
+            onClick={() => setCat("")}
+            className={`shrink-0 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.1em] transition ${!cat ? "bg-violet-400 font-bold text-zinc-950" : "border border-zinc-800 text-zinc-400 hover:border-violet-400/40"}`}
+          >
+            ALL
+          </button>
+          {data.categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCat(cat === c ? "" : c)}
+              className={`shrink-0 rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.1em] transition ${cat === c ? "bg-violet-400 font-bold text-zinc-950" : "border border-zinc-800 text-zinc-400 hover:border-violet-400/40"}`}
+            >
+              {c.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {data === null ? (
+        <div className="card-people h-32 animate-pulse" />
+      ) : shown.length === 0 ? (
+        <p className="py-8 text-center text-sm text-zinc-600">
+          {cat ? "No groups in that category yet — start one." : "No student groups yet — start the first one."}
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {shown.map((g) => (
+            <article key={g.id} className="card-people flex flex-col gap-2.5 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <a href={`/communities/${g.slug}`} className="min-w-0">
+                  <h3 className="truncate text-[15px] font-bold text-zinc-100 hover:text-violet-300">{g.name}</h3>
+                  <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-zinc-500">{g.description}</p>
+                </a>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.14em] ${g.access === "private" ? "bg-amber-400/10 text-amber-300" : g.access === "invite" ? "bg-sky-400/10 text-sky-300" : "bg-lime-400/10 text-lime-300"}`}>
+                  {g.access === "private" ? "PRIVATE" : g.access === "invite" ? "INVITE-ONLY" : "PUBLIC"}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] tracking-[0.08em] text-zinc-500">
+                <span className="text-violet-300">{g.category.toUpperCase()}</span>
+                <span>{g.members} MEMBERS</span>
+                <span>{g.activeMembers} ACTIVE</span>
+              </div>
+              <div className="mt-auto flex items-center gap-2 pt-1">
+                <a href={`/communities/${g.slug}`} className="rounded-full border border-zinc-700 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-violet-400/40 hover:text-violet-300">
+                  View
+                </a>
+                {!g.viewer && g.access !== "invite" && (
+                  <button onClick={() => void join(g)} className="rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-bold text-zinc-950 transition hover:bg-violet-300">
+                    {g.access === "private" ? "Request to join" : "Join"}
+                  </button>
+                )}
+                {!g.viewer && g.access === "invite" && (
+                  <span className="font-mono text-[10px] tracking-[0.1em] text-zinc-500">INVITATION NEEDED</span>
+                )}
+                {g.viewer?.status === "active" && <span className="font-mono text-[10px] tracking-[0.1em] text-lime-300">MEMBER</span>}
+                {g.viewer?.status === "pending" && <span className="font-mono text-[10px] tracking-[0.1em] text-amber-300">REQUEST PENDING</span>}
+                {g.viewer?.status === "invited" && (
+                  <button onClick={() => void join(g)} className="rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-bold text-zinc-950 hover:bg-violet-300">
+                    Accept invitation
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <p className="px-1 text-[11px] text-zinc-600">
+        Looking for broader conversations — music, photo, late-night talk? Those live in{" "}
+        <a href="/communities" className="font-semibold text-violet-300 hover:text-violet-200">Communities</a>.
       </p>
     </div>
   );
