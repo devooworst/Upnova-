@@ -97,7 +97,7 @@ export default function SessionDebugPage() {
           {
             name: "/api/auth/me (server verdict)",
             ok: !!d.user,
-            detail: d.user ? `authenticated as @${d.user.handle}` : "unauthenticated",
+            detail: d.user ? `authenticated as @${d.user.handle}` : `unauthenticated — ${d.reason ?? "no reason given"}`,
           },
         ])
       )
