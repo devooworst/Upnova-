@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
-import { findCommunity, getMembership, isMod, logMod, requireActiveMember } from "@/lib/server/communities";
+import { findCommunity, getMembership, isMod, logMod, requireActiveMember, activeMemberCount } from "@/lib/server/communities";
 import { notify } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
@@ -72,8 +72,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     switch (action) {
       case "approve": {
         if (target.status !== "pending") throw new ApiError(409, "No pending request from that user");
-        set({ status: "active", joinedAt: new Date() });
-        notify({ userId: targetId, actorId: user.id, type: "community", title: `Welcome to ${c.name}`, body: "Your join request was approved", href: `/communities/${c.slug}` });
+        if (c.price > 0) {
+          // paid + approval: approval unlocks the PAYMENT step — membership
+          // activates when they complete it
+          set({ status: "approved_unpaid" });
+          notify({ userId: targetId, actorId: user.id, type: "community", title: `Approved — ${c.name}`, body: `Complete your $${c.price} ${c.billingPeriod} membership to join.`, href: `/communities/${c.slug}` });
+        } else {
+          if (c.capacity != null && activeMemberCount(c.id) >= c.capacity) throw new ApiError(409, "The community is at capacity — raise it or free a spot first");
+          set({ status: "active", joinedAt: new Date() });
+          notify({ userId: targetId, actorId: user.id, type: "community", title: `Welcome to ${c.name}`, body: "Your join request was approved", href: `/communities/${c.slug}` });
+        }
         break;
       }
       case "decline": {

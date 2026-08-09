@@ -6,6 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import {
   findCommunity,
   getMembership,
+  refreshMembership,
   requireActiveMember,
   isMod,
   memberIsMuted,
@@ -35,11 +36,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const c = findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
     const viewer = getSessionUser();
-    const membership = viewer ? getMembership(c.id, viewer.id) : null;
+    let membership = viewer ? getMembership(c.id, viewer.id) : null;
+    if (membership) membership = refreshMembership(c, membership);
     const activeMember = !!membership && membership.status === "active";
 
     if (!activeMember && c.access !== "public")
       throw new ApiError(403, "This community's discussions are members-only");
+    if (!activeMember && c.price > 0)
+      throw new ApiError(
+        403,
+        membership?.status === "inactive"
+          ? "Your membership expired — renew it to regain access. Your posts and history are intact."
+          : `Member content — join for $${c.price} ${c.billingPeriod === "custom" ? `per ${c.customPeriodDays} days` : c.billingPeriod} to see the discussion`
+      );
 
     // demo: seed members reply to fresh protagonist posts (lazy, on read)
     if (viewer) seedRespondsInCommunity(c.id);

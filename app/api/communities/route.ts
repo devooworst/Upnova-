@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
-import { communityCounts, serializeCommunity } from "@/lib/server/communities";
+import { communityCounts, refreshMembership, serializeCommunity } from "@/lib/server/communities";
 import { COMMUNITY_CATEGORIES, isStudentGroup } from "@/lib/communityIdentity";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,15 @@ export async function GET(req: NextRequest) {
     if (category) all = all.filter((c) => c.category === category);
 
     const memberships = viewer
-      ? db.select().from(tables.communityMembers).where(eq(tables.communityMembers.userId, viewer.id)).all()
+      ? db
+          .select()
+          .from(tables.communityMembers)
+          .where(eq(tables.communityMembers.userId, viewer.id))
+          .all()
+          .map((m) => {
+            const c = all.find((x) => x.id === m.communityId);
+            return c ? refreshMembership(c, m) : m; // lazy paid-membership lifecycle
+          })
       : [];
     const mByCommunity = new Map(memberships.map((m) => [m.communityId, m]));
     const counts = communityCounts(all.map((c) => c.id));
@@ -65,6 +73,12 @@ export async function POST(req: NextRequest) {
       ? body.rules.map((r: unknown) => String(r).trim()).filter(Boolean).slice(0, 10)
       : [];
     const whoCanPost = ["members", "mods"].includes(body.whoCanPost) ? body.whoCanPost : "members";
+    const price = Math.round(Number(body.price) || 0);
+    if (price < 0 || price > 100_000) throw new ApiError(400, "That membership price doesn't look right");
+    const billingPeriod = ["weekly", "monthly", "yearly", "custom"].includes(body.billingPeriod) ? body.billingPeriod : "monthly";
+    const customPeriodDays = billingPeriod === "custom" ? Math.max(1, Math.min(3650, Math.round(Number(body.customPeriodDays) || 30))) : null;
+    const capacity = body.capacity != null && body.capacity !== "" ? Math.round(Number(body.capacity)) : null;
+    if (capacity != null && (isNaN(capacity) || capacity < 1 || capacity > 1_000_000)) throw new ApiError(400, "That capacity doesn't look right");
     const whoCanInvite = ["members", "mods"].includes(body.whoCanInvite) ? body.whoCanInvite : "mods";
     const joinApproval = access === "private" ? true : !!body.joinApproval;
 
@@ -106,6 +120,10 @@ export async function POST(req: NextRequest) {
         whoCanPost,
         whoCanInvite,
         identityModes: JSON.stringify(modes),
+        price,
+        billingPeriod,
+        customPeriodDays,
+        capacity,
         campusId,
         coverUrl: body.coverUrl ? String(body.coverUrl).slice(0, 400) : null,
         createdById: user.id,

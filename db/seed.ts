@@ -345,6 +345,11 @@ function seed() {
       owner: "nia", category: "Anime", modes: ["real", "alias"], campus: true,
     },
     {
+      slug: "lenas-design-lab", name: "Lena's Design Lab — Inner Circle",
+      desc: "Weekly design critiques, working files, and portfolio teardowns from a working brand designer. Membership keeps it small and serious.",
+      owner: "lena", category: "Career", modes: ["real"], rules: ["Post work to get work critiqued", "What's shared here stays here"],
+    },
+    {
       slug: "bsu-digital-media-association", name: "Digital Media Student Association",
       desc: "Bowie State's student org for video, design, and content careers. Meetings every other Wednesday.",
       owner: "nia", category: "Student Organizations", modes: ["real"], campus: true,
@@ -397,6 +402,20 @@ function seed() {
   ];
   for (const [slug, handle] of memberships)
     db.insert(t.communityMembers).values({ communityId: cid[slug], userId: uid[handle], status: "active" }).run();
+
+  // paid community economics: $8/month, capacity 60, standard 3-day grace.
+  // Devin's membership expires in ~2 days → the "renews soon" notice fires
+  // on his next visit, and the renew button is live.
+  db.update(t.communities)
+    .set({ price: 8, billingPeriod: "monthly", capacity: 60, graceDays: 3 })
+    .where(eq(t.communities.id, cid["lenas-design-lab"]))
+    .run();
+  db.insert(t.communityMembers)
+    .values({ communityId: cid["lenas-design-lab"], userId: uid["devin"], status: "active", memberUntil: new Date(Date.now() + 2 * 86400_000) })
+    .run();
+  db.insert(t.communityMembers)
+    .values({ communityId: cid["lenas-design-lab"], userId: uid["ava"], status: "active", memberUntil: new Date(Date.now() + 20 * 86400_000) })
+    .run();
 
   // nia asked to join the private study group — a pending request for the
   // protagonist (owner) to approve

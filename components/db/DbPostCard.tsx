@@ -77,10 +77,13 @@ export default function DbPostCard({
   post,
   savedInitial = false,
   onHidden,
+  flat = false,
 }: {
   post: FeedPost;
   savedInitial?: boolean;
   onHidden?: (id: string) => void;
+  /** feed rendering: no card chrome — content and a hairline divider */
+  flat?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user: me } = useSession();
@@ -153,10 +156,20 @@ export default function DbPostCard({
     }
   };
 
+  const share = async () => {
+    const url = `${window.location.origin}/posts/${post.id}`;
+    const title = `${post.author.displayName} on UpNova`;
+    if (navigator.share) {
+      try { await navigator.share({ title, url }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(url);
+    }
+  };
+
   const a = post.author;
 
   return (
-    <article className="card-people p-4 sm:p-5">
+    <article className={flat ? "border-b border-line-soft pb-5" : "card-people p-4 sm:p-5"}>
       {/* header */}
       <div className="flex items-start gap-3">
         <Link href={`/creator/${a.handle}`} className="shrink-0">
@@ -252,7 +265,7 @@ export default function DbPostCard({
       <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-200">{post.body}</p>
       {(post.category || ["work", "bts", "announcement", "promotion", "content"].includes(post.kind)) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {["work", "bts", "announcement", "promotion", "content"].includes(post.kind) && (
+          {(flat ? ["announcement", "promotion"] : ["work", "bts", "announcement", "promotion", "content"]).includes(post.kind) && (
             <span className="rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-500">
               {post.kind === "bts" ? "Behind the scenes" : post.kind}
             </span>
@@ -266,7 +279,7 @@ export default function DbPostCard({
         </div>
       )}
       {post.imageUrl && (
-        <div className="relative mt-3 aspect-[16/10] overflow-hidden rounded-xl border border-line">
+        <div className={`relative mt-3 overflow-hidden ${flat ? "aspect-[4/3] rounded-xl" : "aspect-[16/10] rounded-xl border border-line"}`}>
           {post.imageUrl.startsWith("data:") ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={post.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -296,26 +309,30 @@ export default function DbPostCard({
       {/* trust & context labels — what's verified vs what's claimed */}
       <TrustChips trust={post.trust} postId={post.id} />
 
-      {/* actions */}
-      <div className="mt-3 flex items-center gap-5 border-t border-line-soft pt-2.5 text-xs text-zinc-500">
+      {/* actions — quiet: the content is the star, these are the verbs */}
+      <div className={`flex items-center text-[13px] text-zinc-500 ${flat ? "mt-3.5 gap-6" : "mt-3 gap-5 border-t border-line-soft pt-2.5 text-xs"}`}>
         <button
           onClick={toggleLike}
-          className={`flex items-center gap-1.5 transition ${liked ? "text-rose-400" : "hover:text-zinc-300"}`}
+          aria-label="Like"
+          className={`flex items-center gap-1.5 transition active:scale-90 ${liked ? "text-rose-400" : "hover:text-zinc-200"}`}
         >
-          <Heart className={`h-4 w-4 ${liked ? "fill-rose-400" : ""}`} />
-          {likes}
+          <Heart className={`h-[18px] w-[18px] ${liked ? "fill-rose-400" : ""}`} />
+          {likes > 0 && <span className="tabular-nums">{likes}</span>}
         </button>
-        <button onClick={openComments} className="flex items-center gap-1.5 transition hover:text-zinc-300">
-          <MessageCircle className="h-4 w-4" />
-          {commentCount}
+        <button onClick={openComments} aria-label="Comment" className="flex items-center gap-1.5 transition hover:text-zinc-200">
+          <MessageCircle className="h-[18px] w-[18px]" />
+          {commentCount > 0 && <span className="tabular-nums">{commentCount}</span>}
+        </button>
+        <button onClick={share} aria-label="Share" className="flex items-center gap-1.5 transition hover:text-zinc-200">
+          <Send className="h-[17px] w-[17px]" />
         </button>
         <button
           onClick={toggleSave}
+          aria-label={saved ? "Remove bookmark" : "Save"}
           title={saved ? "Remove bookmark" : "Save"}
-          className={`ml-auto flex items-center gap-1.5 transition ${saved ? "text-violet-300" : "hover:text-zinc-300"}`}
+          className={`ml-auto flex items-center transition ${saved ? "text-violet-300" : "hover:text-zinc-200"}`}
         >
-          <Bookmark className={`h-4 w-4 ${saved ? "fill-violet-300" : ""}`} />
-          {saved ? "Saved" : "Save"}
+          <Bookmark className={`h-[18px] w-[18px] ${saved ? "fill-violet-300" : ""}`} />
         </button>
       </div>
 

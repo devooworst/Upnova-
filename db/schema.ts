@@ -305,6 +305,17 @@ export const communities = sqliteTable("communities", {
   // JSON subset of ["real","alias","anonymous"] — the creator decides which
   // identity modes this community permits. Server-enforced on every post.
   identityModes: text("identity_modes").notNull().default('["real"]'),
+  // ---- access & membership economics (generic: creator circles, education,
+  // networking, hobby groups — the model is the same) ----
+  capacity: integer("capacity"), // max ACTIVE members; null = unlimited
+  // price in whole dollars per period; 0 = free. Paid + private = approval
+  // THEN payment. Members keep their history when access lapses — status
+  // flips to inactive, nothing is deleted.
+  price: integer("price").notNull().default(0),
+  billingPeriod: text("billing_period").notNull().default("monthly"), // weekly | monthly | yearly | custom
+  customPeriodDays: integer("custom_period_days"),
+  graceDays: integer("grace_days").notNull().default(3), // unpaid grace before access pauses
+  paused: bool("paused"), // pause NEW memberships; existing members unaffected
   campusId: text("campus_id").references(() => campuses.id, { onDelete: "set null" }),
   createdById: text("created_by_id")
     .notNull()
@@ -323,7 +334,14 @@ export const communityMembers = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").notNull().default("member"), // member | moderator | owner
-    status: text("status").notNull().default("active"), // active | pending | invited | banned
+    // active | pending (awaiting approval) | invited | approved_unpaid
+    // (approved for a paid community, payment not completed) | inactive
+    // (paid membership lapsed — history kept, access restricted) | banned
+    status: text("status").notNull().default("active"),
+    // paid membership: access runs until this instant (+ grace period)
+    memberUntil: integer("member_until", { mode: "timestamp_ms" }),
+    expiryNotified: bool("expiry_notified"),
+    graceNotified: bool("grace_notified"),
     // community-specific alias. Other members never get a link from the
     // alias back to the profile.
     alias: text("alias"),
@@ -1098,6 +1116,7 @@ export const payments = sqliteTable("payments", {
   bookingId: text("booking_id"),
   orderId: text("order_id"), // product purchase this payment secures
   licenseId: text("license_id"), // creative-work license this payment secures
+  communityId: text("community_id"), // community membership period this payment covers
   payerId: text("payer_id")
     .notNull()
     .references(() => users.id),

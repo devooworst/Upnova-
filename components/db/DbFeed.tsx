@@ -6,7 +6,7 @@
 /*  a real account. No hardcoded users anywhere.                       */
 /* ------------------------------------------------------------------ */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import DbPostCard, { type FeedPost } from "./DbPostCard";
@@ -93,8 +93,20 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
   } | null>(null);
   const [suggestedWork, setSuggestedWork] = useState<{
     id: string; title: string; kind: string; from: number | null; hasFree: boolean; coverUrl: string | null;
+    previewUrl: string | null;
     owner: { handle: string; displayName: string; avatarUrl: string | null }; reasons: string[];
   } | null>(null);
+  const [playingWork, setPlayingWork] = useState(false);
+  const workAudio = useRef<HTMLAudioElement | null>(null);
+  const toggleWorkPreview = (url: string) => {
+    if (!workAudio.current) {
+      workAudio.current = new Audio(url);
+      workAudio.current.onended = () => setPlayingWork(false);
+    }
+    if (playingWork) workAudio.current.pause();
+    else void workAudio.current.play();
+    setPlayingWork(!playingWork);
+  };
   const [suggestedOpp, setSuggestedOpp] = useState<{
     id: string; title: string; budget: number | null; location: string;
     owner: { handle: string; displayName: string; avatarUrl: string | null }; reasons: string[];
@@ -221,6 +233,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
             <span key={p.id} className="block space-y-4">
               <DbPostCard
                 post={p}
+                flat
                 savedInitial={savedPosts.has(p.id)}
                 onHidden={(id) => setPosts((cur) => (cur ?? []).filter((x) => x.id !== id))}
               />
@@ -247,25 +260,47 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
               )}
               {/* WORK card — License is the action */}
               {i === 3 && suggestedWork && (
-                <aside className="card flex flex-wrap items-center gap-3 p-4">
+                <aside className="card flex flex-wrap items-center gap-3.5 p-4">
                   <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Work · License
                     {suggestedWork.reasons.length ? ` · ${suggestedWork.reasons.join(" · ")}` : ""}
                   </span>
-                  {suggestedWork.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={suggestedWork.coverUrl} alt="" className="h-12 w-12 rounded-xl border border-line object-cover" />
-                  ) : (
-                    <Avatar src={suggestedWork.owner.avatarUrl} initials={suggestedWork.owner.displayName.charAt(0)} size="md" />
-                  )}
+                  {/* artwork first; the play button IS the preview */}
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-card-raised">
+                    {suggestedWork.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={suggestedWork.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    ) : (
+                      <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-zinc-600">♩</span>
+                    )}
+                    {suggestedWork.previewUrl && (
+                      <button
+                        onClick={() => toggleWorkPreview(suggestedWork.previewUrl!)}
+                        aria-label={playingWork ? "Pause preview" : "Play preview"}
+                        className="absolute inset-0 flex items-center justify-center bg-black/45 text-zinc-50 transition hover:bg-black/30"
+                      >
+                        {playingWork ? (
+                          <span className="flex gap-[3px]" aria-hidden><span className="h-4 w-[3px] rounded bg-current" /><span className="h-4 w-[3px] rounded bg-current" /></span>
+                        ) : (
+                          <span aria-hidden className="ml-0.5 border-y-[7px] border-l-[11px] border-y-transparent border-l-current" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-zinc-100">{suggestedWork.title}</p>
-                    <p className="text-xs text-zinc-500">
-                      {suggestedWork.owner.displayName} ·{" "}
-                      <span className="font-mono tracking-[0.08em] text-lime-300">
-                        {suggestedWork.from != null ? `licenses from $${suggestedWork.from}` : suggestedWork.hasFree ? "free option" : "custom licensing"}
+                    <p className="truncate text-[15px] font-bold text-zinc-50">{suggestedWork.title}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {suggestedWork.owner.displayName}
+                      <span className="mx-1.5 text-zinc-700">·</span>
+                      <span className="font-mono tracking-[0.06em] text-lime-300">
+                        {suggestedWork.from != null ? `from $${suggestedWork.from}` : suggestedWork.hasFree ? "free option" : "custom licensing"}
                       </span>
                     </p>
+                    {suggestedWork.previewUrl && (
+                      <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-600">
+                        {playingWork ? "Playing preview" : "Tap artwork to preview"}
+                      </p>
+                    )}
                   </div>
                   <Link href={`/works/${suggestedWork.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">License</Link>
                 </aside>
@@ -279,13 +314,18 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                   </span>
                   <Avatar src={suggestedOpp.owner.avatarUrl} initials={suggestedOpp.owner.displayName.charAt(0)} size="md" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-zinc-100">{suggestedOpp.title}</p>
-                    <p className="text-xs text-zinc-500">
-                      {suggestedOpp.owner.displayName} · {suggestedOpp.location}
-                      {suggestedOpp.budget != null && <span className="font-mono tracking-[0.08em] text-lime-300"> · ${suggestedOpp.budget}</span>}
+                    <p className="truncate text-[15px] font-bold text-zinc-50">{suggestedOpp.title}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {suggestedOpp.budget != null && (
+                        <span className="font-mono text-[13px] font-semibold tracking-[0.04em] text-lime-300">${suggestedOpp.budget}</span>
+                      )}
+                      {suggestedOpp.budget != null && <span className="mx-1.5 text-zinc-700">·</span>}
+                      {suggestedOpp.location}
+                      <span className="mx-1.5 text-zinc-700">·</span>
+                      {suggestedOpp.owner.displayName}
                     </p>
                   </div>
-                  <Link href={`/opportunities/${suggestedOpp.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">Apply</Link>
+                  <Link href={`/opportunities/${suggestedOpp.id}`} className="btn-lime shrink-0 px-4 py-1.5 text-xs">Apply</Link>
                 </aside>
               )}
               {/* COMMUNITY card — a popular public-community post, author
@@ -323,20 +363,22 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                   </span>
                   {suggestedProduct.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={suggestedProduct.image} alt="" className="h-12 w-12 rounded-xl border border-line object-cover" />
+                    <img src={suggestedProduct.image} alt="" className="h-16 w-16 shrink-0 rounded-xl border border-line object-cover" />
                   ) : (
                     <Avatar src={suggestedProduct.owner.avatarUrl} initials={suggestedProduct.owner.displayName.charAt(0)} size="md" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-zinc-100">{suggestedProduct.title}</p>
-                    <p className="text-xs text-zinc-500">
-                      {suggestedProduct.owner.displayName} ·{" "}
-                      <span className="font-mono tracking-[0.08em] text-lime-300">${suggestedProduct.price}</span>
-                      <span className="capitalize"> · {suggestedProduct.category}</span>
+                    <p className="truncate text-[15px] font-bold text-zinc-50">{suggestedProduct.title}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      <span className="font-mono text-[13px] font-semibold tracking-[0.04em] text-lime-300">${suggestedProduct.price}</span>
+                      <span className="mx-1.5 text-zinc-700">·</span>
+                      <span className="capitalize">{suggestedProduct.category}</span>
+                      <span className="mx-1.5 text-zinc-700">·</span>
+                      {suggestedProduct.owner.displayName}
                     </p>
                   </div>
-                  <Link href={`/shop/${suggestedProduct.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">
-                    View Product
+                  <Link href={`/shop/${suggestedProduct.id}`} className="btn-lime shrink-0 px-4 py-1.5 text-xs">
+                    Buy
                   </Link>
                 </aside>
               )}

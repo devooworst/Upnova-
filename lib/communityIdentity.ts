@@ -111,3 +111,42 @@ export const communityRefMeta: Record<string, { label: string; href: (id: string
   campus: { label: "CAMPUS LISTING", href: (id) => `/campus/market/${id}` },
   event: { label: "EVENT", href: (id) => `/events/${id}` },
 };
+
+/* ------------------- access & membership economics ------------------- */
+/* Generic by design: creator circles, educational groups, networking,
+   hobby groups, exclusive communities — one configurable model, never a
+   per-use-case build. */
+
+export const ACCESS_MODELS = [
+  { id: "public_free", label: "Public · Free", desc: "Anyone can join instantly", access: "public", paid: false, approval: false },
+  { id: "private_free", label: "Private · Free", desc: "Join by request — you approve members", access: "private", paid: false, approval: true },
+  { id: "paid", label: "Paid subscription", desc: "Members subscribe to join — recurring membership", access: "public", paid: true, approval: false },
+  { id: "paid_approval", label: "Paid + approval", desc: "You approve each member, then they subscribe", access: "private", paid: true, approval: true },
+  { id: "invite", label: "Invite-only", desc: "Members need an invitation (can also carry a price)", access: "invite", paid: false, approval: false },
+] as const;
+
+export const BILLING_PERIODS = [
+  { id: "weekly", label: "Weekly", days: 7 },
+  { id: "monthly", label: "Monthly", days: 30 },
+  { id: "yearly", label: "Yearly", days: 365 },
+  { id: "custom", label: "Custom", days: 0 },
+] as const;
+
+export const periodLabel = (period: string, customDays?: number | null) =>
+  period === "custom" ? `every ${customDays ?? "?"} days` : `/${period.replace("ly", "").replace("week", "week").replace("month", "mo").replace("year", "yr")}`;
+
+/** Buyer-side 5% platform fee on top; the creator's price is the payout. */
+export function membershipQuote(price: number) {
+  const fee = Math.round(price * 0.05 * 100) / 100;
+  return { price, fee, total: Math.round((price + fee) * 100) / 100 };
+}
+
+export const MEMBERSHIP_STATE_LABEL: Record<string, string> = {
+  active: "Active member",
+  grace: "Payment due — grace period",
+  inactive: "Membership inactive — renew to regain access",
+  pending: "Awaiting approval",
+  approved_unpaid: "Approved — complete your membership payment",
+  invited: "Invited",
+  banned: "Removed",
+};

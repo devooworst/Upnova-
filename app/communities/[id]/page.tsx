@@ -75,7 +75,13 @@ interface Community {
   campusId: string | null;
   members: number;
   activeMembers: number;
-  viewer: { role: string; status: string; alias: string | null; anonCode: string | null; lastIdentity: string; isMod: boolean } | null;
+  capacity: number | null;
+  price: number;
+  billingPeriod: string;
+  customPeriodDays: number | null;
+  graceDays: number;
+  paused: boolean;
+  viewer: { role: string; status: string; memberUntil: string | null; alias: string | null; anonCode: string | null; lastIdentity: string; isMod: boolean } | null;
   pendingJoins?: number;
 }
 
@@ -224,6 +230,8 @@ function CommunityInner() {
   const [reportTarget, setReportTarget] = useState<{ type: "community_post" | "community_comment"; id: string } | null>(null);
   const [inviteHandle, setInviteHandle] = useState("");
   const [showMembers, setShowMembers] = useState(false);
+  const [showManage, setShowManage] = useState(false);
+  const [manage, setManage] = useState<{ price: string; capacity: string; graceDays: string; billingPeriod: string; customPeriodDays: string } | null>(null);
 
   const load = useCallback(async () => {
     const cRes = await fetch(`/api/communities/${idParam}`);
@@ -277,7 +285,34 @@ function CommunityInner() {
 
   const join = async () => {
     if (!user) return promptJoin("comment", `/communities/${idParam}`);
-    if (await api(`/api/communities/${idParam}/join`, { method: "POST" })) void load();
+    const res = await fetch(`/api/communities/${idParam}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return setMsg(j.error || "Couldn't join");
+    if (j.paymentRequired) {
+      // transaction-auth: the member confirms the EXACT total before paying
+      const label = j.period === "custom" ? `every ${j.periodDays} days` : j.period;
+      if (!window.confirm(`Membership: $${j.price} ${label} + $${j.fee.toFixed(2)} platform fee = $${j.total.toFixed(2)} per period. Confirm payment?`)) return;
+      const res2 = await fetch(`/api/communities/${idParam}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedTotal: j.total }) });
+      const j2 = await res2.json().catch(() => ({}));
+      if (!res2.ok) return setMsg(j2.error || "Payment didn't go through");
+      setMsg("Membership active — welcome in.");
+    }
+    void load();
+  };
+
+  const renew = async () => {
+    const res = await fetch(`/api/communities/${idParam}/membership`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return setMsg(j.error || "Couldn't renew");
+    if (j.paymentRequired) {
+      const label = j.period === "custom" ? `every ${j.periodDays} days` : j.period;
+      if (!window.confirm(`Renew: $${j.price} ${label} + $${j.fee.toFixed(2)} fee = $${j.total.toFixed(2)}. Confirm payment?`)) return;
+      const res2 = await fetch(`/api/communities/${idParam}/membership`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedTotal: j.total }) });
+      const j2 = await res2.json().catch(() => ({}));
+      if (!res2.ok) return setMsg(j2.error || "Payment didn't go through");
+      setMsg(`Renewed — active through ${new Date(j2.memberUntil).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`);
+    }
+    void load();
   };
 
   const post = async () => {
@@ -399,8 +434,18 @@ function CommunityInner() {
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] tracking-[0.08em] text-zinc-500">
                 <span className="text-zinc-400">{community.category.toUpperCase()}</span>
                 <span>{community.access.toUpperCase()}</span>
-                <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" />{community.members} MEMBERS</span>
+                {community.price > 0 && (
+                  <span className="text-lime-300">
+                    ${community.price}
+                    {community.billingPeriod === "custom" ? ` / ${community.customPeriodDays}D` : ` / ${community.billingPeriod.replace("ly", "").toUpperCase()}`}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {community.members}{community.capacity != null ? ` / ${community.capacity}` : ""} MEMBERS
+                </span>
                 <span>{community.activeMembers} ACTIVE THIS WEEK</span>
+                {community.paused && <span className="text-amber-300">NEW MEMBERSHIPS PAUSED</span>}
                 {community.campusId && <span className="inline-flex items-center gap-1 text-amber-300"><GraduationCap className="h-3 w-3" />CAMPUS</span>}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -414,18 +459,54 @@ function CommunityInner() {
             <div className="flex shrink-0 flex-col items-end gap-2">
               {!v && (
                 <button onClick={() => void join()} className="rounded-full bg-violet-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-violet-300">
-                  {community.access === "private" ? "Request to join" : community.access === "invite" ? "Invitation needed" : "Join"}
+                  {community.access === "private"
+                    ? "Request to join"
+                    : community.access === "invite"
+                    ? "Invitation needed"
+                    : community.price > 0
+                    ? `Join — $${community.price}${community.billingPeriod === "custom" ? ` / ${community.customPeriodDays} days` : ` / ${community.billingPeriod.replace("ly", "")}`}`
+                    : "Join"}
                 </button>
               )}
               {v?.status === "pending" && <span className="font-mono text-[10px] tracking-[0.1em] text-amber-300">REQUEST PENDING</span>}
+              {v?.status === "approved_unpaid" && (
+                <button onClick={() => void join()} className="rounded-full bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300">
+                  Approved — pay ${community.price} to join
+                </button>
+              )}
+              {v?.status === "inactive" && (
+                <button onClick={() => void renew()} className="rounded-full bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300">
+                  Renew membership
+                </button>
+              )}
+              {v?.status === "grace" && (
+                <button onClick={() => void renew()} className="rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-amber-300">
+                  Payment due — renew now
+                </button>
+              )}
+              {v?.status === "active" && community.price > 0 && v.memberUntil && (
+                <span className="text-right">
+                  <span className="block font-mono text-[10px] tracking-[0.08em] text-zinc-500">
+                    ACTIVE THROUGH {new Date(v.memberUntil).toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()}
+                  </span>
+                  <button onClick={() => void renew()} className="mt-1 rounded-full border border-zinc-700 px-3 py-1 text-[11px] font-semibold text-zinc-300 hover:border-lime-400/40 hover:text-lime-300">
+                    Renew early
+                  </button>
+                </span>
+              )}
               {v?.status === "invited" && (
                 <button onClick={() => void join()} className="rounded-full bg-violet-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-violet-300">
-                  Accept invitation
+                  Accept invitation{community.price > 0 ? ` — $${community.price}` : ""}
                 </button>
               )}
               {v?.isMod && (
                 <button onClick={() => (showMembers ? setShowMembers(false) : void loadMembers())} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:border-violet-400/40">
                   <Shield className="h-3.5 w-3.5" /> Members{community.pendingJoins ? ` · ${community.pendingJoins} pending` : ""}
+                </button>
+              )}
+              {v?.role === "owner" && (
+                <button onClick={() => setShowManage((x) => !x)} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:border-lime-400/40">
+                  Manage
                 </button>
               )}
             </div>
@@ -463,6 +544,71 @@ function CommunityInner() {
           {msg}
           <button onClick={() => setMsg(null)} className="float-right text-violet-300/60 hover:text-violet-200">✕</button>
         </div>
+      )}
+
+      {/* ---------------- owner: membership & access controls ---------------- */}
+      {showManage && community.viewer?.role === "owner" && (
+        <section className="card-people space-y-3 p-4">
+          <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Manage membership & access</h2>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm text-zinc-300">
+              <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">PRICE $ / PERIOD</span>
+              <input
+                type="number" min={0}
+                value={manage?.price ?? String(community.price)}
+                onChange={(e) => setManage({ price: e.target.value, capacity: manage?.capacity ?? (community.capacity != null ? String(community.capacity) : ""), graceDays: manage?.graceDays ?? String(community.graceDays), billingPeriod: manage?.billingPeriod ?? community.billingPeriod, customPeriodDays: manage?.customPeriodDays ?? String(community.customPeriodDays ?? 30) })}
+                className="w-24 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-lime-400/40"
+              />
+            </label>
+            <label className="text-sm text-zinc-300">
+              <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">CAPACITY</span>
+              <input
+                type="number" min={1} placeholder="Unlimited"
+                value={manage?.capacity ?? (community.capacity != null ? String(community.capacity) : "")}
+                onChange={(e) => setManage({ price: manage?.price ?? String(community.price), capacity: e.target.value, graceDays: manage?.graceDays ?? String(community.graceDays), billingPeriod: manage?.billingPeriod ?? community.billingPeriod, customPeriodDays: manage?.customPeriodDays ?? String(community.customPeriodDays ?? 30) })}
+                className="w-28 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-lime-400/40"
+              />
+            </label>
+            <label className="text-sm text-zinc-300">
+              <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">GRACE DAYS</span>
+              <input
+                type="number" min={0} max={30}
+                value={manage?.graceDays ?? String(community.graceDays)}
+                onChange={(e) => setManage({ price: manage?.price ?? String(community.price), capacity: manage?.capacity ?? (community.capacity != null ? String(community.capacity) : ""), graceDays: e.target.value, billingPeriod: manage?.billingPeriod ?? community.billingPeriod, customPeriodDays: manage?.customPeriodDays ?? String(community.customPeriodDays ?? 30) })}
+                className="w-20 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-lime-400/40"
+              />
+            </label>
+            <button
+              onClick={async () => {
+                const body: Record<string, unknown> = {
+                  price: Number(manage?.price ?? community.price),
+                  capacity: (manage?.capacity ?? (community.capacity != null ? String(community.capacity) : "")) || null,
+                  graceDays: Number(manage?.graceDays ?? community.graceDays),
+                };
+                if (await api(`/api/communities/${idParam}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })) {
+                  setMsg("Saved — price changes apply to future payments; paid-through dates are honored.");
+                  setManage(null);
+                  void load();
+                }
+              }}
+              className="rounded-full bg-lime-400 px-4 py-1.5 text-xs font-bold text-zinc-950 hover:bg-lime-300"
+            >
+              Save
+            </button>
+            <button
+              onClick={async () => {
+                if (await api(`/api/communities/${idParam}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paused: !community.paused }) })) void load();
+              }}
+              className={`rounded-full border px-4 py-1.5 text-xs font-semibold ${community.paused ? "border-lime-400/40 text-lime-300" : "border-amber-400/40 text-amber-300"}`}
+            >
+              {community.paused ? "Resume new memberships" : "Pause new memberships"}
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-600">
+            Lapsed members are never deleted — their posts and history stay; access pauses until they renew. Pausing stops NEW
+            memberships only; current members and renewals are unaffected.
+          </p>
+        </section>
       )}
 
       {/* ---------------- mod: member management ---------------- */}

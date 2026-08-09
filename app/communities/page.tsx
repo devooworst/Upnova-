@@ -35,6 +35,11 @@ interface CommunityCard {
   campusId: string | null;
   members: number;
   activeMembers: number;
+  capacity: number | null;
+  price: number;
+  billingPeriod: string;
+  customPeriodDays: number | null;
+  paused: boolean;
   viewer: { role: string; status: string; isMod: boolean } | null;
 }
 
@@ -141,9 +146,15 @@ function CommunitiesInner() {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] tracking-[0.08em] text-zinc-500">
           <span className="text-zinc-400">{c.category.toUpperCase()}</span>
-          <span>{c.members} MEMBERS</span>
+          {c.price > 0 && (
+            <span className="text-lime-300">
+              ${c.price}{c.billingPeriod === "custom" ? `/${c.customPeriodDays}D` : `/${c.billingPeriod.replace("ly", "").toUpperCase()}`}
+            </span>
+          )}
+          <span>{c.members}{c.capacity != null ? `/${c.capacity}` : ""} MEMBERS</span>
           <span>{c.activeMembers} ACTIVE</span>
           {c.rules.length > 0 && <span>{c.rules.length} RULES</span>}
+          {c.paused && <span className="text-amber-300">PAUSED</span>}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {c.identityModes.map((m) => (

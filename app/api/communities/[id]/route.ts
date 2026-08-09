@@ -5,6 +5,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import {
   findCommunity,
   getMembership,
+  refreshMembership,
   isMod,
   communityCounts,
   serializeCommunity,
@@ -20,7 +21,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const c = findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
     const viewer = getSessionUser();
-    const membership = viewer ? getMembership(c.id, viewer.id) : null;
+    let membership = viewer ? getMembership(c.id, viewer.id) : null;
+    if (membership) membership = refreshMembership(c, membership); // lazy paid-membership lifecycle
 
     const counts = communityCounts([c.id]).get(c.id);
     let pendingJoins: number | undefined;
@@ -57,6 +59,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (["members", "mods"].includes(body.whoCanPost)) patch.whoCanPost = body.whoCanPost;
     if (["members", "mods"].includes(body.whoCanInvite)) patch.whoCanInvite = body.whoCanInvite;
     if (typeof body.coverUrl === "string") patch.coverUrl = body.coverUrl.slice(0, 400) || null;
+    // membership economics — price changes apply to FUTURE payments only;
+    // paid-through dates already purchased are always honored
+    if (body.capacity !== undefined) {
+      const cap = body.capacity === null || body.capacity === "" ? null : Math.round(Number(body.capacity));
+      if (cap != null && (isNaN(cap) || cap < 1 || cap > 1_000_000)) throw new ApiError(400, "That capacity doesn't look right");
+      patch.capacity = cap;
+    }
+    if (body.price !== undefined) {
+      const price = Math.round(Number(body.price));
+      if (isNaN(price) || price < 0 || price > 100_000) throw new ApiError(400, "That price doesn't look right");
+      patch.price = price;
+    }
+    if (["weekly", "monthly", "yearly", "custom"].includes(body.billingPeriod)) patch.billingPeriod = body.billingPeriod;
+    if (body.customPeriodDays !== undefined) {
+      const days = Math.round(Number(body.customPeriodDays));
+      if (isNaN(days) || days < 1 || days > 3650) throw new ApiError(400, "Custom period is in days (1–3650)");
+      patch.customPeriodDays = days;
+    }
+    if (typeof body.paused === "boolean") patch.paused = body.paused;
+    if (body.graceDays !== undefined) {
+      const g = Math.round(Number(body.graceDays));
+      if (isNaN(g) || g < 0 || g > 30) throw new ApiError(400, "Grace period is 0–30 days");
+      patch.graceDays = g;
+    }
     if (Array.isArray(body.identityModes)) {
       const modes = body.identityModes.filter((x: string) => ["real", "alias", "anonymous"].includes(x));
       if (!modes.length) throw new ApiError(400, "Allow at least one identity mode");

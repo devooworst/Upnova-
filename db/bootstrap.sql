@@ -132,6 +132,12 @@ CREATE TABLE IF NOT EXISTS "communities" (
 	`who_can_post` text DEFAULT 'members' NOT NULL,
 	`who_can_invite` text DEFAULT 'mods' NOT NULL,
 	`identity_modes` text DEFAULT '["real"]' NOT NULL,
+	`capacity` integer,
+	`price` integer DEFAULT 0 NOT NULL,
+	`billing_period` text DEFAULT 'monthly' NOT NULL,
+	`custom_period_days` integer,
+	`grace_days` integer DEFAULT 3 NOT NULL,
+	`paused` integer DEFAULT false NOT NULL,
 	`campus_id` text,
 	`created_by_id` text NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
@@ -152,11 +158,19 @@ CREATE TABLE IF NOT EXISTS `community_comments` (
 	FOREIGN KEY (`post_id`) REFERENCES `community_posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS `community_members` (
+CREATE TABLE IF NOT EXISTS "community_members" (
 	`community_id` text NOT NULL,
 	`user_id` text NOT NULL,
 	`role` text DEFAULT 'member' NOT NULL,
-	`joined_at` integer NOT NULL, status text NOT NULL DEFAULT 'active', alias text, anon_code text, last_identity text NOT NULL DEFAULT 'real', muted_until integer,
+	`status` text DEFAULT 'active' NOT NULL,
+	`member_until` integer,
+	`expiry_notified` integer DEFAULT false NOT NULL,
+	`grace_notified` integer DEFAULT false NOT NULL,
+	`alias` text,
+	`anon_code` text,
+	`last_identity` text DEFAULT 'real' NOT NULL,
+	`muted_until` integer,
+	`joined_at` integer NOT NULL,
 	PRIMARY KEY(`community_id`, `user_id`),
 	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
@@ -472,7 +486,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
 	`status` text DEFAULT 'pending' NOT NULL,
 	`provider` text DEFAULT 'stripe_connect' NOT NULL,
 	`provider_ref` text,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, community_id text,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`payer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`payee_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action

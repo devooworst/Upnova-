@@ -790,6 +790,28 @@ problem returns / currently overdue). The owner deciding a request sees the requ
 record — facts, never an accusation; problem-return reports carry the same history as
 ADVISORY risk signals for the human reviewer. Nothing punishes a borrower automatically.
 
+### Community access & membership (generic monetization)
+
+Five access models, one configurable engine (creator circles, education, networking, hobby
+groups — never a per-use-case build): **Public/free · Private/free · Paid subscription ·
+Paid + approval · Invite-only.** Creators set capacity, category, description, rules,
+identity modes, and optional pricing per **weekly / monthly / yearly / custom-days** periods.
+
+- **Payments follow the platform law**: buyer-side 5% fee on top, creator price = payout,
+  `expectedTotal` transaction-auth on every charge (mismatch → 409 with the new total), rows
+  in `payments` with `communityId`.
+- **Lifecycle is lazy and humane**: renews-soon notice ~3 days out → expiry + grace-period
+  notice (access continues through the creator-set grace days) → status `inactive`. Nothing
+  is deleted — posts, history, and the membership row stay; **Renew** reactivates and extends
+  from the later of now / paid-through (renewing early never loses days).
+- **Creator controls**: approve members (paid+approval → `approved_unpaid` → member pays →
+  active), remove/ban/mute, appoint moderators, capacity (enforced at activation, 409 when
+  full), price changes (future payments only — paid-through dates honored), pause NEW
+  memberships (renewals unaffected), rules.
+- **Non-member preview**: name, description, category, member count/capacity, access type,
+  price/period, and rules are public; member content behind paid communities is locked with
+  an honest join prompt.
+
 ### Audit — still on static demo data (next passes)
 
 - Campus page CONTENT sections other than Marketplace/Questions/Events (the campus gate +

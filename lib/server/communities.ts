@@ -50,9 +50,82 @@ export function getMembership(communityId: string, userId: string): Membership |
 }
 
 export function requireActiveMember(communityId: string, userId: string): Membership {
-  const m = getMembership(communityId, userId);
-  if (!m || m.status !== "active") throw new ApiError(403, "You need to be a member of this community first");
+  const c = db.select().from(tables.communities).where(eq(tables.communities.id, communityId)).get();
+  let m = getMembership(communityId, userId);
+  if (c && m) m = refreshMembership(c, m);
+  if (!m || m.status !== "active")
+    throw new ApiError(
+      403,
+      m?.status === "inactive"
+        ? "Your membership expired — renew it to regain access. Your history is intact."
+        : "You need to be a member of this community first"
+    );
   return m;
+}
+
+/* --------------------- paid membership lifecycle --------------------- */
+
+export function communityPeriodDays(c: Community): number {
+  if (c.billingPeriod === "weekly") return 7;
+  if (c.billingPeriod === "yearly") return 365;
+  if (c.billingPeriod === "custom") return Math.max(1, c.customPeriodDays ?? 30);
+  return 30;
+}
+
+/** Lazy membership state machine, run on every read that matters.
+ *  Paid membership past its date: 3-days-out reminder → expiry +
+ *  grace-period notice (access continues) → INACTIVE after grace.
+ *  Nothing is deleted — history and the membership row stay; renewal
+ *  reactivates. */
+export function refreshMembership(c: Community, m: Membership): Membership {
+  if (!c.price || c.price <= 0 || !m.memberUntil || m.status !== "active") return m;
+  const now = Date.now();
+  const until = new Date(m.memberUntil).getTime();
+  const graceMs = (c.graceDays ?? 3) * 86_400_000;
+  const where = and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.userId, m.userId));
+  const fmt = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  if (until - now < 3 * 86_400_000 && until > now && !m.expiryNotified) {
+    db.update(tables.communityMembers).set({ expiryNotified: true }).where(where).run();
+    notifyMember(m.userId, `Your ${c.name} membership renews soon`, `It runs through ${fmt(until)} — renew any time to keep access.`, c.slug);
+    m = { ...m, expiryNotified: true };
+  }
+  if (until <= now && now < until + graceMs && !m.graceNotified) {
+    db.update(tables.communityMembers).set({ graceNotified: true }).where(where).run();
+    notifyMember(m.userId, `Payment due — ${c.name}`, `Your membership lapsed on ${fmt(until)}. You have a ${c.graceDays}-day grace period before access pauses. Renew to keep it.`, c.slug);
+    m = { ...m, graceNotified: true };
+  }
+  if (now >= until + graceMs) {
+    db.update(tables.communityMembers).set({ status: "inactive" }).where(where).run();
+    notifyMember(m.userId, `Membership paused — ${c.name}`, "Access to member content is paused until you renew. Your posts and history are untouched.", c.slug);
+    m = { ...m, status: "inactive" };
+  }
+  return m;
+}
+
+function notifyMember(userId: string, title: string, body: string, slug: string) {
+  // local import to avoid a cycle
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { notify } = require("./notify") as typeof import("./notify");
+  notify({ userId, type: "community", title, body, href: `/communities/${slug}` });
+}
+
+export function activeMemberCount(communityId: string): number {
+  return db
+    .select({ s: tables.communityMembers.status })
+    .from(tables.communityMembers)
+    .where(eq(tables.communityMembers.communityId, communityId))
+    .all()
+    .filter((m) => m.s === "active").length;
+}
+
+/** Displayable state incl. the derived grace phase. */
+export function membershipState(c: Community, m: Membership): string {
+  if (m.status === "active" && c.price > 0 && m.memberUntil) {
+    const until = new Date(m.memberUntil).getTime();
+    if (Date.now() > until) return "grace";
+  }
+  return m.status;
 }
 
 export const isMod = (m?: Membership | null) => !!m && m.status === "active" && (m.role === "owner" || m.role === "moderator");
@@ -400,10 +473,18 @@ export function serializeCommunity(
     createdAt: c.createdAt,
     members: opts.counts?.members ?? 0,
     activeMembers: opts.counts?.active ?? 0,
+    // public preview facts — visible to everyone, including non-members
+    capacity: c.capacity,
+    price: c.price,
+    billingPeriod: c.billingPeriod,
+    customPeriodDays: c.customPeriodDays,
+    graceDays: c.graceDays,
+    paused: !!c.paused,
     viewer: m
       ? {
           role: m.role,
-          status: m.status,
+          status: membershipState(c, m),
+          memberUntil: m.memberUntil ? new Date(m.memberUntil).toISOString() : null,
           alias: m.alias,
           anonCode: m.anonCode,
           lastIdentity: m.lastIdentity,

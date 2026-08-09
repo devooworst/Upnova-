@@ -69,7 +69,7 @@ export default function Home() {
 
   return (
     <div className="flex gap-6">
-      <div className="min-w-0 flex-1 space-y-4">
+      <div className="mx-auto w-full min-w-0 max-w-[640px] flex-1 space-y-4 xl:mx-0">
         {/* masthead — Home, always */}
         <header className="pt-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">

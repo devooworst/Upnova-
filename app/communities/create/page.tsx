@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, GraduationCap } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { COMMUNITY_ACCESS, COMMUNITY_CATEGORIES, IDENTITY_MODES } from "@/lib/communityIdentity";
+import { ACCESS_MODELS, BILLING_PERIODS, COMMUNITY_CATEGORIES, IDENTITY_MODES, membershipQuote } from "@/lib/communityIdentity";
 
 export default function CreateCommunityPage() {
   const { user } = useSession();
@@ -20,8 +20,12 @@ export default function CreateCommunityPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("General");
-  const [access, setAccess] = useState("public");
+  const [model, setModel] = useState("public_free");
   const [joinApproval, setJoinApproval] = useState(false);
+  const [price, setPrice] = useState("15");
+  const [billingPeriod, setBillingPeriod] = useState("monthly");
+  const [customDays, setCustomDays] = useState("30");
+  const [capacity, setCapacity] = useState("");
   const [whoCanPost, setWhoCanPost] = useState("members");
   const [whoCanInvite, setWhoCanInvite] = useState("mods");
   const [modes, setModes] = useState<string[]>(["real"]);
@@ -55,8 +59,12 @@ export default function CreateCommunityPage() {
         name,
         description,
         category,
-        access,
-        joinApproval,
+        access: ACCESS_MODELS.find((m) => m.id === model)?.access ?? "public",
+        joinApproval: model === "public_free" ? joinApproval : undefined,
+        price: ACCESS_MODELS.find((m) => m.id === model)?.paid || model === "invite" ? Number(price) || 0 : 0,
+        billingPeriod,
+        customPeriodDays: billingPeriod === "custom" ? Number(customDays) || 30 : undefined,
+        capacity: capacity ? Number(capacity) : undefined,
         whoCanPost,
         whoCanInvite,
         identityModes: modes,
@@ -115,22 +123,60 @@ export default function CreateCommunityPage() {
       </section>
 
       <section className="card-people space-y-3 p-4">
-        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Visibility</h2>
-        {COMMUNITY_ACCESS.map((a) => (
-          <label key={a.id} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition ${access === a.id ? "border-violet-400/50 bg-violet-400/5" : "border-zinc-800 hover:border-zinc-700"}`}>
-            <input type="radio" checked={access === a.id} onChange={() => setAccess(a.id)} className="mt-0.5 accent-violet-400" />
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Access & membership</h2>
+        {ACCESS_MODELS.map((a) => (
+          <label key={a.id} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition ${model === a.id ? "border-violet-400/50 bg-violet-400/5" : "border-zinc-800 hover:border-zinc-700"}`}>
+            <input type="radio" checked={model === a.id} onChange={() => setModel(a.id)} className="mt-0.5 accent-violet-400" />
             <span>
               <span className="block text-sm font-semibold text-zinc-200">{a.label}</span>
               <span className="block text-xs text-zinc-500">{a.desc}</span>
             </span>
           </label>
         ))}
-        {access === "public" && (
+        {model === "public_free" && (
           <label className="flex cursor-pointer items-center gap-2 px-1 text-sm text-zinc-300">
             <input type="checkbox" checked={joinApproval} onChange={(e) => setJoinApproval(e.target.checked)} className="accent-violet-400" />
             Require approval to join
           </label>
         )}
+        {(model === "paid" || model === "paid_approval" || model === "invite") && (
+          <div className="space-y-2.5 rounded-lg border border-zinc-800 p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-sm text-zinc-300">
+                <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">
+                  {model === "invite" ? "MEMBERSHIP PRICE $ (0 = FREE)" : "MEMBERSHIP PRICE $"}
+                </span>
+                <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="w-28 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-violet-400/40" />
+              </label>
+              <div>
+                <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">BILLING PERIOD</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {BILLING_PERIODS.map((b) => (
+                    <button key={b.id} onClick={() => setBillingPeriod(b.id)} className={`rounded-full px-3 py-1 font-mono text-[10px] tracking-[0.08em] transition ${billingPeriod === b.id ? "bg-violet-400 font-bold text-zinc-950" : "border border-zinc-800 text-zinc-400 hover:border-violet-400/40"}`}>
+                      {b.label.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {billingPeriod === "custom" && (
+                <label className="text-sm text-zinc-300">
+                  <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">PERIOD (DAYS)</span>
+                  <input type="number" min={1} value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-24 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-violet-400/40" />
+                </label>
+              )}
+            </div>
+            {Number(price) > 0 && (
+              <p className="text-[11px] text-zinc-500">
+                Members pay ${membershipQuote(Number(price) || 0).total.toFixed(2)} per period (your ${Number(price) || 0} + 5% platform fee).
+                Your price is your payout. Lapsed members keep their history — access pauses until they renew.
+              </p>
+            )}
+          </div>
+        )}
+        <label className="block text-sm text-zinc-300">
+          <span className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">CAPACITY (OPTIONAL — MAX ACTIVE MEMBERS)</span>
+          <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="Unlimited" className="w-40 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-violet-400/40" />
+        </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">WHO CAN POST</label>

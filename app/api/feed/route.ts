@@ -319,6 +319,7 @@ export async function GET(req: NextRequest) {
           id: t.work.id, title: t.work.title, kind: t.work.kind,
           from: priced?.price ?? null, hasFree: opts.some((o) => o.price === 0),
           coverUrl: t.work.coverUrl,
+          previewUrl: t.work.previewUrl, // streaming preview, never the original file
           owner: publicUser(t.u, t.profile), reasons: rankedW[0].reasons,
         };
       }
