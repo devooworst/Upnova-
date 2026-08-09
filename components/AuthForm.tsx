@@ -290,7 +290,10 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </p>
       )}
 
-      {mode === "login" && !mfaStep && (
+      {/* development/demo ONLY — hidden by default in every build; a
+          deployment must explicitly set NEXT_PUBLIC_SHOW_DEMO_LOGINS=1
+          (this sandbox demo does; production never should) */}
+      {process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS === "1" && mode === "login" && !mfaStep && (
         <div className="mt-6 rounded-xl border border-line-soft bg-card p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Development seed accounts</p>
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
