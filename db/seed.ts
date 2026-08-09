@@ -76,6 +76,25 @@ function wipe() {
     db.delete(t.communities).where(eq(t.communities.isSeed, true)).run();
     db.delete(t.communities).where(inArray(t.communities.createdById, ids)).run();
 
+    // PRESERVE LIVE LOGINS: deleting seed users cascade-kills their session
+    // rows, which silently signed the demo user out on every reseed.
+    // Remember sessions by HANDLE and restore them after seeding.
+    const liveSessions = db
+      .select({ token: t.sessions.token, expiresAt: t.sessions.expiresAt, userId: t.sessions.userId })
+      .from(t.sessions)
+      .all()
+      .map((srow) => {
+        const u = db.select({ handle: t.users.handle }).from(t.users).where(eq(t.users.id, srow.userId)).get();
+        return u ? { token: srow.token, expiresAt: srow.expiresAt, handle: u.handle } : null;
+      })
+      .filter(Boolean) as { token: string; expiresAt: Date; handle: string }[];
+    try {
+      require("fs").writeFileSync(
+        require("path").join(__dirname, ".preserved-sessions.json"),
+        JSON.stringify(liveSessions.map((x) => ({ ...x, expiresAt: new Date(x.expiresAt).getTime() })))
+      );
+    } catch {}
+
     db.delete(t.users).where(inArray(t.users.id, ids)).run();
   } else {
     db.delete(t.communities).where(eq(t.communities.isSeed, true)).run();
@@ -1368,6 +1387,26 @@ function seed() {
       id: id(), userId: uid[n.user], actorId: uid[n.actor], type: n.type, title: n.title,
       body: n.body, href: n.href, category: n.cat, priority: n.pri, createdAt: hoursAgo(n.h),
     }).run();
+
+  // restore live logins preserved across the wipe (sessions by handle)
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const f = path.join(__dirname, ".preserved-sessions.json");
+    if (fs.existsSync(f)) {
+      const preserved: { token: string; expiresAt: number; handle: string }[] = JSON.parse(fs.readFileSync(f, "utf8"));
+      let restored = 0;
+      for (const p of preserved) {
+        if (p.expiresAt < Date.now()) continue;
+        const u = db.select({ id: t.users.id }).from(t.users).where(eq(t.users.handle, p.handle)).get();
+        if (!u) continue;
+        db.insert(t.sessions).values({ id: id(), token: p.token, userId: u.id, expiresAt: new Date(p.expiresAt) }).run();
+        restored++;
+      }
+      fs.unlinkSync(f);
+      if (restored) console.log(`Restored ${restored} live session(s) across the reseed — nobody got signed out.`);
+    }
+  } catch {}
 
   console.log("Seeded:", defs.length, "users · password: upnova123 · admin: devin@upnova.dev");
 }
