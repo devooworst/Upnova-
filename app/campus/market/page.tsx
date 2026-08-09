@@ -133,13 +133,18 @@ export default function CampusMarketPage() {
       </div>
 
       {!data?.member && data && (
-        <p className="mt-3 rounded-xl border border-violet-400/30 bg-violet-400/5 px-4 py-2.5 text-xs text-zinc-300">
+        <div className="mt-6 rounded-2xl border border-violet-400/30 bg-violet-400/5 p-8 text-center">
+          <p className="text-sm font-semibold text-zinc-200">The Campus Marketplace is a verified-campus space</p>
+          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">
+            Buying, selling, borrowing, and lending here is students-helping-students — it requires verified school
+            affiliation. Free or Pro plan makes no difference; verification is free.
+          </p>
           {me === null ? (
-            <>You&apos;re browsing a limited public slice. <Link href="/signup?next=%2Fcampus%2Fmarket" className="font-semibold text-violet-300 underline-offset-2 hover:underline">Create an account</Link> and verify your campus to participate.</>
+            <Link href="/signup?next=%2Fcampus" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Create free account</Link>
           ) : (
-            <>Browsing a limited slice — <Link href="/campus" className="font-semibold text-violet-300 underline-offset-2 hover:underline">verify your campus</Link> to message, claim, buy, bid, lend, and borrow.</>
+            <Link href="/campus" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Verify your campus — free</Link>
           )}
-        </p>
+        </div>
       )}
 
       <div className="mt-4 flex items-center gap-4 border-b border-line-soft text-sm">

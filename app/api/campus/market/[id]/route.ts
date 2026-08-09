@@ -78,6 +78,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           .where(and(eq(tables.campusVerifications.userId, viewer.id), eq(tables.campusVerifications.status, "verified"), eq(tables.campusVerifications.campusId, l.campusId)))
           .get()
       : false;
+    // campus content is for that campus's verified members — everyone else
+    // gets the verification prompt, not a peek
+    if (!member) throw new ApiError(403, "This is a campus listing — verify your school in Your Campus to view it");
     const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, l.campusId)).get();
 
     const bidRows = db.select().from(tables.bids).where(eq(tables.bids.listingId, l.id)).orderBy(desc(tables.bids.amount)).all();

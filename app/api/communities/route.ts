@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { communityCounts, refreshMembership, serializeCommunity } from "@/lib/server/communities";
+import { campusVerification } from "@/lib/server/campus";
 import { COMMUNITY_CATEGORIES, isStudentGroup } from "@/lib/communityIdentity";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,12 @@ export async function GET(req: NextRequest) {
     const q = (req.nextUrl.searchParams.get("q") || "").toLowerCase().trim();
     const category = req.nextUrl.searchParams.get("category") || "";
 
+    // campus communities are part of the verified campus environment:
+    // they only appear in the directory for members verified at THAT campus
+    const viewerCampus = viewer ? campusVerification(viewer.id)?.campusId ?? null : null;
+
     let all = db.select().from(tables.communities).orderBy(desc(tables.communities.createdAt)).all();
+    all = all.filter((c) => !c.campusId || c.campusId === viewerCampus);
     if (q) all = all.filter((c) => (c.name + " " + c.description + " " + c.category).toLowerCase().includes(q));
     if (category) all = all.filter((c) => c.category === category);
 

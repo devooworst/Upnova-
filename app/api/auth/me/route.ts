@@ -6,8 +6,9 @@ import { ownProfile } from "@/lib/server/serialize";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = getSessionUser();
-  if (!session) return Response.json({ user: null });
+  try {
+    const session = getSessionUser();
+    if (!session) return Response.json({ user: null });
   const user = db.select().from(tables.users).where(eq(tables.users.id, session.id)).get()!;
   const experience = db
     .select()
@@ -37,4 +38,10 @@ export async function GET() {
         : null,
     },
   });
+  } catch (err) {
+    // NEVER an empty/HTML error body — the client always gets parseable
+    // JSON, and an internal failure reads as "unauthenticated", not a crash
+    console.error("[upnova] /api/auth/me failed:", err);
+    return Response.json({ user: null });
+  }
 }

@@ -11,7 +11,7 @@ import Link from "next/link";
 import { MapPin, Users, X, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import PosterBadge, { PosterOverline, type PosterType } from "@/components/PosterBadge";
-import { useSession } from "@/lib/session";
+import { useSession, fetchSession } from "@/lib/session";
 import { engagementTypeLabel, compLabel, type EngagementConfig } from "@/lib/engagement";
 import { promptJoin } from "@/components/GuestGate";
 
@@ -255,20 +255,26 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
 
   useEffect(() => {
     // what's auto-attached — shown, not re-asked
+    // the SHARED session store — same source of truth as the navbar; and
+    // every parse is failure-safe: a bad response degrades to "no meta",
+    // never a page crash
     Promise.all([
-      fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()),
-      fetch("/api/me/portfolio", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { items: [] })),
-    ]).then(([me, pf]) => {
-      if (!me.user) return;
-      fetch(`/api/users/${me.user.handle}`, { cache: "no-store" })
-        .then((r) => r.json())
+      fetchSession().catch(() => null),
+      fetch("/api/me/portfolio", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json().catch(() => ({ items: [] })) : { items: [] }))
+        .catch(() => ({ items: [] })),
+    ]).then(([sessionUser, pf]) => {
+      if (!sessionUser) return;
+      fetch(`/api/users/${sessionUser.handle}`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json().catch(() => ({})) : {}) as Promise<{ stats?: { rating?: number | null } }>)
         .then((d) =>
           setProfileMeta({
-            skills: me.user.profile.skills.length,
+            skills: sessionUser.profile.skills.length,
             portfolio: (pf.items ?? []).length,
-            rating: d.stats?.rating ?? null,
+            rating: d?.stats?.rating ?? null,
           })
-        );
+        )
+        .catch(() => {});
     });
   }, []);
 

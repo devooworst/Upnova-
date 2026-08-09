@@ -47,9 +47,12 @@ export async function GET() {
       }
     }
 
+    // Your Campus is verification-gated end to end: no verified campus, no
+    // marketplace content — the response tells the client to show the
+    // verification prompt instead (plan never factors in)
     const member = !!myCampus;
-    if (member) rows = rows.filter((r) => r.l.campusId === myCampus);
-    else rows = rows.filter((r) => r.l.status === "active").slice(0, 6); // guest slice
+    if (!member) return { member: false, verifyRequired: true, campusName: null, listings: [] };
+    rows = rows.filter((r) => r.l.campusId === myCampus);
 
     const allBids = db.select().from(tables.bids).all();
     return {

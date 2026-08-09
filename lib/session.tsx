@@ -234,7 +234,7 @@ export async function fetchSession(force = false): Promise<SessionUser | null> {
   if (!force && cached !== undefined) return cached;
   if (!inflight || force) {
     inflight = fetch("/api/auth/me", { cache: "no-store" })
-      .then((r) => r.json())
+      .then((r) => r.json().catch(() => ({ user: null })))
       .then((d) => {
         cached = d.user ?? null;
         // server is the source of truth: refresh the snapshot on success,
@@ -269,7 +269,10 @@ export function primeSession(user: SessionUser) {
 }
 
 export function invalidateSession() {
-  cached = undefined;
+  // SOFT revalidation: keep showing the current user while the fresh
+  // answer loads. Blanking to undefined here made session-dependent UI
+  // (e.g. the Your Campus nav item right after verifying) vanish
+  // mid-refetch. The forced fetch below replaces the state when it lands.
   inflight = null;
   fetchSession(true);
 }

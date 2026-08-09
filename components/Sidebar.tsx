@@ -128,21 +128,26 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
-        {user && (
+        {/* Your Campus is a VERIFIED-IDENTITY feature: the nav item exists
+            only for verified members (student / alumni / faculty). Plan
+            (Free vs Pro) never factors in. Unverified members find the
+            verification prompt at /campus via Settings — not a nav tease. */}
+        {campus && (
           <div className="mt-1">
             <Link
               href="/campus"
               className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
                 pathname.startsWith("/campus")
                   ? "bg-violet-400/15 text-violet-200"
-                  : campus
-                    ? "text-violet-300 hover:bg-violet-400/10"
-                    : "text-zinc-500 hover:bg-card-raised"
+                  : "text-violet-300 hover:bg-violet-400/10"
               }`}
             >
               <GraduationCap className="h-[18px] w-[18px]" /> Your Campus
-              <span className="ml-auto truncate font-mono text-[9px] text-zinc-500">
-                {campus ? campus.name.replace(" University", "") : "Verify to unlock"}
+              <span className="ml-auto flex items-center gap-1.5 truncate font-mono text-[9px] text-zinc-500">
+                {campus.affiliation === "alumni" && (
+                  <span className="rounded border border-violet-400/40 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-violet-300">Alumni</span>
+                )}
+                {campus.name.replace(" University", "")}
               </span>
             </Link>
           </div>
