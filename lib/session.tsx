@@ -72,18 +72,55 @@ export const SESSION_EVENT = "upnova:session-changed";
    activates. */
 const TOKEN_KEY = "upnova-session-token";
 
+/* memory first: some embedded views block localStorage/sessionStorage
+   entirely. The in-memory copy keeps the session alive across ALL
+   client-side navigation regardless; the storage layers below are
+   best-effort so a refresh can restore it too. */
+let memoryToken: string | null = null;
+
+const storageLayers: { get: () => string | null; set: (v: string | null) => void }[] = [
+  {
+    get: () => window.localStorage.getItem(TOKEN_KEY),
+    set: (v) => (v ? window.localStorage.setItem(TOKEN_KEY, v) : window.localStorage.removeItem(TOKEN_KEY)),
+  },
+  {
+    get: () => window.sessionStorage.getItem(TOKEN_KEY),
+    set: (v) => (v ? window.sessionStorage.setItem(TOKEN_KEY, v) : window.sessionStorage.removeItem(TOKEN_KEY)),
+  },
+  {
+    // last resort: a JS-readable first-party cookie (demo transport, not
+    // the auth cookie — the server reads the Authorization header)
+    get: () => document.cookie.match(new RegExp(`(?:^|; )${TOKEN_KEY}=([a-f0-9]+)`))?.[1] ?? null,
+    set: (v) =>
+      (document.cookie = v
+        ? `${TOKEN_KEY}=${v}; path=/; max-age=2592000; SameSite=None; Secure`
+        : `${TOKEN_KEY}=; path=/; max-age=0; SameSite=None; Secure`),
+  },
+];
+
 export function getFallbackToken(): string | null {
-  try {
-    return window.localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
+  if (memoryToken) return memoryToken;
+  if (typeof window === "undefined") return null;
+  for (const layer of storageLayers) {
+    try {
+      const v = layer.get();
+      if (v) {
+        memoryToken = v; // hydrate memory from whichever layer survived
+        return v;
+      }
+    } catch {}
   }
+  return null;
 }
+
 export function setFallbackToken(token: string | null) {
-  try {
-    if (token) window.localStorage.setItem(TOKEN_KEY, token);
-    else window.localStorage.removeItem(TOKEN_KEY);
-  } catch {}
+  memoryToken = token;
+  if (typeof window === "undefined") return;
+  for (const layer of storageLayers) {
+    try {
+      layer.set(token);
+    } catch {}
+  }
 }
 
 if (typeof window !== "undefined" && !(window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim) {

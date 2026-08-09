@@ -26,7 +26,6 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [accountType, setAccountType] = useState<"individual" | "business">("individual");
   const [mfaCode, setMfaCode] = useState("");
   const [mfaStep, setMfaStep] = useState(false);
-  const [showOpenTab, setShowOpenTab] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -74,25 +73,16 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setError(data.error || "Something went wrong");
       return;
     }
-    // CONFIRM the session actually persisted before navigating anywhere —
-    // never pretend to be logged in.
+    // adopt the session token immediately — the in-memory demo session
+    // works in every embedding; storage layers add refresh persistence
     setBusy(true);
-    if (data.cookieless && data.sessionToken) setFallbackToken(data.sessionToken);
-    let who = await fetchSession(true);
-    if (!who && data.sessionToken) {
-      // the browser refused the cookie (embedded previews block third-party
-      // cookies) — switch to the Bearer fallback transport: SAME session
-      // token, validated server-side on every request, dies on logout
-      setFallbackToken(data.sessionToken);
-      who = await fetchSession(true);
-    }
+    if (data.sessionToken) setFallbackToken(data.sessionToken);
+    const who = await fetchSession(true);
     setBusy(false);
     if (!who) {
-      setFallbackToken(null);
-      setError(
-        "Signed in, but this browser kept neither the session cookie nor the fallback session. Open UpNova in its own tab and sign in there."
-      );
-      setShowOpenTab(true);
+      // server-side confirmation genuinely failed (not a storage issue —
+      // the header comes from memory). Extremely unlikely; just retry.
+      setError("Couldn't confirm the session — please try signing in again.");
       return;
     }
     // return the user to what they were doing before auth (e.g. the
@@ -243,16 +233,6 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           </>
         )}
 
-        {showOpenTab && (
-          <a
-            href={typeof window !== "undefined" ? window.location.href : "/login"}
-            target="_blank"
-            rel="noopener"
-            className="btn-lime mb-2 w-full justify-center py-2.5 text-sm"
-          >
-            Open UpNova in its own tab
-          </a>
-        )}
         {error && (
           <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300" aria-live="assertive">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
@@ -303,8 +283,9 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <div className="mt-6 rounded-xl border border-line-soft bg-card p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Development seed accounts</p>
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-            devin@upnova.dev (admin) · ava@upnova.dev · jordanmiles@upnova.dev · marcusj@upnova.dev ·
-            nia@upnova.dev · lena@upnova.dev — password{" "}
+            devin (admin) · ava · nia · lena · marcusj · jordanmiles · maya · kofi · sofia · tj ·
+            imani · darius · rachel · omar · nikecreative · harboroak — email{" "}
+            <span className="font-mono text-zinc-300">{"{name}"}@upnova.dev</span>, password{" "}
             <span className="font-mono font-medium tracking-[0.08em] text-zinc-300">upnova123</span>
           </p>
         </div>
