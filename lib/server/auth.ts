@@ -44,8 +44,15 @@ export function sessionCookieOptions(expiresAt?: Date) {
   let https = false;
   try {
     const h = headers();
-    const proto = h.get("x-forwarded-proto") ?? "";
-    https = proto.split(",")[0].trim() === "https";
+    const proto = (h.get("x-forwarded-proto") ?? "").split(",")[0].trim();
+    const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").toLowerCase();
+    https =
+      proto === "https" ||
+      (h.get("x-forwarded-ssl") ?? "").toLowerCase() === "on" ||
+      // known HTTPS-only preview domains — belt and suspenders in case the
+      // proxy doesn't forward the proto header
+      host.endsWith(".e2b.app") ||
+      process.env.UPNOVA_SECURE_COOKIES === "1";
   } catch {
     /* outside a request scope — default to http attributes */
   }

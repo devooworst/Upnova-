@@ -11,8 +11,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { fetchSession } from "@/lib/session";
 import { ShieldCheck } from "lucide-react";
-import { invalidateSession } from "@/lib/session";
 import PasswordField from "@/components/PasswordField";
 import { PASSWORD_MIN, HANDLE_RULE, validatePassword } from "@/lib/passwordPolicy";
 
@@ -26,6 +26,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [accountType, setAccountType] = useState<"individual" | "business">("individual");
   const [mfaCode, setMfaCode] = useState("");
   const [mfaStep, setMfaStep] = useState(false);
+  const [showOpenTab, setShowOpenTab] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -73,7 +74,21 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setError(data.error || "Something went wrong");
       return;
     }
-    invalidateSession();
+    // CONFIRM the session actually persisted before navigating anywhere —
+    // never pretend to be logged in. If the server authenticated us but
+    // the browser refused the session cookie (some browsers block all
+    // third-party cookies inside embedded views), say exactly that and
+    // offer the first-party escape hatch.
+    setBusy(true);
+    const who = await fetchSession(true);
+    setBusy(false);
+    if (!who) {
+      setError(
+        "Signed in, but your browser didn't keep the session cookie — this happens in embedded previews when third-party cookies are blocked. Open UpNova in its own tab and sign in there."
+      );
+      setShowOpenTab(true);
+      return;
+    }
     // return the user to what they were doing before auth (e.g. the
     // opportunity they tried to apply to). Path-only — no open redirects.
     const params = new URLSearchParams(window.location.search);
@@ -222,6 +237,16 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           </>
         )}
 
+        {showOpenTab && (
+          <a
+            href={typeof window !== "undefined" ? window.location.href : "/login"}
+            target="_blank"
+            rel="noopener"
+            className="btn-lime mb-2 w-full justify-center py-2.5 text-sm"
+          >
+            Open UpNova in its own tab
+          </a>
+        )}
         {error && (
           <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300" aria-live="assertive">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
