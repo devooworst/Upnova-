@@ -230,6 +230,14 @@ CREATE TABLE IF NOT EXISTS `disputes` (
 	FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`opened_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
+CREATE TABLE IF NOT EXISTS `event_rsvps` (
+	`event_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`created_at` integer NOT NULL,
+	PRIMARY KEY(`event_id`, `user_id`),
+	FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `events` (
 	`id` text PRIMARY KEY NOT NULL,
 	`slug` text NOT NULL,
@@ -247,7 +255,7 @@ CREATE TABLE IF NOT EXISTS `events` (
 	`kind` text DEFAULT 'rsvp' NOT NULL,
 	`age_rule` text DEFAULT 'all' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, campus_id text REFERENCES campuses(id) ON DELETE SET NULL, category text NOT NULL DEFAULT 'Other', state text NOT NULL DEFAULT '', lat real, lng real, config text NOT NULL DEFAULT '{}', status text NOT NULL DEFAULT 'active',
 	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `experiences` (

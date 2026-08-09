@@ -12,6 +12,6 @@ export function requireCampus(userId: string): string {
     .from(tables.campusVerifications)
     .where(and(eq(tables.campusVerifications.userId, userId), eq(tables.campusVerifications.status, "verified")))
     .get();
-  if (!v) throw new ApiError(403, "Campus Marketplace needs verified campus status — verify your school in Your Campus first");
+  if (!v) throw new ApiError(403, "This is a campus space — verify your school in Your Campus first");
   return v.campusId;
 }

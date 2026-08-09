@@ -1169,16 +1169,42 @@ export const events = sqliteTable("events", {
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
+  // SCOPE RULE — campusId set = a campus event: it lives in Your Campus
+  // (visible to that campus's verified members only) and NEVER appears in
+  // the public Events section. campusId null = the wider world.
+  campusId: text("campus_id").references(() => campuses.id, { onDelete: "set null" }),
+  category: text("category").notNull().default("Other"),
   startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
   timeLabel: text("time_label").notNull().default(""),
   location: text("location").notNull().default(""),
   city: text("city").notNull().default(""),
+  state: text("state").notNull().default(""),
+  // coords power nearby discovery server-side only — never returned by the API
+  lat: real("lat"),
+  lng: real("lng"),
   price: integer("price"), // null = free
   capacity: integer("capacity"),
-  attending: integer("attending").notNull().default(0),
+  attending: integer("attending").notNull().default(0), // seed baseline; real RSVPs add on top
   imageUrl: text("image_url"),
   kind: text("kind").notNull().default("rsvp"), // rsvp | registration | ticket | approval
   ageRule: text("age_rule").notNull().default("all"),
+  config: text("config").notNull().default("{}"), // {fields, rules, waitlist}
+  status: text("status").notNull().default("active"), // active | cancelled
   isSeed: seed(),
   createdAt: ts("created_at"),
 });
+
+/* One-click "Going" — a real attendee record, not a counter. */
+export const eventRsvps = sqliteTable(
+  "event_rsvps",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: ts("created_at"),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] })]
+);

@@ -17,7 +17,6 @@ import {
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
 import OpportunityCard from "@/components/OpportunityCard";
-import EventCard from "@/components/EventCard";
 import { useSession, invalidateSession } from "@/lib/session";
 import { creators, campusOrgs } from "@/lib/data";
 
@@ -437,13 +436,8 @@ export default function CampusPage() {
         </div>
       )}
 
-      {/* ================= 🎉 EVENTS ================= */}
-      {section === "events" && (
-        <div className="grid gap-4 sm:grid-cols-2 animate-fade-up">
-          <EventCard id="meetup" />
-          <EventCard id="photo-walk" />
-        </div>
-      )}
+      {/* ================= 🎉 EVENTS — strictly campus ================= */}
+      {section === "events" && <CampusEvents />}
 
       {/* ================= 📚 CAMPUS QUESTIONS — lives in Communities ================= */}
       {section === "questions" && (
@@ -479,6 +473,96 @@ export default function CampusPage() {
           school → community → skills → collabs → paid work → portfolio → alumni network → career
         </p>
       </section>
+    </div>
+  );
+}
+
+
+/* Campus events — ONLY events stamped with this campus (on-campus or
+   directly school-associated). Off-campus parties, concerts, and city
+   events live in the main Events section, not here. */
+function CampusEvents() {
+  const [data, setData] = useState<{
+    campusName: string;
+    events: {
+      id: string; slug: string; title: string; description: string; category: string;
+      startsAt: string; timeLabel: string; location: string; attending: number;
+      spotsLeft: number | null; kind: string; going: boolean; isHost: boolean;
+    }[];
+  } | null>(null);
+
+  const load = async () => {
+    const res = await fetch("/api/campus/events", { cache: "no-store" });
+    if (res.ok) setData(await res.json());
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const toggleGoing = async (id: string) => {
+    const res = await fetch(`/api/events/${id}`, { method: "POST" });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      if (j.error) alert(j.error);
+    }
+    void load();
+  };
+
+  const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+  return (
+    <div className="space-y-3 animate-fade-up">
+      <div className="flex items-center justify-between px-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+          On campus & school-associated only
+        </p>
+        <a href="/events/create" className="btn-ghost px-4 py-1.5 text-xs">+ Create campus event</a>
+      </div>
+      {data === null ? (
+        <div className="card-event h-32 animate-pulse" />
+      ) : data.events.length === 0 ? (
+        <p className="py-8 text-center text-sm text-zinc-600">No campus events yet — host the first one.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {data.events.map((e) => {
+            const d = new Date(e.startsAt);
+            return (
+              <article key={e.id} className="card-event p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex shrink-0 flex-col items-center rounded-lg border border-amber-400/40 px-2.5 py-1.5">
+                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-400">{MONTHS[d.getMonth()]}</span>
+                    <span className="text-lg font-extrabold leading-tight text-zinc-50">{d.getDate()}</span>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <a href={`/events/${e.slug}`} className="block truncate text-[15px] font-bold text-zinc-50 hover:text-amber-300">{e.title}</a>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-zinc-500">{e.category} · {e.timeLabel}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-400">{e.description}</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-3 border-t border-dashed border-line pt-2.5 text-[11px] text-zinc-500">
+                  <span className="truncate">{e.location.split(",")[0]}</span>
+                  <span className="shrink-0">{e.attending} going</span>
+                  {(e.kind === "rsvp" || e.kind === "registration") && !e.isHost && (
+                    <button
+                      onClick={() => void toggleGoing(e.id)}
+                      className={`ml-auto shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                        e.going ? "border border-lime-400/50 text-lime-300" : "bg-amber-400 text-zinc-950 hover:bg-amber-300"
+                      }`}
+                    >
+                      {e.going ? "Going ✓" : e.kind === "registration" ? "Register" : "RSVP"}
+                    </button>
+                  )}
+                  {e.isHost && <span className="ml-auto font-mono text-[9px] tracking-[0.1em] text-zinc-400">HOSTING</span>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      <p className="px-1 text-[11px] text-zinc-600">
+        Looking for off-campus parties, concerts, and city events? Those live in{" "}
+        <a href="/events" className="font-semibold text-amber-300 hover:text-amber-200">Events</a> — the wider world.
+      </p>
     </div>
   );
 }

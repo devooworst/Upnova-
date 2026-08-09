@@ -744,12 +744,35 @@ written under. The composer's "Post as:" selector remembers your last choice per
   State) — the Campus page section links into it. Popular public-community posts surface in
   For You as labeled COMMUNITY cards (masked exactly as inside the room, click through to source).
 
+### Events: Your Campus vs the wider world (DB-backed)
+
+The scope rule is enforced at the query level, not by UI filtering:
+
+- **Campus events** (`events.campusId` set) are strictly on-campus or directly
+  school-associated. They live ONLY in Your Campus (`/api/campus/events`, campus-verified
+  members of that school), never appear in the public Events list, are refused on detail
+  view/RSVP for anyone outside the campus, and even keep their titles out of public page
+  metadata.
+- **The public Events section** is the wider world: parties, concerts, workshops, markets —
+  with 12 categories, search, time (`week`/`month`) and price (`free`/`paid`) filters, and
+  location-based discovery (`5mi`/`25mi`/`city`/`state`; distances computed server-side from
+  profile coordinates via haversine — coordinates never leave the server, guests get a note
+  instead of an error).
+
+Event **creation is real** (`POST /api/events`): the first choice is scope — a campus event
+(requires verified campus status; stamped with the school, campus-flavored categories) or a
+public event (city/state + nearby discovery). Entry models: one-click RSVP, registration
+(configurable fields), paid ticket, request-to-attend. **RSVPs are real attendee records**
+(`event_rsvps`), toggleable, capacity-enforced (full → 409); ticket events refuse RSVP honestly
+(checkout not built yet) and approval events route to the host's messages. Detail pages are
+DB-backed at `/events/[id-or-slug]`.
+
 ### Audit — still on static demo data (next passes)
 
-- Campus page CONTENT sections other than Marketplace/Questions (the campus gate + verification
-  are real; orgs/events/services sections inside are demo data).
-- Event DETAIL pages (`/events/[slug]` ticketing/QR/manage) — the events list, "This week"
-  widget, and event bookmarks are DB-backed; the rich detail experience is still demo.
+- Campus page CONTENT sections other than Marketplace/Questions/Events (the campus gate +
+  verification are real; orgs/services sections inside are demo data).
+- Ticket CHECKOUT + QR check-in for paid events (`/events/[id]/manage` legacy mock) — the
+  event model, RSVP records, and capacity are real; paid ticketing needs the payments pass.
 - Analytics, Discover, Resolution Center demo case, Settings.
 - Legacy components no longer mounted anywhere but kept in the tree: `components/Feed.tsx`
   (type exports only), `MessagesClient`, `NotificationBell`, `NearbyNow`, `CreatePost`,

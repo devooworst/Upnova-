@@ -1191,12 +1191,17 @@ function seed() {
   ]).run();
 
   /* -------------------------------- events -------------------------------- */
+  /* PUBLIC events — the wider world: city coordinates power the nearby
+     filters (server-side only). Campus events are seeded separately below
+     and NEVER appear in this section. */
+  const BALT = { lat: 39.2904, lng: -76.6122, state: "MD" };
+  const DC = { lat: 38.9072, lng: -77.0369, state: "DC" };
   const eventDefs = [
-    { slug: "meetup", host: "devin", title: "UpNova Creator Meetup", time: "7:00 PM", loc: "The Assembly Room", city: "Baltimore, MD", days: 15, price: null, cap: 150, att: 84, img: "/images/event-meetup.jpg", kind: "rsvp", desc: "Meet the creators you keep seeing in your feed. Demos, collabs, and a live showcase." },
-    { slug: "networking", host: "tj", title: "DMV Music Networking Night", time: "8:00 PM", loc: "Union Stage", city: "Washington, DC", days: 21, price: 15, cap: 200, att: 132, img: "/images/event-networking.jpg", kind: "ticket", desc: "Producers, artists, engineers, and managers in one room. Bring business cards." },
-    { slug: "photo-walk", host: "ava", title: "Golden Hour Photo Walk", time: "6:30 PM", loc: "Federal Hill Park", city: "Baltimore, MD", days: 9, price: null, cap: 40, att: 27, img: "/images/event-photowalk.jpg", kind: "registration", desc: "All levels. Bring any camera — we shoot the skyline at golden hour, then compare edits." },
-    { slug: "after-dark", host: "tj", title: "After Dark — Rooftop Set", time: "10:00 PM", loc: "Rooftop at The Crown", city: "Baltimore, MD", days: 12, price: 25, cap: 180, att: 164, img: "/images/event-afterdark.jpg", kind: "ticket", age: "21+", desc: "Full rig on the roof. Photographers welcome — trade content for entry." },
-    { slug: "workshop", host: "lena", title: "Brand Design Workshop", time: "1:00 PM", loc: "Open Works", city: "Baltimore, MD", days: 18, price: 40, cap: 30, att: 22, img: "/images/event-workshop.jpg", kind: "registration", desc: "Hands-on: build a one-page brand system in three hours. Laptops required." },
+    { slug: "meetup", host: "devin", title: "UpNova Creator Meetup", time: "7:00 PM", loc: "The Assembly Room", city: "Baltimore, MD", days: 15, price: null, cap: 150, att: 84, img: "/images/event-meetup.jpg", kind: "rsvp", cat: "Networking", geo: BALT, desc: "Meet the creators you keep seeing in your feed. Demos, collabs, and a live showcase." },
+    { slug: "networking", host: "tj", title: "DMV Music Networking Night", time: "8:00 PM", loc: "Union Stage", city: "Washington, DC", days: 21, price: 15, cap: 200, att: 132, img: "/images/event-networking.jpg", kind: "ticket", cat: "Networking", geo: DC, desc: "Producers, artists, engineers, and managers in one room. Bring business cards." },
+    { slug: "photo-walk", host: "ava", title: "Golden Hour Photo Walk", time: "6:30 PM", loc: "Federal Hill Park", city: "Baltimore, MD", days: 9, price: null, cap: 40, att: 27, img: "/images/event-photowalk.jpg", kind: "registration", cat: "Creative / Art", geo: BALT, desc: "All levels. Bring any camera — we shoot the skyline at golden hour, then compare edits." },
+    { slug: "after-dark", host: "tj", title: "After Dark — Rooftop Set", time: "10:00 PM", loc: "Rooftop at The Crown", city: "Baltimore, MD", days: 12, price: 25, cap: 180, att: 164, img: "/images/event-afterdark.jpg", kind: "ticket", age: "21+", cat: "Party / Nightlife", geo: BALT, desc: "Full rig on the roof. Photographers welcome — trade content for entry." },
+    { slug: "workshop", host: "lena", title: "Brand Design Workshop", time: "1:00 PM", loc: "Open Works", city: "Baltimore, MD", days: 18, price: 40, cap: 30, att: 22, img: "/images/event-workshop.jpg", kind: "registration", cat: "Workshop", geo: BALT, desc: "Hands-on: build a one-page brand system in three hours. Laptops required." },
   ];
   for (const e of eventDefs) {
     db.insert(t.events)
@@ -1206,16 +1211,51 @@ function seed() {
         hostId: uid[e.host],
         title: e.title,
         description: e.desc,
+        category: e.cat,
         startsAt: daysFromNow(e.days),
         timeLabel: e.time,
         location: `${e.loc}, ${e.city}`,
         city: e.city,
+        state: e.geo.state,
+        lat: e.geo.lat,
+        lng: e.geo.lng,
         price: e.price,
         capacity: e.cap,
         attending: e.att,
         imageUrl: e.img,
         kind: e.kind,
         ageRule: (e as { age?: string }).age ?? "all",
+        isSeed: true,
+      })
+      .run();
+  }
+
+  /* CAMPUS events — strictly on-campus or directly school-associated,
+     stamped with campusId: they live in Your Campus and never surface in
+     the public Events section. */
+  const campusEventDefs = [
+    { slug: "bsu-homecoming-kickback", host: "nia", title: "Homecoming Kickback — Student Center", time: "8:00 PM", venue: "Student Center Ballroom", days: 6, cap: 250, att: 118, kind: "rsvp", cat: "Campus Social", desc: "Music, food, and the whole yard in one room. Bring your student ID." },
+    { slug: "bsu-creator-fair", host: "imani", title: "Bowie State Creator Fair", time: "12:00 PM", venue: "Fine Arts Quad", days: 13, cap: 400, att: 96, kind: "registration", cat: "Career / Networking", desc: "Student businesses, photographers, designers, and musicians table on the quad. Free to attend, table registration for student vendors." },
+    { slug: "bsu-finals-study-night", host: "omar", title: "Late Night Study Jam — Library", time: "9:00 PM", venue: "Thurgood Marshall Library, Floor 2", days: 20, cap: 80, att: 34, kind: "rsvp", cat: "Study / Academic", desc: "Quiet floors, group rooms, and free coffee from the math club. Finals are coming — suffer together." },
+  ];
+  for (const e of campusEventDefs) {
+    db.insert(t.events)
+      .values({
+        id: e.slug,
+        slug: e.slug,
+        hostId: uid[e.host],
+        title: e.title,
+        description: e.desc,
+        campusId,
+        category: e.cat,
+        startsAt: daysFromNow(e.days),
+        timeLabel: e.time,
+        location: `${e.venue}, Bowie State University`,
+        city: "Bowie, MD",
+        state: "MD",
+        capacity: e.cap,
+        attending: e.att,
+        kind: e.kind,
         isSeed: true,
       })
       .run();
