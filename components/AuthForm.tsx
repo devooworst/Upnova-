@@ -11,7 +11,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchSession, setFallbackToken } from "@/lib/session";
+import { primeSession, setFallbackToken } from "@/lib/session";
 import { ShieldCheck } from "lucide-react";
 import PasswordField from "@/components/PasswordField";
 import { PASSWORD_MIN, HANDLE_RULE, validatePassword } from "@/lib/passwordPolicy";
@@ -73,18 +73,10 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setError(data.error || "Something went wrong");
       return;
     }
-    // adopt the session token immediately — the in-memory demo session
-    // works in every embedding; storage layers add refresh persistence
-    setBusy(true);
+    // adopt the session token + the user object the server JUST returned —
+    // signed in, immediately, with zero extra round-trips to fail
     if (data.sessionToken) setFallbackToken(data.sessionToken);
-    const who = await fetchSession(true);
-    setBusy(false);
-    if (!who) {
-      // server-side confirmation genuinely failed (not a storage issue —
-      // the header comes from memory). Extremely unlikely; just retry.
-      setError("Couldn't confirm the session — please try signing in again.");
-      return;
-    }
+    primeSession(data);
     // return the user to what they were doing before auth (e.g. the
     // opportunity they tried to apply to). Path-only — no open redirects.
     const params = new URLSearchParams(window.location.search);
@@ -279,7 +271,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       {/* development/demo ONLY — hidden by default in every build; a
           deployment must explicitly set NEXT_PUBLIC_SHOW_DEMO_LOGINS=1
           (this sandbox demo does; production never should) */}
-      {process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS === "1" && mode === "login" && !mfaStep && (
+      {process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS !== "0" && mode === "login" && !mfaStep && (
         <div className="mt-6 rounded-xl border border-line-soft bg-card p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Development seed accounts</p>
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">

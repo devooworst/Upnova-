@@ -162,6 +162,15 @@ export async function fetchSession(force = false): Promise<SessionUser | null> {
   return inflight;
 }
 
+/** Seed the client session directly from a login/signup response — the
+    response body IS the authoritative user object the server just built.
+    No confirmation round-trip to fail in odd embeddings. */
+export function primeSession(user: SessionUser) {
+  cached = user;
+  inflight = Promise.resolve(user);
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
 export function invalidateSession() {
   cached = undefined;
   inflight = null;

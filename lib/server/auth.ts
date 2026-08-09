@@ -105,6 +105,9 @@ export function getSessionUser(): SessionUser | null {
     } catch {
       /* outside request scope */
     }
+    // demo transport #3: the JS-set token cookie (first-party contexts
+    // send it automatically on every request, including full page loads)
+    if (!token) token = cookies().get("upnova-session-token")?.value || undefined;
   }
   if (!token) return null;
 
