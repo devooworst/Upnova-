@@ -85,8 +85,12 @@ export interface ServiceConfig {
     mode: TravelMode;
     flatFee?: number;
     perMile?: number;
+    /** distance-based: the first N miles are INCLUDED in the service price */
     freeMiles?: number;
+    /** how far the provider goes — the service area, in miles */
     radiusMi?: number;
+    /** custom mode: the provider's own travel policy, in their words */
+    note?: string;
   };
   scheduling: {
     durationMin: number;
@@ -144,7 +148,11 @@ export function parseConfig(raw: string | null | undefined): ServiceConfig {
     return {
       ...DEFAULT_CONFIG,
       ...p,
-      travel: { ...DEFAULT_CONFIG.travel, ...(p.travel ?? {}) },
+      travel: {
+        ...DEFAULT_CONFIG.travel,
+        ...(p.travel ?? {}),
+        note: typeof p.travel?.note === "string" ? p.travel.note.slice(0, 300) : undefined,
+      },
       scheduling: { ...DEFAULT_CONFIG.scheduling, ...(p.scheduling ?? {}) },
       pricing: { ...DEFAULT_CONFIG.pricing, ...(p.pricing ?? {}) },
       policies: { ...DEFAULT_CONFIG.policies, ...(p.policies ?? {}) },
@@ -277,18 +285,29 @@ export const LOCATION_LABEL: Record<LocationMode, string> = {
   flexible: "Flexible",
 };
 
+/* Consumer wording — a mechanic, barber, or tutor should be able to answer
+   this without thinking. "Travel included" is NOT free: the cost is simply
+   built into the service price, and the label says so. */
+export const TRAVEL_MODES: { id: TravelMode; label: string; desc: string }[] = [
+  { id: "none", label: "No travel fee", desc: "No additional travel charge." },
+  { id: "free", label: "Travel included in service price", desc: "You go to them — the cost is already built into your price." },
+  { id: "flat", label: "Flat fee", desc: "One fixed travel charge, regardless of distance." },
+  { id: "per_mile", label: "Distance-based", desc: "Charge based on how far you travel." },
+  { id: "quote", label: "Custom", desc: "Describe your own travel arrangement." },
+];
+
 export function travelLabel(t: ServiceConfig["travel"]): string {
   switch (t.mode) {
     case "none":
       return "No travel offered";
     case "free":
-      return `Travel included — no additional fee${t.radiusMi ? ` (within ${t.radiusMi} mi)` : ""}`;
+      return `Travel included in service price${t.radiusMi ? ` (within ${t.radiusMi} mi)` : ""}`;
     case "flat":
-      return `Travel fee $${t.flatFee ?? 0}${t.radiusMi ? ` within ${t.radiusMi} mi` : ""}`;
+      return `Travel fee $${t.flatFee ?? 0}${t.radiusMi ? ` · serves up to ${t.radiusMi} mi` : ""}`;
     case "per_mile":
-      return `$${t.perMile ?? 0}/mile${t.freeMiles ? ` after ${t.freeMiles} mi` : ""}${t.radiusMi ? ` · up to ${t.radiusMi} mi` : ""}`;
+      return `$${t.perMile ?? 0}/mile${t.freeMiles ? ` (first ${t.freeMiles} mi included)` : ""}${t.radiusMi ? ` · serves up to ${t.radiusMi} mi` : ""}`;
     case "quote":
-      return "Travel quoted before booking";
+      return t.note?.trim() ? t.note.trim() : "Custom travel arrangement — agreed before booking";
   }
 }
 
@@ -384,6 +403,6 @@ export function travelFeeFor(t: ServiceConfig["travel"], distanceMi: number | nu
       return { fee: Math.round(billable * (t.perMile ?? 0)), note: null };
     }
     case "quote":
-      return { fee: 0, note: "Travel is quoted separately in the conversation" };
+      return { fee: 0, note: t.note?.trim() ? `Travel policy: ${t.note.trim()}` : "Travel is quoted separately in the conversation" };
   }
 }

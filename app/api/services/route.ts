@@ -152,6 +152,8 @@ export async function POST(req: NextRequest) {
         perMile: num(inC.travel?.perMile, 50),
         freeMiles: num(inC.travel?.freeMiles, 100),
         radiusMi: num(inC.travel?.radiusMi, 500),
+        // custom mode: the provider's own travel policy, their words
+        note: typeof inC.travel?.note === "string" ? inC.travel.note.slice(0, 300) : undefined,
       },
       scheduling: {
         durationMin: num(inC.scheduling?.durationMin, 480) ?? 60,

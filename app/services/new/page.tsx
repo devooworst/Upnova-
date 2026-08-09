@@ -28,6 +28,7 @@ import {
   EMPTY_MENU,
   LOCATION_LABEL,
   travelLabel,
+  TRAVEL_MODES,
   policyLines,
   priceLabel,
   availabilityLabel,
@@ -520,32 +521,71 @@ export default function NewServicePage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Do you charge a travel fee?</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {([["none", "No"], ["free", "Travel included"], ["flat", "Flat fee"], ["per_mile", "Distance-based"], ["quote", "Custom"]] as const).map(([m, l]) => (
-                  <Chip key={m} on={config.travel.mode === m} onClick={() => setTravel({ mode: m })}>{l}</Chip>
+                {TRAVEL_MODES.map((m) => (
+                  <Chip key={m.id} on={config.travel.mode === m.id} onClick={() => setTravel({ mode: m.id })}>{m.label}</Chip>
                 ))}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                {config.travel.mode === "flat" && (
+              {/* what the selected choice means, in plain words */}
+              <p className="mt-1.5 text-xs text-zinc-500">
+                {TRAVEL_MODES.find((m) => m.id === config.travel.mode)?.desc}
+              </p>
+
+              {/* only the fields that matter for THIS choice — nothing else */}
+              {config.travel.mode === "free" && (
+                <label className="mt-2 flex items-center gap-1.5 text-xs text-zinc-400">
+                  Travel included within
+                  <input value={config.travel.radiusMi ?? ""} onChange={(e) => setTravel({ radiusMi: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="15" className={`${inputCls} w-14 py-1.5`} />
+                  miles
+                </label>
+              )}
+              {config.travel.mode === "flat" && (
+                <div className="mt-2 flex flex-wrap items-center gap-4">
                   <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    Fee $<input value={config.travel.flatFee ?? ""} onChange={(e) => setTravel({ flatFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-20 py-1.5`} />
+                    Travel fee $<input value={config.travel.flatFee ?? ""} onChange={(e) => setTravel({ flatFee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} placeholder="25" className={`${inputCls} w-20 py-1.5`} />
                   </label>
-                )}
-                {config.travel.mode === "per_mile" && (
-                  <>
-                    <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                      $<input value={config.travel.perMile ?? ""} onChange={(e) => setTravel({ perMile: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-14 py-1.5`} />/mi
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                      after<input value={config.travel.freeMiles ?? ""} onChange={(e) => setTravel({ freeMiles: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} className={`${inputCls} w-14 py-1.5`} />mi
-                    </label>
-                  </>
-                )}
-                {config.travel.mode !== "none" && (
                   <label className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    Radius<input value={config.travel.radiusMi ?? ""} onChange={(e) => setTravel({ radiusMi: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="mi" className={`${inputCls} w-14 py-1.5`} />mi
+                    Service area
+                    <input value={config.travel.radiusMi ?? ""} onChange={(e) => setTravel({ radiusMi: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="20" className={`${inputCls} w-14 py-1.5`} />
+                    miles
                   </label>
-                )}
-              </div>
+                </div>
+              )}
+              {config.travel.mode === "per_mile" && (
+                <div className="mt-2 flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    Rate $<input value={config.travel.perMile ?? ""} onChange={(e) => setTravel({ perMile: Number(e.target.value.replace(/[^0-9.]/g, "")) || 0 })} placeholder="2.00" className={`${inputCls} w-16 py-1.5`} />
+                    / mile
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    Included distance
+                    <input value={config.travel.freeMiles ?? ""} onChange={(e) => setTravel({ freeMiles: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} placeholder="10" className={`${inputCls} w-14 py-1.5`} />
+                    miles
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    Service area
+                    <input value={config.travel.radiusMi ?? ""} onChange={(e) => setTravel({ radiusMi: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} placeholder="30" className={`${inputCls} w-14 py-1.5`} />
+                    miles
+                  </label>
+                </div>
+              )}
+              {config.travel.mode === "per_mile" && (config.travel.freeMiles ?? 0) > 0 && (
+                <p className="mt-1.5 text-[11px] text-zinc-500">
+                  Example: a {(config.travel.freeMiles ?? 0) + 5}-mile trip bills only the extra 5 miles — the first{" "}
+                  {config.travel.freeMiles} are included.
+                </p>
+              )}
+              {config.travel.mode === "quote" && (
+                <label className="mt-2 block text-xs text-zinc-400">
+                  Travel policy
+                  <textarea
+                    value={config.travel.note ?? ""}
+                    onChange={(e) => setTravel({ note: e.target.value.slice(0, 300) })}
+                    rows={2}
+                    placeholder="Describe your travel pricing — e.g. free within the city, quoted for anything further."
+                    className={`${inputCls} mt-1 w-full py-2`}
+                  />
+                </label>
+              )}
             </div>
           )}
           <div className="rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2.5">
