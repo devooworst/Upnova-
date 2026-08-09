@@ -88,15 +88,33 @@ const storageLayers: { get: () => string | null; set: (v: string | null) => void
     set: (v) => (v ? window.sessionStorage.setItem(TOKEN_KEY, v) : window.sessionStorage.removeItem(TOKEN_KEY)),
   },
   {
-    // last resort: a JS-readable first-party cookie (demo transport, not
-    // the auth cookie — the server reads the Authorization header)
+    // JS-readable token cookie. Partitioned (CHIPS) so it survives even
+    // when third-party cookies are blocked in the embedding (Chrome).
     get: () => document.cookie.match(new RegExp(`(?:^|; )${TOKEN_KEY}=([a-f0-9]+)`))?.[1] ?? null,
-    set: (v) =>
-      (document.cookie = v
-        ? `${TOKEN_KEY}=${v}; path=/; max-age=2592000; SameSite=None; Secure`
-        : `${TOKEN_KEY}=; path=/; max-age=0; SameSite=None; Secure`),
+    set: (v) => {
+      const base = `${TOKEN_KEY}=${v ?? ""}; path=/; SameSite=None; Secure; Partitioned`;
+      document.cookie = v ? `${base}; max-age=2592000` : `${base}; max-age=0`;
+      // non-Partitioned twin for browsers that reject the attribute
+      const plain = `${TOKEN_KEY}=${v ?? ""}; path=/; SameSite=None; Secure`;
+      document.cookie = v ? `${plain}; max-age=2592000` : `${plain}; max-age=0`;
+    },
+  },
+  {
+    // window.name survives page reloads in the same tab/iframe and is NOT
+    // subject to storage/cookie blocking — the layer of last resort.
+    // Demo-only: cleared on sign-out with everything else.
+    get: () => {
+      const m = /^upnova-token:([a-f0-9]+)$/.exec(window.name || "");
+      return m ? m[1] : null;
+    },
+    set: (v) => {
+      if (v) window.name = `upnova-token:${v}`;
+      else if (/^upnova-token:/.test(window.name || "")) window.name = "";
+    },
   },
 ];
+
+const TOKEN_SHAPE = /^[a-f0-9]{32,128}$/; // opaque hex token — anything else is corrupt
 
 export function getFallbackToken(): string | null {
   if (memoryToken) return memoryToken;
@@ -104,10 +122,11 @@ export function getFallbackToken(): string | null {
   for (const layer of storageLayers) {
     try {
       const v = layer.get();
-      if (v) {
+      if (v && TOKEN_SHAPE.test(v)) {
         memoryToken = v; // hydrate memory from whichever layer survived
         return v;
       }
+      if (v) layer.set(null); // corrupted value — clear it safely
     } catch {}
   }
   return null;
@@ -151,10 +170,14 @@ export async function fetchSession(force = false): Promise<SessionUser | null> {
       .then((r) => r.json())
       .then((d) => {
         cached = d.user ?? null;
+        // the server explicitly said "nobody" while we hold a token →
+        // the stored session is dead/corrupted; clear it safely
+        if (!cached && getFallbackToken()) setFallbackToken(null);
         window.dispatchEvent(new Event(SESSION_EVENT));
         return cached ?? null;
       })
       .catch(() => {
+        // network hiccup: do NOT clear anything — keep the stored session
         cached = null;
         return null;
       });
