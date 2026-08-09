@@ -144,6 +144,16 @@ export default function CampusPage() {
   const activeCommunity = interestCommunities.find((c) => c.id === community)!;
 
   /* ---------------- locked: free verification first ---------------- */
+  // session still being checked — decide NOTHING yet (no locked-state flash)
+  if (user === undefined) {
+    return (
+      <div className="mx-auto max-w-md pt-12 text-center" aria-busy="true">
+        <div className="mx-auto h-16 w-16 animate-pulse rounded-2xl bg-card-raised" />
+        <div className="mx-auto mt-4 h-5 w-48 animate-pulse rounded bg-card-raised" />
+      </div>
+    );
+  }
+
   if (!verified) {
     return (
       <div className="mx-auto max-w-md pt-12 text-center">

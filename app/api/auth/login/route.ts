@@ -8,6 +8,7 @@ import {
   needsRehash,
   createSession,
   SESSION_COOKIE,
+  sessionCookieOptions,
   guarded,
   ApiError,
 } from "@/lib/server/auth";
@@ -53,12 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { token, expiresAt } = createSession(user.id);
-    cookies().set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      expires: expiresAt,
-      path: "/",
-    });
+    cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     // security notification: every new sign-in is visible to the account
     notify({

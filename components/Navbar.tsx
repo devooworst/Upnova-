@@ -111,7 +111,11 @@ export default function Navbar() {
           <DbNotificationBell />
 
           {/* Profile dropdown — the real authenticated user, or Sign in */}
-          {!user ? (
+          {user === undefined ? (
+            /* session still resolving — a quiet placeholder, never a
+               premature "Sign in" that flashes at logged-in users */
+            <span className="h-8 w-8 animate-pulse rounded-full bg-card-raised" aria-hidden />
+          ) : user === null ? (
             <Link href="/login" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
               Sign in
             </Link>

@@ -16,13 +16,48 @@
 /*               Business subscriptions.                               */
 /* ------------------------------------------------------------------ */
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 
 export const SESSION_COOKIE = "upnova_session";
 const SESSION_DAYS = 30;
+
+/* Session cookie attributes — THE fix for "login succeeds but I'm logged
+   out afterwards" in proxied/embedded environments:
+
+   · Behind HTTPS (previews, production — detected via x-forwarded-proto,
+     the standard proxy header) the app is often rendered inside an
+     iframe on another origin. Browsers treat its cookies as THIRD-PARTY
+     and refuse SameSite=Lax ones, so the login sets a cookie the browser
+     never keeps. Embedded contexts require SameSite=None + Secure, and
+     modern third-party-cookie rules additionally want Partitioned
+     (CHIPS) — partitioned per top site, which is exactly right for a
+     session cookie.
+   · On plain HTTP (local dev, curl) Secure cookies would be DROPPED
+     instead, so there we keep SameSite=Lax without Secure.
+
+   Same server-side session either way — only the cookie attributes
+   adapt to the transport. */
+export function sessionCookieOptions(expiresAt?: Date) {
+  let https = false;
+  try {
+    const h = headers();
+    const proto = h.get("x-forwarded-proto") ?? "";
+    https = proto.split(",")[0].trim() === "https";
+  } catch {
+    /* outside a request scope — default to http attributes */
+  }
+  return {
+    httpOnly: true as const,
+    path: "/" as const,
+    ...(expiresAt ? { expires: expiresAt } : {}),
+    ...(https
+      ? { sameSite: "none" as const, secure: true, partitioned: true }
+      : { sameSite: "lax" as const }),
+  };
+}
 
 // scrypt with per-password salt; legacy bcrypt verified + rehashed on login
 export { hashPassword, verifyPassword, needsRehash } from "./passwords";

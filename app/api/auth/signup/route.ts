@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { hashPassword, createSession, SESSION_COOKIE, guarded, ApiError } from "@/lib/server/auth";
+import { hashPassword, createSession, SESSION_COOKIE, sessionCookieOptions, guarded, ApiError } from "@/lib/server/auth";
 import { rateLimit } from "@/lib/server/ratelimit";
 import { validatePassword, HANDLE_RE, HANDLE_RULE } from "@/lib/passwordPolicy";
 import { ownProfile } from "@/lib/server/serialize";
@@ -52,12 +52,7 @@ export async function POST(req: NextRequest) {
       .run();
 
     const { token, expiresAt } = createSession(userId);
-    cookies().set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      expires: expiresAt,
-      path: "/",
-    });
+    cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     const user = db.select().from(tables.users).where(eq(tables.users.id, userId)).get()!;
     const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get()!;
