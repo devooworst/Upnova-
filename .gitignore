@@ -45,3 +45,4 @@ db/.demo-session
 db/.preserved-sessions.json
 db/.demo-signout.json
 db/.instance-id
+db/.demo-revoked.json

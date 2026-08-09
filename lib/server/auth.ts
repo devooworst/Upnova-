@@ -32,7 +32,6 @@ import { join } from "path";
    create one, sign-out really ends it. Single-user demo sandboxes only;
    NEVER set in production (any visitor would resume the demo session).  */
 const STICKY_FILE = join(process.cwd(), "db", ".demo-session");
-const SIGNOUT_FILE = join(process.cwd(), "db", ".demo-signout.json");
 const stickyOn = () => process.env.UPNOVA_DEMO_STICKY_SESSION === "1";
 /* Demo mode gate that SURVIVES instance swaps: env files are per-machine
    and do not travel with the platform's snapshots — a committed marker
@@ -55,38 +54,34 @@ const demoSecret = () => "upnova-demo-signing-key-NOT-FOR-PRODUCTION";
 
 export const isDemoMode = () => demoModeOn();
 
-/* per-machine instance id: revocation cutoffs only apply to tokens minted
-   on the SAME machine — comparing an issued-at from machine A against a
-   sign-out timestamp from machine B is meaningless under clock skew, and
-   was capable of rejecting a token seconds after login. */
-const INSTANCE_FILE = join(process.cwd(), "db", ".instance-id");
-function instanceId(): string {
-  try {
-    const v = readFileSync(INSTANCE_FILE, "utf8").trim();
-    if (v) return v;
-  } catch {}
-  const v = randomBytes(4).toString("hex");
-  try { writeFileSync(INSTANCE_FILE, v, "utf8"); } catch {}
-  return v;
-}
-
 export function signDemoToken(handle: string): string {
   const iat = Date.now();
-  const inst = instanceId();
-  const sig = createHmac("sha256", demoSecret()).update(`${handle}|${iat}|${inst}`).digest("hex");
-  return `demo.${handle}.${iat}.${inst}.${sig}`;
+  const nonce = randomBytes(4).toString("hex"); // uniqueness only — carries no machine meaning
+  const sig = createHmac("sha256", demoSecret()).update(`${handle}|${iat}|${nonce}`).digest("hex");
+  return `demo.${handle}.${iat}.${nonce}.${sig}`;
 }
 
-function signoutCutoffs(): Record<string, number> {
-  try { return JSON.parse(readFileSync(SIGNOUT_FILE, "utf8")); } catch { return {}; }
+/* Revocation by TOKEN HASH — the only clock-free, snapshot-safe scheme.
+   Sign-out records sha256(token); verification refuses hashes in the set.
+   A FRESH login can never be affected: its hash cannot pre-exist. */
+const REVOKED_FILE = join(process.cwd(), "db", ".demo-revoked.json");
+
+function revokedHashes(): string[] {
+  try { return JSON.parse(readFileSync(REVOKED_FILE, "utf8")); } catch { return []; }
 }
 
-export function revokeDemoTokens(handle: string) {
+export function revokeDemoToken(token: string) {
   try {
-    const m = signoutCutoffs();
-    m[handle] = Date.now();
-    writeFileSync(SIGNOUT_FILE, JSON.stringify(m), "utf8");
+    const h = createHmac("sha256", "revocation").update(token).digest("hex");
+    const set = revokedHashes();
+    if (!set.includes(h)) set.push(h);
+    writeFileSync(REVOKED_FILE, JSON.stringify(set.slice(-200)), "utf8");
   } catch {}
+}
+
+function isRevoked(token: string): boolean {
+  const h = createHmac("sha256", "revocation").update(token).digest("hex");
+  return revokedHashes().includes(h);
 }
 
 /** Verify a signed demo token. Returns the handle, or a rejection reason
@@ -106,10 +101,9 @@ export function verifyDemoTokenDetailed(token: string): { handle: string | null;
   if (sig !== expect) return { handle: null, reason: "bad_signature" };
   const iat = Number(iatStr);
   if (Date.now() - iat > 30 * 86400_000) return { handle: null, reason: "token_expired_30d" };
-  // revocation: ONLY comparable when the cutoff and the token came from
-  // THIS machine — cross-machine clock comparisons caused false rejections
-  if ((inst === null || inst === instanceId()) && iat <= (signoutCutoffs()[handle] ?? 0))
-    return { handle: null, reason: "revoked_by_signout" };
+  // revocation by hash of the EXACT token — clock-free, snapshot-safe;
+  // a freshly minted token can never be pre-revoked
+  if (isRevoked(token)) return { handle: null, reason: "revoked_by_signout" };
   return { handle };
 }
 

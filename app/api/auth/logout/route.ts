@@ -1,7 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { destroySession, forgetDemoSession, readDemoSession, revokeDemoTokens, verifyDemoToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/server/auth";
+import { destroySession, forgetDemoSession, readDemoSession, revokeDemoToken, verifyDemoToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,10 @@ export async function POST() {
   // signed demo token: revoke ALL demo tokens for that handle from now on
   if (token?.startsWith("demo.")) {
     const handle = verifyDemoToken(token);
+    revokeDemoToken(token); // this exact token dies, by hash — clock-free
+    const marker = readDemoSession();
+    if (marker?.startsWith("demo.")) revokeDemoToken(marker);
     if (handle) {
-      revokeDemoTokens(handle);
       const u = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
       if (u) db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run(); // account-level signout
     }
