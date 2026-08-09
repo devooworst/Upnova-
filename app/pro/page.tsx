@@ -65,11 +65,12 @@ const proBenefits = [
   { icon: Star, title: "Featured Creator placement", desc: "Eligibility for featured slots across Discover." },
 ];
 
-type View = "plans" | "checkout" | "verify" | "success" | "college" | "manage";
+type View = "plans" | "checkout" | "collegeCheckout" | "verify" | "success" | "college" | "manage";
 
 export default function ProPage() {
   const { user } = useSession();
   const campus = user?.campus ?? null; // DB-backed verification — same fact the sidebar checks
+  const plan = (user?.plan ?? "free") as ReturnType<typeof getPlan>; // DB-backed subscription — independent of verification
   const [view, setView] = useState<View>("plans");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [school, setSchool] = useState("Bowie State University");
@@ -77,12 +78,35 @@ export default function ProPage() {
   const [gradDate, setGradDate] = useState("May 2028");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState("");
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState("");
 
+  // initial view follows the ACCOUNT plan once the session resolves;
+  // ?intent=college deep-links straight into the College+ demo checkout
   useEffect(() => {
-    const plan = getPlan();
-    if (plan === "pro") setView("manage");
-    if (plan === "college") setView("college");
-  }, []);
+    if (user === undefined) return;
+    const intent = new URLSearchParams(window.location.search).get("intent");
+    if (intent === "college" && (user?.plan ?? "free") !== "college") {
+      setView("collegeCheckout");
+      return;
+    }
+    if (user?.plan === "pro") setView("manage");
+    else if (user?.plan === "college") setView("college");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user === undefined, user?.plan]);
+
+  /* DEMO/TEST plan change — persists to the account, no real payment */
+  const changePlan = async (next: ReturnType<typeof getPlan>, after?: View) => {
+    setPlanBusy(true);
+    setPlanError("");
+    const ok = await setPlan(next);
+    setPlanBusy(false);
+    if (!ok) {
+      setPlanError("Plan change failed — are you signed in? Nothing about your session was changed.");
+      return;
+    }
+    if (after) setView(after);
+  };
 
   // default the school email from the signed-in account (never someone else's)
   useEffect(() => {
@@ -193,12 +217,36 @@ export default function ProPage() {
                 Boost is <span className="font-semibold text-zinc-300">relevance-first</span> — verified
                 students get extra exposure when they&apos;re a qualified match, never just because they paid.
               </p>
-              <button
-                onClick={() => (campus ? setView("college") : setView("verify"))}
-                className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
-              >
-                {campus ? `Verified at ${campus.name} — open dashboard` : "Verify Student Status — Free"}
-              </button>
+              {plan === "college" ? (
+                <button
+                  onClick={() => setView("college")}
+                  className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+                >
+                  College+ active — open dashboard
+                </button>
+              ) : campus ? (
+                <div className="mt-4 space-y-2">
+                  <p className="flex items-center justify-center gap-1.5 rounded-md border border-violet-400/25 bg-violet-400/5 px-2 py-1.5 text-[11px] font-semibold text-violet-300">
+                    <Check className="h-3.5 w-3.5" /> Verified {campus.affiliation === "alumni" ? "Alumni" : "Student"} — {campus.name}
+                  </p>
+                  <button
+                    onClick={() => setView("collegeCheckout")}
+                    className="w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+                  >
+                    Add College+ — ${COLLEGE_PRICE}/mo
+                  </button>
+                  <button onClick={() => setView("college")} className="w-full text-center text-[11px] font-semibold text-violet-400 hover:text-violet-300">
+                    Open your campus dashboard →
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setView("verify")}
+                  className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+                >
+                  Verify Student Status — Free
+                </button>
+              )}
               <p className="mt-2 text-center text-[10px] text-zinc-600">
                 College+ ends at graduation; your alumni community and everything you built stay
                 free, forever.
@@ -310,7 +358,7 @@ export default function ProPage() {
           <header className="pt-2">
             <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-400">
               <GraduationCap className="h-3.5 w-3.5" />
-              verified student · {getPlan() === "college" ? "college+ active" : "free"}
+              verified {campus?.affiliation === "alumni" ? "alumni" : "student"} · {plan === "college" ? "college+ active" : plan === "pro" ? "pro plan" : "free plan"}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-50">
               Your campus-to-career network
@@ -379,7 +427,7 @@ export default function ProPage() {
               <div>
                 <h2 className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-zinc-100">
                   <Rocket className="h-4 w-4 text-violet-400" />
-                  {getPlan() === "college" ? "Student Boost — active" : "Student Boost — College+"}
+                  {plan === "college" ? "Student Boost — active" : "Student Boost — College+"}
                 </h2>
                 <p className="mt-1 max-w-md text-xs leading-relaxed text-zinc-500">
                   Relevance first, always: location, skills, availability, reputation, activity —
@@ -392,9 +440,9 @@ export default function ProPage() {
                 <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">boosted matches this month</p>
               </div>
             </div>
-            {getPlan() !== "college" && (
+            {plan !== "college" && (
               <button
-                onClick={() => setPlan("college")}
+                onClick={() => setView("collegeCheckout")}
                 className="mt-3 w-full rounded-md bg-violet-400 py-2 text-xs font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
               >
                 Add College+ · {money(COLLEGE_PRICE)}/mo — extra exposure, featured portfolio, analytics
@@ -420,15 +468,18 @@ export default function ProPage() {
               No pressure.
             </p>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => { setPlan("pro"); setView("manage"); }} className="btn-lime rounded-md px-4 py-1.5 text-xs">
+              <button onClick={() => changePlan("pro", "manage")} disabled={planBusy} className="btn-lime rounded-md px-4 py-1.5 text-xs disabled:opacity-50">
                 Preview Pro transition
               </button>
-              <button
-                onClick={() => { setPlan("free"); setView("plans"); }}
-                className="rounded-full border border-line px-4 py-1.5 text-xs text-zinc-400 transition hover:border-zinc-600"
-              >
-                Cancel College
-              </button>
+              {plan === "college" && (
+                <button
+                  onClick={() => changePlan("free")}
+                  disabled={planBusy}
+                  className="rounded-full border border-line px-4 py-1.5 text-xs text-zinc-400 transition hover:border-zinc-600 disabled:opacity-50"
+                >
+                  Cancel College+
+                </button>
+              )}
             </div>
             <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
               Plan ≠ identity: changing plans removes College perks only. Your verified school
@@ -436,6 +487,50 @@ export default function ProPage() {
             </p>
           </section>
         </>
+      )}
+
+      {/* ---------------- college+ demo checkout ---------------- */}
+      {view === "collegeCheckout" && (
+        <div className="card-people mx-auto max-w-sm border-violet-400/30 p-5">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">UpNova</p>
+            <button onClick={() => setView("plans")} className="icon-btn h-8 w-8" aria-label="Back">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <Perforation className="mt-3" />
+          <h1 className="mt-4 flex items-center gap-2 text-[15px] font-bold tracking-tight text-zinc-50">
+            <GraduationCap className="h-4 w-4 text-violet-400" /> Add College+
+          </h1>
+          <p className="text-xs text-zinc-500">College+ Monthly — the optional exposure upgrade</p>
+          {campus ? (
+            <p className="mt-3 flex items-center gap-1.5 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] font-semibold text-violet-300">
+              <Check className="h-3.5 w-3.5" /> Verified {campus.affiliation === "alumni" ? "Alumni" : "Student"} — {campus.name}
+            </p>
+          ) : (
+            <p className="mt-3 rounded-md border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-300">
+              You aren&apos;t verified yet — Student Boost only applies once your student status is
+              verified (free, anytime). You can still add College+ now.
+            </p>
+          )}
+          <div className="mt-3 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
+            <span className="font-mono font-medium">•••• 4242</span>
+            <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-violet-300">${COLLEGE_PRICE}</span>
+          </div>
+          {planError && (
+            <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>
+          )}
+          <button
+            onClick={() => changePlan("college", "college")}
+            disabled={planBusy}
+            className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
+          >
+            {planBusy ? "Activating…" : `Activate College+ — ${"$"}${COLLEGE_PRICE}/mo`}
+          </button>
+          <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
+            Demo checkout — no real payment. Billing runs on Stripe when we go live.
+          </p>
+        </div>
       )}
 
       {/* ---------------- pro checkout ---------------- */}
@@ -454,11 +549,15 @@ export default function ProPage() {
             <span className="font-mono font-medium">•••• 4242</span>
             <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${PRO_PRICE}</span>
           </div>
+          {planError && (
+            <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>
+          )}
           <button
-            onClick={() => { setPlan("pro"); setView("success"); }}
-            className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm"
+            onClick={() => changePlan("pro", "success")}
+            disabled={planBusy}
+            className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm disabled:opacity-50"
           >
-            Subscribe to UpNova Pro
+            {planBusy ? "Activating…" : "Subscribe to UpNova Pro"}
           </button>
           <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
 Billing runs on Stripe when we go live
@@ -529,10 +628,11 @@ Billing runs on Stripe when we go live
             <div className="mt-4 flex gap-2">
               <button onClick={() => setCancelOpen(false)} className="btn-lime flex-1 rounded-md py-2 text-xs">Keep Pro</button>
               <button
-                onClick={() => { setPlan("free"); setCancelOpen(false); setView("plans"); }}
-                className="flex-1 rounded-full border border-red-500/40 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10"
+                onClick={async () => { await changePlan("free", "plans"); setCancelOpen(false); }}
+                disabled={planBusy}
+                className="flex-1 rounded-full border border-red-500/40 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
               >
-                Cancel Pro
+                {planBusy ? "Cancelling…" : "Cancel Pro"}
               </button>
             </div>
           </div>

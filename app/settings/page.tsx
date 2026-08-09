@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import {
   User,
   Palette,
+  FlaskConical,
+  GraduationCap,
   Bell,
   ShieldCheck,
   Wallet,
@@ -18,9 +20,9 @@ import {
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import SecurityCard from "@/components/SecurityCard";
-import { useSession } from "@/lib/session";
+import { useSession, invalidateSession } from "@/lib/session";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
-import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
+import { setPlan, PRO_EVENT, type Plan } from "@/lib/pro";
 import { currentUser, services, bookings } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -37,6 +39,7 @@ const sections = [
   { id: "hiring", label: "Hiring", icon: Briefcase },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "pro", label: "Plan & Billing", icon: Sparkles },
+  { id: "demo", label: "Demo Controls", icon: FlaskConical },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 
@@ -120,17 +123,46 @@ export default function SettingsPage() {
     setTheme(c);
     setThemeState(c);
   };
-  const [plan, setPlanState] = useState<Plan>("free");
-  // student verification is a DB fact on the session user — not localStorage
+  // plan + verification are ACCOUNT facts from the session (DB) — never localStorage
+  const plan = (user?.plan ?? "free") as Plan;
   const studentVerified = !!user?.campus;
+  // PRO_EVENT re-render bridges the moment between a plan change and the session refetch
+  const [, forceTick] = useState(0);
   useEffect(() => {
-    const sync = () => {
-      setPlanState(getPlan());
-    };
-    sync();
+    const sync = () => forceTick((n) => n + 1);
     window.addEventListener(PRO_EVENT, sync);
     return () => window.removeEventListener(PRO_EVENT, sync);
   }, []);
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoMsg, setDemoMsg] = useState("");
+  /* DEMO ONLY — switches the verification state of THIS account through a
+     demo-gated API. Auth/session state is never touched. */
+  const setAccountState = async (state: "unverified" | "current_student" | "alumni") => {
+    setDemoBusy(true);
+    setDemoMsg("");
+    try {
+      const res = await fetch("/api/demo/account-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state }),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) { setDemoMsg((data as { error?: string }).error || "Switch failed — try again."); return; }
+      invalidateSession();
+      setDemoMsg("");
+    } catch {
+      setDemoMsg("Network error — try again.");
+    } finally {
+      setDemoBusy(false);
+    }
+  };
+  const setDemoPlan = async (p: Plan) => {
+    setDemoBusy(true);
+    setDemoMsg("");
+    const ok = await setPlan(p);
+    if (!ok) setDemoMsg("Plan change failed — are you signed in?");
+    setDemoBusy(false);
+  };
   const setT = (k: string) => (v: boolean) => setToggles((s) => ({ ...s, [k]: v }));
 
   const earned = 4850;
@@ -492,6 +524,96 @@ export default function SettingsPage() {
                 <p className="mt-2 text-center text-[10px] text-zinc-600">
                   Test prices. Transaction fees on paid work are separate — UpNova earns even from
                   Free users when they earn.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {section === "demo" && (
+            <section className="card overflow-hidden">
+              <div className="border-b border-amber-400/20 bg-gradient-to-b from-amber-400/10 to-transparent p-5">
+                <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-amber-300">
+                  <FlaskConical className="h-4 w-4" /> Demo Controls
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                  Testing tools for this demo environment — switch your account&apos;s verification
+                  state and plan without payments or permanent changes. In production, verification
+                  runs through the education-verification provider and plans through Stripe.
+                  <span className="font-semibold text-zinc-300"> Your sign-in session is never touched.</span>
+                </p>
+              </div>
+              <div className="space-y-5 p-5">
+                <div>
+                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                    <GraduationCap className="h-3.5 w-3.5" /> Demo Account State — verification
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {([
+                      { id: "unverified", label: "Unverified", desc: "Your Campus locks" },
+                      { id: "current_student", label: "Current Student", desc: "Student campus experience" },
+                      { id: "alumni", label: "Alumni", desc: "Alumni campus experience" },
+                    ] as const).map((s2) => {
+                      const active =
+                        s2.id === "unverified"
+                          ? !user?.campus
+                          : user?.campus?.affiliation === s2.id;
+                      return (
+                        <button
+                          key={s2.id}
+                          onClick={() => setAccountState(s2.id)}
+                          disabled={demoBusy || active}
+                          className={`rounded-lg border p-3 text-left transition disabled:cursor-default ${
+                            active
+                              ? "border-violet-400/50 bg-violet-400/10"
+                              : "border-line hover:border-zinc-600 hover:bg-card-raised disabled:opacity-50"
+                          }`}
+                        >
+                          <p className={`text-sm font-semibold ${active ? "text-violet-300" : "text-zinc-200"}`}>
+                            {s2.label} {active ? "· current" : ""}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-zinc-500">{s2.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                    <Sparkles className="h-3.5 w-3.5" /> Demo Plan — subscription
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {([
+                      { id: "free", label: "Free", desc: "Basic features" },
+                      { id: "college", label: "College+", desc: "Student growth benefits" },
+                      { id: "pro", label: "Pro", desc: "Professional creator tools" },
+                    ] as const).map((p2) => {
+                      const active = plan === p2.id;
+                      return (
+                        <button
+                          key={p2.id}
+                          onClick={() => setDemoPlan(p2.id)}
+                          disabled={demoBusy || active}
+                          className={`rounded-lg border p-3 text-left transition disabled:cursor-default ${
+                            active
+                              ? "border-lime-400/50 bg-lime-400/10"
+                              : "border-line hover:border-zinc-600 hover:bg-card-raised disabled:opacity-50"
+                          }`}
+                        >
+                          <p className={`text-sm font-semibold ${active ? "text-lime-300" : "text-zinc-200"}`}>
+                            {p2.label} {active ? "· current" : ""}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-zinc-500">{p2.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {demoMsg && (
+                  <p className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{demoMsg}</p>
+                )}
+                <p className="border-t border-line-soft pt-3 text-[10px] leading-relaxed text-zinc-600">
+                  Verification and plan are independent facts: switching plans never removes your
+                  verified school identity, and verifying never activates a paid plan.
                 </p>
               </div>
             </section>

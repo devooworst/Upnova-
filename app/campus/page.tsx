@@ -266,6 +266,18 @@ export default function CampusPage() {
         </div>
       </header>
 
+      {/* alumni environment — same campus, different doors open */}
+      {user?.campus?.affiliation === "alumni" && (
+        <div className="rounded-lg border border-violet-400/25 bg-violet-400/5 px-4 py-3">
+          <p className="text-xs font-semibold text-violet-300">Alumni environment</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
+            You&apos;re here as {user.campus.name} alumni{user.campus.gradYear ? ` — Class of ${user.campus.gradYear}` : ""}.
+            Communities, events, networking, and your alumni community stay open; current-student-only
+            areas (Marketplace, Student Groups) are closed.
+          </p>
+        </div>
+      )}
+
       {/* section nav — conversation, discovery, and commerce are separate layers */}
       <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Campus sections">
         {/* Marketplace is real and important enough to lead — a live link,

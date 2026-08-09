@@ -21,15 +21,28 @@ export function getPlan(): Plan {
   return v === "pro" || v === "college" ? v : "free";
 }
 
-export function setPlan(plan: Plan) {
-  window.localStorage.setItem("upnova-plan", plan);
-  // plan is account state — persist to the DB so it survives user switches
-  fetch("/api/me/plan", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan }),
-  }).catch(() => {});
+/** DEMO/TEST plan change — no real payment. Persists to the ACCOUNT
+    (users.plan via the API) so it survives refreshes and device switches;
+    the session is soft-refreshed so every plan-aware surface updates.
+    Returns false when the server refused (e.g. not signed in) — the
+    caller shows an inline message; nothing about auth state is touched. */
+export async function setPlan(plan: Plan): Promise<boolean> {
+  try {
+    const res = await fetch("/api/me/plan", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
+    if (!res.ok) return false;
+  } catch {
+    return false;
+  }
+  window.localStorage.setItem("upnova-plan", plan); // legacy mirror only — UI reads user.plan
   window.dispatchEvent(new Event(PRO_EVENT));
+  // soft session refetch: user.plan updates everywhere without a reload
+  const { invalidateSession } = await import("./session");
+  invalidateSession();
+  return true;
 }
 
 /** DEPRECATED — student verification is a DATABASE FACT (campus_verifications

@@ -17,6 +17,7 @@ import {
   Bookmark,
   BarChart3,
   GraduationCap,
+  Lock,
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ import Avatar from "./Avatar";
 import { communities } from "@/lib/data";
 import { useSession } from "@/lib/session";
 import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
+import { COLLEGE_PRICE } from "@/lib/fees";
 
 /* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
 const navGroups: {
@@ -128,11 +130,11 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
-        {/* Your Campus is a VERIFIED-IDENTITY feature: the nav item exists
-            only for verified members (student / alumni / faculty). Plan
-            (Free vs Pro) never factors in. Unverified members find the
-            verification prompt at /campus via Settings — not a nav tease. */}
-        {campus && (
+        {/* Your Campus is a VERIFIED-IDENTITY feature: verified members get
+            the live item; signed-in unverified members see it LOCKED with
+            the path in (verification, always free — never a plan). Plan
+            (Free vs Pro) never factors in. Guests see nothing. */}
+        {campus ? (
           <div className="mt-1">
             <Link
               href="/campus"
@@ -151,7 +153,20 @@ export default function Sidebar() {
               </span>
             </Link>
           </div>
-        )}
+        ) : user ? (
+          <div className="mt-1">
+            <Link
+              href="/campus"
+              title="Verify your student or alumni affiliation to access Your Campus — verification is free."
+              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-card-raised hover:text-zinc-300"
+            >
+              <Lock className="h-[18px] w-[18px] text-zinc-600" /> Your Campus
+              <span className="ml-auto rounded border border-line px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide text-zinc-600">
+                Verify to unlock
+              </span>
+            </Link>
+          </div>
+        ) : null}
       </nav>
 
       {/* Your Account — the plan card gets the prime real estate */}
@@ -164,22 +179,63 @@ export default function Sidebar() {
             <Sparkles className="absolute -right-3 -top-3 h-16 w-16 text-lime-400/10" />
             <p className="text-sm font-bold text-lime-300">✦ UpNova Pro ✓</p>
             <p className="mt-0.5 text-xs text-zinc-400">Your Pro membership is active</p>
+            {campus && (
+              <p className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold text-violet-300">
+                <GraduationCap className="h-3 w-3" /> Verified {campus.affiliation === "alumni" ? "Alumni" : "Student"} — {campus.name.replace(" University", "")}
+              </p>
+            )}
             <ul className="mt-2 space-y-0.5 text-[10px] text-zinc-500">
               <li>Priority exposure · Advanced analytics</li>
               <li>Premium profile & creator tools</li>
             </ul>
             <Link href="/pro" className="btn-ghost mt-3 flex w-full border-lime-400/40 py-1.5 text-xs text-lime-300">
-              Manage Plan →
+              Manage Subscription →
             </Link>
           </div>
         ) : plan === "college" ? (
           <div className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-400/10 to-card p-4">
             <p className="text-sm font-bold text-violet-300">UpNova College+ ✓</p>
-            <p className="mt-0.5 text-xs text-zinc-400">Bowie State University</p>
-            <p className="mt-1 text-[10px] text-zinc-500">College benefits active · Student Boost on</p>
+            {campus ? (
+              <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-violet-300">
+                <GraduationCap className="h-3.5 w-3.5" /> Verified {campus.affiliation === "alumni" ? "Alumni" : "Student"} — {campus.name.replace(" University", "")}
+              </p>
+            ) : (
+              <Link href="/pro" className="mt-0.5 block text-xs font-semibold text-amber-300 hover:text-amber-200">
+                Not verified yet — verify free to activate Student Boost →
+              </Link>
+            )}
+            <p className="mt-1 text-[10px] text-zinc-500">
+              College+ benefits active{campus ? " · Student Boost on" : ""}
+            </p>
             <Link href="/pro" className="btn-ghost mt-3 flex w-full border-violet-400/40 py-1.5 text-xs text-violet-300">
-              Manage Plan →
+              Manage Subscription →
             </Link>
+          </div>
+        ) : campus ? (
+          /* Free plan + VERIFIED identity — two separate facts, shown separately:
+             the identity badge (permanent) and the subscription (not active) */
+          <div className="relative overflow-hidden rounded-2xl border border-line bg-card p-4">
+            <p className="text-sm font-bold text-zinc-100">Free Plan</p>
+            <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-violet-300">
+              <GraduationCap className="h-3.5 w-3.5" /> Verified {campus.affiliation === "alumni" ? "Alumni" : campus.affiliation === "faculty_staff" ? "Faculty / Staff" : "Student"} ✓
+            </p>
+            <p className="text-[10px] text-zinc-500">{campus.name}</p>
+            <Link href="/pro" className="btn-ghost mt-3 flex w-full py-1.5 text-xs">
+              Manage Account →
+            </Link>
+            {campus.affiliation !== "faculty_staff" && (
+              <div className="mt-2 border-t border-line-soft pt-2">
+                <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-600">
+                  College+ — Not Active
+                </p>
+                <Link
+                  href="/pro?intent=college"
+                  className="mt-1.5 flex w-full items-center justify-center rounded-md bg-violet-400/15 py-1.5 text-[11px] font-bold text-violet-300 transition hover:bg-violet-400/25"
+                >
+                  Add College+ — ${COLLEGE_PRICE}/mo
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           <div className="relative overflow-hidden rounded-2xl border border-line bg-card p-4">
