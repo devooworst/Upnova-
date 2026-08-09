@@ -110,7 +110,10 @@ const campusQuestions = [
 export default function CampusPage() {
   // campus access is a database fact: a verified campus_verifications row
   const { user } = useSession();
-  const verified = !!user?.campus;
+  // DEMO MODE (tester switch, top-left): gate opens for testing; the real
+  // verification fact is still shown honestly. SIMULATION MODE enforces.
+  const demoUnrestricted = !!user && user.testerMode !== "simulation";
+  const verified = !!user?.campus || demoUnrestricted;
   const [section, setSection] = useState<SectionId>("communities");
   const [community, setCommunity] = useState("general");
   const [svcFilter, setSvcFilter] = useState<string | null>(null);
@@ -243,12 +246,18 @@ export default function CampusPage() {
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user?.campus?.name ?? "Your Campus"}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user?.campus?.name ?? "Bowie State University"}</h1>
             <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-              <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-violet-300">
-                {user?.campus?.affiliation === "alumni" ? "Alumni" : user?.campus?.affiliation === "faculty_staff" ? "Faculty / Staff" : "Current Student"}
-                {user?.campus?.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
-              </span>
+              {user?.campus ? (
+                <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-violet-300">
+                  {user.campus.affiliation === "alumni" ? "Alumni" : user.campus.affiliation === "faculty_staff" ? "Faculty / Staff" : "Current Student"}
+                  {user.campus.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
+                </span>
+              ) : (
+                <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-amber-300" title="DEMO MODE — you are not verified; access is open for testing only">
+                  Demo access — not verified
+                </span>
+              )}
               <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> 2,841 verified students</span>
               <span className="flex items-center gap-1 text-violet-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" /> 116 online
@@ -256,8 +265,8 @@ export default function CampusPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <AcademicProfileCard />
-            {user?.campus?.affiliation !== "alumni" && user?.campus?.affiliation !== "faculty_staff" && (
+            {user?.campus && <AcademicProfileCard />}
+            {!!user?.campus && user.campus.affiliation !== "alumni" && user.campus.affiliation !== "faculty_staff" && (
               <button onClick={graduate} className="btn-ghost px-3.5 py-1.5 text-xs" title="Student → Alumni: nothing is deleted; student-only areas close, the alumni environment opens">
                 I graduated
               </button>
@@ -265,6 +274,17 @@ export default function CampusPage() {
           </div>
         </div>
       </header>
+
+      {/* DEMO MODE, no real verification — say so plainly */}
+      {!user?.campus && demoUnrestricted && (
+        <div className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-3">
+          <p className="text-xs font-semibold text-amber-300">DEMO MODE — verification gate opened for testing</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
+            You are not actually verified at this school. Switch to Simulation Mode (top-left) to
+            experience the real verification requirement, or verify below Settings → Demo Controls.
+          </p>
+        </div>
+      )}
 
       {/* alumni environment — same campus, different doors open */}
       {user?.campus?.affiliation === "alumni" && (

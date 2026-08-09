@@ -95,11 +95,19 @@ export default function ProPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user === undefined, user?.plan]);
 
-  /* DEMO/TEST plan change — persists to the account, no real payment */
-  const changePlan = async (next: ReturnType<typeof getPlan>, after?: View) => {
+  const [processing, setProcessing] = useState(false);
+  /* DEMO/TEST plan change — persists to the account, never a real charge.
+     `simulatePayment` adds the realistic checkout beat:
+     confirm → TEST PAYMENT processing → success → subscription active. */
+  const changePlan = async (next: ReturnType<typeof getPlan>, after?: View, simulatePayment = false) => {
     setPlanBusy(true);
     setPlanError("");
+    if (simulatePayment) {
+      setProcessing(true);
+      await new Promise((r) => setTimeout(r, 1100)); // test-payment processing
+    }
     const ok = await setPlan(next);
+    setProcessing(false);
     setPlanBusy(false);
     if (!ok) {
       setPlanError("Plan change failed — are you signed in? Nothing about your session was changed.");
@@ -515,20 +523,21 @@ export default function ProPage() {
           )}
           <div className="mt-3 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
             <span className="font-mono font-medium">•••• 4242</span>
+            <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-amber-300">test payment</span>
             <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-violet-300">${COLLEGE_PRICE}</span>
           </div>
           {planError && (
             <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>
           )}
           <button
-            onClick={() => changePlan("college", "college")}
+            onClick={() => changePlan("college", "college", true)}
             disabled={planBusy}
             className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
           >
-            {planBusy ? "Activating…" : `Activate College+ — ${"$"}${COLLEGE_PRICE}/mo`}
+            {processing ? "Processing test payment…" : planBusy ? "Activating…" : `Activate College+ — ${"$"}${COLLEGE_PRICE}/mo`}
           </button>
           <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
-            Demo checkout — no real payment. Billing runs on Stripe when we go live.
+            TEST/DEMO PAYMENT — no real money can move. Billing runs on Stripe when we go live.
           </p>
         </div>
       )}
@@ -547,20 +556,21 @@ export default function ProPage() {
           <p className="text-xs text-zinc-500">Pro Monthly</p>
           <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
             <span className="font-mono font-medium">•••• 4242</span>
+            <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-amber-300">test payment</span>
             <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${PRO_PRICE}</span>
           </div>
           {planError && (
             <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>
           )}
           <button
-            onClick={() => changePlan("pro", "success")}
+            onClick={() => changePlan("pro", "success", true)}
             disabled={planBusy}
             className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm disabled:opacity-50"
           >
-            {planBusy ? "Activating…" : "Subscribe to UpNova Pro"}
+            {processing ? "Processing test payment…" : planBusy ? "Activating…" : "Subscribe to UpNova Pro"}
           </button>
           <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
-Billing runs on Stripe when we go live
+            TEST/DEMO PAYMENT — no real money can move. Billing runs on Stripe when we go live.
           </p>
         </div>
       )}

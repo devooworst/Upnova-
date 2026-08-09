@@ -6,6 +6,7 @@ import { getSessionUser, requireUser, guarded, ApiError } from "@/lib/server/aut
 import { serializeEvent, rsvpCounts, verifiedCampusOf } from "@/lib/server/events";
 import { haversineMi } from "@/lib/server/feed";
 import { EVENT_CATEGORIES, CAMPUS_EVENT_CATEGORIES, AGE_RULES } from "@/lib/events";
+import { unrestrictedTester, demoCampusId } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
     let campusId: string | null = null;
     if (isCampus) {
       campusId = verifiedCampusOf(user.id);
+      if (!campusId && unrestrictedTester(user.id)) campusId = demoCampusId(); // DEMO MODE
       if (!campusId) throw new ApiError(403, "Campus events need verified campus status — verify your school in Your Campus first");
     }
 

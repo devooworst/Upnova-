@@ -16,7 +16,15 @@ CREATE TABLE IF NOT EXISTS `applications` (
 	FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`applicant_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS bids (id text PRIMARY KEY NOT NULL, listing_id text NOT NULL REFERENCES campus_listings(id) ON DELETE CASCADE, bidder_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount integer NOT NULL, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS `bids` (
+	`id` text PRIMARY KEY NOT NULL,
+	`listing_id` text NOT NULL,
+	`bidder_id` text NOT NULL,
+	`amount` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`listing_id`) REFERENCES `campus_listings`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`bidder_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `blocks` (
 	`id` text PRIMARY KEY NOT NULL,
 	`blocker_id` text NOT NULL,
@@ -56,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `bookmarks` (
 	PRIMARY KEY(`user_id`, `target_type`, `target_id`),
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "campus_listings" (
+CREATE TABLE IF NOT EXISTS `campus_listings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`seller_id` text NOT NULL,
 	`campus_id` text NOT NULL,
@@ -86,7 +94,7 @@ CREATE TABLE IF NOT EXISTS "campus_listings" (
 	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "campus_verifications" (
+CREATE TABLE IF NOT EXISTS `campus_verifications` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`campus_id` text NOT NULL,
@@ -120,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `comments` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "communities" (
+CREATE TABLE IF NOT EXISTS `communities` (
 	`id` text PRIMARY KEY NOT NULL,
 	`slug` text NOT NULL,
 	`name` text NOT NULL,
@@ -143,9 +151,10 @@ CREATE TABLE IF NOT EXISTS "communities" (
 	`grace_days` integer DEFAULT 3 NOT NULL,
 	`paused` integer DEFAULT false NOT NULL,
 	`campus_id` text,
+	`audience` text DEFAULT 'everyone' NOT NULL,
 	`created_by_id` text NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, audience text NOT NULL DEFAULT 'everyone',
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`created_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -162,7 +171,7 @@ CREATE TABLE IF NOT EXISTS `community_comments` (
 	FOREIGN KEY (`post_id`) REFERENCES `community_posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "community_members" (
+CREATE TABLE IF NOT EXISTS `community_members` (
 	`community_id` text NOT NULL,
 	`user_id` text NOT NULL,
 	`role` text DEFAULT 'member' NOT NULL,
@@ -262,19 +271,27 @@ CREATE TABLE IF NOT EXISTS `events` (
 	`host_id` text NOT NULL,
 	`title` text NOT NULL,
 	`description` text DEFAULT '' NOT NULL,
+	`campus_id` text,
+	`category` text DEFAULT 'Other' NOT NULL,
 	`starts_at` integer NOT NULL,
 	`time_label` text DEFAULT '' NOT NULL,
 	`location` text DEFAULT '' NOT NULL,
 	`city` text DEFAULT '' NOT NULL,
+	`state` text DEFAULT '' NOT NULL,
+	`lat` real,
+	`lng` real,
 	`price` integer,
 	`capacity` integer,
 	`attending` integer DEFAULT 0 NOT NULL,
 	`image_url` text,
 	`kind` text DEFAULT 'rsvp' NOT NULL,
 	`age_rule` text DEFAULT 'all' NOT NULL,
+	`config` text DEFAULT '{}' NOT NULL,
+	`status` text DEFAULT 'active' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, campus_id text REFERENCES campuses(id) ON DELETE SET NULL, category text NOT NULL DEFAULT 'Other', state text NOT NULL DEFAULT '', lat real, lng real, config text NOT NULL DEFAULT '{}', status text NOT NULL DEFAULT 'active',
-	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE set null
 );
 CREATE TABLE IF NOT EXISTS `experiences` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -314,10 +331,11 @@ CREATE TABLE IF NOT EXISTS `identity_reveals` (
 	`target_id` text NOT NULL,
 	`community_id` text,
 	`requester_label` text DEFAULT '' NOT NULL,
+	`target_label` text DEFAULT '' NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`responded_at` integer,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, target_label text NOT NULL DEFAULT '',
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`requester_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`target_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE set null
@@ -360,7 +378,7 @@ CREATE TABLE IF NOT EXISTS `likes` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "loans" (
+CREATE TABLE IF NOT EXISTS `loans` (
 	`id` text PRIMARY KEY NOT NULL,
 	`listing_id` text,
 	`lender_id` text NOT NULL,
@@ -483,6 +501,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
 	`booking_id` text,
 	`order_id` text,
 	`license_id` text,
+	`community_id` text,
 	`payer_id` text NOT NULL,
 	`payee_id` text NOT NULL,
 	`amount_cents` integer NOT NULL,
@@ -490,7 +509,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
 	`status` text DEFAULT 'pending' NOT NULL,
 	`provider` text DEFAULT 'stripe_connect' NOT NULL,
 	`provider_ref` text,
-	`created_at` integer NOT NULL, community_id text,
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`payer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`payee_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
@@ -581,6 +600,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`accept_collabs` integer DEFAULT true NOT NULL,
 	`who_can_message` text DEFAULT 'everyone' NOT NULL,
 	`visibility` text DEFAULT 'public' NOT NULL,
+	`reveal_identity_mode` text DEFAULT 'keep_anonymous' NOT NULL,
 	`show_location` integer DEFAULT true NOT NULL,
 	`show_education` integer DEFAULT true NOT NULL,
 	`show_followers` integer DEFAULT true NOT NULL,
@@ -591,7 +611,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`show_availability` integer DEFAULT true NOT NULL,
 	`links` text DEFAULT '[]' NOT NULL,
 	`education` text DEFAULT '[]' NOT NULL,
-	`trust_level` text DEFAULT 'standard' NOT NULL, reveal_identity_mode text NOT NULL DEFAULT 'keep_anonymous',
+	`trust_level` text DEFAULT 'standard' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `project_milestones` (
@@ -692,7 +712,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`mfa_secret` text,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
-);
+, `tester_mode` text DEFAULT 'demo' NOT NULL);
 CREATE TABLE IF NOT EXISTS `works` (
 	`id` text PRIMARY KEY NOT NULL,
 	`creator_id` text NOT NULL,
@@ -711,7 +731,7 @@ CREATE TABLE IF NOT EXISTS `works` (
 	FOREIGN KEY (`creator_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE UNIQUE INDEX IF NOT EXISTS `app_opp_applicant` ON `applications` (`opportunity_id`,`applicant_id`);
-CREATE INDEX IF NOT EXISTS bids_listing ON bids (listing_id, amount);
+CREATE INDEX IF NOT EXISTS `bids_listing` ON `bids` (`listing_id`,`amount`);
 CREATE UNIQUE INDEX IF NOT EXISTS `blocks_pair` ON `blocks` (`blocker_id`,`blocked_id`);
 CREATE INDEX IF NOT EXISTS `bookings_provider_starts` ON `bookings` (`provider_id`,`starts_at`);
 CREATE INDEX IF NOT EXISTS `campus_listings_campus` ON `campus_listings` (`campus_id`,`created_at`);

@@ -529,7 +529,26 @@ export default function SettingsPage() {
             </section>
           )}
 
-          {section === "demo" && (
+          {section === "demo" && user?.testerMode === "simulation" && (
+            <section className="card p-5">
+              <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-sky-300">
+                <FlaskConical className="h-4 w-4" /> Demo Controls
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                You are in <span className="font-semibold text-sky-300">Simulation Mode</span> — the
+                realistic user experience, where developer testing tools are hidden and every
+                restriction applies. To use the account-state and plan switchers, switch to{" "}
+                <span className="font-semibold text-amber-300">Demo Mode</span> with the toggle in
+                the top-left corner of the page.
+              </p>
+              <p className="mt-3 border-t border-line-soft pt-3 text-[10px] leading-relaxed text-zinc-600">
+                In Simulation Mode you change plans through the real (test-payment) checkout on the
+                Plans page, and verification through Your Campus — exactly like a normal user.
+              </p>
+            </section>
+          )}
+
+          {section === "demo" && user?.testerMode !== "simulation" && (
             <section className="card overflow-hidden">
               <div className="border-b border-amber-400/20 bg-gradient-to-b from-amber-400/10 to-transparent p-5">
                 <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-amber-300">

@@ -59,6 +59,9 @@ export interface SessionUser {
   accountType?: string;
   businessVerified?: boolean;
   profile: SessionProfile;
+  /** demo deployments only: "demo" = unrestricted testing, "simulation" =
+      realistic user experience. Feature-access state, never auth state. */
+  testerMode?: "demo" | "simulation";
   campus?: { name: string; slug: string; program: string; affiliation?: string; gradYear?: string } | null;
 }
 

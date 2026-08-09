@@ -21,7 +21,7 @@ import {
   parseRefUrl,
   resolveRef,
 } from "@/lib/server/communities";
-import { campusVerification } from "@/lib/server/campus";
+import { campusVerification, unrestrictedTester, demoCampusId } from "@/lib/server/campus";
 import { notify } from "@/lib/server/notify";
 import { seedRespondsInCommunity } from "@/lib/server/demo";
 
@@ -47,7 +47,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // active members (e.g. alumni who joined as students) keep access
     if (c.campusId && !activeMember) {
       const vc = viewer ? campusVerification(viewer.id) : null;
-      if (!vc || vc.campusId !== c.campusId)
+      const demoBypass = !!viewer && unrestrictedTester(viewer.id); // DEMO MODE
+      if (!demoBypass && (!vc || vc.campusId !== c.campusId))
         throw new ApiError(403, "This is a campus community — verify your school in Your Campus to view it");
     }
     if (!activeMember && c.price > 0)

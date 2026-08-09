@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { communityCounts, refreshMembership, serializeCommunity } from "@/lib/server/communities";
-import { campusVerification } from "@/lib/server/campus";
+import { campusVerification, unrestrictedTester, demoCampusId } from "@/lib/server/campus";
 import { COMMUNITY_CATEGORIES, isStudentGroup } from "@/lib/communityIdentity";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
 
     // campus communities are part of the verified campus environment:
     // they only appear in the directory for members verified at THAT campus
-    const viewerCampus = viewer ? campusVerification(viewer.id)?.campusId ?? null : null;
+    let viewerCampus = viewer ? campusVerification(viewer.id)?.campusId ?? null : null;
+    if (!viewerCampus && viewer && unrestrictedTester(viewer.id)) viewerCampus = demoCampusId(); // DEMO MODE
 
     let all = db.select().from(tables.communities).orderBy(desc(tables.communities.createdAt)).all();
     all = all.filter((c) => !c.campusId || c.campusId === viewerCampus);

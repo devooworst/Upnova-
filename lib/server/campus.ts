@@ -11,7 +11,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { ApiError } from "@/lib/server/auth";
+import { ApiError, isDemoMode } from "@/lib/server/auth";
 
 export function campusVerification(userId: string) {
   return db
@@ -21,16 +21,56 @@ export function campusVerification(userId: string) {
     .get();
 }
 
+/* ------------------------------------------------------------------ */
+/* DEMO MODE vs SIMULATION MODE — the tester-mode master switch.       */
+/* Only meaningful on a demo deployment (db/DEMO_MODE present):        */
+/*   demo       → unrestricted developer testing; access gates below   */
+/*                 open without verification/affiliation               */
+/*   simulation → the realistic user experience; every gate applies    */
+/* Production has no db/DEMO_MODE → always false → gates always apply. */
+/* This controls FEATURE ACCESS only. It never reads or writes auth/   */
+/* session state, and display surfaces keep showing the REAL account   */
+/* facts (verification, plan) — demo mode opens doors, it never lies.  */
+/* ------------------------------------------------------------------ */
+export function unrestrictedTester(userId: string): boolean {
+  if (!isDemoMode()) return false;
+  const u = db
+    .select({ t: tables.users.testerMode })
+    .from(tables.users)
+    .where(eq(tables.users.id, userId))
+    .get();
+  return (u?.t ?? "demo") === "demo";
+}
+
+/** Campus a demo-mode tester is dropped into when they have no real
+    verification (the seeded campus). */
+export function demoCampusId(): string | null {
+  const c =
+    db.select().from(tables.campuses).where(eq(tables.campuses.slug, "bowie-state")).get() ??
+    db.select().from(tables.campuses).get();
+  return c?.id ?? null;
+}
+
 export function requireCampus(userId: string): string {
   const v = campusVerification(userId);
-  if (!v) throw new ApiError(403, "This is a campus space — verify your school in Your Campus first");
-  return v.campusId;
+  if (v) return v.campusId;
+  if (unrestrictedTester(userId)) {
+    const id = demoCampusId();
+    if (id) return id; // DEMO MODE: gate opens for testing
+  }
+  throw new ApiError(403, "This is a campus space — verify your school in Your Campus first");
 }
 
 /** Student-to-student areas. The Student → Alumni transition deletes
-    nothing — these areas simply become unavailable for new activity. */
+    nothing — these areas simply become unavailable for new activity.
+    DEMO MODE bypasses the affiliation restriction too (unrestricted
+    testing); SIMULATION MODE enforces it exactly like production. */
 export function requireCurrentStudent(userId: string): string {
   const v = campusVerification(userId);
+  if (unrestrictedTester(userId)) {
+    const id = v?.campusId ?? demoCampusId();
+    if (id) return id;
+  }
   if (!v) throw new ApiError(403, "This is a campus space — verify your school in Your Campus first");
   if (v.affiliation !== "current_student")
     throw new ApiError(

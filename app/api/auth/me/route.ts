@@ -51,6 +51,9 @@ export async function GET() {
     user: {
       ...ownProfile(user, session.profile),
       experience,
+      // tester mode is only meaningful on a demo deployment; production is
+      // always the realistic experience (feature access, never auth state)
+      testerMode: isDemoMode() ? (user.testerMode === "simulation" ? "simulation" : "demo") : "simulation",
       campus: verification
         ? {
             name: verification.c.name,

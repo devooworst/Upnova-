@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/communities";
 import { membershipQuote } from "@/lib/communityIdentity";
 import { notify } from "@/lib/server/notify";
+import { unrestrictedTester, demoCampusId } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const quote = membershipQuote(c.price);
     const periodMs = communityPeriodDays(c) * 86_400_000;
 
-    if (c.campusId) {
+    if (c.campusId && !unrestrictedTester(user.id) /* DEMO MODE bypasses; SIMULATION enforces */) {
       const v = db
         .select()
         .from(tables.campusVerifications)

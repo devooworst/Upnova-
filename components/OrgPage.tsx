@@ -26,7 +26,8 @@ export default function OrgPage({ id }: { id: string }) {
   const org = campusOrgs.find((o) => o.id === id)!;
   // campus access is a database fact (campus_verifications) — same check as the sidebar and /campus
   const { user } = useSession();
-  const verified = !!user?.campus;
+  // DEMO MODE opens the gate for testing; SIMULATION MODE enforces
+  const verified = !!user?.campus || (!!user && user.testerMode !== "simulation");
   const [joined, setJoined] = useState(false);
   const [rsvp, setRsvp] = useState<Record<string, boolean>>({});
 

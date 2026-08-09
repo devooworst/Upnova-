@@ -6,7 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { conversationBetween } from "@/lib/server/oppFlow";
-import { requireCurrentStudent } from "@/lib/server/campus";
+import { requireCurrentStudent, unrestrictedTester } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -79,8 +79,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           .get()
       : false;
     // campus content is for that campus's verified members — everyone else
-    // gets the verification prompt, not a peek
-    if (!member) throw new ApiError(403, "This is a campus listing — verify your school in Your Campus to view it");
+    // gets the verification prompt, not a peek (DEMO MODE testers excepted)
+    if (!member && !(viewer && unrestrictedTester(viewer.id)))
+      throw new ApiError(403, "This is a campus listing — verify your school in Your Campus to view it");
     const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, l.campusId)).get();
 
     const bidRows = db.select().from(tables.bids).where(eq(tables.bids.listingId, l.id)).orderBy(desc(tables.bids.amount)).all();

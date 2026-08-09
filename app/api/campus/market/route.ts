@@ -6,7 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import { publicUser } from "@/lib/server/serialize";
 import { createLinkedPost } from "@/lib/server/publish";
 import { LISTING_TYPES, CAMPUS_CATEGORIES } from "@/lib/campusMarket";
-import { requireCurrentStudent } from "@/lib/server/campus";
+import { requireCurrentStudent, unrestrictedTester, demoCampusId } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,10 @@ export async function GET() {
           .where(and(eq(tables.campusVerifications.userId, viewer.id), eq(tables.campusVerifications.status, "verified")))
           .get() ?? null
       : null;
-    const myCampus = verif && verif.affiliation === "current_student" ? verif.campusId : null;
+    let myCampus = verif && verif.affiliation === "current_student" ? verif.campusId : null;
+    // DEMO MODE: unrestricted tester browses without verification;
+    // SIMULATION MODE / production: the real gate applies
+    if (!myCampus && viewer && unrestrictedTester(viewer.id)) myCampus = demoCampusId();
 
     const campuses = new Map(db.select().from(tables.campuses).all().map((c) => [c.id, c.name]));
     let rows = db

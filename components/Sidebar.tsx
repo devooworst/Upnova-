@@ -154,18 +154,39 @@ export default function Sidebar() {
             </Link>
           </div>
         ) : user ? (
-          <div className="mt-1">
-            <Link
-              href="/campus"
-              title="Verify your student or alumni affiliation to access Your Campus — verification is free."
-              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-card-raised hover:text-zinc-300"
-            >
-              <Lock className="h-[18px] w-[18px] text-zinc-600" /> Your Campus
-              <span className="ml-auto rounded border border-line px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide text-zinc-600">
-                Verify to unlock
-              </span>
-            </Link>
-          </div>
+          user.testerMode !== "simulation" ? (
+            /* DEMO MODE: gate is open for testing — labeled, never implied
+               to be a real verified state */
+            <div className="mt-1">
+              <Link
+                href="/campus"
+                title="DEMO MODE — access opened for testing. In Simulation Mode this requires verification."
+                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  pathname.startsWith("/campus")
+                    ? "bg-violet-400/15 text-violet-200"
+                    : "text-violet-300 hover:bg-violet-400/10"
+                }`}
+              >
+                <GraduationCap className="h-[18px] w-[18px]" /> Your Campus
+                <span className="ml-auto rounded border border-amber-400/40 bg-amber-400/10 px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide text-amber-300">
+                  demo
+                </span>
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-1">
+              <Link
+                href="/campus"
+                title="Verify your student or alumni affiliation to access Your Campus — verification is free."
+                className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-card-raised hover:text-zinc-300"
+              >
+                <Lock className="h-[18px] w-[18px] text-zinc-600" /> Your Campus
+                <span className="ml-auto rounded border border-line px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide text-zinc-600">
+                  Verify to unlock
+                </span>
+              </Link>
+            </div>
+          )
         ) : null}
       </nav>
 

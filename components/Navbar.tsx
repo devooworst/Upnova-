@@ -26,6 +26,7 @@ import Avatar from "./Avatar";
 import { promptJoin } from "./GuestGate";
 import { useSession, logout } from "@/lib/session";
 import { openCreateModal } from "./CreateModalTrigger";
+import DemoModeSwitch from "./DemoModeSwitch";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -55,13 +56,9 @@ export default function Navbar() {
           <span className="font-display text-lg font-bold tracking-tight text-zinc-50">
             UpNova
           </span>
-          <span
-            className="ml-1 hidden rounded border border-line px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.15em] text-zinc-500 sm:inline"
-            title="Demo Mode — simulated creator responses and payments. No real money is transferred. The same interfaces switch to real payments and real messages in production."
-          >
-            demo
-          </span>
         </Link>
+        {/* DEMO MODE / SIMULATION MODE master switch — outside the logo link */}
+        <DemoModeSwitch />
 
         {/* Desktop search */}
         <div className="relative mx-auto hidden w-full max-w-xl md:block">

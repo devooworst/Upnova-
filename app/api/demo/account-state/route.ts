@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
   return guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
     const user = requireUser();
+    // the developer test panel lives in DEMO MODE only — in Simulation Mode
+    // you change verification/plan through the realistic user flows
+    const mode = db.select({ t: tables.users.testerMode }).from(tables.users).where(eq(tables.users.id, user.id)).get();
+    if (mode?.t === "simulation")
+      throw new ApiError(403, "Demo account-state switching requires Demo Mode — use the toggle in the top-left");
     const state = String(body.state || "");
     if (!STATES.includes(state as (typeof STATES)[number]))
       throw new ApiError(400, "state must be one of: " + STATES.join(", "));

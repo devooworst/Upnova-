@@ -33,6 +33,12 @@ export const users = sqliteTable("users", {
   handle: text("handle").notNull().unique(),
   role: text("role").notNull().default("user"), // user | admin
   plan: text("plan").notNull().default("free"), // free | college | pro
+  // DEMO DEPLOYMENT ONLY (db/DEMO_MODE): per-account tester mode.
+  //   demo       — unrestricted developer testing: access gates bypass
+  //   simulation — realistic user experience: every real gate applies
+  // Ignored entirely in production (isDemoMode() false → always realistic).
+  // This is feature-access state, NEVER auth state.
+  testerMode: text("tester_mode").notNull().default("demo"),
   status: text("status").notNull().default("active"), // active | suspended
   // individual | business. businessVerified is EARNED through UpNova's
   // business-verification process — it is never granted by a subscription.

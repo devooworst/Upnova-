@@ -1,10 +1,50 @@
-import { BarChart3, ArrowUpRight } from "lucide-react";
-import { analytics } from "@/lib/data";
+"use client";
 
-export const metadata = { title: "Analytics" };
+import Link from "next/link";
+import { BarChart3, ArrowUpRight, Sparkles, FlaskConical } from "lucide-react";
+import { analytics } from "@/lib/data";
+import { useSession } from "@/lib/session";
 
 export default function AnalyticsPage() {
   const max = Math.max(...analytics.weeklyReach.map((d) => d.value));
+  const { user } = useSession();
+  // Advanced Analytics is a PRO feature. SIMULATION MODE enforces it like
+  // production; DEMO MODE opens it for testing (clearly labeled below).
+  const demoUnrestricted = !!user && user.testerMode !== "simulation";
+  const hasPro = user?.plan === "pro";
+
+  if (user === undefined) {
+    return (
+      <div className="mx-auto max-w-4xl pt-10" aria-busy="true">
+        <div className="h-8 w-56 animate-pulse rounded bg-card-raised" />
+        <div className="mt-4 h-40 animate-pulse rounded-xl bg-card-raised" />
+      </div>
+    );
+  }
+
+  if (!hasPro && !demoUnrestricted) {
+    return (
+      <div className="mx-auto max-w-md pt-12 text-center">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10">
+          <BarChart3 className="h-7 w-7 text-lime-400" />
+        </span>
+        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">Advanced Analytics</h1>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
+          Profile views, application rates, earnings breakdowns, and audience location are part of
+          UpNova Pro. Your current plan: <span className="font-semibold text-zinc-300">{user?.plan === "college" ? "College+" : "Free"}</span>.
+        </p>
+        <Link
+          href="/pro"
+          className="btn-lime mt-5 inline-flex items-center gap-2 rounded-md px-6 py-2.5 text-sm"
+        >
+          <Sparkles className="h-4 w-4" /> Upgrade to Pro
+        </Link>
+        <p className="mt-3 text-[10px] text-zinc-600">
+          Earning is never paywalled — analytics is a growth perk, not an earnings gate.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -17,6 +57,17 @@ export default function AnalyticsPage() {
         </h1>
         <p className="mt-1 text-sm text-zinc-500">Last 7 days • UpNova Pro unlocks deeper insights.</p>
       </header>
+
+      {!hasPro && demoUnrestricted && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-3">
+          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <p className="text-[11px] leading-relaxed text-zinc-400">
+            <span className="font-semibold text-amber-300">DEMO MODE</span> — this is a Pro feature
+            and your plan is {user?.plan === "college" ? "College+" : "Free"}. Access is open for
+            testing; switch to Simulation Mode (top-left) to see the real Pro gate.
+          </p>
+        </div>
+      )}
 
       {/* stat cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
