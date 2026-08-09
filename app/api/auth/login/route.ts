@@ -11,6 +11,7 @@ import {
   sessionCookieOptions,
   rememberDemoSession,
   signDemoToken,
+  isDemoMode,
   guarded,
   ApiError,
 } from "@/lib/server/auth";
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
       ...ownProfile(user, profile),
       // the client stores THIS in its persistence layers: in demo mode a
       // SIGNED token any instance can verify; otherwise the opaque token
-      sessionToken: process.env.UPNOVA_DEMO_STICKY_SESSION === "1" ? signDemoToken(user.handle) : token,
+      sessionToken: isDemoMode() ? signDemoToken(user.handle) : token,
       cookieless,
     };
   });

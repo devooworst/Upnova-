@@ -18,7 +18,7 @@
 
 import { cookies, headers } from "next/headers";
 import { randomBytes } from "crypto";
-import { readFileSync, writeFileSync, unlinkSync } from "fs";
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 
 /* ---------------- DEV/DEMO ONLY: sticky sandbox session ----------------
@@ -34,6 +34,11 @@ import { join } from "path";
 const STICKY_FILE = join(process.cwd(), "db", ".demo-session");
 const SIGNOUT_FILE = join(process.cwd(), "db", ".demo-signout.json");
 const stickyOn = () => process.env.UPNOVA_DEMO_STICKY_SESSION === "1";
+/* Demo mode gate that SURVIVES instance swaps: env files are per-machine
+   and do not travel with the platform's snapshots — a committed marker
+   file does. Production deletes db/DEMO_MODE (see README + the file
+   itself); until then every instance of this demo accepts demo tokens. */
+const demoModeOn = () => stickyOn() || existsSync(join(process.cwd(), "db", "DEMO_MODE"));
 
 /* Signed demo token — the transport that survives BOTH storage-blocked
    embeddings and preview-instance swaps. Format:
@@ -43,7 +48,12 @@ const stickyOn = () => process.env.UPNOVA_DEMO_STICKY_SESSION === "1";
    (seed identities are deterministic across instances); revoked by
    sign-out via a per-handle issued-before cutoff. Demo-only (flag). */
 import { createHmac } from "crypto";
-const demoSecret = () => process.env.SESSION_SECRET || "upnova-dev";
+/* CONSTANT on purpose: cross-instance verification must not depend on any
+   per-machine env value. Demo-only — production removes db/DEMO_MODE and
+   this whole path goes dead. */
+const demoSecret = () => "upnova-demo-signing-key-NOT-FOR-PRODUCTION";
+
+export const isDemoMode = () => demoModeOn();
 
 export function signDemoToken(handle: string): string {
   const iat = Date.now();
@@ -64,7 +74,7 @@ export function revokeDemoTokens(handle: string) {
 }
 
 export function verifyDemoToken(token: string): string | null {
-  if (!stickyOn()) return null;
+  if (!demoModeOn()) return null;
   const m = /^demo\.([a-z0-9_]+)\.(\d+)\.([a-f0-9]{64})$/.exec(token);
   if (!m) return null;
   const [, handle, iatStr, sig] = m;
