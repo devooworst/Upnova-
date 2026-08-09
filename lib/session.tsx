@@ -207,16 +207,26 @@ export function saveUserSnapshot(user: SessionUser | null) {
   } catch {}
 }
 
-if (typeof window !== "undefined") {
-  // synchronous, at module init — BEFORE any useSession() evaluates
+/* Hydration-safe boot: the SERVER renders the auth-initializing state and
+   the client's FIRST render must be byte-identical — so nothing here runs
+   before mount. bootSession() is called from useSession's effect (i.e.
+   AFTER hydration): it restores the saved user from localStorage, then
+   revalidates against the server in the background.
+     Server render → identical client render → hydration completes →
+     read localStorage → restore user → show profile. */
+let booted = false;
+
+export function bootSession() {
+  if (booted || typeof window === "undefined") return;
+  booted = true;
+  if (cached !== undefined) return; // login already primed this session
   const restored = readUserSnapshot();
   if (restored) {
-    cached = restored;
-    // background revalidation: confirm with the server; an explicit
-    // "nobody" clears the snapshot (dead session), a network error keeps it
-    setTimeout(() => {
-      void fetchSession(true);
-    }, 0);
+    cached = restored; // instant signed-in UI, post-hydration
+    window.dispatchEvent(new Event(SESSION_EVENT));
+    void fetchSession(true); // server confirms or (explicitly) clears
+  } else {
+    void fetchSession(); // normal path: ask the server who we are
   }
 }
 
@@ -276,10 +286,15 @@ export async function logout() {
 
 /** Live session hook. `user === undefined` while loading, null when logged out. */
 export function useSession(): { user: SessionUser | null | undefined; refresh: () => void } {
+  // IMPORTANT for hydration: the initial state is whatever the module
+  // cache holds — undefined (auth initializing) on a fresh page load,
+  // matching the server-rendered HTML exactly. The saved user is restored
+  // only AFTER mount, inside the effect below.
   const [user, setUser] = useState<SessionUser | null | undefined>(cached);
   useEffect(() => {
     const sync = () => setUser(cached);
     window.addEventListener(SESSION_EVENT, sync);
+    bootSession(); // post-hydration: restore snapshot, then revalidate
     fetchSession().then(() => setUser(cached));
     return () => window.removeEventListener(SESSION_EVENT, sync);
   }, []);
