@@ -767,6 +767,29 @@ public event (city/state + nearby discovery). Entry models: one-click RSVP, regi
 (checkout not built yet) and approval events route to the host's messages. Detail pages are
 DB-backed at `/events/[id-or-slug]`.
 
+### Campus borrowing agreements (upgraded)
+
+Borrow is a structured REQUEST, not a button: when the item is needed (date + approx time),
+expected return (date + approx time), preferred exchange (campus meetup / pickup / drop-off /
+custom — custom requires a description), and an optional message. The owner Accepts, Declines,
+or Messages. Accepting creates a tracked agreement:
+
+`Requested → Accepted → Exchange pending → Borrowed → Return due → Returned → Completed`
+
+("Return due" and "Overdue" are time phases of the borrowed state, derived from the agreed
+dueAt — the chain renders on every loan card.) Extensions: the borrower asks (allowed even
+while overdue — communication before anything punitive), the owner approves, declines, or
+**proposes a different return date/time**, which the borrower accepts or declines; the agreed
+date never changes unilaterally and both parties see it update. Overdue notifies both sides
+once, changes nothing automatically. Returns: borrower marks returned (timestamped) → owner
+confirms with an AFTER-condition record → completed, with a factual `returnedLate` flag — an
+extension that was approved moves the due date, so an extended on-time return is NOT late.
+
+History & trust: `/api/me/loans` returns each user's borrowing record (on-time / late /
+problem returns / currently overdue). The owner deciding a request sees the requester's
+record — facts, never an accusation; problem-return reports carry the same history as
+ADVISORY risk signals for the human reviewer. Nothing punishes a borrower automatically.
+
 ### Audit — still on static demo data (next passes)
 
 - Campus page CONTENT sections other than Marketplace/Questions/Events (the campus gate +

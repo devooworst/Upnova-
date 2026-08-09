@@ -198,23 +198,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     if (action === "borrow") {
+      // a structured BORROWING REQUEST: when it's needed, when it comes
+      // back (both date + approx time), how the exchange happens, and an
+      // optional message — the owner accepts, declines, or messages
       if (l.type !== "borrow") throw new ApiError(409, "This item isn't listed for borrowing");
       if (l.status !== "active") throw new ApiError(409, "Not available right now");
+
+      const neededAt = new Date(body.neededAt);
+      if (isNaN(neededAt.getTime())) throw new ApiError(400, "When do you need it? Pick a date and time");
+      if (neededAt.getTime() < Date.now() - 3600_000) throw new ApiError(400, "The needed-by time is in the past");
+
       const dueAt = new Date(body.until);
-      if (isNaN(dueAt.getTime()) || dueAt.getTime() < Date.now()) throw new ApiError(400, "Pick a valid return date");
-      if (l.maxBorrowDays && dueAt.getTime() > Date.now() + l.maxBorrowDays * 86400_000)
-        throw new ApiError(409, `${row.profile.displayName} lends this for up to ${l.maxBorrowDays} days`);
+      if (isNaN(dueAt.getTime())) throw new ApiError(400, "Pick an expected return date and time");
+      if (dueAt.getTime() <= neededAt.getTime()) throw new ApiError(400, "The return time has to be after you get the item");
+      if (l.maxBorrowDays && dueAt.getTime() > neededAt.getTime() + l.maxBorrowDays * 86400_000)
+        throw new ApiError(409, `${row.profile.displayName} lends this for up to ${l.maxBorrowDays} day${l.maxBorrowDays > 1 ? "s" : ""}`);
+
+      const exchangeMethod = ["campus_meetup", "pickup", "dropoff", "custom"].includes(body.exchangeMethod)
+        ? body.exchangeMethod
+        : "campus_meetup";
+      const exchangeNote = String(body.exchangeNote || "").slice(0, 200);
+      if (exchangeMethod === "custom" && !exchangeNote.trim())
+        throw new ApiError(400, "Describe the custom exchange arrangement");
+
       const loanId = rid();
       const convId = conversationBetween(user.id, l.sellerId);
       db.insert(tables.loans)
         .values({
           id: loanId, listingId: l.id, lenderId: l.sellerId, borrowerId: user.id,
           itemTitle: l.title, message: String(body.message || "").slice(0, 300),
-          dueAt, startAt: body.from ? new Date(body.from) : null,
+          neededAt, dueAt, exchangeMethod, exchangeNote,
           deposit: l.deposit, conversationId: convId,
         })
         .run();
-      notify({ userId: l.sellerId, actorId: user.id, type: "order", title: `Borrow request — ${l.title}`, body: `${user.profile.displayName} · return by ${dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}${body.message ? ` · "${String(body.message).slice(0, 60)}"` : ""}`, href: "/campus/market?loans=1", priority: "high" });
+      const fmt = (d: Date) => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" });
+      notify({ userId: l.sellerId, actorId: user.id, type: "order", title: `Borrow request — ${l.title}`, body: `${user.profile.displayName} · needs it ${fmt(neededAt)} · returns ${fmt(dueAt)}${body.message ? ` · "${String(body.message).slice(0, 60)}"` : ""}`, href: "/campus/market?loans=1", priority: "high" });
       return { loanId, status: "requested", conversationId: convId };
     }
 

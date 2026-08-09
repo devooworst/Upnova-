@@ -25,6 +25,7 @@ const db = drizzle(sqlite, { schema: t });
 const id = () => randomBytes(12).toString("hex");
 const PASSWORD = bcrypt.hashSync("upnova123", 10);
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000);
+const daysAgo = (d: number) => new Date(Date.now() - d * 86400_000);
 const daysFromNow = (d: number) => new Date(Date.now() + d * 86400_000);
 
 function wipe() {
@@ -872,10 +873,39 @@ function seed() {
     id: id(), listingId: calcListing, lenderId: uid["devin"], borrowerId: uid["omar"],
     itemTitle: "TI-84 Plus CE", message: "Calc II midterm Thursday — lifesaver.",
     status: "borrowed", startAt: hoursAgo(28), dueAt: new Date(Date.now() + 20 * 3600_000),
+    neededAt: hoursAgo(28), exchangeMethod: "campus_meetup", exchangeNote: "Library front desk",
     conditionBefore: JSON.stringify({ note: "Like new, small scuff on the back, charger + case included.", photos: [], at: hoursAgo(28).toISOString() }),
     conversationId: makeConversation("devin", "omar", [
       ["omar", "Picked up the calculator — thanks again! Back to you Thursday after the exam.", 27],
     ]), isSeed: true, createdAt: hoursAgo(30),
+  }).run();
+
+  // borrowing HISTORY: omar once returned devin's HDMI adapter two days
+  // late — completed, factual record, no punishment. It shows up in his
+  // borrowing record when he asks to borrow again.
+  db.insert(t.loans).values({
+    id: id(), listingId: null, lenderId: uid["devin"], borrowerId: uid["omar"],
+    itemTitle: "HDMI Adapter", message: "Presentation in Comm 210.",
+    status: "completed", startAt: daysAgo(21), dueAt: daysAgo(19),
+    neededAt: daysAgo(21), exchangeMethod: "pickup",
+    returnedAt: daysAgo(17), returnedLate: true,
+    conditionBefore: JSON.stringify({ note: "Works fine.", photos: [], at: daysAgo(21).toISOString() }),
+    conditionAfter: JSON.stringify({ note: "Back in one piece — two days late but all good.", photos: [], at: daysAgo(17).toISOString() }),
+    isSeed: true, createdAt: daysAgo(22),
+  }).run();
+
+  // a PENDING borrowing request for the protagonist to accept/decline —
+  // structured agreement: needed when, back when, exchange method
+  db.insert(t.loans).values({
+    id: id(), listingId: calcListing, lenderId: uid["devin"], borrowerId: uid["imani"],
+    itemTitle: "TI-84 Plus CE", message: "Stats quiz next week — only need it for the afternoon.",
+    status: "requested",
+    neededAt: new Date(Date.now() + 5 * 86400_000 + 13 * 3600_000),
+    dueAt: new Date(Date.now() + 5 * 86400_000 + 19 * 3600_000),
+    exchangeMethod: "campus_meetup", exchangeNote: "Student Center, between classes",
+    conversationId: makeConversation("devin", "imani", [
+      ["imani", "Hey! Sent a borrow request for the calculator — just for Tuesday afternoon.", 2],
+    ]), isSeed: true, createdAt: hoursAgo(3),
   }).run();
 
   /* -------- role opportunity: TEAM & OPENINGS, the flagship demo -------- */

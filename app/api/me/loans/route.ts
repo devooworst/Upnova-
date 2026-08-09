@@ -2,12 +2,27 @@ import { desc, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
+import { loanChainStep, loanPhase } from "@/lib/campusMarket";
 
 export const dynamic = "force-dynamic";
 
+/** Factual borrowing record for a user AS BORROWER: completed on time,
+ *  returned late, problem returns, currently overdue. History that both
+ *  sides can weigh — advisory context, never an automatic penalty. */
+function borrowerRecord(userId: string, now: number) {
+  const rows = db.select().from(tables.loans).where(eq(tables.loans.borrowerId, userId)).all();
+  return {
+    onTime: rows.filter((l) => l.status === "completed" && !l.returnedLate).length,
+    late: rows.filter((l) => (l.status === "completed" || l.status === "returned_disputed") && l.returnedLate).length,
+    problems: rows.filter((l) => l.status === "returned_disputed").length,
+    overdueNow: rows.filter((l) => l.status === "borrowed" && l.dueAt.getTime() < now).length,
+  };
+}
+
 /** GET /api/me/loans — borrowing history: borrowed / lent, active /
  *  completed / overdue. Reminders fire lazily here: due-soon (<24h) and
- *  overdue notifications to BOTH parties, once each. */
+ *  overdue notifications to BOTH parties, once each. Overdue is a status
+ *  and a conversation, not a punishment. */
 export async function GET() {
   return guarded(() => {
     const user = requireUser();
@@ -31,29 +46,51 @@ export async function GET() {
       }
       if (!loan.overdueNotified && due < now) {
         db.update(tables.loans).set({ overdueNotified: true }).where(eq(tables.loans.id, loan.id)).run();
-        notify({ userId: loan.borrowerId, type: "order", title: `Overdue — ${loan.itemTitle}`, body: "Please return it or request an extension.", href: "/campus/market?loans=1", priority: "high" });
-        notify({ userId: loan.lenderId, type: "order", title: `Overdue — your ${loan.itemTitle}`, body: `${names.get(loan.borrowerId) ?? "The borrower"} was due ${when}.`, href: "/campus/market?loans=1", priority: "high" });
+        notify({ userId: loan.borrowerId, type: "order", title: `Overdue — ${loan.itemTitle}`, body: "Nothing bad happens automatically — message the owner or request an extension.", href: "/campus/market?loans=1", priority: "high" });
+        notify({ userId: loan.lenderId, type: "order", title: `Overdue — your ${loan.itemTitle}`, body: `${names.get(loan.borrowerId) ?? "The borrower"} was due ${when}. You can message them or propose a new return date.`, href: "/campus/market?loans=1", priority: "high" });
       }
     }
 
+    // record cache — computed once per counterpart that needs one
+    const recordCache = new Map<string, ReturnType<typeof borrowerRecord>>();
+    const recordOf = (uid: string) => {
+      if (!recordCache.has(uid)) recordCache.set(uid, borrowerRecord(uid, now));
+      return recordCache.get(uid)!;
+    };
+
     return {
-      loans: rows.map((l) => ({
-        id: l.id,
-        listingId: l.listingId,
-        itemTitle: l.itemTitle,
-        message: l.message,
-        status: l.status,
-        overdue: l.status === "borrowed" && l.dueAt.getTime() < now,
-        startAt: l.startAt?.toISOString() ?? null,
-        dueAt: l.dueAt.toISOString(),
-        extensionUntil: l.extensionUntil?.toISOString() ?? null,
-        deposit: l.deposit,
-        conditionBefore: (() => { try { return JSON.parse(l.conditionBefore); } catch { return {}; } })(),
-        conditionAfter: (() => { try { return JSON.parse(l.conditionAfter); } catch { return {}; } })(),
-        conversationId: l.conversationId,
-        myRole: l.lenderId === user.id ? "lender" : "borrower",
-        with: names.get(l.lenderId === user.id ? l.borrowerId : l.lenderId) ?? "—",
-      })),
+      // my own record as a borrower — my history, visible to me
+      myRecord: recordOf(user.id),
+      loans: rows.map((l) => {
+        const isLender = l.lenderId === user.id;
+        return {
+          id: l.id,
+          listingId: l.listingId,
+          itemTitle: l.itemTitle,
+          message: l.message,
+          status: l.status,
+          phase: loanPhase(l.status, l.dueAt.getTime(), now),
+          chainStep: loanChainStep(l.status, l.dueAt.getTime(), now),
+          overdue: l.status === "borrowed" && l.dueAt.getTime() < now,
+          neededAt: l.neededAt?.toISOString() ?? null,
+          exchangeMethod: l.exchangeMethod,
+          exchangeNote: l.exchangeNote,
+          startAt: l.startAt?.toISOString() ?? null,
+          dueAt: l.dueAt.toISOString(),
+          extensionUntil: l.extensionUntil?.toISOString() ?? null,
+          counterUntil: l.counterUntil?.toISOString() ?? null,
+          returnedLate: !!l.returnedLate,
+          deposit: l.deposit,
+          conditionBefore: (() => { try { return JSON.parse(l.conditionBefore); } catch { return {}; } })(),
+          conditionAfter: (() => { try { return JSON.parse(l.conditionAfter); } catch { return {}; } })(),
+          conversationId: l.conversationId,
+          myRole: isLender ? "lender" : "borrower",
+          with: names.get(isLender ? l.borrowerId : l.lenderId) ?? "—",
+          // the owner deciding a REQUEST sees the requester's factual
+          // borrowing history — records, not accusations
+          withRecord: isLender && l.status === "requested" ? recordOf(l.borrowerId) : null,
+        };
+      }),
     };
   });
 }

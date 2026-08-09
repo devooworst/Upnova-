@@ -13,7 +13,7 @@ import Link from "next/link";
 import { GraduationCap, Plus, Clock, Check, RotateCcw, MessageSquare, HandHeart, ArrowLeft } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
-import { LISTING_TYPES, LOAN_STATUS_LABEL, typeLabel } from "@/lib/campusMarket";
+import { LISTING_TYPES, LOAN_CHAIN, exchangeLabel, typeLabel } from "@/lib/campusMarket";
 
 interface Listing {
   id: string;
@@ -32,20 +32,35 @@ interface Listing {
   isMine: boolean;
 }
 
+interface BorrowRecord {
+  onTime: number;
+  late: number;
+  problems: number;
+  overdueNow: number;
+}
+
 interface Loan {
   id: string;
   itemTitle: string;
   message: string;
   status: string;
+  phase: string;
+  chainStep: number;
   overdue: boolean;
+  neededAt: string | null;
+  exchangeMethod: string;
+  exchangeNote: string;
   dueAt: string;
   extensionUntil: string | null;
+  counterUntil: string | null;
+  returnedLate: boolean;
   deposit: number | null;
   conditionBefore: { note?: string; photos?: string[] };
   conditionAfter: { note?: string; photos?: string[] };
   conversationId: string | null;
   myRole: "lender" | "borrower";
   with: string;
+  withRecord: BorrowRecord | null;
 }
 
 const TYPE_TONE: Record<string, string> = {
@@ -62,6 +77,7 @@ export default function CampusMarketPage() {
   const { user: me } = useSession();
   const [data, setData] = useState<{ member: boolean; campusName: string | null; listings: Listing[] } | null>(null);
   const [loans, setLoans] = useState<Loan[] | null>(null);
+  const [myRecord, setMyRecord] = useState<BorrowRecord | null>(null);
   const [view, setView] = useState<"browse" | "loans">("browse");
   const [type, setType] = useState("All");
 
@@ -73,7 +89,9 @@ export default function CampusMarketPage() {
   const loadLoans = useCallback(async () => {
     const res = await fetch("/api/me/loans", { cache: "no-store" });
     if (!res.ok) return setLoans([]);
-    setLoans((await res.json()).loans ?? []);
+    const j = await res.json();
+    setLoans(j.loans ?? []);
+    setMyRecord(j.myRecord ?? null);
   }, []);
   useEffect(() => {
     if (view === "loans") loadLoans();
@@ -221,7 +239,16 @@ export default function CampusMarketPage() {
               <p className="mt-1 text-xs text-zinc-500">Borrow something — or list an item as borrowable — and the whole loan is tracked here.</p>
             </div>
           ) : (
-            loans.map((ln) => (
+            <>
+            {myRecord && (myRecord.onTime + myRecord.late + myRecord.problems > 0 || myRecord.overdueNow > 0) && (
+              <p className="rounded-xl border border-line-soft bg-card-raised/40 px-3.5 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-500">
+                Your borrowing record: <span className="text-lime-300">{myRecord.onTime} on time</span>
+                {myRecord.late > 0 && <> · <span className="text-amber-300">{myRecord.late} late</span></>}
+                {myRecord.problems > 0 && <> · <span className="text-rose-300">{myRecord.problems} problem</span></>}
+                {myRecord.overdueNow > 0 && <> · <span className="text-rose-300">{myRecord.overdueNow} overdue now</span></>}
+              </p>
+            )}
+            {loans.map((ln) => (
               <article key={ln.id} className={`card p-4 ${["declined", "cancelled"].includes(ln.status) ? "opacity-60" : ""} ${ln.overdue ? "border-rose-400/40" : ""}`}>
                 <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-100">
                   {ln.itemTitle}
@@ -229,13 +256,48 @@ export default function CampusMarketPage() {
                     {ln.myRole === "lender" ? "Lending" : "Borrowing"}
                   </span>
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${ln.overdue ? "border-rose-400/40 text-rose-300" : ln.status === "completed" ? "border-lime-400/40 text-lime-300" : "border-amber-400/40 text-amber-300"}`}>
-                    {ln.overdue ? "Overdue" : LOAN_STATUS_LABEL[ln.status] ?? ln.status}
+                    {ln.phase}
                   </span>
+                  {ln.status === "completed" && ln.returnedLate && (
+                    <span className="rounded-full border border-amber-400/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300/80">Returned late</span>
+                  )}
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {ln.myRole === "lender" ? "To" : "From"} {ln.with} · due {new Date(ln.dueAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" })}
+                {/* the agreement, tracked end to end */}
+                {ln.chainStep >= 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1 font-mono text-[9px] uppercase tracking-[0.06em]">
+                    {LOAN_CHAIN.map((step, i) => (
+                      <span key={step} className="flex items-center gap-1">
+                        {i > 0 && <span className="text-zinc-700">→</span>}
+                        <span className={i < ln.chainStep ? "text-zinc-500" : i === ln.chainStep ? (ln.overdue ? "font-bold text-rose-300" : "font-bold text-sky-300") : "text-zinc-700"}>
+                          {i === ln.chainStep && ln.overdue ? "OVERDUE" : step}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  {ln.myRole === "lender" ? "To" : "From"} {ln.with}
+                  {ln.neededAt ? ` · needed ${new Date(ln.neededAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" })}` : ""}
+                  {" · "}agreed return {new Date(ln.dueAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" })}
+                  {` · ${exchangeLabel(ln.exchangeMethod)}`}
+                  {ln.exchangeNote ? ` (${ln.exchangeNote})` : ""}
                   {ln.deposit ? ` · refundable deposit $${ln.deposit} (borrowing itself is free)` : ""}
                 </p>
+                {ln.withRecord && (
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-500">
+                    {ln.with}&apos;s borrowing record:{" "}
+                    {ln.withRecord.onTime + ln.withRecord.late + ln.withRecord.problems === 0 && ln.withRecord.overdueNow === 0 ? (
+                      <span className="text-zinc-400">first borrow on UpNova</span>
+                    ) : (
+                      <>
+                        <span className="text-lime-300">{ln.withRecord.onTime} on time</span>
+                        {ln.withRecord.late > 0 && <> · <span className="text-amber-300">{ln.withRecord.late} late</span></>}
+                        {ln.withRecord.problems > 0 && <> · <span className="text-rose-300">{ln.withRecord.problems} problem</span></>}
+                        {ln.withRecord.overdueNow > 0 && <> · <span className="text-rose-300">{ln.withRecord.overdueNow} overdue now</span></>}
+                      </>
+                    )}
+                  </p>
+                )}
                 {ln.message && <p className="mt-1.5 text-xs italic text-zinc-400">&ldquo;{ln.message}&rdquo;</p>}
                 {ln.conditionBefore?.note && (
                   <p className="mt-1.5 text-[11px] text-zinc-500">Condition at handoff: {ln.conditionBefore.note}</p>
@@ -245,13 +307,18 @@ export default function CampusMarketPage() {
                 )}
                 {ln.extensionUntil && (
                   <p className="mt-1.5 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-1.5 text-[11px] text-amber-300">
-                    Extension requested until {new Date(ln.extensionUntil).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    Extension requested until {new Date(ln.extensionUntil).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" })}
+                  </p>
+                )}
+                {ln.counterUntil && (
+                  <p className="mt-1.5 rounded-lg border border-sky-400/30 bg-sky-400/5 px-3 py-1.5 text-[11px] text-sky-300">
+                    Owner proposed a different return: {new Date(ln.counterUntil).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" })}
                   </p>
                 )}
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-line-soft pt-2.5">
                   {ln.myRole === "lender" && ln.status === "requested" && (
                     <>
-                      <button onClick={() => loanAct(ln.id, { action: "approve" })} className="btn-lime px-3 py-1.5 text-[11px]"><Check className="h-3 w-3" /> Approve</button>
+                      <button onClick={() => loanAct(ln.id, { action: "approve" })} className="btn-lime px-3 py-1.5 text-[11px]"><Check className="h-3 w-3" /> Accept</button>
                       <button onClick={() => loanAct(ln.id, { action: "decline" })} className="btn-ghost px-3 py-1.5 text-[11px]">Decline</button>
                     </>
                   )}
@@ -269,16 +336,22 @@ export default function CampusMarketPage() {
                   {ln.myRole === "borrower" && ln.status === "borrowed" && (
                     <>
                       <button onClick={() => loanAct(ln.id, { action: "mark_returned" })} className="btn-lime px-3 py-1.5 text-[11px]"><RotateCcw className="h-3 w-3" /> Mark returned</button>
-                      {!ln.extensionUntil && (
+                      {!ln.extensionUntil && !ln.counterUntil && (
                         <button
                           onClick={() => {
-                            const until = window.prompt("Need more time? New return date (YYYY-MM-DD):");
-                            if (until) loanAct(ln.id, { action: "request_extension", until });
+                            const until = window.prompt("Need more time? New return date & time (YYYY-MM-DD HH:MM):");
+                            if (until) loanAct(ln.id, { action: "request_extension", until: until.replace(" ", "T") });
                           }}
                           className="btn-ghost px-3 py-1.5 text-[11px]"
                         >
                           Request extension
                         </button>
+                      )}
+                      {ln.counterUntil && (
+                        <>
+                          <button onClick={() => loanAct(ln.id, { action: "counter_decide", accept: true })} className="btn-lime px-3 py-1.5 text-[11px]">Accept new date</button>
+                          <button onClick={() => loanAct(ln.id, { action: "counter_decide", accept: false })} className="btn-ghost px-3 py-1.5 text-[11px]">Decline</button>
+                        </>
                       )}
                     </>
                   )}
@@ -287,6 +360,17 @@ export default function CampusMarketPage() {
                       <button onClick={() => loanAct(ln.id, { action: "extension_decide", approve: true })} className="btn-lime px-3 py-1.5 text-[11px]">Approve extension</button>
                       <button onClick={() => loanAct(ln.id, { action: "extension_decide", approve: false })} className="btn-ghost px-3 py-1.5 text-[11px]">Decline</button>
                     </>
+                  )}
+                  {ln.myRole === "lender" && ln.status === "borrowed" && !ln.counterUntil && (
+                    <button
+                      onClick={() => {
+                        const until = window.prompt("Propose a different return date & time (YYYY-MM-DD HH:MM):");
+                        if (until) loanAct(ln.id, { action: "extension_counter", until: until.replace(" ", "T") });
+                      }}
+                      className="btn-ghost px-3 py-1.5 text-[11px]"
+                    >
+                      Propose different date
+                    </button>
                   )}
                   {ln.myRole === "lender" && ["return_claimed", "borrowed"].includes(ln.status) && ln.status !== "requested" && (
                     <>
@@ -320,7 +404,8 @@ export default function CampusMarketPage() {
                   )}
                 </div>
               </article>
-            ))
+            ))}
+            </>
           )}
           <p className="flex items-start gap-2 rounded-xl border border-line-soft bg-card-raised/40 px-3.5 py-2.5 text-[11px] leading-relaxed text-zinc-500">
             <HandHeart className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-300" />

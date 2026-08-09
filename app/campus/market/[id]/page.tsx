@@ -14,7 +14,7 @@ import TrustReportModal from "@/components/TrustReportModal";
 import ShareSheet, { PublishedBanner } from "@/components/ShareSheet";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
-import { CAMPUS_REPORT_REASONS, typeLabel, typeCta } from "@/lib/campusMarket";
+import { EXCHANGE_METHODS, CAMPUS_REPORT_REASONS, typeLabel, typeCta } from "@/lib/campusMarket";
 
 interface ListingDetail {
   id: string;
@@ -60,7 +60,10 @@ export default function CampusListingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [bidAmount, setBidAmount] = useState("");
+  const [borrowNeeded, setBorrowNeeded] = useState("");
   const [borrowUntil, setBorrowUntil] = useState("");
+  const [borrowMethod, setBorrowMethod] = useState("campus_meetup");
+  const [borrowExchangeNote, setBorrowExchangeNote] = useState("");
   const [borrowMsg, setBorrowMsg] = useState("");
   const [reporting, setReporting] = useState(false);
 
@@ -236,20 +239,62 @@ export default function CampusListingPage() {
                 </div>
               )}
               {l.type === "borrow" && (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-                    Return by
-                    <input type="datetime-local" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} className="rounded-lg border border-line bg-card-raised px-2.5 py-2 text-xs text-zinc-100 outline-none focus:border-sky-400/50" />
+                <div className="space-y-2.5">
+                  {/* the borrowing request: needed when · back when · how the exchange happens */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-xs text-zinc-400">
+                      <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">Needed (date & approx time)</span>
+                      <input type="datetime-local" value={borrowNeeded} onChange={(e) => setBorrowNeeded(e.target.value)} className="w-full rounded-lg border border-line bg-card-raised px-2.5 py-2 text-xs text-zinc-100 outline-none focus:border-sky-400/50" />
+                    </label>
+                    <label className="text-xs text-zinc-400">
+                      <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">Expected return (date & approx time)</span>
+                      <input type="datetime-local" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} className="w-full rounded-lg border border-line bg-card-raised px-2.5 py-2 text-xs text-zinc-100 outline-none focus:border-sky-400/50" />
+                    </label>
                   </div>
-                  <input value={borrowMsg} onChange={(e) => setBorrowMsg(e.target.value)} placeholder={`Why do you need it? (optional, helps ${l.seller.displayName.split(" ")[0]} say yes)`} maxLength={300} className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-400/50" />
+                  <div>
+                    <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">Preferred exchange</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {EXCHANGE_METHODS.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => setBorrowMethod(m.id)}
+                          title={m.desc}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${borrowMethod === m.id ? "border-sky-400/50 bg-sky-400/10 font-semibold text-sky-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    {(borrowMethod === "custom" || borrowMethod === "campus_meetup") && (
+                      <input
+                        value={borrowExchangeNote}
+                        onChange={(e) => setBorrowExchangeNote(e.target.value)}
+                        placeholder={borrowMethod === "custom" ? "Describe the arrangement" : "Suggest a spot (optional) — e.g. library front desk"}
+                        maxLength={200}
+                        className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-400/50"
+                      />
+                    )}
+                  </div>
+                  <input value={borrowMsg} onChange={(e) => setBorrowMsg(e.target.value)} placeholder={`Message to ${l.seller.displayName.split(" ")[0]} (optional — helps them say yes)`} maxLength={300} className="w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-400/50" />
                   <button
-                    onClick={() => borrowUntil ? act({ action: "borrow", until: new Date(borrowUntil).toISOString(), message: borrowMsg }, () => setNotice(null)) : setNotice("Pick when you'll return it")}
+                    onClick={() => {
+                      if (!borrowNeeded) return setNotice("Pick when you need it");
+                      if (!borrowUntil) return setNotice("Pick when you'll return it");
+                      act({
+                        action: "borrow",
+                        neededAt: new Date(borrowNeeded).toISOString(),
+                        until: new Date(borrowUntil).toISOString(),
+                        exchangeMethod: borrowMethod,
+                        exchangeNote: borrowExchangeNote,
+                        message: borrowMsg,
+                      }, () => setNotice(null));
+                    }}
                     disabled={busy}
                     className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40"
                   >
-                    <HandHeart className="h-4 w-4" /> Request to Borrow — free
+                    <HandHeart className="h-4 w-4" /> Send borrowing request — free
                   </button>
-                  <p className="text-center text-[11px] text-zinc-500">The owner approves, condition gets documented at handoff and at return.</p>
+                  <p className="text-center text-[11px] text-zinc-500">The owner accepts, declines, or messages you. Condition gets documented at handoff and at return.</p>
                 </div>
               )}
               {l.type === "need_borrow" && (

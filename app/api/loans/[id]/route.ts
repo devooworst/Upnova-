@@ -66,30 +66,55 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return { status: "borrowed" };
     }
 
+    const fmt = (d: Date) => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" });
+
     if (action === "request_extension") {
+      // before the due date is the normal path — but being OVERDUE never
+      // blocks asking: communication and extensions come before anything
+      // punitive
       if (!isBorrower) throw new ApiError(403, "Only the borrower requests extensions");
       if (loan.status !== "borrowed") throw new ApiError(409, "No active loan to extend");
       const listing = loan.listingId ? db.select().from(tables.campusListings).where(eq(tables.campusListings.id, loan.listingId)).get() : null;
       if (listing && !listing.allowExtensions) throw new ApiError(409, "The owner doesn't allow extensions on this item");
       const until = new Date(body.until);
-      if (isNaN(until.getTime()) || until.getTime() <= loan.dueAt.getTime()) throw new ApiError(400, "Pick a date after the current due date");
-      set({ extensionUntil: until });
-      notify({ userId: other, actorId: user.id, type: "order", title: `Extension requested — ${loan.itemTitle}`, body: `Until ${until.toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Approve or decline in Borrowing.`, href: "/campus/market?loans=1", priority: "high" });
+      if (isNaN(until.getTime()) || until.getTime() <= Math.max(loan.dueAt.getTime(), Date.now()))
+        throw new ApiError(400, "Pick a date and time after the current due date");
+      set({ extensionUntil: until, counterUntil: null });
+      notify({ userId: other, actorId: user.id, type: "order", title: `Extension requested — ${loan.itemTitle}`, body: `Until ${fmt(until)}. Approve, decline, or propose a different date in Borrowing.`, href: "/campus/market?loans=1", priority: "high" });
       return { extensionUntil: until.toISOString() };
     }
     if (action === "extension_decide") {
       if (!isLender) throw new ApiError(403, "Only the owner decides extensions");
       if (!loan.extensionUntil) throw new ApiError(409, "No extension pending");
       const approve = body.approve === true;
-      set(approve ? { dueAt: loan.extensionUntil, extensionUntil: null, dueSoonNotified: false, overdueNotified: false } : { extensionUntil: null });
-      notify({ userId: other, actorId: user.id, type: "order", title: approve ? `Extension approved — ${loan.itemTitle}` : `Extension declined — ${loan.itemTitle}`, body: approve ? `New due date: ${loan.extensionUntil.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : `Still due ${due}.`, href: "/campus/market?loans=1" });
+      set(approve ? { dueAt: loan.extensionUntil, extensionUntil: null, counterUntil: null, dueSoonNotified: false, overdueNotified: false } : { extensionUntil: null });
+      notify({ userId: other, actorId: user.id, type: "order", title: approve ? `Extension approved — ${loan.itemTitle}` : `Extension declined — ${loan.itemTitle}`, body: approve ? `New agreed return: ${fmt(loan.extensionUntil)}` : `Still due ${due}. You can message or propose a different date.`, href: "/campus/market?loans=1" });
       return { approved: approve };
+    }
+    if (action === "extension_counter") {
+      // the owner proposes a DIFFERENT return date/time — the borrower
+      // decides; the agreed date never changes unilaterally
+      if (!isLender) throw new ApiError(403, "Only the owner proposes a different date");
+      if (loan.status !== "borrowed") throw new ApiError(409, "No active loan");
+      const until = new Date(body.until);
+      if (isNaN(until.getTime()) || until.getTime() <= Date.now()) throw new ApiError(400, "Pick a future date and time");
+      set({ counterUntil: until, extensionUntil: null });
+      notify({ userId: other, actorId: user.id, type: "order", title: `Different return date proposed — ${loan.itemTitle}`, body: `${fmt(until)} instead. Accept or decline in Borrowing.`, href: "/campus/market?loans=1", priority: "high" });
+      return { counterUntil: until.toISOString() };
+    }
+    if (action === "counter_decide") {
+      if (!isBorrower) throw new ApiError(403, "Only the borrower answers the owner's proposal");
+      if (!loan.counterUntil) throw new ApiError(409, "No proposed date pending");
+      const accept = body.accept === true;
+      set(accept ? { dueAt: loan.counterUntil, counterUntil: null, extensionUntil: null, dueSoonNotified: false, overdueNotified: false } : { counterUntil: null });
+      notify({ userId: other, actorId: user.id, type: "order", title: accept ? `New return date agreed — ${loan.itemTitle}` : `Proposed date declined — ${loan.itemTitle}`, body: accept ? `Both of you now see: return by ${fmt(loan.counterUntil)}` : `Still due ${due}.`, href: "/campus/market?loans=1" });
+      return { accepted: accept };
     }
 
     if (action === "mark_returned") {
       if (!isBorrower) throw new ApiError(403, "Only the borrower marks it returned");
       if (loan.status !== "borrowed") throw new ApiError(409, `Cannot mark returned from "${loan.status}"`);
-      set({ status: "return_claimed" });
+      set({ status: "return_claimed", returnedAt: new Date() });
       notify({ userId: other, actorId: user.id, type: "order", title: `Return claimed — ${loan.itemTitle}`, body: "Confirm the return and the condition to complete the loan.", href: "/campus/market?loans=1" });
       return { status: "return_claimed" };
     }
@@ -100,7 +125,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!isLender) throw new ApiError(403, "Only the owner confirms the return");
       if (!["return_claimed", "borrowed"].includes(loan.status)) throw new ApiError(409, `Cannot confirm from "${loan.status}"`);
       const problem = body.problem === true;
-      set({ status: problem ? "returned_disputed" : "completed", conditionAfter: JSON.stringify(cond()) });
+      // factual record only: WAS it back after the agreed date? History,
+      // never automatic punishment — extensions that were approved moved
+      // dueAt, so an extended return on time is NOT late
+      const backAt = loan.returnedAt ?? new Date();
+      const late = backAt.getTime() > loan.dueAt.getTime();
+      set({ status: problem ? "returned_disputed" : "completed", conditionAfter: JSON.stringify(cond()), returnedAt: backAt, returnedLate: late });
       if (problem) {
         db.insert(tables.reports)
           .values({
@@ -110,7 +140,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             targetId: loan.id,
             category: "unsafe_transaction",
             details: `Loan return problem — ${loan.itemTitle}: ${String(body.note || "damage/missing reported").slice(0, 400)}. Before/after condition records are on the loan.`,
-            signals: JSON.stringify(["Before/after condition records exist on this loan — compare them"]),
+            // ADVISORY risk signals for the human reviewer — factual
+            // borrowing history, never proof, never an automatic penalty
+            signals: JSON.stringify((() => {
+              const hist = db.select().from(tables.loans).where(eq(tables.loans.borrowerId, loan.borrowerId)).all();
+              const lateCt = hist.filter((h) => h.returnedLate).length;
+              const probCt = hist.filter((h) => h.status === "returned_disputed").length;
+              return [
+                "Before/after condition records exist on this loan — compare them",
+                `Borrower history (factual): ${hist.filter((h) => h.status === "completed" && !h.returnedLate).length} on-time returns · ${lateCt} late · ${probCt} prior problem return${probCt === 1 ? "" : "s"}`,
+              ];
+            })()),
           })
           .run();
         notify({ userId: other, actorId: user.id, type: "order", title: `Return problem reported — ${loan.itemTitle}`, body: "The before/after condition records go to review. Nothing is decided automatically.", href: "/campus/market?loans=1", priority: "high" });

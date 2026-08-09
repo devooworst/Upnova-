@@ -985,11 +985,26 @@ export const loans = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     itemTitle: text("item_title").notNull(),
     message: text("message").notNull().default(""),
-    // requested → approved → borrowed → return_claimed → completed ·
-    // declined · cancelled · returned_disputed (damage/missing reported)
+    // requested → approved (accepted, exchange pending) → borrowed →
+    // return_claimed → completed · declined · cancelled ·
+    // returned_disputed (damage/missing reported). Display phases
+    // "Return due"/"Overdue" derive from dueAt — see loanPhase().
     status: text("status").notNull().default("requested"),
+    // the borrowing AGREEMENT: when the item is needed (date + approx
+    // time), how the exchange happens, and when it comes back (dueAt
+    // carries date + approx time)
+    neededAt: integer("needed_at", { mode: "timestamp_ms" }),
+    exchangeMethod: text("exchange_method").notNull().default("campus_meetup"), // campus_meetup | pickup | dropoff | custom
+    exchangeNote: text("exchange_note").notNull().default(""),
     startAt: integer("start_at", { mode: "timestamp_ms" }),
     dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(),
+    // owner's counter-proposed return date/time on an extension request —
+    // the borrower accepts or declines; nothing changes automatically
+    counterUntil: integer("counter_until", { mode: "timestamp_ms" }),
+    // factual return record: when the borrower handed it back, and whether
+    // that was after the agreed due date (history, never auto-punishment)
+    returnedAt: integer("returned_at", { mode: "timestamp_ms" }),
+    returnedLate: bool("returned_late"),
     // {note, photos[]} — recorded at handoff / at return
     conditionBefore: text("condition_before").notNull().default("{}"),
     conditionAfter: text("condition_after").notNull().default("{}"),
