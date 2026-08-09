@@ -175,6 +175,51 @@ if (typeof window !== "undefined" && !(window as unknown as { __upnovaFetchShim?
 let cached: SessionUser | null | undefined; // undefined = not loaded yet
 let inflight: Promise<SessionUser | null> | null = null;
 
+/* ---------- auth initialization: restore BEFORE first render ----------
+   The saved user snapshot makes the startup sequence:
+     App starts → check localStorage → restore current user → render
+   instead of:
+     App starts → currentUser = null/undefined → wait for network.
+   The snapshot is display state only — every API request is still
+   validated server-side; the background revalidation below corrects the
+   snapshot the moment the server disagrees. */
+const USER_SNAPSHOT_KEY = "upnova-session-user";
+
+function readUserSnapshot(): SessionUser | null {
+  try {
+    const raw = window.localStorage.getItem(USER_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const u = JSON.parse(raw) as SessionUser;
+    // defensive shape check — corrupted snapshots are cleared, never trusted
+    if (u && typeof u.id === "string" && typeof u.handle === "string" && u.profile && typeof u.profile.displayName === "string")
+      return u;
+    window.localStorage.removeItem(USER_SNAPSHOT_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveUserSnapshot(user: SessionUser | null) {
+  try {
+    if (user) window.localStorage.setItem(USER_SNAPSHOT_KEY, JSON.stringify(user));
+    else window.localStorage.removeItem(USER_SNAPSHOT_KEY);
+  } catch {}
+}
+
+if (typeof window !== "undefined") {
+  // synchronous, at module init — BEFORE any useSession() evaluates
+  const restored = readUserSnapshot();
+  if (restored) {
+    cached = restored;
+    // background revalidation: confirm with the server; an explicit
+    // "nobody" clears the snapshot (dead session), a network error keeps it
+    setTimeout(() => {
+      void fetchSession(true);
+    }, 0);
+  }
+}
+
 export async function fetchSession(force = false): Promise<SessionUser | null> {
   if (!force && cached !== undefined) return cached;
   if (!inflight || force) {
@@ -182,8 +227,10 @@ export async function fetchSession(force = false): Promise<SessionUser | null> {
       .then((r) => r.json())
       .then((d) => {
         cached = d.user ?? null;
-        // the server explicitly said "nobody" while we hold a token →
-        // the stored session is dead/corrupted; clear it safely
+        // server is the source of truth: refresh the snapshot on success,
+        // clear it (and any dead token) when the server explicitly says
+        // "nobody"
+        saveUserSnapshot(cached ?? null);
         if (!cached && getFallbackToken()) setFallbackToken(null);
         window.dispatchEvent(new Event(SESSION_EVENT));
         return cached ?? null;
@@ -203,6 +250,7 @@ export async function fetchSession(force = false): Promise<SessionUser | null> {
 export function primeSession(user: SessionUser) {
   cached = user;
   inflight = Promise.resolve(user);
+  saveUserSnapshot(user); // persists the signed-in account for next startup
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
@@ -215,6 +263,7 @@ export function invalidateSession() {
 export async function logout() {
   await fetch("/api/auth/logout", { method: "POST" }); // shim attaches Bearer if needed
   setFallbackToken(null); // fallback transport dies with the session
+  saveUserSnapshot(null); // explicit sign-out is what clears the saved account
   cached = null;
   // per-user client caches must not leak into the next session
   for (const k of ["upnova-plan", "upnova-trust", "upnova-student-verified", "upnova-notif-read", "upnova-following"]) {
