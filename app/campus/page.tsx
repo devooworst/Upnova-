@@ -118,19 +118,38 @@ export default function CampusPage() {
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
   const [affiliation, setAffiliation] = useState("current_student");
   const [vGradYear, setVGradYear] = useState("");
   const [vProgram, setVProgram] = useState("");
+  /* Verification NEVER touches the auth session. Any failure — including
+     a 401 — stays on this page as an inline message; we never redirect,
+     never clear credentials. Success soft-refreshes the session so
+     user.campus arrives and the page (and sidebar) unlock in place. */
   const verifyCollege = async () => {
     setVerifyBusy(true);
-    const res = await fetch("/api/campus/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ affiliation, gradYear: vGradYear, program: vProgram }),
-    });
-    if (res.status === 401) window.location.href = "/login";
-    invalidateSession();
-    setVerifyBusy(false);
+    setVerifyError("");
+    try {
+      const res = await fetch("/api/campus/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ affiliation, gradYear: vGradYear, program: vProgram }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (res.status === 401) {
+        setVerifyError("We couldn't confirm your session for this request. You have not been signed out — refresh the page and try again.");
+        return;
+      }
+      if (!res.ok) {
+        setVerifyError(data?.error || "Verification failed — please try again.");
+        return;
+      }
+      invalidateSession();
+    } catch {
+      setVerifyError("Network error — please try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
   };
   const graduate = async () => {
     if (!window.confirm("Switch your status to Alumni? Everything you built stays — connections, messages, portfolio, history. Student-only areas (Marketplace, Student Groups) close; the alumni environment opens.")) return;
@@ -185,13 +204,27 @@ export default function CampusPage() {
             </div>
           )}
         </div>
-        <button
-          onClick={verifyCollege}
-          disabled={verifyBusy}
-          className="mt-4 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
-        >
-          <GraduationCap className="h-4 w-4" /> {verifyBusy ? "Verifying…" : "Verify affiliation — Free"}
-        </button>
+        {user === null ? (
+          <Link
+            href="/login"
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+          >
+            <GraduationCap className="h-4 w-4" /> Sign in to verify
+          </Link>
+        ) : (
+          <button
+            onClick={verifyCollege}
+            disabled={verifyBusy}
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-violet-400 px-6 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
+          >
+            <GraduationCap className="h-4 w-4" /> {verifyBusy ? "Verifying…" : "Verify affiliation — Free"}
+          </button>
+        )}
+        {verifyError && (
+          <p className="mx-auto mt-3 max-w-sm rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] leading-relaxed text-red-300">
+            {verifyError}
+          </p>
+        )}
         <p className="mt-3 text-[10px] text-zinc-600">
           Verification is always free — Free vs Pro controls platform features, never campus access.
           Class year and major are optional profile attributes you control; they are never turned into

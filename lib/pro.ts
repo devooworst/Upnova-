@@ -32,7 +32,9 @@ export function setPlan(plan: Plan) {
   window.dispatchEvent(new Event(PRO_EVENT));
 }
 
-/** Verified student identity — independent of the current plan. */
+/** DEPRECATED — student verification is a DATABASE FACT (campus_verifications
+    row, surfaced as user.campus on the session). No UI reads this flag
+    anymore; kept only so old localStorage keys are still cleaned on logout. */
 export function isStudentVerified(): boolean {
   if (typeof window === "undefined") return false;
   return window.localStorage.getItem("upnova-student-verified") === "1";

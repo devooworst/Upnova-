@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,7 +16,7 @@ import {
 import Avatar from "@/components/Avatar";
 import OpportunityCard from "@/components/OpportunityCard";
 import { campusOrgs, creators } from "@/lib/data";
-import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
+import { useSession } from "@/lib/session";
 
 /* Organization page — another type of community, not a separate product.
    Verified Organization ✓ = the org is legitimate. Branding colors are
@@ -24,16 +24,21 @@ import { isStudentVerified, PRO_EVENT } from "@/lib/pro";
 
 export default function OrgPage({ id }: { id: string }) {
   const org = campusOrgs.find((o) => o.id === id)!;
-  const [verified, setVerified] = useState(false);
+  // campus access is a database fact (campus_verifications) — same check as the sidebar and /campus
+  const { user } = useSession();
+  const verified = !!user?.campus;
   const [joined, setJoined] = useState(false);
   const [rsvp, setRsvp] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    const sync = () => setVerified(isStudentVerified());
-    sync();
-    window.addEventListener(PRO_EVENT, sync);
-    return () => window.removeEventListener(PRO_EVENT, sync);
-  }, []);
+  // session still resolving — decide nothing yet
+  if (user === undefined) {
+    return (
+      <div className="mx-auto max-w-md pt-12 text-center" aria-busy="true">
+        <div className="mx-auto h-16 w-16 animate-pulse rounded-2xl bg-card-raised" />
+        <div className="mx-auto mt-4 h-5 w-48 animate-pulse rounded bg-card-raised" />
+      </div>
+    );
+  }
 
   if (!verified) {
     return (

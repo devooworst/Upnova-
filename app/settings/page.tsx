@@ -20,7 +20,7 @@ import Avatar from "@/components/Avatar";
 import SecurityCard from "@/components/SecurityCard";
 import { useSession } from "@/lib/session";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
-import { getPlan, isStudentVerified, PRO_EVENT, type Plan } from "@/lib/pro";
+import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
 import { currentUser, services, bookings } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -121,11 +121,11 @@ export default function SettingsPage() {
     setThemeState(c);
   };
   const [plan, setPlanState] = useState<Plan>("free");
-  const [studentVerified, setStudentVerifiedState] = useState(false);
+  // student verification is a DB fact on the session user — not localStorage
+  const studentVerified = !!user?.campus;
   useEffect(() => {
     const sync = () => {
       setPlanState(getPlan());
-      setStudentVerifiedState(isStudentVerified());
     };
     sync();
     window.addEventListener(PRO_EVENT, sync);

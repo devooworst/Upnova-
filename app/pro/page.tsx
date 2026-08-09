@@ -16,8 +16,22 @@ import {
   Zap,
 } from "lucide-react";
 import Perforation from "@/components/Perforation";
-import { getPlan, setPlan, isStudentVerified, setStudentVerified } from "@/lib/pro";
+import { getPlan, setPlan } from "@/lib/pro";
 import { PRO_PRICE, COLLEGE_PRICE, money } from "@/lib/fees";
+import { useSession, invalidateSession } from "@/lib/session";
+
+/* Campus verification is a DATABASE FACT (campus_verifications row) —
+   the same one the sidebar, /campus, and every campus API check.
+   Only schools with a campuses row can verify; the rest are honest
+   about not being onboarded yet. */
+const SCHOOL_SLUGS: Record<string, string> = {
+  "Bowie State University": "bowie-state",
+  "Morgan State University": "morgan-state",
+  "University of Maryland": "umd",
+  "Towson University": "towson",
+  "Johns Hopkins University": "jhu",
+  "Coppin State University": "coppin-state",
+};
 
 /* ------------------------------------------------------------------ */
 /* Three plans, three jobs:                                            */
@@ -54,16 +68,71 @@ const proBenefits = [
 type View = "plans" | "checkout" | "verify" | "success" | "college" | "manage";
 
 export default function ProPage() {
+  const { user } = useSession();
+  const campus = user?.campus ?? null; // DB-backed verification — same fact the sidebar checks
   const [view, setView] = useState<View>("plans");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [school, setSchool] = useState("Bowie State University");
+  const [schoolEmail, setSchoolEmail] = useState("");
   const [gradDate, setGradDate] = useState("May 2028");
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
 
   useEffect(() => {
     const plan = getPlan();
     if (plan === "pro") setView("manage");
     if (plan === "college") setView("college");
   }, []);
+
+  // default the school email from the signed-in account (never someone else's)
+  useEffect(() => {
+    if (user?.handle) setSchoolEmail((v) => v || `${user.handle}@students.bowiestate.edu`);
+  }, [user?.handle]);
+
+  /* REAL verification: persists a campus_verifications row via the same
+     API /campus uses. Verifying NEVER touches the auth session — on any
+     failure (including 401) we show an inline error and stay put. */
+  const verifyStudent = async () => {
+    setVerifyBusy(true);
+    setVerifyError("");
+    try {
+      const slug = SCHOOL_SLUGS[school];
+      if (!slug) {
+        setVerifyError("That school isn't on UpNova yet — pick a listed school or check back soon.");
+        return;
+      }
+      const yearMatch = gradDate.match(/(19|20)\d{2}/);
+      const res = await fetch("/api/campus/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campus: slug,
+          affiliation: "current_student",
+          gradYear: yearMatch ? yearMatch[0] : "",
+        }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (res.status === 401) {
+        // do NOT redirect or clear anything — the session on this device is untouched
+        setVerifyError("We couldn't confirm your session for this request. Refresh the page and try again — you have not been signed out.");
+        return;
+      }
+      if (res.status === 404) {
+        setVerifyError(`${school} isn't onboarded on UpNova yet. Bowie State University is live in this demo.`);
+        return;
+      }
+      if (!res.ok) {
+        setVerifyError(data?.error || "Verification failed — please try again.");
+        return;
+      }
+      invalidateSession(); // soft refetch → user.campus arrives → sidebar item appears
+      setView("college");
+    } catch {
+      setVerifyError("Network error — please try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -125,10 +194,10 @@ export default function ProPage() {
                 students get extra exposure when they&apos;re a qualified match, never just because they paid.
               </p>
               <button
-                onClick={() => setView("verify")}
+                onClick={() => (campus ? setView("college") : setView("verify"))}
                 className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
               >
-                Verify Student Status — Free
+                {campus ? `Verified at ${campus.name} — open dashboard` : "Verify Student Status — Free"}
               </button>
               <p className="mt-2 text-center text-[10px] text-zinc-600">
                 College+ ends at graduation; your alumni community and everything you built stay
@@ -183,7 +252,7 @@ export default function ProPage() {
           <div className="mt-4 space-y-3">
             <div>
               <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">School email</label>
-              <input defaultValue="devin@students.bowiestate.edu" className="input-dark mt-1.5" />
+              <input value={schoolEmail} onChange={(e) => setSchoolEmail(e.target.value)} className="input-dark mt-1.5" />
             </div>
             <div>
               <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">College / University</label>
@@ -207,15 +276,27 @@ export default function ProPage() {
             email alone isn&apos;t the permanent source of truth, and your student email is never
             shown publicly. You get a simple status: Verified Student.
           </p>
-          <button
-            onClick={() => {
-              setStudentVerified(true); // free identity — the network is never paywalled
-              setView("college");
-            }}
-            className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
-          >
-            Verify — Free
-          </button>
+          {verifyError && (
+            <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] leading-relaxed text-red-300">
+              {verifyError}
+            </p>
+          )}
+          {user === null ? (
+            <Link
+              href="/login"
+              className="mt-4 flex w-full items-center justify-center rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet"
+            >
+              Sign in to verify
+            </Link>
+          ) : (
+            <button
+              onClick={verifyStudent}
+              disabled={verifyBusy || user === undefined}
+              className="mt-4 w-full rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300 hover:shadow-glow-violet disabled:opacity-50"
+            >
+              {verifyBusy ? "Verifying…" : "Verify — Free"}
+            </button>
+          )}
           <p className="mt-2.5 text-center text-[10px] leading-relaxed text-zinc-600">
             Verification unlocks your school community, campus chat, networking, and applying —
             all $0. You can add College+ ({money(COLLEGE_PRICE)}/mo) for extra exposure anytime.
@@ -235,7 +316,8 @@ export default function ProPage() {
               Your campus-to-career network
             </h1>
             <p className="mt-1 text-sm text-zinc-500">
-              School community, campus chat, networking, and applying are free until {gradDate} —
+              School community, campus chat, networking, and applying are free
+              {campus?.gradYear ? ` through ${campus.gradYear}` : " while you study"} —
               and your alumni community after that.
             </p>
           </header>
@@ -244,8 +326,11 @@ export default function ProPage() {
             {/* campus */}
             <section className="card-people p-5">
               <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Your Campus</h2>
-              <p className="mt-1 text-sm font-semibold text-violet-300">{school}</p>
-              <p className="text-xs text-zinc-500">1,284 UpNova members</p>
+              <p className="mt-1 text-sm font-semibold text-violet-300">{campus?.name ?? school}</p>
+              <p className="text-xs text-zinc-500">
+                Verified {campus?.affiliation === "alumni" ? "alumni" : "student"}
+                {campus?.gradYear ? ` · Class of ${campus.gradYear}` : ""}
+              </p>
               <ul className="mt-3 space-y-1 text-xs text-zinc-400">
                 {["Campus communities & events", "Student creators & businesses", "Campus gigs & study groups", "Student-only collabs"].map((i) => (
                   <li key={i} className="flex items-center gap-2">
@@ -326,10 +411,10 @@ export default function ProPage() {
 
           {/* graduation pipeline */}
           <section className="rounded-xl border border-line p-4">
-            <p className="text-sm font-semibold text-zinc-200">When you graduate ({gradDate})</p>
+            <p className="text-sm font-semibold text-zinc-200">When you graduate{campus?.gradYear ? ` (${campus.gradYear})` : ""}</p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-              Your status changes from <span className="font-semibold text-zinc-300">Bowie State Student</span> to{" "}
-              <span className="font-semibold text-zinc-300">Bowie State Alumni</span> — the alumni
+              Your status changes from <span className="font-semibold text-zinc-300">{campus?.name ?? school} Student</span> to{" "}
+              <span className="font-semibold text-zinc-300">{campus?.name ?? school} Alumni</span> — the alumni
               community is free, and your account, portfolio, projects, followers, reviews, and
               earnings history remain yours. Want to keep College+ benefits? Continue with Pro.
               No pressure.
@@ -414,9 +499,9 @@ Billing runs on Stripe when we go live
               </span>
             </p>
             <p className="mt-1 text-xs text-zinc-500">Next billing date: September 7, 2026</p>
-            {isStudentVerified() && (
+            {campus && (
               <p className="mt-2 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] text-zinc-400">
-                <span className="font-semibold text-violet-300">Verified Student</span> — your
+                <span className="font-semibold text-violet-300">Verified Student — {campus.name}</span> — your
                 school identity and campus access are independent of your plan and remain active.
               </p>
             )}
