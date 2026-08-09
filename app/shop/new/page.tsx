@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Tag, ImagePlus, X } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { PRODUCT_CATEGORIES, FULFILLMENT_LABEL, type ProductFulfillment } from "@/lib/products";
+import { DEFAULT_RETURN_POLICY, type ReturnPolicy } from "@/lib/protection";
 import { normalizeCategory } from "@/lib/servicePolicies";
 
 const inputCls =
@@ -56,6 +57,7 @@ export default function NewProductPage() {
   const [variants, setVariants] = useState<{ name: string; options: string }[]>([]);
   const [fulfillment, setFulfillment] = useState<ProductFulfillment[]>(["shipping"]);
   const [external, setExternal] = useState(false);
+  const [policy, setPolicy] = useState<ReturnPolicy>({ ...DEFAULT_RETURN_POLICY });
   const [externalUrl, setExternalUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,6 +89,7 @@ export default function NewProductPage() {
           .map((v) => ({ name: v.name.trim(), options: v.options.split(",").map((o) => o.trim()).filter(Boolean) })),
         fulfillment,
         externalUrl: external ? externalUrl.trim() : undefined,
+        returnPolicy: policy,
       }),
     });
     const d = await res.json();
@@ -234,6 +237,47 @@ export default function NewProductPage() {
           )}
         </div>
       </section>
+
+      {/* return policy — disclosed to buyers BEFORE checkout */}
+      {!external && (
+        <section className="card space-y-3 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Returns</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
+              Your terms, shown to buyers before they pay. Platform protection (non-delivery, wrong/damaged/
+              counterfeit/misrepresented items) applies no matter what you pick here.
+            </p>
+          </div>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+            <span className="text-sm text-zinc-200">Accept ordinary returns <span className="block text-xs text-zinc-500">Changed mind, wrong size, etc.</span></span>
+            <input type="checkbox" checked={policy.accepts} onChange={(e) => setPolicy({ ...policy, accepts: e.target.checked })} className="accent-lime-400" />
+          </label>
+          {policy.accepts && (
+            <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+              <label className="flex items-center gap-1.5">
+                Window
+                <select value={policy.windowDays} onChange={(e) => setPolicy({ ...policy, windowDays: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                  {[7, 14, 30].map((d) => <option key={d} value={d}>{d} days</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5">
+                Return shipping
+                <select value={policy.whoPaysShipping} onChange={(e) => setPolicy({ ...policy, whoPaysShipping: e.target.value as "buyer" | "seller" })} className={`${inputCls} w-auto py-1.5`}>
+                  <option value="buyer">Buyer pays</option>
+                  <option value="seller">I pay</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5">
+                Restocking fee
+                <select value={policy.restockingPct} onChange={(e) => setPolicy({ ...policy, restockingPct: Number(e.target.value) })} className={`${inputCls} w-auto py-1.5`}>
+                  {[0, 5, 10, 15, 20].map((p2) => <option key={p2} value={p2}>{p2}%</option>)}
+                </select>
+              </label>
+              <input value={policy.conditions} onChange={(e) => setPolicy({ ...policy, conditions: e.target.value })} placeholder="Condition requirements — e.g. unworn, tags attached" maxLength={160} className={`${inputCls} py-1.5 text-xs`} />
+            </div>
+          )}
+        </section>
+      )}
 
       {error && (
         <p className="flex items-center gap-1.5 text-xs font-medium text-rose-300">

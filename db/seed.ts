@@ -584,6 +584,7 @@ function seed() {
   }).run();
   db.insert(t.products).values({
     id: id(), sellerId: uid["marcusj"], title: "Vintage Denim Jacket",
+    returnPolicy: JSON.stringify({ accepts: false }),
     description: "Size L. Like new — worn twice. Heavy 90s denim, no stains or repairs.",
     price: 35, category: "clothing", condition: "like_new", quantity: 1,
     variants: JSON.stringify([]),
@@ -613,6 +614,54 @@ function seed() {
     body: "Hand-dyed canvas totes are live — $28, three colorways, small batches.",
     refType: "product", refId: prodTote, isSeed: true, createdAt: hoursAgo(12),
   }).run();
+
+  /* ---------- THE PS5 TEST CASE: contested dispute, under review ---------- */
+  // Tracking says delivered. Buyer says the box held books. Seller filed a
+  // serial + pre-ship photos. Nobody wins automatically — the case sits in
+  // platform review with BOTH sides' evidence for the admin to decide.
+  const prodPs5 = id();
+  db.insert(t.products).values({
+    id: prodPs5, sellerId: uid["marcusj"], title: "Game Console — 1TB (Disc Edition)",
+    description: "Adult-owned, barely used. Original box, two controllers.",
+    price: 500, category: "electronics", condition: "like_new", quantity: 1, sold: 1, status: "sold_out",
+    returnPolicy: JSON.stringify({ accepts: false }),
+    fulfillment: JSON.stringify(["shipping"]), isSeed: true,
+  }).run();
+  const orderPs5 = id();
+  db.insert(t.orders).values({
+    id: orderPs5, productId: prodPs5, buyerId: uid["rachel"], sellerId: uid["marcusj"],
+    title: "Game Console — 1TB (Disc Edition)", price: 500, qty: 1, fulfillment: "shipping",
+    status: "delivered",
+    tracking: JSON.stringify({ carrier: "UPS", code: "1Z999AA10123456784", eta: hoursAgo(30).toISOString() }),
+    protectionEndsAt: daysFromNow(3),
+    sellerEvidence: JSON.stringify({ serial: "CFI-1215A-889021743", weightLb: 9.8, note: "Boxed with both controllers, taped and labeled.", photos: [] }),
+    isSeed: true, createdAt: hoursAgo(24 * 5),
+  }).run();
+  db.insert(t.payments).values({
+    id: id(), orderId: orderPs5, payerId: uid["rachel"], payeeId: uid["marcusj"],
+    amountCents: 50000, feeCents: 2500, status: "held",
+  }).run();
+  const dispPs5 = id();
+  db.insert(t.disputes).values({
+    id: dispPs5, orderId: orderPs5, openedById: uid["rachel"], kind: "problem",
+    reason: "wrong_package_contents", status: "under_review",
+    evidence: JSON.stringify([
+      { by: uid["rachel"], at: hoursAgo(20).toISOString(), note: "The box weight matched but it was full of hardcover books — no console. Photos of the opened package and the shipping label attached.", photos: [] },
+      { by: uid["marcusj"], at: hoursAgo(16).toISOString(), note: "I packed the console myself — serial recorded before shipping, weight matches the console + accessories. Requesting review of the label photos: the tape pattern in the buyer's photo doesn't match mine.", photos: [] },
+    ]),
+    isSeed: true, createdAt: hoursAgo(22),
+  }).run();
+  const evPs5 = (kind: string, note: string, h: number, actor: string | null) =>
+    db.insert(t.orderEvents).values({ id: id(), orderId: orderPs5, actorId: actor, kind, note, createdAt: hoursAgo(h) }).run();
+  evPs5("created", "Game Console — 1TB (Disc Edition) ×1 · listing price $500", 24 * 5, uid["rachel"]);
+  evPs5("paid", "$525.00 secured (incl. fee) — held until completion", 24 * 5 - 1, uid["rachel"]);
+  evPs5("shipped", "UPS 1Z999AA10123456784 · serial recorded (private) · 9.8 lb (weight is context, not proof of contents)", 24 * 4, uid["marcusj"]);
+  evPs5("delivered", "Carrier confirmed delivery", 30, null);
+  evPs5("protection_started", "96h buyer-protection window", 30, null);
+  evPs5("disputed", "wrong_package_contents", 22, uid["rachel"]);
+  evPs5("evidence", "Buyer: box of books, photos attached", 20, uid["rachel"]);
+  evPs5("evidence", "Seller: serial + packing evidence, tape mismatch claim", 16, uid["marcusj"]);
+  evPs5("escalated", "Seller contested — sent to platform review", 16, uid["marcusj"]);
 
   /* ---------- ongoing engagement: the "hire an editor" demo ---------- */
   // Devin (content creator) hires an ONGOING video editor — engagement

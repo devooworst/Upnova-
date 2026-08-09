@@ -35,6 +35,8 @@ interface ProductDetail {
   media: string[];
   external: boolean;
   externalUrl: string | null;
+  returnPolicyLines?: string[];
+  protection?: { tier: string; protectionHours: number; sellerEvidenceRequired: boolean };
   seller: { id: string; handle: string; displayName: string; avatarUrl: string | null; verified: boolean; roleLine: string; locationLabel?: string | null };
   sellerStats: { completedOrders: number; rating: number | null; reviewsCount: number; identityVerified: boolean; businessVerified: boolean; joined: string };
   otherListings: { id: string; title: string; price: number }[];
@@ -259,6 +261,27 @@ export default function ProductPage() {
                 <Lock className="h-3 w-3" /> Create a free account to buy — orders, payments, and tracking in one place.
               </p>
             )}
+          </div>
+        )}
+
+        {/* returns & protection — the terms, BEFORE any money moves */}
+        {!p.external && (
+          <div className="mt-4 rounded-xl border border-line bg-card-raised/50 p-3.5">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Returns &amp; buyer protection — before you pay</p>
+            <ul className="mt-1.5 space-y-0.5 text-[11px] leading-relaxed text-zinc-400">
+              {(p.returnPolicyLines ?? []).map((l) => (
+                <li key={l} className="flex items-start gap-1.5">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-600" /> {l}
+                </li>
+              ))}
+              {p.protection && (
+                <li className="flex items-start gap-1.5 text-zinc-300">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-lime-400/70" />
+                  Payment held until delivery + a {p.protection.protectionHours}h protection window after it
+                  {p.protection.sellerEvidenceRequired ? " · high-value: seller records item evidence before shipping" : ""}
+                </li>
+              )}
+            </ul>
           </div>
         )}
 

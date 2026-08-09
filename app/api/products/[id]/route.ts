@@ -4,6 +4,7 @@ import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { parseVariants, parseFulfillment } from "@/lib/products";
+import { parseReturnPolicy, returnPolicyLines, protectionRules } from "@/lib/protection";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         media: (() => { try { return JSON.parse(product.media); } catch { return []; } })(),
         external: !!product.externalUrl,
         externalUrl: product.externalUrl,
+        // return & protection terms — visible BEFORE any payment
+        returnPolicy: parseReturnPolicy(product.returnPolicy),
+        returnPolicyLines: returnPolicyLines(parseReturnPolicy(product.returnPolicy)),
+        protection: protectionRules(product.price),
         createdAt: product.createdAt.toISOString(),
         seller: publicUser(user, profile),
         sellerStats: {

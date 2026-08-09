@@ -621,6 +621,9 @@ export const products = sqliteTable("products", {
   // subset of: shipping | pickup | delivery | digital — buyer picks one
   fulfillment: text("fulfillment").notNull().default('["shipping"]'),
   media: text("media").notNull().default("[]"), // up to 4 images
+  // seller-defined return policy (JSON, lib/protection.ts) — disclosed
+  // BEFORE checkout. Platform protections survive "no returns".
+  returnPolicy: text("return_policy").notNull().default("{}"),
   // set ⇒ external checkout: discovery on UpNova, purchase on their site
   externalUrl: text("external_url"),
   status: text("status").notNull().default("active"), // active | sold_out | archived
@@ -658,6 +661,13 @@ export const orders = sqliteTable(
     // {carrier, code, eta} — set at ship time; a real integration would
     // sync from the carrier, the demo simulates the states honestly
     tracking: text("tracking").notNull().default("{}"),
+    // buyer-protection window: starts at delivery; if no problem is
+    // reported before it ends, the order auto-completes and funds release
+    protectionEndsAt: integer("protection_ends_at", { mode: "timestamp_ms" }),
+    // PRIVATE seller shipment evidence (JSON): {serial?, weightLb?, note?,
+    // photos: []} — recorded before shipping (required for high-value).
+    // Never public; serial visible to seller + platform review only.
+    sellerEvidence: text("seller_evidence").notNull().default("{}"),
     conversationId: text("conversation_id"),
     isSeed: seed(),
     createdAt: ts("created_at"),
@@ -726,6 +736,57 @@ export const licenses = sqliteTable(
     createdAt: ts("created_at"),
   },
   (t) => [index("licenses_work").on(t.workId), index("licenses_creator").on(t.creatorId, t.createdAt)]
+);
+
+/* --------------------------------- disputes --------------------------------- */
+/* Two-sided, evidence-based. Opening one FREEZES funds; nobody wins by
+   default. kind "problem" (delivery/item disputes) or "return" (policy
+   returns). Evidence entries: [{by, at, note, photos[]}] — private to the
+   parties and platform review. */
+
+export const disputes = sqliteTable(
+  "disputes",
+  {
+    id: id(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    openedById: text("opened_by_id")
+      .notNull()
+      .references(() => users.id),
+    kind: text("kind").notNull().default("problem"), // problem | return
+    reason: text("reason").notNull(),
+    // open → under_review | return_authorized → return_in_transit →
+    // resolved_refund | resolved_release | withdrawn
+    status: text("status").notNull().default("open"),
+    evidence: text("evidence").notNull().default("[]"),
+    returnTracking: text("return_tracking").notNull().default(""),
+    resolutionNote: text("resolution_note").notNull().default(""),
+    resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("disputes_order").on(t.orderId)]
+);
+
+/* ------------------------------- order events ------------------------------- */
+/* The private chronological evidence timeline / audit log — every state
+   change, payment event, evidence submission, and decision, appended and
+   never rewritten. Visible only to the two parties and platform review. */
+
+export const orderEvents = sqliteTable(
+  "order_events",
+  {
+    id: id(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    actorId: text("actor_id"), // null = system
+    kind: text("kind").notNull(), // created | paid | preparing | shipped | delivered | protection_started | disputed | evidence | return_* | resolved | completed | cancelled | released | refunded
+    note: text("note").notNull().default(""),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("order_events_order").on(t.orderId, t.createdAt)]
 );
 
 /* --------------------------- reviews / payments --------------------------- */

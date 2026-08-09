@@ -485,6 +485,33 @@ instantly with mock USPS tracking (digital delivers, pickup proposes a meetup in
 shipped orders auto-deliver at ETA. Later phases stay honest: real carrier tracking, deposits,
 and a full dispute/refund workflow are production items, not demo pretense.
 
+**Marketplace protection — never auto-side with anyone.** The dispute/refund workflow is now real
+(`disputes`, `order_events`, `lib/protection.ts`). *Payment protection:* placed → secured →
+preparing → shipped → delivered → **buyer-protection window** → completed → funds released. The
+carrier-confirmed delivery starts a value-tiered window (48h under $50 · 72h to $199 · 96h at
+$200+); no eternal manual confirmation — no problem reported means auto-complete and release
+(verified). *Disputes:* ten specific problem reasons + ten return reasons; opening a case
+freezes funds (auto-complete and confirm both blocked, verified 409s); the seller responds —
+approve return or contest with evidence — and contested cases land in **platform review** where
+a human sees BOTH evidence sets, the private seller shipment record, the full order timeline,
+and INTERNAL risk context (prior dispute counts — advisory, never public, never a verdict).
+*The PS5 test case ships in the seed:* $500 console, tracking says delivered, buyer says box of
+books, seller filed serial + weight + packing claims — sitting in review for the admin to decide
+(resolved live in testing: refund applied, order cancelled, both parties notified with the
+reasoning). *Fake-package protection:* high-value orders require the seller to record a serial
+or item photo BEFORE shipping (server-enforced 400), stored privately (buyer sees "recorded —
+visible to platform review", admin sees the value), with the explicit rule that weight is
+context, never proof of contents. *Returns:* seller-defined policy (accept/deny ordinary
+returns, window, who pays shipping, restocking %, conditions) disclosed on the product page
+BEFORE checkout — and the platform floor survives "no returns": non-delivery, wrong, damaged,
+defective, counterfeit, and misrepresented items stay disputable (verified: changed-mind 409'd,
+not-as-described accepted, on the same no-returns product). Return flow: request → approve →
+ship back (tracking required at high value) → seller confirms → refund (restocking % honored
+per the DISCLOSED policy, full refund for protected reasons). *Evidence timeline:* every order
+carries an append-only private audit log — created, paid, shipped (+evidence summary),
+delivered, protection, disputes, evidence, decisions, releases — visible to the two parties and
+review only. The normal path stays simple: Buy → Track → Receive → confirm or just wait.
+
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
 gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /

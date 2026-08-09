@@ -7,6 +7,8 @@ import { notify } from "@/lib/server/notify";
 import { conversationBetween } from "@/lib/server/oppFlow";
 import { seedSellerFulfills } from "@/lib/server/demo";
 import type { OrderTracking } from "@/lib/products";
+import { protectionRules } from "@/lib/protection";
+import { logOrderEvent } from "@/lib/server/orderEvents";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +78,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       const convId = o.conversationId ?? conversationBetween(o.buyerId, o.sellerId);
       set({ status: "secured", conversationId: convId });
+      logOrderEvent(o.id, user.id, "paid", `$${((subtotal * 105) / 100).toFixed(2)} secured (incl. fee) — held until completion`);
       sys(convId, `Order placed — ${o.title}${o.variant ? ` (${o.variant})` : ""} ×${o.qty}. Payment secured: $${((subtotal * 105) / 100).toFixed(2)}. Funds are held until the order completes.`);
       notify({
         userId: other,
@@ -108,7 +111,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         code: String(body.code || "").slice(0, 40) || undefined,
         eta: body.eta ? new Date(body.eta).toISOString() : undefined,
       };
-      set({ status: "shipped", tracking: JSON.stringify(tracking) });
+      // pre-shipment evidence — PRIVATE (serial never public; weight is
+      // context, never proof of contents). Required for high-value orders.
+      const rules = protectionRules(o.price * o.qty);
+      const photos = Array.isArray(body.evidencePhotos)
+        ? body.evidencePhotos.filter((p: unknown) => typeof p === "string" && (p as string).startsWith("data:image/") && (p as string).length < 500_000).slice(0, 3)
+        : [];
+      const evidence = {
+        serial: String(body.serial || "").slice(0, 60) || undefined,
+        weightLb: body.weightLb ? Math.max(0, Number(body.weightLb) || 0) : undefined,
+        note: String(body.evidenceNote || "").slice(0, 300) || undefined,
+        photos,
+      };
+      if (rules.sellerEvidenceRequired && !evidence.serial && photos.length === 0)
+        throw new ApiError(400, `High-value order ($${o.price * o.qty}) — record the serial number or a photo of the actual item before shipping. It protects YOU in a dispute.`);
+      set({ status: "shipped", tracking: JSON.stringify(tracking), sellerEvidence: JSON.stringify(evidence) });
+      logOrderEvent(o.id, user.id, "shipped", `${tracking.carrier ?? ""} ${tracking.code ?? ""}${evidence.serial ? " · serial recorded (private)" : ""}${photos.length ? ` · ${photos.length} pre-ship photo(s)` : ""}${evidence.weightLb ? ` · ${evidence.weightLb} lb (weight is context, not proof of contents)` : ""}`.trim());
       if (o.conversationId)
         sys(o.conversationId, `${o.title} shipped${tracking.carrier ? ` via ${tracking.carrier}` : ""}${tracking.code ? ` · tracking ${tracking.code}` : ""}${tracking.eta ? ` · estimated ${new Date(tracking.eta).toLocaleDateString("en-US", { month: "long", day: "numeric" })}` : ""}.`);
       notify({ userId: other, actorId: user.id, type: "order", title: `Shipped — ${o.title}`, body: tracking.eta ? `Estimated delivery ${new Date(tracking.eta).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "", href: "/orders" });
@@ -119,15 +137,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // pickup/delivery/digital: seller marks it handed over
       if (!isSeller) throw new ApiError(403, "Only the seller confirms handoff");
       if (!["secured", "preparing"].includes(o.status)) throw new ApiError(409, `Cannot hand off from ${o.status}`);
-      set({ status: "delivered" });
-      notify({ userId: other, actorId: user.id, type: "order", title: `Handed off — ${o.title}`, body: "Confirm you received it to complete the order.", href: "/orders" });
+      const hRules = protectionRules(o.price * o.qty);
+      set({ status: "delivered", protectionEndsAt: new Date(Date.now() + hRules.protectionHours * 3600_000) });
+      logOrderEvent(o.id, user.id, "delivered", "Seller marked handed off");
+      logOrderEvent(o.id, null, "protection_started", `${hRules.protectionHours}h buyer-protection window`);
+      notify({ userId: other, actorId: user.id, type: "order", title: `Handed off — ${o.title}`, body: `Confirm receipt anytime — otherwise the order completes when the ${hRules.protectionHours}h protection window ends.`, href: "/orders" });
       return { status: "delivered" };
     }
 
     if (action === "confirm_received") {
       if (!isBuyer) throw new ApiError(403, "Only the buyer confirms receipt");
       if (!["shipped", "delivered"].includes(o.status)) throw new ApiError(409, `Cannot confirm from ${o.status}`);
+      const openCase = db
+        .select()
+        .from(tables.disputes)
+        .where(eq(tables.disputes.orderId, o.id))
+        .all()
+        .some((d) => ["open", "under_review", "return_authorized", "return_in_transit"].includes(d.status));
+      if (openCase) throw new ApiError(409, "There's an open case on this order — resolve or withdraw it first");
       set({ status: "completed" });
+      logOrderEvent(o.id, user.id, "completed", "Buyer confirmed receipt — funds released");
       db.update(tables.payments)
         .set({ status: "released" })
         .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
@@ -155,6 +184,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             .run();
       }
       set({ status: "cancelled" });
+      logOrderEvent(o.id, user.id, "cancelled", hadPayment ? "Refunded in full" : "");
       if (o.conversationId) sys(o.conversationId, `Order cancelled — ${o.title}.${hadPayment ? " Payment refunded in full." : ""}`);
       notify({ userId: other, actorId: user.id, type: "order", title: `Order cancelled — ${o.title}`, body: hadPayment ? "Payment refunded in full" : "", href: "/orders" });
       return { status: "cancelled" };

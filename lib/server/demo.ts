@@ -276,8 +276,16 @@ export function seedSellerFulfills(orderId: string) {
   if (o.fulfillment === "shipping") {
     const eta = new Date(Date.now() + 4 * 86400_000).toISOString();
     const code = "9400" + String(Math.floor(1e10 + Math.random() * 9e10));
+    // high-value: the seed seller records evidence like a careful human would
+    const highValue = o.price * o.qty >= 200;
     db.update(tables.orders)
-      .set({ status: "shipped", tracking: JSON.stringify({ carrier: "USPS", code, eta }) })
+      .set({
+        status: "shipped",
+        tracking: JSON.stringify({ carrier: "USPS", code, eta }),
+        ...(highValue
+          ? { sellerEvidence: JSON.stringify({ serial: "SN-" + code.slice(-8), note: "Photographed and serial-logged before packing (demo evidence)", photos: [] }) }
+          : {}),
+      })
       .where(eq(tables.orders.id, o.id))
       .run();
     if (o.conversationId)

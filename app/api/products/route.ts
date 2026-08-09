@@ -7,6 +7,7 @@ import { publicUser } from "@/lib/server/serialize";
 import { normalizeCategory } from "@/lib/servicePolicies";
 import { parseVariants, parseFulfillment } from "@/lib/products";
 import { createLinkedPost } from "@/lib/server/publish";
+import { parseReturnPolicy } from "@/lib/protection";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,8 @@ export async function POST(req: NextRequest) {
             : []
         ),
         externalUrl,
+        // seller-defined return terms — disclosed BEFORE checkout
+        returnPolicy: JSON.stringify(parseReturnPolicy(JSON.stringify(body.returnPolicy ?? {}))),
       })
       .run();
     // one canonical product + one linked feed post (Buy opens the product)

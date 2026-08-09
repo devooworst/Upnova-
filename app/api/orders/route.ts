@@ -1,11 +1,13 @@
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
-import { desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { parseVariants, parseFulfillment, type OrderTracking } from "@/lib/products";
+import { protectionRules } from "@/lib/protection";
+import { logOrderEvent } from "@/lib/server/orderEvents";
 
 export const dynamic = "force-dynamic";
 
@@ -20,25 +22,46 @@ export async function GET() {
       .orderBy(desc(tables.orders.createdAt))
       .all();
 
-    // demo realism: a shipped package whose ETA has passed has arrived —
-    // mark delivered so the buyer gets their "confirm receipt" moment
+    // open disputes freeze everything — fetch once for the lazy transitions
+    const allDisputes = db.select().from(tables.disputes).all();
+    const hasOpenDispute = (orderId: string) =>
+      allDisputes.some((d) => d.orderId === orderId && ["open", "under_review", "return_authorized", "return_in_transit"].includes(d.status));
+
     for (const o of rows) {
+      // carrier confirms delivery (demo: ETA passed) → the buyer-protection
+      // window STARTS. No eternal manual confirmation required.
       if (o.status === "shipped") {
         try {
           const t = JSON.parse(o.tracking) as OrderTracking;
           if (t.eta && new Date(t.eta).getTime() < Date.now()) {
-            db.update(tables.orders).set({ status: "delivered" }).where(eq(tables.orders.id, o.id)).run();
+            const rules = protectionRules(o.price * o.qty);
+            const ends = new Date(Date.now() + rules.protectionHours * 3600_000);
+            db.update(tables.orders).set({ status: "delivered", protectionEndsAt: ends }).where(eq(tables.orders.id, o.id)).run();
             o.status = "delivered";
+            o.protectionEndsAt = ends;
+            logOrderEvent(o.id, null, "delivered", "Carrier confirmed delivery");
+            logOrderEvent(o.id, null, "protection_started", `${rules.protectionHours}h buyer-protection window`);
             notify({
               userId: o.buyerId,
               actorId: o.sellerId,
               type: "order",
               title: `Delivered — ${o.title}`,
-              body: "Confirm you received it to complete the order and release the payout.",
+              body: `Everything good? Confirm anytime — otherwise the order completes automatically when your ${rules.protectionHours}h protection window ends. Problems? Report them before then.`,
               href: "/orders",
             });
           }
         } catch {}
+      }
+      // protection window over + no open case → auto-complete, release funds
+      if (o.status === "delivered" && o.protectionEndsAt && o.protectionEndsAt.getTime() < Date.now() && !hasOpenDispute(o.id)) {
+        db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
+        db.update(tables.payments)
+          .set({ status: "released" })
+          .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
+          .run();
+        o.status = "completed";
+        logOrderEvent(o.id, null, "completed", "Protection window ended with no reported problem — funds released");
+        notify({ userId: o.sellerId, actorId: o.buyerId, type: "payment", title: `Order completed — $${o.price * o.qty} released`, body: `${o.title} · protection window ended with no reported problems`, href: "/orders", category: "payments" });
       }
     }
 
@@ -60,6 +83,15 @@ export async function GET() {
           note: o.note,
           status: o.status,
           tracking: (() => { try { return JSON.parse(o.tracking); } catch { return {}; } })(),
+          protectionEndsAt: o.protectionEndsAt?.toISOString() ?? null,
+          protection: protectionRules(o.price * o.qty),
+          dispute: (() => {
+            const d = allDisputes.filter((x) => x.orderId === o.id).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+            return d ? { id: d.id, kind: d.kind, reason: d.reason, status: d.status, openedByMe: d.openedById === user.id } : null;
+          })(),
+          // serial and shipment evidence stay PRIVATE: full detail via the
+          // timeline endpoint with role-based masking, never in list payloads
+          hasSellerEvidence: o.sellerEvidence !== "{}",
           paymentStatus: payment?.status ?? null,
           conversationId: o.conversationId,
           myRole: o.buyerId === user.id ? "buyer" : "seller",
@@ -116,6 +148,7 @@ export async function POST(req: NextRequest) {
         note: String(body.note || "").slice(0, 300),
       })
       .run();
+    logOrderEvent(id, user.id, "created", `${product.title}${picks.length ? ` (${picks.join(" · ")})` : ""} ×${qty} · listing price $${product.price}`);
 
     return { id, status: "placed", total: product.price * qty };
   });

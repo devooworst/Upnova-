@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, Users, Flag, BarChart3 } from "lucide-react";
+import { ShieldCheck, Users, Flag, BarChart3, Scale } from "lucide-react";
 
 interface Overview {
   users: number;
@@ -53,20 +53,39 @@ interface AdminReport {
   createdAt: string;
 }
 
-type Tab = "overview" | "users" | "reports";
+type Tab = "overview" | "users" | "reports" | "disputes";
+
+interface AdminDispute {
+  id: string;
+  kind: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  resolutionNote: string;
+  order: {
+    id: string; title: string; amount: number; status: string; buyer: string; seller: string;
+    tracking: { carrier?: string; code?: string; eta?: string };
+    sellerEvidence: { serial?: string; weightLb?: number; note?: string; photos?: string[] };
+  } | null;
+  evidence: { by: string; at: string; note: string; photos: string[] }[];
+  timeline: { at: string; actor: string; kind: string; note: string }[];
+  risk: { buyerPriorDisputes: number; sellerPriorDisputes: number };
+}
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
+  const [disputes, setDisputes] = useState<AdminDispute[]>([]);
   const [denied, setDenied] = useState(false);
 
   const load = useCallback(async () => {
-    const [o, u, r] = await Promise.all([
+    const [o, u, r, dp] = await Promise.all([
       fetch("/api/admin/overview", { cache: "no-store" }),
       fetch("/api/admin/users", { cache: "no-store" }),
       fetch("/api/admin/reports", { cache: "no-store" }),
+      fetch("/api/admin/disputes", { cache: "no-store" }),
     ]);
     if (o.status === 401 || o.status === 403) {
       setDenied(true);
@@ -75,6 +94,7 @@ export default function AdminPage() {
     setOverview((await o.json()) as Overview);
     setUsers((await u.json()).users ?? []);
     setReports((await r.json()).reports ?? []);
+    setDisputes((await dp.json()).disputes ?? []);
   }, []);
 
   useEffect(() => {
@@ -129,6 +149,7 @@ export default function AdminPage() {
             { id: "overview", label: "Overview", icon: BarChart3 },
             { id: "users", label: "Users", icon: Users },
             { id: "reports", label: "Reports", icon: Flag },
+            { id: "disputes", label: "Disputes", icon: Scale },
           ] as const
         ).map((t) => (
           <button
@@ -185,6 +206,88 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ------------------------------ disputes ------------------------------ */}
+      {tab === "disputes" && (
+        <div className="mt-5 space-y-3">
+          {disputes.length === 0 && <p className="card p-8 text-center text-sm text-zinc-500">No disputes.</p>}
+          {disputes.map((d) => (
+            <div key={d.id} className="card p-4">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
+                {d.order?.title ?? "—"}
+                <span className="font-mono text-xs tracking-[0.08em] text-lime-300">${d.order?.amount ?? 0}</span>
+                <span className="rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-400">{d.kind} · {d.reason.replace(/_/g, " ")}</span>
+                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${d.status.startsWith("resolved") || d.status === "withdrawn" ? "border-line text-zinc-500" : "border-amber-400/40 text-amber-300"}`}>
+                  {d.status.replace(/_/g, " ")}
+                </span>
+              </p>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Buyer {d.order?.buyer} · Seller {d.order?.seller} · opened {new Date(d.createdAt).toLocaleDateString()}
+                {d.order?.tracking.code ? ` · tracking ${d.order.tracking.carrier} ${d.order.tracking.code}` : " · no tracking"}
+              </p>
+
+              {/* seller shipment evidence — serial visible HERE (platform review), never publicly */}
+              {d.order?.sellerEvidence && (d.order.sellerEvidence.serial || d.order.sellerEvidence.photos?.length || d.order.sellerEvidence.weightLb) && (
+                <p className="mt-1.5 rounded-lg border border-line-soft bg-card-raised/50 px-3 py-1.5 text-[11px] text-zinc-400">
+                  Seller shipment record: {d.order.sellerEvidence.serial ? `serial ${d.order.sellerEvidence.serial}` : "no serial"}
+                  {d.order.sellerEvidence.weightLb ? ` · ${d.order.sellerEvidence.weightLb} lb (weight ≠ proof of contents)` : ""}
+                  {d.order.sellerEvidence.photos?.length ? ` · ${d.order.sellerEvidence.photos.length} pre-ship photo(s)` : ""}
+                </p>
+              )}
+
+              {d.evidence.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {d.evidence.map((e, i) => (
+                    <div key={i} className="text-[11px] text-zinc-400">
+                      <span className="font-semibold text-zinc-300">{e.by}</span> — {e.note}
+                      {e.photos.length > 0 && (
+                        <span className="mt-1 flex gap-1.5">
+                          {e.photos.map((ph, j) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={j} src={ph} alt="Evidence" className="h-14 w-14 rounded-lg border border-line object-cover" />
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* INTERNAL risk context — advisory, never a verdict, never public */}
+              <p className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-1.5 font-mono text-[10px] tracking-[0.05em] text-amber-300/90">
+                internal risk context · buyer prior disputes: {d.risk.buyerPriorDisputes} · seller prior disputes: {d.risk.sellerPriorDisputes} — context for review, not proof
+              </p>
+
+              {!d.status.startsWith("resolved") && d.status !== "withdrawn" ? (
+                <div className="mt-2.5 flex flex-wrap gap-2 border-t border-line-soft pt-2.5">
+                  <button
+                    onClick={async () => {
+                      const note = window.prompt("Resolution note (both parties see it):") ?? "";
+                      await fetch("/api/admin/disputes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disputeId: d.id, resolution: "refund_buyer", note }) });
+                      load();
+                    }}
+                    className="rounded-full border border-rose-400/40 px-3.5 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-400/10"
+                  >
+                    Refund buyer
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const note = window.prompt("Resolution note (both parties see it):") ?? "";
+                      await fetch("/api/admin/disputes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disputeId: d.id, resolution: "release_seller", note }) });
+                      load();
+                    }}
+                    className="rounded-full border border-lime-400/40 px-3.5 py-1.5 text-[11px] font-semibold text-lime-300 transition hover:bg-lime-400/10"
+                  >
+                    Release to seller
+                  </button>
+                </div>
+              ) : (
+                d.resolutionNote && <p className="mt-2 text-[11px] text-zinc-400">Resolution: {d.resolutionNote}</p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
