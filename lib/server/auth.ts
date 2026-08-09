@@ -18,6 +18,36 @@
 
 import { cookies, headers } from "next/headers";
 import { randomBytes } from "crypto";
+import { readFileSync, writeFileSync, unlinkSync } from "fs";
+import { join } from "path";
+
+/* ---------------- DEV/DEMO ONLY: sticky sandbox session ----------------
+   Some embedded previews block EVERY client storage mechanism (cookies,
+   localStorage, sessionStorage, window.name). No client can survive a
+   refresh there. When UPNOVA_DEMO_STICKY_SESSION=1, the sandbox itself
+   remembers the demo session: login writes the session token to a local
+   marker file; a request arriving with NO credentials restores that
+   session; logout destroys the session row AND the marker. It restores a
+   REAL session created by a real password check — wrong passwords never
+   create one, sign-out really ends it. Single-user demo sandboxes only;
+   NEVER set in production (any visitor would resume the demo session).  */
+const STICKY_FILE = join(process.cwd(), "db", ".demo-session");
+const stickyOn = () => process.env.UPNOVA_DEMO_STICKY_SESSION === "1";
+
+export function rememberDemoSession(token: string) {
+  if (!stickyOn()) return;
+  try { writeFileSync(STICKY_FILE, token, "utf8"); } catch {}
+}
+export function readDemoSession(): string | null {
+  if (!stickyOn()) return null;
+  try { return readFileSync(STICKY_FILE, "utf8").trim() || null; } catch { return null; }
+}
+export function forgetDemoSession(token?: string) {
+  try {
+    if (token && readFileSync(STICKY_FILE, "utf8").trim() !== token) return;
+    unlinkSync(STICKY_FILE);
+  } catch {}
+}
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 
@@ -108,6 +138,9 @@ export function getSessionUser(): SessionUser | null {
     // demo transport #3: the JS-set token cookie (first-party contexts
     // send it automatically on every request, including full page loads)
     if (!token) token = cookies().get("upnova-session-token")?.value || undefined;
+    // demo transport #4 (LAST): no credentials at all — the sandbox's own
+    // sticky marker restores the current demo session (see block above)
+    if (!token) token = readDemoSession() ?? undefined;
   }
   if (!token) return null;
 

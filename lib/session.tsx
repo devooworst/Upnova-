@@ -142,6 +142,18 @@ export function setFallbackToken(token: string | null) {
   }
 }
 
+if (typeof window !== "undefined" && !(window as unknown as { __upnovaDiag?: boolean }).__upnovaDiag) {
+  (window as unknown as { __upnovaDiag?: boolean }).__upnovaDiag = true;
+  try {
+    const diag: string[] = [];
+    try { window.localStorage.setItem("__t", "1"); window.localStorage.removeItem("__t"); diag.push("localStorage:ok"); } catch { diag.push("localStorage:BLOCKED"); }
+    try { window.sessionStorage.setItem("__t", "1"); window.sessionStorage.removeItem("__t"); diag.push("sessionStorage:ok"); } catch { diag.push("sessionStorage:BLOCKED"); }
+    try { document.cookie = "__t=1; path=/; SameSite=None; Secure"; diag.push(document.cookie.includes("__t=1") ? "jsCookie:ok" : "jsCookie:BLOCKED"); document.cookie = "__t=; path=/; max-age=0; SameSite=None; Secure"; } catch { diag.push("jsCookie:BLOCKED"); }
+    // eslint-disable-next-line no-console
+    console.info("[upnova] session persistence layers →", diag.join(" · "));
+  } catch {}
+}
+
 if (typeof window !== "undefined" && !(window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim) {
   (window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim = true;
   const realFetch = window.fetch.bind(window);

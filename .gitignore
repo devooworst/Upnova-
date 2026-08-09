@@ -41,3 +41,4 @@ prisma/dev.db-journal
 db/upnova.dev.db
 db/upnova.dev.db-shm
 db/upnova.dev.db-wal
+db/.demo-session

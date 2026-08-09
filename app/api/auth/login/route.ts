@@ -9,6 +9,7 @@ import {
   createSession,
   SESSION_COOKIE,
   sessionCookieOptions,
+  rememberDemoSession,
   guarded,
   ApiError,
 } from "@/lib/server/auth";
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { token, expiresAt } = createSession(user.id);
+    rememberDemoSession(token); // dev sticky marker (no-op unless enabled)
     const cookieless = process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
