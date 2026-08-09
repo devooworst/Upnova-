@@ -35,6 +35,7 @@ export type JoinAction =
   | "follow"
   | "message"
   | "create"
+  | "buy"
   | "tickets"
   | "personalize"
   | "report"
@@ -90,6 +91,10 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
   create: {
     title: "Join UpNova to create",
     body: "Create posts, offer services, publish opportunities, build your profile, and connect with people.",
+  },
+  buy: {
+    title: "Create an account to buy",
+    body: "Orders, payments, tracking, and the seller conversation live on your account — with funds held until delivery.",
   },
   tickets: {
     title: "Create an account to get tickets",

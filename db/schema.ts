@@ -572,6 +572,77 @@ export const experiences = sqliteTable("experiences", {
   order: integer("order").notNull().default(0),
 });
 
+/* -------------------------------- products -------------------------------- */
+/* The sixth entity. Post = something you share · Service = something you
+   offer · Booking = someone scheduled you · Project = structured paid work
+   · Opportunity = you're asking for people · PRODUCT = something you SELL.
+   One configurable listing system: category (official or custom), variants,
+   quantity, fulfillment options, and either UpNova checkout (orders below)
+   or an HONEST external link ("you'll complete your purchase on the
+   seller's website" — UpNova never pretends it processed that sale). */
+
+export const products = sqliteTable("products", {
+  id: id(),
+  sellerId: text("seller_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  // whole dollars, seller payout; buyer pays the 5% fee on top (UpNova checkout)
+  price: integer("price").notNull(),
+  category: text("category").notNull().default("other"),
+  condition: text("condition").notNull().default(""), // "", new, like_new, used
+  quantity: integer("quantity").notNull().default(1),
+  sold: integer("sold").notNull().default(0),
+  // [{name:"Size", options:["S","M","L"]}] — up to 2 groups
+  variants: text("variants").notNull().default("[]"),
+  // subset of: shipping | pickup | delivery | digital — buyer picks one
+  fulfillment: text("fulfillment").notNull().default('["shipping"]'),
+  media: text("media").notNull().default("[]"), // up to 4 images
+  // set ⇒ external checkout: discovery on UpNova, purchase on their site
+  externalUrl: text("external_url"),
+  status: text("status").notNull().default("active"), // active | sold_out | archived
+  isSeed: seed(),
+  createdAt: ts("created_at"),
+});
+
+/* --------------------------------- orders --------------------------------- */
+/* The purchase transaction — the buyer SEES what's happening instead of
+   hoping: placed → secured → preparing → shipped (carrier/tracking/eta) →
+   delivered → completed (payout released) · cancelled. Funds are held from
+   payment until completion, exactly like bookings/projects. */
+
+export const orders = sqliteTable(
+  "orders",
+  {
+    id: id(),
+    productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+    buyerId: text("buyer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sellerId: text("seller_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // frozen snapshot — the receipt survives product edits
+    title: text("title").notNull(),
+    price: integer("price").notNull(), // per unit, seller payout dollars
+    qty: integer("qty").notNull().default(1),
+    variant: text("variant").notNull().default(""), // "Size: L · Color: Black"
+    fulfillment: text("fulfillment").notNull().default("shipping"),
+    // pickup orders NEVER carry an address — exact location is arranged in
+    // the conversation after confirmation, by design
+    note: text("note").notNull().default(""),
+    status: text("status").notNull().default("placed"),
+    // {carrier, code, eta} — set at ship time; a real integration would
+    // sync from the carrier, the demo simulates the states honestly
+    tracking: text("tracking").notNull().default("{}"),
+    conversationId: text("conversation_id"),
+    isSeed: seed(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("orders_buyer").on(t.buyerId, t.createdAt), index("orders_seller").on(t.sellerId, t.createdAt)]
+);
+
 /* --------------------------- reviews / payments --------------------------- */
 
 export const reviews = sqliteTable(
@@ -598,6 +669,7 @@ export const payments = sqliteTable("payments", {
   id: id(),
   projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
   bookingId: text("booking_id"),
+  orderId: text("order_id"), // product purchase this payment secures
   payerId: text("payer_id")
     .notNull()
     .references(() => users.id),

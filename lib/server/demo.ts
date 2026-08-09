@@ -262,3 +262,45 @@ export function seedApplicantsApplyToRoles(opportunityId: string) {
     }
   }
 }
+
+/* ------------------------------ shop orders ------------------------------ */
+
+/**
+ * Seed seller fulfills a paid order instantly: preparing → shipped with
+ * mock tracking (ETA ≈ 4 days; pickup/digital hand off directly). The
+ * buyer sees every state of the timeline without waiting for a human.
+ */
+export function seedSellerFulfills(orderId: string) {
+  const o = db.select().from(tables.orders).where(eq(tables.orders.id, orderId)).get();
+  if (!o || o.status !== "secured" || !isSeedUser(o.sellerId)) return;
+  if (o.fulfillment === "shipping") {
+    const eta = new Date(Date.now() + 4 * 86400_000).toISOString();
+    const code = "9400" + String(Math.floor(1e10 + Math.random() * 9e10));
+    db.update(tables.orders)
+      .set({ status: "shipped", tracking: JSON.stringify({ carrier: "USPS", code, eta }) })
+      .where(eq(tables.orders.id, o.id))
+      .run();
+    if (o.conversationId)
+      sendAs(o.conversationId, o.sellerId, `Packed and shipped! USPS tracking ${code} — should land in about 4 days.`);
+    notify({
+      userId: o.buyerId, actorId: o.sellerId, type: "order",
+      title: `Shipped — ${o.title}`, body: `USPS · estimated ${new Date(eta).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+      href: "/orders",
+    });
+  } else if (o.fulfillment === "digital") {
+    db.update(tables.orders).set({ status: "delivered" }).where(eq(tables.orders.id, o.id)).run();
+    if (o.conversationId)
+      sendAs(o.conversationId, o.sellerId, `Download link sent! Confirm you got everything and the order completes.`);
+    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Delivered — ${o.title}`, body: "Confirm receipt to complete the order.", href: "/orders" });
+  } else {
+    // pickup / local delivery: seed seller proposes the meetup in chat
+    db.update(tables.orders).set({ status: "preparing" }).where(eq(tables.orders.id, o.id)).run();
+    if (o.conversationId)
+      sendAs(
+        o.conversationId,
+        o.sellerId,
+        `I'm flexible for the ${o.fulfillment === "pickup" ? "pickup" : "drop-off"} — does Saturday around 2 PM near downtown work? Exact spot once we confirm.`
+      );
+    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Seller is preparing your order`, body: `${o.title} — arrange the ${o.fulfillment} in Messages`, href: "/orders", priority: "normal" });
+  }
+}

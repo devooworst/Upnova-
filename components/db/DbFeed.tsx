@@ -81,6 +81,16 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
     cta: string;
     owner: { handle: string; displayName: string; avatarUrl: string | null };
   } | null>(null);
+  const [suggestedProduct, setSuggestedProduct] = useState<{
+    id: string;
+    title: string;
+    price: number;
+    category: string;
+    external: boolean;
+    image: string | null;
+    owner: { handle: string; displayName: string; avatarUrl: string | null };
+    reasons: string[];
+  } | null>(null);
   const [suggested, setSuggested] = useState<{
     id: string;
     title: string;
@@ -117,6 +127,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       setGuestTotal(data.totalPublic ?? 0);
       setPromoted(data.promoted ?? null);
       setSuggested(data.suggestedService ?? null);
+      setSuggestedProduct(data.suggestedProduct ?? null);
       // passive view signals for what actually rendered (deduped server-side)
       // — members only; guests have no interaction log to write to
       const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
@@ -214,6 +225,32 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                   </div>
                   <Link href={`/services/${suggested.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">
                     {suggested.cta}
+                  </Link>
+                </aside>
+              )}
+              {/* PRODUCT card — the feed knows a product is not a post */}
+              {i === 7 && suggestedProduct && (
+                <aside className="card flex flex-wrap items-center gap-3 p-4">
+                  <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Product
+                    {suggestedProduct.reasons.length ? ` · ${suggestedProduct.reasons.join(" · ")}` : ""}
+                  </span>
+                  {suggestedProduct.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={suggestedProduct.image} alt="" className="h-12 w-12 rounded-xl border border-line object-cover" />
+                  ) : (
+                    <Avatar src={suggestedProduct.owner.avatarUrl} initials={suggestedProduct.owner.displayName.charAt(0)} size="md" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-zinc-100">{suggestedProduct.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {suggestedProduct.owner.displayName} ·{" "}
+                      <span className="font-mono tracking-[0.08em] text-lime-300">${suggestedProduct.price}</span>
+                      <span className="capitalize"> · {suggestedProduct.category}</span>
+                    </p>
+                  </div>
+                  <Link href={`/shop/${suggestedProduct.id}`} className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">
+                    View Product
                   </Link>
                 </aside>
               )}

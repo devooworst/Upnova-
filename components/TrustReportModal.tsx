@@ -10,20 +10,24 @@
 
 import { useState } from "react";
 import { X, Flag, Check } from "lucide-react";
-import { REPORT_REASONS, type ReportReason } from "@/lib/trust";
+import { REPORT_REASONS } from "@/lib/trust";
 
 export default function TrustReportModal({
   targetType,
   targetId,
   targetLabel,
+  reasons,
   onClose,
 }: {
-  targetType: "post" | "user" | "service" | "opportunity";
+  targetType: "post" | "user" | "service" | "opportunity" | "order" | "product";
   targetId: string;
   targetLabel: string;
+  /** custom reason set (e.g. order problems) — defaults to trust reasons */
+  reasons?: readonly { id: string; label: string }[];
   onClose: () => void;
 }) {
-  const [reason, setReason] = useState<ReportReason | null>(null);
+  const REASONS = reasons ?? REPORT_REASONS;
+  const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -80,7 +84,7 @@ export default function TrustReportModal({
             </div>
 
             <div className="mt-3 space-y-1.5">
-              {REPORT_REASONS.map((r) => (
+              {REASONS.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => setReason(r.id)}

@@ -223,6 +223,26 @@ CREATE TABLE IF NOT EXISTS `opportunities` (
 	`created_at` integer NOT NULL, roles text NOT NULL DEFAULT '[]',
 	FOREIGN KEY (`poster_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS "orders" (
+	`id` text PRIMARY KEY NOT NULL,
+	`product_id` text,
+	`buyer_id` text NOT NULL,
+	`seller_id` text NOT NULL,
+	`title` text NOT NULL,
+	`price` integer NOT NULL,
+	`qty` integer DEFAULT 1 NOT NULL,
+	`variant` text DEFAULT '' NOT NULL,
+	`fulfillment` text DEFAULT 'shipping' NOT NULL,
+	`note` text DEFAULT '' NOT NULL,
+	`status` text DEFAULT 'placed' NOT NULL,
+	`tracking` text DEFAULT '{}' NOT NULL,
+	`conversation_id` text,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`buyer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `password_resets` (
 	`id` text PRIMARY KEY NOT NULL,
 	`token` text NOT NULL,
@@ -243,7 +263,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
 	`status` text DEFAULT 'pending' NOT NULL,
 	`provider` text DEFAULT 'stripe_connect' NOT NULL,
 	`provider_ref` text,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, order_id text,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`payer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`payee_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
@@ -278,6 +298,25 @@ CREATE TABLE IF NOT EXISTS "posts" (
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS "products" (
+	`id` text PRIMARY KEY NOT NULL,
+	`seller_id` text NOT NULL,
+	`title` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`price` integer NOT NULL,
+	`category` text DEFAULT 'other' NOT NULL,
+	`condition` text DEFAULT '' NOT NULL,
+	`quantity` integer DEFAULT 1 NOT NULL,
+	`sold` integer DEFAULT 0 NOT NULL,
+	`variants` text DEFAULT '[]' NOT NULL,
+	`fulfillment` text DEFAULT '["shipping"]' NOT NULL,
+	`media` text DEFAULT '[]' NOT NULL,
+	`external_url` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `profiles` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -436,6 +475,8 @@ CREATE INDEX IF NOT EXISTS `interactions_user` ON `interactions` (`user_id`,`act
 CREATE INDEX IF NOT EXISTS `messages_conv_created` ON `messages` (`conversation_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_created` ON `notifications` (`user_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `notif_user_read` ON `notifications` (`user_id`,`read_at`);
+CREATE INDEX IF NOT EXISTS `orders_buyer` ON `orders` (`buyer_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `orders_seller` ON `orders` (`seller_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `password_resets_token_unique` ON `password_resets` (`token`);
 CREATE INDEX IF NOT EXISTS `posts_author_created` ON `posts` (`author_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `profiles_user_id_unique` ON `profiles` (`user_id`);

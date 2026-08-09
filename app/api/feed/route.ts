@@ -231,6 +231,57 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return { items: items.slice(0, 60), reasons, promoted, suggestedService, guest: !user, totalPublic: mapped.length };
+    // ---- one product card, same engine, labeled PRODUCT — the feed knows
+    // a product is not a post ----
+    let suggestedProduct: object | null = null;
+    if (tab === "for-you" && user && taste) {
+      const prods = db
+        .select({ product: tables.products, profile: tables.profiles, u: tables.users })
+        .from(tables.products)
+        .innerJoin(tables.users, eq(tables.products.sellerId, tables.users.id))
+        .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+        .all()
+        .filter(
+          (r) =>
+            r.product.status === "active" &&
+            r.product.sellerId !== user.id &&
+            r.u.status === "active" &&
+            !taste.hiddenTargets.has(r.product.id)
+        );
+      const rankedProd = ranker.rank(
+        prods.map((r) => ({
+          item: r,
+          scorable: {
+            id: r.product.id,
+            type: "service",
+            authorId: r.product.sellerId,
+            category: r.product.category,
+            tags: [r.product.category, r.product.title],
+            lat: r.profile.lat,
+            lng: r.profile.lng,
+            locationOk: r.profile.locationVisibility !== "hidden",
+            sameCity: !!user.profile.city && r.profile.city === user.profile.city,
+            createdAt: r.product.createdAt,
+            engagement: r.product.sold,
+          } as Scorable,
+        })),
+        taste
+      );
+      const topP = rankedProd[0];
+      if (topP) {
+        suggestedProduct = {
+          id: topP.item.product.id,
+          title: topP.item.product.title,
+          price: topP.item.product.price,
+          category: topP.item.product.category,
+          external: !!topP.item.product.externalUrl,
+          image: (() => { try { return (JSON.parse(topP.item.product.media) as string[])[0] ?? null; } catch { return null; } })(),
+          owner: publicUser(topP.item.u, topP.item.profile),
+          reasons: topP.reasons,
+        };
+      }
+    }
+
+    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, guest: !user, totalPublic: mapped.length };
   });
 }

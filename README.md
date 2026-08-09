@@ -395,6 +395,27 @@ accept offers instantly (the protagonist admin account never auto-acts). Seed wo
 "Clothing Brand Photoshoot" with four roles, Marcus confirmed (booking + conversation live),
 Imani's offer awaiting acceptance, and a full review queue.
 
+**Products & Orders — "buy this", staged honestly.** PRODUCT is the sixth entity (Post = share ·
+Service = offer · Booking = scheduled · Project = paid work · Opportunity = asking for people ·
+Product = SELL), on the same configurable listing system: photos, price, quantity (qty 1 = a
+one-time sale that shows SOLD and stays in history), condition, official + custom categories,
+variant groups (Size/Color…), and fulfillment options (shipping / local pickup / local delivery /
+digital). Two DISCLOSED checkout modes: **UpNova checkout** — the order timeline the buyer can
+actually see (placed → payment secured → preparing → shipped with carrier/tracking/ETA →
+delivered → completed), funds held from payment until the buyer confirms receipt, cancels before
+shipping refund in full, stock re-checked at pay time, `expectedTotal` transaction authentication
+(tampered totals 409) — or **External checkout**, labeled "you'll complete your purchase on the
+seller's website; UpNova doesn't process this sale". Pickup orders never store or show an address:
+the exact spot is arranged in Messages after confirmation. Seller pages show only what UpNova has
+verified and counted — badges, rating, completed orders, joined date, other listings — never a
+guarantee. "Report a problem" (item never shipped / not received / wrong item / not as described /
+damaged / seller unresponsive) files into the human moderation queue; no automatic refunds or
+accusations. The feed knows a product is not a post: a labeled PRODUCT card ranked by the same
+engine, separate from the SERVICE suggestion and the Promoted slot. Demo Mode: seed sellers ship
+instantly with mock USPS tracking (digital delivers, pickup proposes a meetup in chat) and
+shipped orders auto-deliver at ETA. Later phases stay honest: real carrier tracking, deposits,
+and a full dispute/refund workflow are production items, not demo pretense.
+
 **Posts, not Portfolio** — the profile's first tab is **Posts**: a visual work grid whose
 filters are LEARNED from the creator's own categories (a hairstylist gets Hair/Nails, a producer
 gets Beats — nothing hard-coded). Posts carry a kind (Work / Behind the scenes / Announcement /

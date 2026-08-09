@@ -507,6 +507,50 @@ function seed() {
       .run();
   }
 
+  /* -------------------------------- products -------------------------------- */
+  // PRODUCT = "buy this" — the sixth entity. UpNova checkout listings,
+  // a one-time sale, a digital good, and an HONEST external listing.
+  const prodTote = id();
+  db.insert(t.products).values({
+    id: prodTote, sellerId: uid["sofia"], title: "Hand-Dyed Canvas Tote",
+    description: "Heavyweight canvas, hand-dyed in small batches. Every one is slightly different — that's the point.",
+    price: 28, category: "handmade", condition: "new", quantity: 15, sold: 1,
+    variants: JSON.stringify([{ name: "Color", options: ["Rust", "Indigo", "Moss"] }]),
+    fulfillment: JSON.stringify(["shipping", "pickup"]), isSeed: true,
+  }).run();
+  db.insert(t.products).values({
+    id: id(), sellerId: uid["kofi"], title: "Drum Kit Vol. 2 — 300 Sounds",
+    description: "300 originals: drums, 808s, textures. Royalty-free, instant download.",
+    price: 25, category: "music", condition: "new", quantity: 9999,
+    fulfillment: JSON.stringify(["digital"]), isSeed: true,
+  }).run();
+  db.insert(t.products).values({
+    id: id(), sellerId: uid["marcusj"], title: "Vintage Denim Jacket",
+    description: "Size L. Like new — worn twice. Heavy 90s denim, no stains or repairs.",
+    price: 35, category: "clothing", condition: "like_new", quantity: 1,
+    variants: JSON.stringify([]),
+    fulfillment: JSON.stringify(["pickup", "shipping"]), isSeed: true,
+  }).run();
+  db.insert(t.products).values({
+    id: id(), sellerId: uid["lena"], title: "Studio Print — 'Harbor Nights'",
+    description: "18×24 giclée print from the Harbor Nights series. Sold through my print shop.",
+    price: 45, category: "art", condition: "new", quantity: 50,
+    fulfillment: JSON.stringify(["shipping"]), externalUrl: "https://lenaortiz.shop/harbor-nights", isSeed: true,
+  }).run();
+  // one COMPLETED order → Sofia's seller history reads "1 completed order"
+  const orderNia = id();
+  db.insert(t.orders).values({
+    id: orderNia, productId: prodTote, buyerId: uid["nia"], sellerId: uid["sofia"],
+    title: "Hand-Dyed Canvas Tote", price: 28, qty: 1, variant: "Color: Rust",
+    fulfillment: "shipping", status: "completed",
+    tracking: JSON.stringify({ carrier: "USPS", code: "9400111899223197428339", eta: hoursAgo(24 * 3).toISOString() }),
+    isSeed: true, createdAt: hoursAgo(24 * 9),
+  }).run();
+  db.insert(t.payments).values({
+    id: id(), orderId: orderNia, payerId: uid["nia"], payeeId: uid["sofia"],
+    amountCents: 2800, feeCents: 140, status: "released",
+  }).run();
+
   /* -------- role opportunity: TEAM & OPENINGS, the flagship demo -------- */
   // Sofia's clothing-brand shoot: one opportunity, four roles. Marcus is
   // CONFIRMED as photographer (accepted -> booking on both calendars),

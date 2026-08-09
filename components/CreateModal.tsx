@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  Tag,
   X,
   Image as ImageIcon,
   Briefcase,
@@ -29,7 +30,7 @@ import { promptJoin } from "./GuestGate";
 /* audience/reach, community, tags.                                    */
 /* ------------------------------------------------------------------ */
 
-type Kind = "Post" | "Opportunity" | "Service" | "Poll" | "Event" | "Live";
+type Kind = "Post" | "Opportunity" | "Service" | "Poll" | "Event" | "Live" | "Product";
 
 const menu: { group: string; items: { kind: Kind; icon: typeof ImageIcon; title: string; desc: string; tint: string }[] }[] = [
   {
@@ -43,6 +44,7 @@ const menu: { group: string; items: { kind: Kind; icon: typeof ImageIcon; title:
     items: [
       { kind: "Opportunity", icon: Briefcase, title: "Opportunity", desc: "Find people for a project.", tint: "text-lime-400" },
       { kind: "Service", icon: Sparkles, title: "Service", desc: "Offer your skills and get hired.", tint: "text-lime-400" },
+      { kind: "Product", icon: Tag, title: "Product", desc: "Sell something — shipped, picked up, or digital.", tint: "text-lime-400" },
     ],
   },
   {
@@ -378,6 +380,19 @@ export default function CreateModal() {
             </p>
             <a href="/services/new" className="btn-lime inline-flex px-5 py-2 text-sm">
               Open the service builder
+            </a>
+          </div>
+        )}
+
+        {kind === "Product" && !published && (
+          <div className="space-y-3 px-5 py-6 text-center">
+            <p className="text-sm font-semibold text-zinc-100">Products get the full builder</p>
+            <p className="mx-auto max-w-sm text-xs leading-relaxed text-zinc-500">
+              Photos, price, quantity, variants, and fulfillment — sell through UpNova checkout
+              (funds held until delivery) or link to your own store, clearly disclosed.
+            </p>
+            <a href="/shop/new" className="btn-lime inline-flex px-5 py-2 text-sm">
+              Open the product builder
             </a>
           </div>
         )}
