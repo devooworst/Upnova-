@@ -85,10 +85,10 @@ function CommunitiesInner() {
     if (user) {
       const r = await fetch("/api/me/reveals");
       if (r.ok) setReveals(await r.json());
-      const p = await fetch("/api/me/profile");
+      const p = await fetch("/api/auth/me", { cache: "no-store" });
       if (p.ok) {
         const j = await p.json();
-        setRevealMode(j.profile?.revealIdentityMode ?? "keep_anonymous");
+        setRevealMode(j.user?.profile?.revealIdentityMode ?? "keep_anonymous");
       }
     }
   }, [q, cat, user]);
