@@ -63,7 +63,7 @@ export default function NewWorkPage() {
       if (res.status === 401) router.push("/login");
       return;
     }
-    router.push(`/works/${d.id}`);
+    router.push(`/works/${d.id}?published=1`);
   };
 
   if (!user)

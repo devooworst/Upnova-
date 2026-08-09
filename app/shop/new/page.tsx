@@ -96,7 +96,7 @@ export default function NewProductPage() {
       if (res.status === 401) router.push("/login");
       return;
     }
-    router.push(`/shop/${d.id}`);
+    router.push(`/shop/${d.id}?published=1`);
   };
 
   if (!user)

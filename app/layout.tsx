@@ -8,6 +8,9 @@ import GuestGate from "@/components/GuestGate";
 import { FollowProvider } from "@/lib/follow";
 
 export const metadata: Metadata = {
+  // canonical base for social previews (og:image URLs). Set
+  // NEXT_PUBLIC_APP_URL to the public domain in production.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   title: {
     default: "UpNova · Find what's happening around you",
     template: "%s • UpNova",

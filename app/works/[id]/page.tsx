@@ -17,6 +17,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import TrustReportModal from "@/components/TrustReportModal";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
+import { PublishedBanner } from "@/components/ShareSheet";
 import { WORK_KINDS, WORK_REPORT_REASONS, type LicenseOption } from "@/lib/licensing";
 
 interface WorkDetail {
@@ -108,6 +109,8 @@ export default function WorkPage() {
       <Link href="/works" className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300">
         <ArrowLeft className="h-3.5 w-3.5" /> Works
       </Link>
+
+      <PublishedBanner path={`/works/${w.id}`} title={`${w.title} — license on UpNova`} text="Stream the preview, license on the creator's terms" />
 
       <article className="card-money p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">

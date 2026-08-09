@@ -448,6 +448,22 @@ compensation = Σ pay × openings recalculated on every keystroke against the Ma
 are 400'd, verified). Freelance opportunities fund through UpNova (secured before work, released
 on completion); external employment stays labeled and outside — unchanged and re-verified.
 
+**Post-publish sharing + social preview cards.** Every published public item has a permanent
+shareable URL — including posts now (`/posts/[id]`, public, guest-viewable) alongside
+`/services/[id]`, `/opportunities/[id]`, `/shop/[id]`, `/works/[id]`, and `/creator/[handle]`.
+After publishing, every flow offers a **Share it** moment (`components/ShareSheet.tsx`): native
+device sharing via `navigator.share` where available, plus universal fallbacks that work
+everywhere — copy link, X, WhatsApp, Facebook, email intents. The composer shows it inline after
+posting; opportunity/product/work publishing lands on the permanent page with a one-shot
+"Published — it's live" banner; the service wizard's success screen embeds it. Shared links
+unfurl with **server-generated social preview cards** (`next/og` + `lib/server/ogCard.tsx`,
+per-route `opengraph-image.tsx` + `generateMetadata`): dark UpNova frame, type overline
+(SERVICE · BOOK, OPPORTUNITY · APPLY…), title, creator, price/compensation and location where
+appropriate (respecting location visibility), and the lime UpNova CTA — verified rendering
+offline. The UpNova object stays the source of truth: every share drives people back to the
+real, actionable page, never a copy. Set `NEXT_PUBLIC_APP_URL` in production so og:image URLs
+resolve to the public domain.
+
 **Products & Orders — "buy this", staged honestly.** PRODUCT is the sixth entity (Post = share ·
 Service = offer · Booking = scheduled · Project = paid work · Opportunity = asking for people ·
 Product = SELL), on the same configurable listing system: photos, price, quantity (qty 1 = a

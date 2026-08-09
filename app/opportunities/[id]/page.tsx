@@ -17,6 +17,7 @@ import Avatar from "@/components/Avatar";
 import PosterBadge, { type PosterType } from "@/components/PosterBadge";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
+import { PublishedBanner } from "@/components/ShareSheet";
 import { engagementTypeLabel, compLabel, type EngagementConfig } from "@/lib/engagement";
 
 interface Opp {
@@ -103,6 +104,8 @@ export default function OpportunityPage() {
       <Link href="/opportunities" className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300">
         <ArrowLeft className="h-3.5 w-3.5" /> Opportunities
       </Link>
+
+      <PublishedBanner path={`/opportunities/${opp.id}`} title={`${opp.title} — apply on UpNova`} text={opp.budget != null ? `$${opp.budget} · ${opp.remote ? "Remote" : opp.location}` : opp.location} />
 
       <article className="card-event p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">

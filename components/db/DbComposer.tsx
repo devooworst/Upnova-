@@ -11,6 +11,8 @@ import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
 import { DISCLOSURES, type DisclosureType } from "@/lib/trust";
 import { FEED_EVENT } from "./DbFeed";
+import ShareSheet from "@/components/ShareSheet";
+import Link from "next/link";
 
 const KINDS = [
   { id: "post", label: "Post" },
@@ -56,6 +58,8 @@ export default function DbComposer() {
   const [workLink, setWorkLink] = useState(""); // "project:id" | "booking:id"
   const [myWork, setMyWork] = useState<{ kind: string; id: string; title: string; with: string }[] | null>(null);
   const [busy, setBusy] = useState(false);
+  // post-publish share moment: the permanent /posts/<id> link, right here
+  const [justPosted, setJustPosted] = useState<{ id: string; body: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // fetch completed transactions once the trust panel becomes relevant
@@ -105,6 +109,8 @@ export default function DbComposer() {
     });
     setBusy(false);
     if (res.ok) {
+      const d = await res.json();
+      setJustPosted({ id: d.id, body: text.slice(0, 80) });
       reset();
       window.dispatchEvent(new Event(FEED_EVENT));
     }
@@ -112,6 +118,19 @@ export default function DbComposer() {
 
   return (
     <section className="border-y border-line-soft py-3">
+      {justPosted && (
+        <div className="mb-3 rounded-2xl border border-lime-400/40 bg-lime-400/5 p-3.5">
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-bold text-lime-300">Posted.</span>
+            <span className="text-xs text-zinc-400">It&apos;s in the feed and on your profile — want to share it further?</span>
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <ShareSheet path={`/posts/${justPosted.id}`} title={`${user?.profile.displayName ?? "New post"} on UpNova`} text={justPosted.body} compact />
+            <Link href={`/posts/${justPosted.id}`} className="btn-ghost px-3 py-1.5 text-xs">View post</Link>
+            <button onClick={() => setJustPosted(null)} className="ml-auto rounded-full px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300">Dismiss</button>
+          </div>
+        </div>
+      )}
       <div className="flex items-start gap-3">
         <Avatar src={user.profile.avatarUrl} initials={user.profile.displayName.charAt(0)} size="sm" />
         {!open ? (

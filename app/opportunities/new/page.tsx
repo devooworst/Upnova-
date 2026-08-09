@@ -127,7 +127,8 @@ export default function NewOpportunityPage() {
       if (res.status === 401) router.push("/login");
       return;
     }
-    router.push("/opportunities");
+    // land on the permanent link with the share moment ready
+    router.push(`/opportunities/${data.id}?published=1`);
   };
 
   return (

@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Sparkles, ImagePlus, X, Check, MapPin, BadgeCheck, Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
+import ShareSheet from "@/components/ShareSheet";
 import {
   type ServiceConfig,
   type ServiceMenu,
@@ -256,13 +257,15 @@ export default function NewServicePage() {
         </div>
 
         {visibility !== "draft" && (
-          <button
-            onClick={() => navigator.clipboard?.writeText(shareUrl)}
-            className="btn-ghost mx-auto px-4 py-2 text-xs"
-            title="Anyone with the link can view it — no account needed"
-          >
-            Copy share link — /services/{liveId.slice(0, 8)}…
-          </button>
+          <div className="card p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Share it</p>
+            <p className="mt-0.5 text-[11px] text-zinc-500">
+              Permanent link — anyone can view it, no account needed. Booking brings them back here.
+            </p>
+            <div className="mt-2 flex justify-center">
+              <ShareSheet path={`/services/${liveId}`} title={`${title} — book on UpNova`} text={priceLabel(config, Number(price) || 0)} />
+            </div>
+          </div>
         )}
 
         {visibility === "public" && shareToFeed && (
