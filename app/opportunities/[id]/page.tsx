@@ -17,6 +17,7 @@ import Avatar from "@/components/Avatar";
 import PosterBadge, { type PosterType } from "@/components/PosterBadge";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
+import { engagementTypeLabel, compLabel, type EngagementConfig } from "@/lib/engagement";
 
 interface Opp {
   id: string;
@@ -33,6 +34,7 @@ interface Opp {
   createdAt: string;
   applicants: number;
   roles: { id: string; title: string; count: number; pay: number | null; description?: string; open: number }[];
+  engagement: EngagementConfig | null;
   myStatus: string | null;
   poster: {
     id: string;
@@ -138,6 +140,26 @@ export default function OpportunityPage() {
             </span>
           )}
         </div>
+
+        {opp.engagement && opp.engagement.type !== "one_time" && (
+          <div className="mt-3 rounded-xl border border-sky-400/25 bg-sky-400/5 px-3.5 py-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-sky-300">{engagementTypeLabel(opp.engagement)}</p>
+            <ul className="mt-1 space-y-0.5 text-xs text-zinc-300">
+              {opp.engagement.rate != null && <li>Compensation: <span className="font-mono tracking-[0.05em] text-lime-300">{compLabel(opp.engagement)}</span></li>}
+              {opp.engagement.workload && <li>Workload: {opp.engagement.workload}</li>}
+              {opp.engagement.schedule && <li>Schedule: {opp.engagement.schedule}</li>}
+              {opp.engagement.duration && <li>Duration: {opp.engagement.duration}</li>}
+              {opp.engagement.startDate && <li>Starts {new Date(opp.engagement.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</li>}
+              <li className={opp.engagement.classification === "external_employment" ? "text-sky-300" : "text-zinc-400"}>
+                {opp.engagement.classification === "external_employment"
+                  ? "Employment handled by the employer — payroll and paperwork happen outside UpNova."
+                  : "Freelance/contract through UpNova — payments secured per cycle, released on completion."}
+              </li>
+              {opp.engagement.interviewMode === "external" && <li className="text-zinc-500">Interview process happens outside UpNova (labeled external).</li>}
+              {opp.engagement.interviewMode === "upnova" && <li className="text-zinc-500">Interviews scheduled through UpNova — they land on both calendars.</li>}
+            </ul>
+          </div>
+        )}
 
         <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-300">{opp.description}</p>
 

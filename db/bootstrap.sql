@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `applications` (
 	`availability` text DEFAULT 'yes' NOT NULL,
 	`answers` text DEFAULT '{}' NOT NULL,
 	`status` text DEFAULT 'submitted' NOT NULL,
-	`created_at` integer NOT NULL, role_id text,
+	`created_at` integer NOT NULL, role_id text, interview text NOT NULL DEFAULT '{}', offer text NOT NULL DEFAULT '{}',
 	FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`applicant_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS `opportunities` (
 	`apply_config` text DEFAULT '{}' NOT NULL,
 	`status` text DEFAULT 'open' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, roles text NOT NULL DEFAULT '[]',
+	`created_at` integer NOT NULL, roles text NOT NULL DEFAULT '[]', engagement text NOT NULL DEFAULT '{}',
 	FOREIGN KEY (`poster_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS "orders" (

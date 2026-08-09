@@ -11,10 +11,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Briefcase, Plus } from "lucide-react";
 import OpportunityList from "@/components/db/OpportunityList";
+import { ENGAGEMENT_TYPES, cycleLabel, type EngagementOffer, type InterviewInfo } from "@/lib/engagement";
 
 interface MyApplication {
   id: string;
-  status: "submitted" | "shortlisted" | "selected" | "confirmed" | "declined" | "offer_declined";
+  status: "submitted" | "shortlisted" | "interview" | "selected" | "confirmed" | "active" | "completed" | "declined" | "offer_declined";
+  interview: InterviewInfo | null;
+  offer: (EngagementOffer & { cycles?: number }) | null;
   availability: string;
   message: string;
   createdAt: string;
@@ -25,8 +28,11 @@ interface MyApplication {
 const APP_STATUS: Record<string, { label: string; cls: string }> = {
   submitted: { label: "Under Review", cls: "border-amber-400/40 bg-amber-400/10 text-amber-300" },
   shortlisted: { label: "Shortlisted", cls: "border-violet-400/40 bg-violet-400/10 text-violet-300" },
-  selected: { label: "Selected — respond", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  interview: { label: "Interview", cls: "border-sky-400/40 bg-sky-400/10 text-sky-300" },
+  selected: { label: "Offer — respond", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
   confirmed: { label: "Confirmed", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  active: { label: "Active", cls: "border-lime-400/40 bg-lime-400/10 text-lime-300" },
+  completed: { label: "Completed", cls: "border-line text-zinc-400" },
   declined: { label: "Not selected", cls: "border-line text-zinc-500" },
   offer_declined: { label: "You declined", cls: "border-line text-zinc-500" },
 };
@@ -174,8 +180,50 @@ export default function OpportunitiesPage() {
                     {APP_STATUS[a.status].label}
                   </span>
                 </button>
+                {a.status === "interview" && a.interview && (
+                  <p className="mt-3 rounded-xl border border-sky-400/30 bg-sky-400/5 px-3.5 py-2.5 text-xs leading-relaxed text-zinc-300">
+                    {a.interview.mode === "external" ? (
+                      <>Interview stage — <span className="font-semibold text-sky-300">external process</span>: it happens outside UpNova.{a.interview.note ? ` ${a.interview.note}` : ""} Coordinate in Messages.</>
+                    ) : (
+                      <>Interview scheduled{a.interview.at ? ` — ${new Date(a.interview.at).toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${new Date(a.interview.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}. It&apos;s on your <Link href="/calendar" className="font-semibold text-sky-300 underline-offset-2 hover:underline">calendar</Link>.</>
+                    )}
+                  </p>
+                )}
+                {/* configurable OFFER — the full terms, then the choice */}
+                {a.status === "selected" && a.offer && (
+                  <div className="mt-3 rounded-xl border border-lime-400/40 bg-lime-400/5 p-3.5">
+                    <p className="text-sm font-bold text-lime-300">Offer — {a.offer.title}</p>
+                    <ul className="mt-1.5 space-y-0.5 text-xs leading-relaxed text-zinc-300">
+                      <li>{ENGAGEMENT_TYPES.find((t) => t.id === a.offer!.engagementType)?.label ?? a.offer.engagementType}{a.offer.duration ? ` · ${a.offer.duration}` : ""}</li>
+                      <li><span className="font-mono tracking-[0.05em] text-lime-300">${a.offer.amount}</span> per {cycleLabel(a.offer.compModel)}</li>
+                      {a.offer.schedule && <li>Schedule: {a.offer.schedule}</li>}
+                      {a.offer.startDate && <li>Starts {new Date(a.offer.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</li>}
+                      {a.offer.note && <li className="text-zinc-400">&ldquo;{a.offer.note}&rdquo;</li>}
+                      <li className={a.offer.classification === "external_employment" ? "text-sky-300" : "text-zinc-400"}>
+                        {a.offer.classification === "external_employment"
+                          ? "External employment — pay & paperwork handled by the employer OUTSIDE UpNova."
+                          : "Freelance via UpNova — each cycle secured up front, released on completion."}
+                      </li>
+                    </ul>
+                    <div className="mt-2.5 flex gap-2">
+                      <button onClick={() => respond(a.id, "accept")} className="btn-lime px-4 py-1.5 text-xs">Accept offer</button>
+                      <button onClick={() => respond(a.id, "decline_offer")} className="btn-ghost px-3.5 py-1.5 text-xs">Decline</button>
+                    </div>
+                  </div>
+                )}
+                {a.status === "active" && a.offer && (
+                  <p className="mt-3 rounded-xl border border-lime-400/30 bg-lime-400/5 px-3.5 py-2.5 text-xs leading-relaxed text-zinc-300">
+                    <span className="font-semibold text-lime-300">Active</span> — {a.offer.title}.
+                    {a.offer.classification === "external_employment"
+                      ? " Compensation handled outside UpNova."
+                      : ` ${a.offer.cycles ?? 0} paid cycle${(a.offer.cycles ?? 0) === 1 ? "" : "s"} started — track them in `}
+                    {a.offer.classification !== "external_employment" && (
+                      <Link href="/calendar" className="font-semibold text-lime-300 underline-offset-2 hover:underline">Bookings</Link>
+                    )}
+                  </p>
+                )}
                 {/* the offer moment — role, date, place, pay, and the choice */}
-                {a.status === "selected" && a.role && (
+                {a.status === "selected" && !a.offer && a.role && (
                   <div className="mt-3 rounded-xl border border-lime-400/40 bg-lime-400/5 p-3.5">
                     <p className="text-sm font-bold text-lime-300">You&apos;ve been selected!</p>
                     <p className="mt-1 text-xs leading-relaxed text-zinc-300">
@@ -210,7 +258,7 @@ export default function OpportunitiesPage() {
                     <p className="mt-1.5 text-[11px] text-zinc-500">
                       Availability: {a.availability === "yes" ? "confirmed for the date" : "needs to check schedule"}
                     </p>
-                    {!["selected", "confirmed", "declined"].includes(a.status) && (
+                    {!["selected", "confirmed", "active", "completed", "declined"].includes(a.status) && (
                       <button
                         onClick={() => withdraw(a.id)}
                         className="mt-2.5 rounded-full border border-line px-3.5 py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300"

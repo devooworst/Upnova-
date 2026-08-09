@@ -14,16 +14,19 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, Star, Users, MessageSquare, Lock } from "lucide-react";
+import { ArrowLeft, Check, Star, Users, MessageSquare, Lock, CalendarClock, FileText, X } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import { ENGAGEMENT_TYPES, COMP_MODELS, cycleLabel, type EngagementConfig, type EngagementOffer, type InterviewInfo } from "@/lib/engagement";
 
 interface Applicant {
   id: string;
   message: string;
   availability: "yes" | "no" | "need_check";
   answers?: { question?: string; answer?: string; extra?: string };
-  status: "submitted" | "shortlisted" | "selected" | "confirmed" | "declined" | "offer_declined";
+  status: "submitted" | "shortlisted" | "interview" | "selected" | "confirmed" | "active" | "completed" | "declined" | "offer_declined";
   roleId: string | null;
+  interview: InterviewInfo | null;
+  offer: (EngagementOffer & { cycles?: number }) | null;
   createdAt: string;
   applicant: {
     id: string;
@@ -54,21 +57,28 @@ interface Payload {
     eventDate: string | null;
     location: string;
     roles: Role[];
+    engagement: EngagementConfig | null;
   };
   applications: Applicant[];
 }
 
 const STATUS_CHIP: Record<string, string> = {
   shortlisted: "border-violet-400/40 text-violet-300",
+  interview: "border-sky-400/40 text-sky-300",
   selected: "border-amber-400/40 text-amber-300",
   confirmed: "border-lime-400/40 text-lime-300",
+  active: "border-lime-400/40 text-lime-300",
+  completed: "border-line text-zinc-400",
   declined: "border-line text-zinc-500",
   offer_declined: "border-line text-zinc-500",
 };
 const STATUS_LABEL: Record<string, string> = {
   shortlisted: "Shortlisted",
-  selected: "Awaiting acceptance",
+  interview: "Interview",
+  selected: "Offer out",
   confirmed: "Confirmed",
+  active: "Active",
+  completed: "Completed",
   declined: "Not selected",
   offer_declined: "Offer declined",
 };
@@ -80,6 +90,9 @@ export default function ApplicantsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedConv, setSelectedConv] = useState<string | null>(null);
+  const [interviewFor, setInterviewFor] = useState<string | null>(null);
+  const [interviewAt, setInterviewAt] = useState("");
+  const [offerFor, setOfferFor] = useState<Applicant | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/opportunities/${id}/applications`, { cache: "no-store" });
@@ -95,15 +108,17 @@ export default function ApplicantsPage() {
     load();
   }, [load]);
 
-  const act = async (appId: string, action: "shortlist" | "select" | "decline") => {
+  const act = async (appId: string, body: Record<string, unknown>) => {
     const res = await fetch(`/api/applications/${appId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify(body),
     });
     const d = await res.json();
     if (!res.ok) setNotice(d.error || "Could not update");
-    else if (action === "select" && d.conversationId) setSelectedConv(d.conversationId);
+    else if (body.action === "select" && d.conversationId) setSelectedConv(d.conversationId);
+    setInterviewFor(null);
+    setOfferFor(null);
     load();
   };
 
@@ -150,7 +165,7 @@ export default function ApplicantsPage() {
   const { opportunity, applications } = data;
   const roles = opportunity.roles;
   const hasRoles = roles.length > 0;
-  const team = applications.filter((a) => ["selected", "confirmed"].includes(a.status));
+  const team = applications.filter((a) => ["selected", "confirmed", "active"].includes(a.status));
   const order: Record<string, number> = { shortlisted: 0, submitted: 1, selected: -1, confirmed: -2, offer_declined: 2, declined: 3 };
   const sorted = [...applications].sort((a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1));
 
@@ -210,24 +225,84 @@ export default function ApplicantsPage() {
         </div>
       </div>
 
-      {!["declined", "selected", "confirmed"].includes(a.status) && opportunity.status === "open" && (
+      {a.status === "interview" && a.interview && (
+        <p className="mt-2 rounded-lg border border-sky-400/25 bg-sky-400/5 px-3 py-2 text-[11px] text-zinc-300">
+          {a.interview.mode === "external"
+            ? "Interview happens OUTSIDE UpNova — external process, coordinate in Messages."
+            : `Interview scheduled ${a.interview.at ? new Date(a.interview.at).toLocaleDateString("en-US", { month: "long", day: "numeric" }) + " · " + new Date(a.interview.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""} — on both calendars.`}
+        </p>
+      )}
+      {a.status === "active" && a.offer && (
+        <div className="mt-2 rounded-lg border border-lime-400/25 bg-lime-400/5 px-3 py-2">
+          <p className="text-[11px] text-zinc-300">
+            <span className="font-semibold text-lime-300">Active</span> — {a.offer.title} ·{" "}
+            {ENGAGEMENT_TYPES.find((t) => t.id === a.offer!.engagementType)?.label}
+            {a.offer.classification === "external_employment"
+              ? " · compensation handled OUTSIDE UpNova"
+              : ` · $${a.offer.amount} per ${cycleLabel(a.offer.compModel)} · ${a.offer.cycles ?? 0} cycle${(a.offer.cycles ?? 0) === 1 ? "" : "s"} started`}
+          </p>
+          {a.offer.classification !== "external_employment" && (
+            <div className="mt-1.5 flex gap-2">
+              <button onClick={() => act(a.id, { action: "next_cycle" })} className="btn-lime px-2.5 py-1 text-[11px]">
+                Start cycle {(a.offer.cycles ?? 0) + 1} — ${a.offer.amount}
+              </button>
+              <Link href="/calendar" className="btn-ghost px-2.5 py-1 text-[11px]">Pay cycles in Bookings</Link>
+              <button onClick={() => act(a.id, { action: "complete_engagement" })} className="rounded-full px-2.5 py-1 text-[11px] text-zinc-500 hover:text-zinc-300">
+                Mark completed
+              </button>
+            </div>
+          )}
+          {a.offer.classification === "external_employment" && (
+            <button onClick={() => act(a.id, { action: "complete_engagement" })} className="mt-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] text-zinc-400 hover:text-zinc-200">
+              Mark completed
+            </button>
+          )}
+        </div>
+      )}
+
+      {!["declined", "selected", "confirmed", "active", "completed"].includes(a.status) && opportunity.status === "open" && (
         <div className="mt-3 flex items-center gap-2 border-t border-line-soft pt-3">
           {a.status === "submitted" && (
             <button
-              onClick={() => act(a.id, "shortlist")}
+              onClick={() => act(a.id, { action: "shortlist" })}
               className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 px-3.5 py-1.5 text-xs font-semibold text-violet-300 transition hover:bg-violet-400/10"
             >
               <Star className="h-3.5 w-3.5" /> Shortlist
             </button>
           )}
-          <button onClick={() => act(a.id, "select")} className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
-            <Check className="h-3.5 w-3.5" /> {hasRoles ? "Select — send offer" : "Select — create project"}
-          </button>
+          {opportunity.engagement ? (
+            <button onClick={() => setOfferFor(a)} className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
+              <FileText className="h-3.5 w-3.5" /> Send offer
+            </button>
+          ) : (
+            <button onClick={() => act(a.id, { action: "select" })} className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
+              <Check className="h-3.5 w-3.5" /> {hasRoles ? "Select — send offer" : "Select — create project"}
+            </button>
+          )}
+          {opportunity.engagement && opportunity.engagement.interviewMode !== "none" && a.status !== "interview" && (
+            interviewFor === a.id ? (
+              opportunity.engagement.interviewMode === "upnova" ? (
+                <span className="flex items-center gap-1.5">
+                  <input type="datetime-local" value={interviewAt} onChange={(e) => setInterviewAt(e.target.value)} className="rounded-lg border border-line bg-card-raised px-2 py-1.5 text-xs text-zinc-100 outline-none" />
+                  <button onClick={() => interviewAt && act(a.id, { action: "interview", at: new Date(interviewAt).toISOString() })} className="btn-ghost px-2.5 py-1.5 text-xs">Book</button>
+                  <button onClick={() => setInterviewFor(null)} className="rounded-md p-1 text-zinc-500"><X className="h-3.5 w-3.5" /></button>
+                </span>
+              ) : (
+                <button onClick={() => act(a.id, { action: "interview", external: true })} className="btn-ghost px-3 py-1.5 text-xs">
+                  Confirm external interview
+                </button>
+              )
+            ) : (
+              <button onClick={() => setInterviewFor(a.id)} className="btn-ghost px-3 py-1.5 text-xs">
+                <CalendarClock className="h-3.5 w-3.5" /> Interview{opportunity.engagement.interviewMode === "external" ? " (external)" : ""}
+              </button>
+            )
+          )}
           <button onClick={() => message(a.applicant.handle)} className="btn-ghost px-3 py-1.5 text-xs">
             <MessageSquare className="h-3.5 w-3.5" /> Message
           </button>
           <button
-            onClick={() => act(a.id, "decline")}
+            onClick={() => act(a.id, { action: "decline" })}
             className="ml-auto rounded-full px-3 py-1.5 text-xs font-medium text-zinc-500 transition hover:text-rose-300"
           >
             Decline
@@ -353,6 +428,17 @@ export default function ApplicantsPage() {
         <div className="space-y-3">{sorted.map(renderCard)}</div>
       )}
 
+      {offerFor && (
+        <OfferModal
+          applicant={offerFor}
+          engagement={opportunity.engagement}
+          defaultTitle={roles.find((r) => r.id === offerFor.roleId)?.title ?? opportunity.title}
+          defaultAmount={roles.find((r) => r.id === offerFor.roleId)?.pay ?? opportunity.engagement?.rate ?? opportunity.budget ?? 0}
+          onSend={(terms) => act(offerFor.id, { action: "offer", ...terms })}
+          onClose={() => setOfferFor(null)}
+        />
+      )}
+
       <p className="text-[11px] leading-relaxed text-zinc-600">
         {hasRoles ? (
           <>
@@ -367,6 +453,83 @@ export default function ApplicantsPage() {
           </>
         )}
       </p>
+    </div>
+  );
+}
+
+/* ------------------------- configurable offer ------------------------- */
+
+function OfferModal({
+  applicant,
+  engagement,
+  defaultTitle,
+  defaultAmount,
+  onSend,
+  onClose,
+}: {
+  applicant: Applicant;
+  engagement: EngagementConfig | null;
+  defaultTitle: string;
+  defaultAmount: number;
+  onSend: (terms: Record<string, unknown>) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(defaultTitle);
+  const [engagementType, setEngagementType] = useState(engagement?.type ?? "one_time");
+  const [compModel, setCompModel] = useState(engagement?.compModel ?? "per_project");
+  const [amount, setAmount] = useState(String(defaultAmount || ""));
+  const [schedule, setSchedule] = useState(engagement?.schedule ?? "");
+  const [startDate, setStartDate] = useState(engagement?.startDate?.slice(0, 10) ?? "");
+  const [duration, setDuration] = useState(engagement?.duration ?? "");
+  const [note, setNote] = useState("");
+  const classification = engagement?.classification ?? "upnova_freelance";
+  const inputCls =
+    "w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Send offer</p>
+            <h3 className="mt-1 text-sm font-bold text-zinc-100">{applicant.applicant.displayName}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-4 space-y-3">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Role / position" className={inputCls} maxLength={80} />
+          <div className="grid grid-cols-2 gap-2">
+            <select value={engagementType} onChange={(e) => setEngagementType(e.target.value as typeof engagementType)} className={inputCls}>
+              {ENGAGEMENT_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+            <select value={compModel} onChange={(e) => setCompModel(e.target.value as typeof compModel)} className={inputCls}>
+              {COMP_MODELS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-zinc-400">
+            $<input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Amount" className={inputCls} />
+            <span className="shrink-0 text-xs text-zinc-500">per {cycleLabel(compModel)}</span>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
+            <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Duration — e.g. 3 months" className={inputCls} maxLength={60} />
+          </div>
+          <input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Schedule — e.g. 2 videos/week" className={inputCls} maxLength={120} />
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Other agreed terms (optional)" className={`${inputCls} resize-none`} />
+          <p className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${classification === "external_employment" ? "border-sky-400/25 bg-sky-400/5 text-sky-200" : "border-lime-400/25 bg-lime-400/5 text-zinc-300"}`}>
+            {classification === "external_employment"
+              ? "External employment — payroll and classification are handled by the employer OUTSIDE UpNova. No UpNova payment workflow."
+              : "Freelance / contract through UpNova — each cycle is secured up front and released on completion. Buyer pays the 5% fee on top."}
+          </p>
+          <button
+            onClick={() => onSend({ title, engagementType, compModel, amount: Number(amount) || 0, schedule, startDate: startDate || undefined, duration, note, classification })}
+            disabled={!title.trim() || !amount}
+            className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40"
+          >
+            Send offer{amount ? ` — $${amount} per ${cycleLabel(compModel)}` : ""}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

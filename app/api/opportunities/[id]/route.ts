@@ -7,6 +7,7 @@ import { notify } from "@/lib/server/notify";
 import { requireOpportunityPoster } from "@/lib/server/authz";
 import { requireUser } from "@/lib/server/auth";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
+import { parseEngagement } from "@/lib/engagement";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         createdAt: opp.createdAt.toISOString(),
         applicants,
         roles,
+        engagement: parseEngagement(opp.engagement),
         myRoleId: myApp?.roleId ?? null,
         myStatus: myApp?.status ?? null,
         poster: publicUser(user, profile),

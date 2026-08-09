@@ -12,6 +12,7 @@ import { MapPin, Users, X, Bookmark } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import PosterBadge, { PosterOverline, type PosterType } from "@/components/PosterBadge";
 import { useSession } from "@/lib/session";
+import { engagementTypeLabel, compLabel, type EngagementConfig } from "@/lib/engagement";
 import { promptJoin } from "@/components/GuestGate";
 
 export interface OpportunityItem {
@@ -28,6 +29,7 @@ export interface OpportunityItem {
   eventDate: string | null;
   applyConfig?: { requireMessage?: boolean; question?: string };
   roles?: { id: string; title: string; count: number; pay: number | null; description?: string; open: number }[];
+  engagement?: EngagementConfig | null;
   posterType?: PosterType;
   poster: { id: string; handle: string; displayName: string; avatarUrl: string | null; locationLabel?: string | null };
   isMine: boolean;
@@ -127,6 +129,20 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
                 )}
               </div>
               {!compact && <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{o.description}</p>}
+              {o.engagement && o.engagement.type !== "one_time" && (
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="rounded-full border border-sky-400/30 bg-sky-400/5 px-2 py-0.5 font-mono tracking-[0.05em] text-sky-300">
+                    {engagementTypeLabel(o.engagement)}
+                  </span>
+                  {o.engagement.rate != null && (
+                    <span className="rounded-full border border-line px-2 py-0.5 font-mono tracking-[0.05em] text-lime-300">{compLabel(o.engagement)}</span>
+                  )}
+                  {o.engagement.workload && <span className="rounded-full border border-line px-2 py-0.5 text-zinc-400">{o.engagement.workload}</span>}
+                  {o.engagement.classification === "external_employment" && (
+                    <span className="rounded-full border border-line px-2 py-0.5 text-zinc-500">pay handled by employer</span>
+                  )}
+                </p>
+              )}
               {(o.roles?.length ?? 0) > 0 && (
                 <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {o.roles!.map((r) => (

@@ -411,6 +411,14 @@ export const opportunities = sqliteTable("opportunities", {
   // single-role opportunity. Roles are CONFIGURATION of the universal
   // system — never a separate casting/hiring/fashion system.
   roles: text("roles").notNull().default("[]"),
+  // ENGAGEMENT configuration (JSON, lib/engagement.ts) — one-time work vs
+  // ongoing relationships on the SAME system: {type: one_time|short_term|
+  // ongoing|part_time|full_time|temporary|collab|custom, workload, schedule,
+  // startDate, duration, compModel, rate, classification: upnova_freelance|
+  // external_employment, interviewMode: none|upnova|external}. UpNova never
+  // classifies anyone as employee/contractor — the poster configures it and
+  // external employment is labeled as handled OUTSIDE UpNova.
+  engagement: text("engagement").notNull().default("{}"),
   status: text("status").notNull().default("open"), // open | closed | filled
   isSeed: seed(),
   createdAt: ts("created_at"),
@@ -429,12 +437,19 @@ export const applications = sqliteTable(
     message: text("message").notNull().default(""),
     // which role this person applied for (role opportunities only)
     roleId: text("role_id"),
+    // interview stage (JSON): {mode: "upnova"|"external", at?, note?} —
+    // external interviews are labeled as happening OUTSIDE UpNova
+    interview: text("interview").notNull().default("{}"),
+    // the configurable OFFER the poster sent (JSON, lib/engagement.ts):
+    // role, comp model + amount, schedule, start date, duration,
+    // classification, terms — what the applicant actually agrees to
+    offer: text("offer").notNull().default("{}"),
     availability: text("availability").notNull().default("yes"), // yes | no | need_check
     // answers to poster-defined questions + the optional "anything else"
     answers: text("answers").notNull().default("{}"),
-    // submitted → shortlisted → selected (offer out, awaiting acceptance)
-    // → confirmed (accepted; booking exists) · declined (by poster) ·
-    // offer_declined (by applicant)
+    // submitted → shortlisted → interview → selected (offer out) →
+    // confirmed (one-time; booking exists) | active (ongoing engagement;
+    // paid in cycles) → completed · declined (poster) · offer_declined
     status: text("status").notNull().default("submitted"),
     createdAt: ts("created_at"),
   },

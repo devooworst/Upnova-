@@ -6,7 +6,8 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { requireOpportunityPoster } from "@/lib/server/authz";
 import { notify } from "@/lib/server/notify";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
-import { acceptRoleOffer, declineRoleOffer, conversationBetween } from "@/lib/server/oppFlow";
+import { acceptRoleOffer, declineRoleOffer, conversationBetween, startEngagementCycle } from "@/lib/server/oppFlow";
+import { parseEngagement, normalizeEngagement, parseOffer, compLabel, cycleLabel, ENGAGEMENT_TYPES, COMP_MODELS } from "@/lib/engagement";
 import { seedAcceptsRoleOffer } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";
@@ -38,9 +39,119 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     if (action === "decline_offer") return declineRoleOffer(app.id, user.id);
 
+    if (action === "next_cycle") {
+      // poster starts the next paid cycle of an ACTIVE engagement
+      requireOpportunityPoster(app.opportunityId, user.id);
+      return startEngagementCycle(app.id);
+    }
+
     /* --------------------------- poster side --------------------------- */
     const opp = requireOpportunityPoster(app.opportunityId, user.id);
-    if (!["shortlist", "select", "decline"].includes(action)) throw new ApiError(400, "Unknown action");
+    if (!["shortlist", "select", "decline", "interview", "offer", "complete_engagement"].includes(action))
+      throw new ApiError(400, "Unknown action");
+
+    /* ---- interview: scheduled through UpNova, or clearly EXTERNAL ---- */
+    if (action === "interview") {
+      if (!["submitted", "shortlisted", "interview"].includes(app.status))
+        throw new ApiError(409, `Cannot schedule an interview from "${app.status}"`);
+      const external = body.external === true;
+      const applicantName = db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get()?.displayName ?? "Applicant";
+      if (external) {
+        db.update(tables.applications)
+          .set({ status: "interview", interview: JSON.stringify({ mode: "external", note: String(body.note || "").slice(0, 200) }) })
+          .where(eq(tables.applications.id, app.id))
+          .run();
+        notify({
+          userId: app.applicantId, actorId: user.id, type: "application",
+          title: `Interview — ${opp.title}`,
+          body: `The interview happens OUTSIDE UpNova.${body.note ? ` ${String(body.note).slice(0, 120)}` : ""} Details in Messages.`,
+          href: "/opportunities?apps=1",
+        });
+        return { status: "interview", external: true };
+      }
+      const at = new Date(body.at);
+      if (isNaN(at.getTime()) || at.getTime() < Date.now()) throw new ApiError(400, "Pick a future interview time");
+      const convId = conversationBetween(user.id, app.applicantId);
+      // UpNova-scheduled: a $0 booking lands on BOTH calendars
+      db.insert(tables.bookings)
+        .values({
+          id: randomBytes(12).toString("hex"),
+          serviceId: null, clientId: user.id, providerId: app.applicantId,
+          title: `Interview — ${opp.title}`, startsAt: at, durationMin: 30, price: 0,
+          items: JSON.stringify([{ label: `Interview · ${opp.title}`, amount: 0 }]),
+          location: opp.remote ? "Remote" : opp.location, status: "confirmed", conversationId: convId,
+        })
+        .run();
+      db.update(tables.applications)
+        .set({ status: "interview", interview: JSON.stringify({ mode: "upnova", at: at.toISOString() }) })
+        .where(eq(tables.applications.id, app.id))
+        .run();
+      db.insert(tables.messages)
+        .values({
+          id: randomBytes(12).toString("hex"), conversationId: convId, senderId: user.id, kind: "system",
+          body: `Interview scheduled — ${opp.title} · ${at.toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}. It's on both calendars.`,
+        })
+        .run();
+      db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+      notify({
+        userId: app.applicantId, actorId: user.id, type: "booking",
+        title: `Interview scheduled — ${opp.title}`,
+        body: `${at.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} — it's on your calendar`,
+        href: "/calendar",
+      });
+      return { status: "interview", at: at.toISOString(), applicant: applicantName };
+    }
+
+    /* ---- offer: configurable terms the applicant actually agrees to ---- */
+    if (action === "offer") {
+      if (!["submitted", "shortlisted", "interview", "offer_declined"].includes(app.status))
+        throw new ApiError(409, `Cannot send an offer from "${app.status}"`);
+      const eng = parseEngagement(opp.engagement) ?? normalizeEngagement({ type: "one_time" })!;
+      const amount = Math.round(Number(body.amount));
+      if (!Number.isFinite(amount) || amount < 0) throw new ApiError(400, "Set the compensation amount");
+      const offer = {
+        title: String(body.title || opp.title).trim().slice(0, 80),
+        engagementType: ENGAGEMENT_TYPES.find((t) => t.id === body.engagementType)?.id ?? eng.type,
+        customLabel: String(body.customLabel || eng.customLabel || "").slice(0, 40) || undefined,
+        compModel: COMP_MODELS.find((c) => c.id === body.compModel)?.id ?? eng.compModel,
+        amount,
+        schedule: String(body.schedule || eng.schedule || "").slice(0, 120) || undefined,
+        startDate: body.startDate ? String(body.startDate).slice(0, 24) : eng.startDate,
+        duration: String(body.duration || eng.duration || "").slice(0, 60) || undefined,
+        classification: body.classification === "external_employment" || eng.classification === "external_employment"
+          ? "external_employment"
+          : "upnova_freelance",
+        note: String(body.note || "").slice(0, 500) || undefined,
+        cycles: 0,
+      };
+      db.update(tables.applications)
+        .set({ status: "selected", offer: JSON.stringify(offer) })
+        .where(eq(tables.applications.id, app.id))
+        .run();
+      notify({
+        userId: app.applicantId, actorId: user.id, type: "application_selected",
+        title: `Offer — ${offer.title}`,
+        body: `${ENGAGEMENT_TYPES.find((t) => t.id === offer.engagementType)?.label}${offer.amount ? ` · $${offer.amount}${["weekly","biweekly","monthly","hourly"].includes(offer.compModel) ? ` per ${cycleLabel(offer.compModel)}` : ""}` : ""}${offer.classification === "external_employment" ? " · employment handled OUTSIDE UpNova" : " · paid through UpNova (secured → released)"}. Review it in My Applications.`,
+        href: "/opportunities?apps=1",
+      });
+      seedAcceptsRoleOffer(app.id); // demo: seed applicants accept instantly
+      const fresh = db.select().from(tables.applications).where(eq(tables.applications.id, app.id)).get()!;
+      return { status: fresh.status };
+    }
+
+    /* ---- the relationship ends: completed, kept in history ---- */
+    if (action === "complete_engagement") {
+      if (app.status !== "active") throw new ApiError(409, `Cannot complete from "${app.status}"`);
+      db.update(tables.applications).set({ status: "completed" }).where(eq(tables.applications.id, app.id)).run();
+      const offer = parseOffer(app.offer);
+      notify({
+        userId: app.applicantId, actorId: user.id, type: "application",
+        title: `Engagement completed — ${offer?.title ?? opp.title}`,
+        body: "It stays in both histories. Thanks for the work!",
+        href: "/opportunities?apps=1",
+      });
+      return { status: "completed" };
+    }
     const roles = parseRoles(opp.roles);
     const role = roles.find((r) => r.id === app.roleId);
 

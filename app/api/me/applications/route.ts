@@ -27,8 +27,12 @@ export async function GET() {
             return null;
           }
         })();
+        const interview = (() => { try { const i = JSON.parse(r.app.interview); return i.mode ? i : null; } catch { return null; } })();
+        const offer = (() => { try { const o = JSON.parse(r.app.offer); return o.title ? o : null; } catch { return null; } })();
         return {
           id: r.app.id,
+          interview,
+          offer,
           status: r.app.status, // submitted | shortlisted | selected | confirmed | declined | offer_declined
           availability: r.app.availability,
           message: r.app.message,

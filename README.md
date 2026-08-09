@@ -394,6 +394,21 @@ Mode: post a role opportunity and seed locals apply to every role instantly; see
 accept offers instantly (the protagonist admin account never auto-acts). Seed world: Sofia's
 "Clothing Brand Photoshoot" with four roles, Marcus confirmed (booking + conversation live),
 Imani's offer awaiting acceptance, and a full review queue.
+**Engagements — one-time work AND ongoing relationships, same system.** The poster configures the
+engagement (`opportunities.engagement`, `lib/engagement.ts`): type (one-time / short-term contract /
+ongoing freelance / part-time / full-time / temporary / collaboration / custom label), workload,
+schedule, start date, duration, and a compensation schedule (hourly / per-project / milestone /
+weekly / biweekly / monthly / custom). The hiring workflow is states, not vibes: Open →
+Applications → Review → Shortlisted → **Interview** (scheduled through UpNova = a $0 booking on
+BOTH calendars, or an external process labeled "happens OUTSIDE UpNova") → **Offer** (a
+configurable terms sheet: role, comp model + amount, schedule, start, duration, classification,
+notes) → Accepted → **Active** → Completed. Classification is configuration, never automatic:
+**freelance/contract through UpNova** runs each cycle through the real payment machinery — accept
+→ cycle 1 booking → secured ($150 + fee, verified) → completed → released, poster starts cycle N
+from the team board — while **external employment** is labeled everywhere as handled by the
+employer outside UpNova, refuses UpNova payment cycles (409, verified), and creates no payment
+records. Seed: Devin's "Ongoing Video Editor — 2 videos/week" (weekly $150, UpNova interviews)
+with three applicants ready for the full hiring demo.
 
 **Products & Orders — "buy this", staged honestly.** PRODUCT is the sixth entity (Post = share ·
 Service = offer · Booking = scheduled · Project = paid work · Opportunity = asking for people ·

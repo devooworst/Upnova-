@@ -551,6 +551,38 @@ function seed() {
     amountCents: 2800, feeCents: 140, status: "released",
   }).run();
 
+  /* ---------- ongoing engagement: the "hire an editor" demo ---------- */
+  // Devin (content creator) hires an ONGOING video editor — engagement
+  // type + comp schedule are configuration, and the human drives the
+  // whole hiring flow (interview → offer → active → paid cycles).
+  const editorOppId = id();
+  db.insert(t.opportunities).values({
+    id: editorOppId, posterId: uid["devin"],
+    title: "Ongoing Video Editor — 2 videos/week",
+    description: "Looking for an editor to own my weekly uploads long-term. You get raw footage Mondays, cuts due Thursdays. Consistent style, fast comms. Paid weekly through UpNova.",
+    budget: 150, type: "gig", location: "Baltimore, MD", remote: true,
+    engagement: JSON.stringify({
+      type: "ongoing", workload: "≈10 hrs/week", schedule: "2 videos/week, cuts due Thursdays",
+      duration: "3 months to start", compModel: "weekly", rate: 150,
+      classification: "upnova_freelance", interviewMode: "upnova",
+    }),
+    applyConfig: JSON.stringify({ requireMessage: true, question: "Link two edits that show your pacing.", notifyUnselected: true }),
+    lat: defs.find((d) => d.handle === "devin")!.lat, lng: defs.find((d) => d.handle === "devin")!.lng,
+    isSeed: true,
+  }).run();
+  for (const [handle, msg] of [
+    ["marcusj", "I cut multicam and short-form daily — pacing is my whole thing. Two links on my profile."],
+    ["rachel", "I edit fashion films but my YouTube pacing work is stronger than my reel suggests."],
+    ["darius", "I batch-edit for two creators already — room for one more weekly slot."],
+  ] as const) {
+    db.insert(t.applications).values({
+      id: id(), opportunityId: editorOppId, applicantId: uid[handle],
+      message: msg, availability: "yes", status: "submitted",
+      answers: JSON.stringify({ question: "Link two edits that show your pacing.", answer: "On my profile — pinned." }),
+      createdAt: hoursAgo(20),
+    }).run();
+  }
+
   /* -------- role opportunity: TEAM & OPENINGS, the flagship demo -------- */
   // Sofia's clothing-brand shoot: one opportunity, four roles. Marcus is
   // CONFIRMED as photographer (accepted -> booking on both calendars),

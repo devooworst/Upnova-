@@ -6,6 +6,7 @@ import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/aut
 import { publicUser } from "@/lib/server/serialize";
 import { normalizeRoles, parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 import { seedApplicantsApplyToRoles } from "@/lib/server/demo";
+import { normalizeEngagement, parseEngagement } from "@/lib/engagement";
 import { FeedScope, inScope, viewerContext, verifiedCampusMap } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
@@ -122,6 +123,7 @@ export async function GET(req: NextRequest) {
           }
         })(),
         roles: rolesFor(r.opp.id, r.opp.roles),
+        engagement: parseEngagement(r.opp.engagement),
         poster: publicUser(r.user, r.profile),
         posterType: posterTypeFor(r.user),
         isMine: viewer?.id === r.opp.posterId,
@@ -164,6 +166,8 @@ export async function POST(req: NextRequest) {
         // TEAM & OPENINGS — roles are configuration of the universal
         // system, never a separate casting/job board
         roles: JSON.stringify(normalizeRoles(body.roles)),
+        // engagement type is CONFIGURATION — one-time or ongoing, same system
+        engagement: JSON.stringify(body.engagement ? normalizeEngagement(body.engagement) ?? {} : {}),
         lat: user.profile.lat,
         lng: user.profile.lng,
       })

@@ -36,6 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         eventDate: opp.eventDate?.toISOString() ?? null,
         location: opp.remote ? "Remote" : opp.location,
         roles: roleList.map((r) => ({ ...r, open: openingsLeft(r, rows.map((x) => x.app)) })),
+        engagement: (() => { try { const e = JSON.parse(opp.engagement); return e.type ? e : null; } catch { return null; } })(),
       },
       applications: rows.map((r) => ({
         id: r.app.id,
@@ -50,6 +51,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         })(),
         status: r.app.status,
         roleId: r.app.roleId,
+        interview: (() => { try { const i = JSON.parse(r.app.interview); return i.mode ? i : null; } catch { return null; } })(),
+        offer: (() => { try { const o = JSON.parse(r.app.offer); return o.title ? o : null; } catch { return null; } })(),
         createdAt: r.app.createdAt.toISOString(),
         applicant: publicUser(r.user, r.profile),
       })),

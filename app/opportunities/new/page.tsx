@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Briefcase, Plus, X, Users } from "lucide-react";
 import type { OppRole } from "@/lib/opportunityRoles";
+import { ENGAGEMENT_TYPES, COMP_MODELS, type EngagementType, type CompModel } from "@/lib/engagement";
 
 const inputCls =
   "w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-lime-400/50";
@@ -34,6 +35,18 @@ export default function NewOpportunityPage() {
   const [roles, setRoles] = useState<OppRole[]>([]);
   const [selection, setSelection] = useState<"manual" | "shortlist">("manual");
   const [notifyUnselected, setNotifyUnselected] = useState(true);
+  // ENGAGEMENT — one-time or ongoing relationship, same universal system
+  const [engType, setEngType] = useState<EngagementType>("one_time");
+  const [customLabel, setCustomLabel] = useState("");
+  const [workload, setWorkload] = useState("");
+  const [schedule, setSchedule] = useState("");
+  const [duration, setDuration] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [compModel, setCompModel] = useState<CompModel>("per_project");
+  const [rate, setRate] = useState("");
+  const [classification, setClassification] = useState<"upnova_freelance" | "external_employment">("upnova_freelance");
+  const [interviewMode, setInterviewMode] = useState<"none" | "upnova" | "external">("none");
+  const ongoing = engType !== "one_time";
   const newRole = () =>
     setRoles((r) => [...r, { id: Math.random().toString(36).slice(2, 10), title: "", count: 1, pay: null }]);
   const patchRole = (id: string, patch: Partial<OppRole>) =>
@@ -70,6 +83,18 @@ export default function NewOpportunityPage() {
         roles: activeRoles,
         selection,
         notifyUnselected,
+        engagement: {
+          type: engType,
+          customLabel: customLabel || undefined,
+          workload: workload || undefined,
+          schedule: schedule || undefined,
+          duration: duration || undefined,
+          startDate: startDate || undefined,
+          compModel,
+          rate: rate ? Number(rate) : undefined,
+          classification,
+          interviewMode,
+        },
         type: paid ? "gig" : "collab",
         location,
         remote,
@@ -150,6 +175,110 @@ export default function NewOpportunityPage() {
           <input type="checkbox" checked={studentFriendly} onChange={(e) => setStudentFriendly(e.target.checked)} className="accent-violet-400" />
           Student-friendly — flexible with class schedules
         </label>
+      </section>
+
+      {/* ENGAGEMENT — one-time project or ongoing relationship. Type is
+          configuration; UpNova never auto-classifies employee/contractor. */}
+      <section className="card p-5">
+        <h2 className="text-sm font-bold text-zinc-100">Engagement</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          One-time work or an ongoing relationship — same system, your configuration.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {ENGAGEMENT_TYPES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setEngType(t.id)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                engType === t.id ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {engType === "custom" && (
+          <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="Name it — e.g. Residency, Apprenticeship" maxLength={40} className={`${inputCls} mt-2`} />
+        )}
+
+        {ongoing && (
+          <div className="mt-3 space-y-3 border-t border-line-soft pt-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input value={workload} onChange={(e) => setWorkload(e.target.value)} placeholder="Expected workload — e.g. ≈10 hrs/week" maxLength={80} className={inputCls} />
+              <input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Schedule — e.g. 2 videos/week" maxLength={120} className={inputCls} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Start date (optional)</p>
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Duration (optional)</p>
+                <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder='e.g. "3 months", "until filled"' maxLength={60} className={inputCls} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 border-t border-line-soft pt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Compensation schedule</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {COMP_MODELS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCompModel(c.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  compModel === c.id ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+            <label className="flex items-center gap-1 text-xs text-zinc-400">
+              $<input value={rate} onChange={(e) => setRate(e.target.value.replace(/[^0-9]/g, ""))} placeholder="rate" className={`${inputCls} w-24 py-1.5`} />
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-3 border-t border-line-soft pt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Who handles pay &amp; paperwork?</p>
+          <div className="mt-1.5 space-y-1.5">
+            <button
+              onClick={() => setClassification("upnova_freelance")}
+              className={`flex w-full items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${classification === "upnova_freelance" ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"}`}
+            >
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${classification === "upnova_freelance" ? "bg-lime-400" : "bg-zinc-700"}`} />
+              <span>
+                <span className={`block text-sm font-semibold ${classification === "upnova_freelance" ? "text-lime-300" : "text-zinc-200"}`}>Freelance / contract through UpNova</span>
+                <span className="block text-xs text-zinc-500">Payments run through UpNova — secured per cycle, released on completion.</span>
+              </span>
+            </button>
+            <button
+              onClick={() => setClassification("external_employment")}
+              className={`flex w-full items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${classification === "external_employment" ? "border-sky-400/50 bg-sky-400/5" : "border-line hover:border-zinc-600"}`}
+            >
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${classification === "external_employment" ? "bg-sky-400" : "bg-zinc-700"}`} />
+              <span>
+                <span className={`block text-sm font-semibold ${classification === "external_employment" ? "text-sky-300" : "text-zinc-200"}`}>Employment handled by the employer</span>
+                <span className="block text-xs text-zinc-500">Payroll, classification, and paperwork happen OUTSIDE UpNova — labeled as external throughout.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 border-t border-line-soft pt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Interviews</p>
+          <div className="mt-1.5 flex gap-1.5">
+            {([["none", "No interview"], ["upnova", "Schedule through UpNova"], ["external", "External process"]] as const).map(([v, l]) => (
+              <button key={v} onClick={() => setInterviewMode(v)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${interviewMode === v ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {interviewMode === "external" && (
+            <p className="mt-1.5 text-[11px] text-zinc-600">External interviews are labeled clearly — applicants know the process leaves UpNova.</p>
+          )}
+        </div>
       </section>
 
       {/* TEAM & OPENINGS — one opportunity, multiple roles. Universal:
