@@ -93,7 +93,11 @@ export default function NewCampusListingPage() {
     router.push(`/campus/market/${d.id}?published=1`);
   };
 
-  if (!user)
+  // auth still initializing — never show the signed-out wall yet
+  if (user === undefined)
+    return <div className="mx-auto max-w-md py-16"><div className="h-32 animate-pulse rounded-2xl bg-card-raised" aria-hidden /></div>;
+
+  if (user === null)
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <p className="text-sm font-semibold text-zinc-200">Join UpNova and verify your campus to list</p>

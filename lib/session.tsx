@@ -246,9 +246,13 @@ export async function fetchSession(force = false): Promise<SessionUser | null> {
         return cached ?? null;
       })
       .catch(() => {
-        // network hiccup: do NOT clear anything — keep the stored session
-        cached = null;
-        return null;
+        // network hiccup / aborted request: NOT a logout. Keep whatever
+        // state we had (restored user stays restored; still-initializing
+        // stays initializing so the next mount retries). Only an explicit
+        // server "nobody" above ever flips the app to logged out.
+        inflight = null; // allow a retry
+        window.dispatchEvent(new Event(SESSION_EVENT));
+        return cached ?? null;
       });
   }
   return inflight;

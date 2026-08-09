@@ -194,7 +194,10 @@ export default function Sidebar() {
       </div>
 
       {/* Profile — the authenticated user, never a hardcoded person */}
-      {user ? (
+      {user === undefined ? (
+        /* auth initializing — never flash the guest card at a signed-in user */
+        <div className="card h-16 animate-pulse" aria-hidden />
+      ) : user ? (
         <Link
           href="/profile"
           className="card flex items-center gap-3 p-3 transition hover:border-zinc-600"
