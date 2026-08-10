@@ -59,6 +59,31 @@ export default function SimulationPage() {
   const [convos, setConvos] = useState<ConvRow[] | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [activity, setActivity] = useState<ActItem[] | null>(null);
+  const [ftBusy, setFtBusy] = useState(false);
+  const [ft, setFt] = useState<{ summary: { passed: number; failed: number; blocked: number; durationMs: number }; categories: { name: string; ok: boolean; steps: { name: string; status: string; expected?: string; actual?: string; route?: string; record?: string }[] }[] } | null>(null);
+  const [ftOpen, setFtOpen] = useState<string | null>(null);
+  const runFullTest = async () => {
+    setFtBusy(true);
+    setFt(null);
+    try {
+      const res = await fetch("/api/demo/fulltest", { method: "POST" });
+      const d = await res.json();
+      if (res.ok) setFt(d);
+      else setAdvMsg(`✗ ${d.error || "Full test could not run"}`);
+    } catch {
+      setAdvMsg("✗ Network error running the full test");
+    }
+    setFtBusy(false);
+    refresh();
+  };
+  const advanceClock = async (ms: number, label: string) => {
+    setBusy(true);
+    const res = await fetch("/api/demo/clock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advanceMs: ms }) });
+    const d = await res.json();
+    setAdvMsg(res.ok ? `✓ Simulated ${label} passing — ${d.recordsAged} record(s) aged. Reload the relevant views.` : `✗ ${d.error}`);
+    setBusy(false);
+    refresh();
+  };
   const [advMsg, setAdvMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -165,6 +190,76 @@ export default function SimulationPage() {
           {refreshedAt && <span className="rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-zinc-600">state as of {refreshedAt.toLocaleTimeString()}</span>}
         </div>
       </header>
+
+      {/* FULL SYSTEM TEST — the whole ecosystem, real HTTP, real sessions */}
+      <section className="card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lime-400/20 bg-gradient-to-b from-lime-400/10 to-transparent px-5 py-4">
+          <div>
+            <p className="text-[15px] font-bold tracking-tight text-lime-300">Full UpNova System Test</p>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-400">
+              Plays UpNova as three real people (rachel · lena · Harbor &amp; Oak), each with their own
+              authenticated session, over real HTTP: message ↔ reply, booking ↔ both sides, test
+              payment held → released, full project lifecycle with a revision, review, business
+              opportunity ↔ application ↔ selection, notification destinations, activity on both
+              sides, plan/verification gates, logout &amp; session isolation, and database integrity.
+              Time is simulated, never waited for. Designated test records reset at the start of
+              every run — real accounts and auth are never touched.
+            </p>
+          </div>
+          <button onClick={runFullTest} disabled={ftBusy} className="btn-lime shrink-0 rounded-md px-5 py-2.5 text-sm disabled:opacity-50">
+            {ftBusy ? "Running…" : "Run Full Test"}
+          </button>
+        </div>
+        {ft && (
+          <div className="p-5">
+            <p className="flex flex-wrap gap-3 text-xs font-bold">
+              <span className="text-lime-300">PASSED {ft.summary.passed}</span>
+              <span className={ft.summary.failed ? "text-red-300" : "text-zinc-600"}>FAILED {ft.summary.failed}</span>
+              <span className={ft.summary.blocked ? "text-amber-300" : "text-zinc-600"}>BLOCKED {ft.summary.blocked}</span>
+              <span className="ml-auto font-mono text-[10px] font-medium text-zinc-500">{(ft.summary.durationMs / 1000).toFixed(1)}s</span>
+            </p>
+            <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+              {ft.categories.map((c) => (
+                <div key={c.name}>
+                  <button onClick={() => setFtOpen(ftOpen === c.name ? null : c.name)} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-bold transition ${c.ok ? "border-lime-400/25 text-lime-300 hover:bg-lime-400/5" : "border-red-500/40 text-red-300 hover:bg-red-500/5"}`}>
+                    <span>{c.ok ? "✓" : "✕"}</span> {c.name}
+                    <span className="ml-auto font-mono text-[9px] font-medium text-zinc-600">{c.steps.length} steps</span>
+                  </button>
+                  {ftOpen === c.name && (
+                    <ul className="mt-1 space-y-1 rounded-lg border border-line bg-card-raised p-2">
+                      {c.steps.map((st, i) => (
+                        <li key={i} className="text-[11px]">
+                          <span className={st.status === "PASSED" ? "text-lime-300" : st.status === "BLOCKED" ? "text-amber-300" : "text-red-300"}>{st.status === "PASSED" ? "✓" : st.status === "BLOCKED" ? "◌" : "✕"}</span>{" "}
+                          <span className="text-zinc-300">{st.name}</span>
+                          {st.status !== "PASSED" && (
+                            <span className="block pl-4 text-[10px] text-zinc-500">
+                              {st.expected && <>expected: <span className="text-zinc-300">{st.expected}</span> · </>}
+                              {st.actual && <>actual: <span className="text-red-300">{st.actual}</span> · </>}
+                              {st.route && <>route: {st.route} · </>}
+                              {st.record && <>record: {st.record}</>}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* TIME SIMULATION — age your test records instead of waiting */}
+      <section className="card flex flex-wrap items-center gap-2 p-4">
+        <p className="mr-2 text-xs font-bold text-zinc-100">Time simulation</p>
+        <p className="mr-2 text-[10px] text-zinc-500">ages YOUR live test records (bookings, protection windows, deadlines) — never the real clock</p>
+        {([["1 minute", 60e3], ["5 minutes", 300e3], ["1 hour", 3600e3], ["1 day", 86400e3]] as const).map(([label, ms]) => (
+          <button key={label} onClick={() => advanceClock(ms, label)} disabled={busy} className="rounded-full border border-line px-3 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-zinc-600 disabled:opacity-50">
+            +{label}
+          </button>
+        ))}
+      </section>
 
       {/* live transactions — advance the SEED counterpart step by step */}
       <section className="card overflow-hidden">

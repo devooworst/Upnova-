@@ -6,6 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { canMessage } from "@/lib/server/authz";
 import { blockedEitherWay } from "@/lib/server/communities";
 import { publicUser } from "@/lib/server/serialize";
+import { notify } from "@/lib/server/notify";
 import { resolvePairConversation } from "@/lib/server/conversations";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +113,16 @@ export async function POST(req: NextRequest) {
       db.insert(tables.messages)
         .values({ id: randomBytes(12).toString("hex"), conversationId: convId, senderId: user.id, body: first })
         .run();
+      // the FIRST message notifies too — found by the full-system test:
+      // recipients previously only heard about replies, not new threads
+      notify({
+        userId: target.id,
+        actorId: user.id,
+        type: "message",
+        title: `New message from ${user.profile.displayName}`,
+        body: first.slice(0, 120),
+        href: `/messages?c=${convId}`,
+      });
     }
 
     return { conversationId: convId };

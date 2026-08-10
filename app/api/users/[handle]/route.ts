@@ -169,6 +169,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         const opps = db.select().from(tables.opportunities)
           .where(eq(tables.opportunities.posterId, user.id)).all()
           .filter((o) => o.status === "open")
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) // newest first — the fresh role was falling off the slice
           .slice(0, 6)
           .map((o) => ({ id: o.id, title: o.title, budget: o.budget, location: o.location, remote: o.remote, type: o.type }));
         const allApps = db.select().from(tables.applications).all();
