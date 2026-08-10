@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import { useSession } from "@/lib/session";
 
+interface ActItem {
+  kind: "booking" | "purchase" | "project" | "application";
+  id: string; title: string; myRole: string;
+  with: { handle: string; displayName: string };
+  status: string; stageIndex: number; stages: string[];
+  paymentStatus: string | null; conversationId: string | null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Simulation / Test Center — developer tooling for the DEMO           */
 /* deployment. Every scenario card shows LIVE state pulled from your   */
@@ -50,8 +58,44 @@ export default function SimulationPage() {
   const [apps, setApps] = useState<AppRow[] | null>(null);
   const [convos, setConvos] = useState<ConvRow[] | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const [activity, setActivity] = useState<ActItem[] | null>(null);
+  const [advMsg, setAdvMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const advance = async (item: ActItem) => {
+    setBusy(true);
+    setAdvMsg(null);
+    try {
+      const res = await fetch("/api/demo/advance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: item.kind, id: item.id }),
+      });
+      const d = await res.json();
+      if (!res.ok) setAdvMsg(`✗ ${d.error || "Could not advance"}`);
+      else if (d.requiresAction) setAdvMsg(`→ Your step, never simulated: ${d.requiresAction}`);
+      else setAdvMsg(`✓ ${item.title}: now "${d.stage}" — check the conversation, notification, and Activity timeline`);
+    } catch {
+      setAdvMsg("✗ Network error");
+    }
+    setBusy(false);
+    refresh();
+  };
+
+  const resetScenario = async (kind: string) => {
+    if (!window.confirm(`Reset your ${kind} test transactions with seed accounts? Conversations stay as history; auth, verification, and plan are untouched.`)) return;
+    setBusy(true);
+    const res = await fetch("/api/demo/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind }) });
+    const d = await res.json();
+    setAdvMsg(res.ok ? `✓ Reset ${d.reset} ${kind} record(s)` : `✗ ${d.error || "Reset failed"}`);
+    setBusy(false);
+    refresh();
+  };
 
   const refresh = () => {
+    fetch("/api/activity", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+      if (d.bookings) setActivity([...d.bookings, ...d.purchases, ...d.projects, ...d.applications]);
+    }).catch(() => {});
     fetch("/api/bookings", { cache: "no-store" }).then((r) => r.json()).then((d) => setBookings(d.bookings ?? [])).catch(() => setBookings([]));
     fetch("/api/me/applications", { cache: "no-store" }).then((r) => r.json()).then((d) => setApps(d.applications ?? [])).catch(() => setApps([]));
     fetch("/api/conversations", { cache: "no-store" }).then((r) => r.json()).then((d) => setConvos(d.conversations ?? [])).catch(() => setConvos([]));
@@ -121,6 +165,57 @@ export default function SimulationPage() {
           {refreshedAt && <span className="rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-zinc-600">state as of {refreshedAt.toLocaleTimeString()}</span>}
         </div>
       </header>
+
+      {/* live transactions — advance the SEED counterpart step by step */}
+      <section className="card overflow-hidden">
+        <div className="border-b border-amber-400/20 bg-gradient-to-b from-amber-400/10 to-transparent px-5 py-4">
+          <p className="text-[15px] font-bold tracking-tight text-amber-300">Live test transactions — advance &amp; reset</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            &quot;Advance&quot; plays the seed counterpart&apos;s next REAL action (accept, prepare, start, ship,
+            deliver, complete, shortlist…) through the same code the organic flow uses — messages,
+            notifications, payment states, and the Activity timeline all update for real. Your own
+            steps (like paying) are never simulated: the button points you at the real UI instead.
+            Reset removes only your test records with seed accounts — never auth, verification, or plan.
+          </p>
+        </div>
+        <div className="p-5">
+          {advMsg && <p className="mb-3 rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">{advMsg}</p>}
+          {activity === null ? (
+            <p className="text-xs text-zinc-500">Loading…</p>
+          ) : activity.length === 0 ? (
+            <p className="text-xs text-zinc-500">No transactions yet — start one with the scenario cards below, then advance it here stage by stage.</p>
+          ) : (
+            <ul className="divide-y divide-line-soft">
+              {activity.slice(0, 10).map((i) => (
+                <li key={`${i.kind}:${i.id}`} className="flex flex-wrap items-center gap-2 py-2.5">
+                  <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-wide text-zinc-500">{i.kind}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    <span className="font-semibold text-zinc-100">{i.title}</span>
+                    <span className="text-zinc-500"> · @{i.with.handle} · </span>
+                    <span className="font-semibold text-lime-300">{i.stageIndex < 0 ? i.status : i.stages[Math.min(i.stageIndex, i.stages.length - 1)]}</span>
+                    {i.paymentStatus && <span className="text-zinc-500"> · payment {i.paymentStatus} (test)</span>}
+                  </span>
+                  <Link href={`/activity?focus=${i.kind}:${i.id}`} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-200">Timeline</Link>
+                  {i.conversationId && <Link href={`/messages?c=${i.conversationId}`} className="text-[11px] font-semibold text-sky-300 hover:underline">Thread</Link>}
+                  {i.kind !== "project" && i.stageIndex >= 0 && i.stageIndex < i.stages.length - 1 && (
+                    <button onClick={() => advance(i)} disabled={busy} className="rounded-md bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-300 transition hover:bg-amber-400/25 disabled:opacity-50">
+                      Advance stage →
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-line-soft pt-3">
+            {["booking", "purchase", "application"].map((k) => (
+              <button key={k} onClick={() => resetScenario(k)} disabled={busy} className="rounded-full border border-red-500/30 px-3 py-1 text-[11px] font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50">
+                Reset {k} scenario
+              </button>
+            ))}
+            <span className="ml-auto self-center font-mono text-[9px] uppercase tracking-wide text-zinc-600">projects advance through their real in-thread flow</span>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* booking */}

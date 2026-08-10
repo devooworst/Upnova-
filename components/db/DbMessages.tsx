@@ -359,7 +359,10 @@ export default function DbMessages() {
                 lifecycle: Requested → Accepted → Confirmed → Preparing →
                 In progress → Completed. */}
             {active.booking && !["cancelled"].includes(active.booking.status) && (
-              <div className="flex items-center gap-1 overflow-x-auto border-b border-line-soft px-4 py-1.5">
+              <Link
+                href={`/activity?focus=booking:${active.booking.id}`}
+                title="Open the full live timeline"
+                className="flex items-center gap-1 overflow-x-auto border-b border-line-soft px-4 py-1.5 transition hover:bg-card-raised">
                 {(() => {
                   const b = active.booking!;
                   const stages = ["Requested", "Accepted", "Confirmed", "Preparing", "In progress", "Completed"];
@@ -381,7 +384,7 @@ export default function DbMessages() {
                     </span>
                   ));
                 })()}
-              </div>
+              </Link>
             )}
             {active.booking && (
               <div className="flex items-center gap-2.5 border-b border-line-soft px-4 py-2">
@@ -406,8 +409,8 @@ export default function DbMessages() {
                   </span>
                   <span className="font-medium capitalize text-zinc-300">{active.booking.status.replace("_", " ")}</span>
                 </p>
-                <Link href="/calendar" className="shrink-0 text-[11px] font-semibold text-lime-300 hover:underline">
-                  View Booking →
+                <Link href={`/activity?focus=booking:${active.booking.id}`} className="shrink-0 text-[11px] font-semibold text-lime-300 hover:underline">
+                  Live timeline →
                 </Link>
               </div>
             )}

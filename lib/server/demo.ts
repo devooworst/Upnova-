@@ -211,6 +211,107 @@ export function seedConfirmsBookingPayment(bookingId: string) {
   sendAs(b.conversationId, b.providerId, `Got it — your payment is secured. You're confirmed for ${when} at ${time}. See you then!`);
 }
 
+/* ------------------- Test Center: force-advance -------------------- */
+/* Simulates the SEED counterpart's next real action on a transaction
+   the CALLER participates in. It never elevates the caller's own
+   privileges, never touches auth, and uses the exact same messages,
+   notifications, and payment records the organic flow produces —
+   just without waiting for the clock. Demo deployments only (the
+   route gates on isDemoMode); the caller's own steps (like paying)
+   are NEVER faked — the response points at the real UI instead. */
+export function forceAdvanceBooking(bookingId: string, actorUserId: string): { ok: true; stage: string } | { requiresAction: string; href: string } {
+  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b) throw new Error("Booking not found");
+  if (b.clientId !== actorUserId && b.providerId !== actorUserId) throw new Error("Not your booking");
+  const other = b.clientId === actorUserId ? b.providerId : b.clientId;
+  if (!isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
+
+  if (b.status === "pending") {
+    seedAcceptsBooking(bookingId);
+    return { ok: true, stage: "Accepted — awaiting your test payment" };
+  }
+  if (b.status === "accepted") {
+    // paying is the CALLER's step — never simulated for them
+    return { requiresAction: "Pay (test payment) in the real UI", href: "/calendar" };
+  }
+  if (b.status === "confirmed") {
+    if (b.progress === "") {
+      db.update(tables.bookings).set({ progress: "preparing" }).where(eq(tables.bookings.id, bookingId)).run();
+      if (b.conversationId) sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
+      notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Preparing for your booking", body: b.title, href: `/activity?focus=booking:${b.id}`, category: "work" });
+      return { ok: true, stage: "Preparing" };
+    }
+    if (b.progress === "preparing") {
+      db.update(tables.bookings).set({ progress: "in_progress" }).where(eq(tables.bookings.id, bookingId)).run();
+      if (b.conversationId) sendAs(b.conversationId, b.providerId, `Starting ${b.title} now.`);
+      notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Service in progress", body: b.title, href: `/activity?focus=booking:${b.id}`, category: "work" });
+      return { ok: true, stage: "In progress" };
+    }
+    db.update(tables.bookings).set({ status: "completed" }).where(eq(tables.bookings.id, bookingId)).run();
+    db.update(tables.payments).set({ status: "released" }).where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held"))).run();
+    if (b.conversationId) sendAs(b.conversationId, b.providerId, `${b.title} is done — thanks for booking me! If everything looks good, a quick review helps a lot.`);
+    notify({ userId: b.clientId, actorId: b.providerId, type: "payment", title: `${b.title} completed`, body: `Payout released to the provider (test payment)`, href: `/activity?focus=booking:${b.id}`, category: "payments" });
+    return { ok: true, stage: "Completed — payment released" };
+  }
+  throw new Error(`Nothing to advance from "${b.status}"`);
+}
+
+export function forceAdvanceOrder(orderId: string, actorUserId: string): { ok: true; stage: string } | { requiresAction: string; href: string } {
+  const o = db.select().from(tables.orders).where(eq(tables.orders.id, orderId)).get();
+  if (!o) throw new Error("Order not found");
+  if (o.buyerId !== actorUserId && o.sellerId !== actorUserId) throw new Error("Not your order");
+  const other = o.buyerId === actorUserId ? o.sellerId : o.buyerId;
+  if (!isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
+  const log = (kind: string, note: string) =>
+    db.insert(tables.orderEvents).values({ id: id(), orderId: o.id, actorId: o.sellerId, kind, note }).run();
+
+  if (o.status === "placed") return { requiresAction: "Pay (test payment) in the real UI", href: "/orders" };
+  if (o.status === "paid") {
+    db.update(tables.orders).set({ status: "preparing" }).where(eq(tables.orders.id, o.id)).run();
+    log("preparing", "Seller is preparing your order");
+    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Your order is being prepared", body: o.title, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    return { ok: true, stage: "Preparing" };
+  }
+  if (o.status === "preparing") {
+    db.update(tables.orders).set({ status: "shipped", tracking: JSON.stringify({ carrier: "Demo Carrier", code: "TEST-" + o.id.slice(0, 6).toUpperCase() }) }).where(eq(tables.orders.id, o.id)).run();
+    log("shipped", "Demo Carrier TEST-" + o.id.slice(0, 6).toUpperCase());
+    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Your order shipped", body: o.title, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    return { ok: true, stage: "Shipped" };
+  }
+  if (o.status === "shipped") {
+    db.update(tables.orders).set({ status: "delivered", protectionEndsAt: new Date(Date.now() + 48 * 3600_000) }).where(eq(tables.orders.id, o.id)).run();
+    log("delivered", "Carrier confirmed delivery");
+    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Delivered", body: `${o.title} — protection window open`, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    return { ok: true, stage: "Delivered — protection window open" };
+  }
+  if (o.status === "delivered") {
+    db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
+    db.update(tables.payments).set({ status: "released" }).where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held"))).run();
+    log("completed", "Protection window ended with no reported problem — funds released");
+    notify({ userId: o.buyerId, actorId: o.sellerId, type: "payment", title: "Order complete", body: `${o.title} — funds released (test payment)`, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    return { ok: true, stage: "Completed — funds released" };
+  }
+  throw new Error(`Nothing to advance from "${o.status}"`);
+}
+
+export function forceAdvanceApplication(applicationId: string, actorUserId: string): { ok: true; stage: string } {
+  const a = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+  if (!a) throw new Error("Application not found");
+  if (a.applicantId !== actorUserId) throw new Error("Not your application");
+  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, a.opportunityId)).get();
+  if (!opp || !isSeedUser(opp.posterId)) throw new Error("Advance works only against seed demo accounts");
+  const next: Record<string, { status: string; stage: string; note: string }> = {
+    submitted: { status: "shortlisted", stage: "Shortlisted", note: "You've been shortlisted" },
+    shortlisted: { status: "selected", stage: "Selected", note: "You were selected — congratulations" },
+    selected: { status: "confirmed", stage: "Confirmed", note: "You're confirmed for this opportunity" },
+  };
+  const step = next[a.status];
+  if (!step) throw new Error(`Nothing to advance from "${a.status}"`);
+  db.update(tables.applications).set({ status: step.status }).where(eq(tables.applications.id, a.id)).run();
+  notify({ userId: a.applicantId, actorId: opp.posterId, type: "opportunity", title: step.note, body: opp.title, href: `/opportunities/${opp.id}`, category: "work" });
+  return { ok: true, stage: step.stage };
+}
+
 /** Seed counterparty confirms a linked work post ("Client Confirmed"). */
 export function seedClientConfirmsWork(postId: string, counterpartyId: string) {
   if (!isSeedUser(counterpartyId)) return;

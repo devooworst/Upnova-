@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
+  Activity as ActivityIcon,
   Home,
   Search,
   Users,
@@ -51,6 +52,7 @@ const navGroups: {
       { href: "/shop", label: "Shop", icon: Tag },
       { href: "/works", label: "Works", icon: Disc3 },
       { href: "/calendar", label: "Bookings", icon: CalendarCheck },
+      { href: "/activity", label: "Activity", icon: ActivityIcon },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
