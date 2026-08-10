@@ -284,6 +284,9 @@ function seed() {
         role: d.admin ? "admin" : "user",
         accountType: d.business ? "business" : "individual",
         businessVerified: !!d.bizVerified,
+        // seeded accounts are established members — the first-run tour
+        // only greets genuinely new signups
+        onboarding: JSON.stringify({ completedAt: new Date().toISOString(), seeded: true }),
         isSeed: true,
       })
       .run();

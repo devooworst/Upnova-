@@ -117,7 +117,9 @@ export default function Navbar() {
             {lightMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </button>
 
-          <DbNotificationBell />
+          <span data-tour="notifications" className="inline-flex">
+            <DbNotificationBell />
+          </span>
 
           {/* Profile dropdown — the real authenticated user, or Sign in */}
           {user === undefined ? (

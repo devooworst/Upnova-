@@ -5,6 +5,7 @@ import SidebarShell from "@/components/SidebarShell";
 import MobileNav from "@/components/MobileNav";
 import CreateModal from "@/components/CreateModal";
 import GuestGate from "@/components/GuestGate";
+import OnboardingTour from "@/components/OnboardingTour";
 import { FollowProvider } from "@/lib/follow";
 
 export const metadata: Metadata = {
@@ -46,6 +47,7 @@ export default function RootLayout({
         <MobileNav />
         <CreateModal />
         <GuestGate />
+        <OnboardingTour />
         </FollowProvider>
       </body>
     </html>

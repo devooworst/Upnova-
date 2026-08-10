@@ -69,6 +69,14 @@ export async function POST(req: NextRequest) {
         db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
         db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
       }
+      // projects where the test persona is the CREATOR (progress scenario)
+      for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
+        db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+        db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+      }
+      // preferred-client relationships involving the test persona
+      db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
+      db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
       db.delete(tables.applications).where(eq(tables.applications.applicantId, u.id)).run();
       for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
         db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
@@ -84,6 +92,27 @@ export async function POST(req: NextRequest) {
         db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
       }
     db.delete(tables.notifications).where(eq(tables.notifications.userId, lena.id)).run();
+    // preferred-first windows from prior runs
+    for (const s of db.select().from(tables.services).where(eq(tables.services.ownerId, lena.id)).all())
+      if (s.preferredUntil) db.update(tables.services).set({ preferredUntil: null }).where(eq(tables.services.id, s.id)).run();
+    // onboarding/progress test accounts from prior runs (handle prefix "tonb")
+    for (const u of db.select().from(tables.users).all())
+      if (u.handle.startsWith("tonb")) {
+        for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
+          db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+          db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+        }
+        for (const p of db.select().from(tables.projects).where(eq(tables.projects.clientId, u.id)).all()) {
+          db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+          db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+        }
+        db.delete(tables.payments).where(eq(tables.payments.payeeId, u.id)).run();
+        db.delete(tables.payments).where(eq(tables.payments.payerId, u.id)).run();
+        db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run();
+        db.delete(tables.notifications).where(eq(tables.notifications.userId, u.id)).run();
+        db.delete(tables.profiles).where(eq(tables.profiles.userId, u.id)).run();
+        db.delete(tables.users).where(eq(tables.users.id, u.id)).run();
+      }
   };
   resetTestData();
 
@@ -261,6 +290,220 @@ export async function POST(req: NextRequest) {
     step(c, "after selection the role is FILLED and correctly leaves open roles", !((bp2.data as any).business?.openOpportunities ?? []).some((o: any) => o.id === oppId), { route: "GET /api/users/harboroak", record: oppId });
   }
 
+  /* ================= PROGRESS UPDATES + ETA + EXTENSIONS (workspace loop) ================= */
+  {
+    const c = cat("PROGRESS & EXTENSIONS");
+    // A FRESH non-seed provider runs this scenario (rachel/lena are seed
+    // accounts, and seed creators have demo auto-behaviors that would
+    // taint the assertions). tonbp exists only for this run; the reset
+    // removes it next time. lena is the client — every action below is a
+    // real authenticated HTTP call: updates → ETA → extension → approval
+    // → delivery → completion → payment → review.
+    const mkProv = await api(null, "/api/auth/signup", { method: "POST", body: { email: "tonbp@upnova.dev", password: "Tour-walkthrough-99", handle: "tonbp", displayName: "Pat Provider" } });
+    tok.tonbp = (mkProv.data as { sessionToken?: string }).sessionToken ?? "";
+    const deadline = new Date(Date.now() + 4 * 86400e3);
+    const pr = await api("tonbp", "/api/projects", {
+      method: "POST",
+      body: { asCreator: true, clientHandle: "lena", title: "[TEST] Music production — progress demo", amount: 150, brief: "Full production, two revisions.", deadline: deadline.toISOString() },
+    });
+    const pid = String((pr.data as any).id ?? "");
+    step(c, "provider opens the project draft with the client", pr.status === 200 && !!pid, { route: "POST /api/projects", record: pid });
+    await api("tonbp", `/api/projects/${pid}`, { method: "PATCH", body: { action: "send_offer" } });
+    await api("lena", `/api/projects/${pid}`, { method: "PATCH", body: { action: "accept_offer" } });
+    await api("lena", `/api/projects/${pid}`, { method: "PATCH", body: { action: "start" } });
+    const st0 = ((await api("tonbp", `/api/projects/${pid}`)).data as any).project;
+    step(c, "offer → accept → start: payment secured, work begins", st0?.state === "in_progress", { expected: "in_progress", actual: st0?.state });
+
+    // AUTHORIZATION: the client cannot post progress on the provider's behalf
+    const forge = await api("lena", `/api/projects/${pid}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 99 } });
+    step(c, "authz: client cannot post progress updates", forge.status === 403, { route: "POST progress as client", actual: String(forge.status) });
+
+    const up1 = await api("tonbp", `/api/projects/${pid}/progress`, {
+      method: "POST",
+      body: { kind: "update", status: "in_progress", percent: 25, message: "Started working on the first draft.", etaAt: new Date(Date.now() + 3 * 86400e3).toISOString() },
+    });
+    step(c, "update #1 posted: 25% · ETA 3 days", up1.status === 200 && (up1.data as any).progress?.latest?.percent === 25, { route: "POST /api/projects/[id]/progress" });
+    const ln1 = ((await api("lena", "/api/notifications")).data as any).notifications ?? [];
+    const pNotif = ln1.find((n: any) => n.type === "progress_update");
+    step(c, "client notified of the update; link points at the project", !!pNotif && String(pNotif.href).includes(pid), { expected: `href contains ${pid}`, actual: pNotif?.href });
+
+    await api("tonbp", `/api/projects/${pid}/progress`, {
+      method: "POST",
+      body: { kind: "update", status: "finalizing", percent: 70, message: "First draft is nearly finished.", etaAt: new Date(Date.now() + 1 * 86400e3).toISOString() },
+    });
+    const asClient = (await api("lena", `/api/projects/${pid}/progress`)).data as any;
+    step(c, "update #2 (70%): the CLIENT reads the exact same state", asClient.progress?.latest?.percent === 70 && /nearly finished/.test(asClient.progress?.latest?.message), { route: "GET progress as client", actual: `${asClient.progress?.latest?.percent}%` });
+
+    const eta = await api("tonbp", `/api/projects/${pid}/progress`, {
+      method: "POST",
+      body: { kind: "eta", etaAt: new Date(Date.now() + 2 * 86400e3).toISOString(), reason: "Additional vocal revisions are taking longer than expected." },
+    });
+    const ln2 = ((await api("lena", "/api/notifications")).data as any).notifications ?? [];
+    step(c, "ETA change recorded + client notified (never silent)", eta.status === 200 && ln2.some((n: any) => n.type === "eta_changed"), { route: "POST progress kind=eta" });
+
+    const ext = await api("tonbp", `/api/projects/${pid}/extension`, { method: "POST", body: { days: 2, reason: "Waiting for the final vocal files and need additional mixing time." } });
+    const stExt = ((await api("lena", `/api/projects/${pid}`)).data as any).project;
+    step(c, "extension requested (+2 days) → state extension_requested, client notified", ext.status === 200 && stExt?.state === "extension_requested" && (((await api("lena", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "extension_requested"), { actual: stExt?.state });
+
+    const pendingExt = (stExt?.extensions ?? []).find((x: any) => x.status === "pending");
+    const beforeDeadline = Date.parse(stExt?.deadline);
+    const dec = await api("lena", `/api/extensions/${pendingExt?.id}`, { method: "PATCH", body: { approve: true } });
+    const stAfter = ((await api("tonbp", `/api/projects/${pid}`)).data as any).project;
+    step(c, "client APPROVED via the real route → new deadline = old + 2 days", dec.status === 200 && Math.abs(Date.parse(stAfter?.deadline) - (beforeDeadline + 2 * 86400e3)) < 1000 && stAfter?.state === "in_progress", { expected: new Date(beforeDeadline + 2 * 86400e3).toISOString(), actual: `${stAfter?.deadline} state=${stAfter?.state}` });
+    step(c, "provider notified of the approval", (((await api("tonbp", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "extension_approved"));
+
+    const tlP = ((await api("tonbp", `/api/projects/${pid}`)).data as any).project?.timeline ?? [];
+    const tlC = ((await api("lena", `/api/projects/${pid}`)).data as any).project?.timeline ?? [];
+    step(c, "timeline generated from real records; BOTH sides see the identical history",
+      tlP.length >= 6 && tlP.length === tlC.length &&
+      tlP.some((e: any) => /Progress update — 25%/.test(e.label)) &&
+      tlP.some((e: any) => /estimated completion/.test(e.label)) &&
+      tlP.some((e: any) => /2-day extension/.test(e.label)) &&
+      tlP.some((e: any) => /Extension approved/.test(e.label)),
+      { actual: `${tlP.length} events` });
+
+    await api("tonbp", `/api/projects/${pid}`, { method: "PATCH", body: { action: "submit" } });
+    step(c, "provider submitted → client gets 'review it' notification", (((await api("lena", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "project_submitted"));
+    await api("lena", `/api/projects/${pid}`, { method: "PATCH", body: { action: "approve" } });
+    await api("lena", `/api/projects/${pid}`, { method: "PATCH", body: { action: "complete" } });
+    const done = ((await api("lena", `/api/projects/${pid}`)).data as any).project;
+    const payRow = db.select().from(tables.payments).where(eq(tables.payments.projectId, pid)).get();
+    step(c, "approve → complete: project COMPLETED, payment RELEASED (TEST)", done?.state === "completed" && payRow?.status === "released", { expected: "completed/released", actual: `${done?.state}/${payRow?.status}` });
+    const rv = await api("lena", `/api/projects/${pid}/review`, { method: "POST", body: { rating: 5, body: "[TEST] Great communication throughout." } });
+    step(c, "review became available after completion", rv.status === 200, { route: "POST review" });
+    const act2 = (await api("lena", "/api/activity")).data as any;
+    const actProj = (act2.projects ?? []).find((p: any) => p.id === pid);
+    step(c, "Activity mirrors the progress history (latest update on the record)", !!actProj?.latestUpdate && actProj.latestUpdate.percent === 70, { actual: JSON.stringify(actProj?.latestUpdate ?? null) });
+  }
+
+  /* ================= PREFERRED CLIENTS (private loyalty loop) ================= */
+  {
+    const c = cat("PREFERRED CLIENTS");
+    const svc = ((await api("rachel", "/api/services")).data as any).services.find((s: any) => s.owner?.handle === "lena");
+    // three completed bookings with the SAME provider → eligibility.
+    // Booked on WEEKDAYS so the provider's real scheduling policy never
+    // interferes with what this scenario measures.
+    const weekdays: Date[] = [];
+    for (let d = 2; weekdays.length < 3 && d < 14; d++) {
+      const t = new Date(Date.now() + d * 86400e3);
+      if (t.getDay() >= 1 && t.getDay() <= 5) weekdays.push(t);
+    }
+    let okAll = true;
+    for (let k = 0; k < 3; k++) {
+      const when = new Date(weekdays[k]);
+      when.setHours(10 + k, 0, 0, 0);
+      const bk = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: when.toISOString(), durationMin: 60 } });
+      const bid = String((bk.data as any).id ?? "");
+      const pay = await api("rachel", `/api/bookings/${bid}`, { method: "PATCH", body: { action: "pay" } });
+      const fin = await api("lena", `/api/bookings/${bid}`, { method: "PATCH", body: { action: "complete" } });
+      okAll = okAll && bk.status === 200 && pay.status === 200 && fin.status === 200;
+    }
+    step(c, "3 bookings completed with the same provider (book → pay → complete ×3)", okAll, { route: "POST /api/bookings ×3" });
+
+    const dash = (await api("lena", "/api/clients")).data as any;
+    const rrow = (dash.clients ?? []).find((x: any) => x.handle === "rachel");
+    step(c, "provider dashboard shows the client ELIGIBLE (3 completed in 12 months)", !!rrow && rrow.eligible === true && rrow.completedBookings >= 3, { route: "GET /api/clients", actual: `completed=${rrow?.completedBookings} eligible=${rrow?.eligible}` });
+
+    const add = await api("lena", "/api/preferred-clients", {
+      method: "POST",
+      body: { clientId: rachel.id, benefits: [{ key: "priority_booking" }, { key: "early_access" }, { key: "discount", percent: 10 }] },
+    });
+    const relId = String((add.data as any).id ?? "");
+    step(c, "provider adds the client with 3 chosen benefits", add.status === 200 && !!relId, { route: "POST /api/preferred-clients", record: relId });
+    step(c, "client notified: 'added as a Preferred Client'", (((await api("rachel", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "preferred_added"));
+
+    const mine = (await api("rachel", "/api/me/preferred")).data as any;
+    const rel = (mine.preferred ?? []).find((x: any) => x.provider?.handle === "lena");
+    step(c, "client sees the provider under My Preferred Clients with the benefits", !!rel && rel.benefits?.length === 3, { route: "GET /api/me/preferred", actual: `${rel?.benefits?.length} benefits` });
+
+    // PRIVACY: nothing preferred-related on the public profile, to anyone
+    const pub = await api("harboroak", "/api/users/rachel");
+    step(c, "PRIVACY: public profile carries no trace of preferred status", pub.status === 200 && !/preferred/i.test(JSON.stringify(pub.data)), { route: "GET /api/users/rachel as another business" });
+    const bizDash = (await api("harboroak", "/api/clients")).data as any;
+    const leak = (bizDash.clients ?? []).find((x: any) => x.handle === "rachel" && x.preferred?.status === "active");
+    step(c, "ISOLATION: another provider does NOT see the relationship", !leak, { route: "GET /api/clients as harboroak" });
+    // AUTHORIZATION: the client cannot modify their own status
+    const cheat1 = await api("rachel", `/api/preferred-clients/${relId}`, { method: "PATCH", body: { benefits: [{ key: "discount", percent: 50 }] } });
+    const cheat2 = await api("rachel", `/api/preferred-clients/${relId}`, { method: "DELETE" });
+    step(c, "authz: client cannot edit or remove their own preferred status", cheat1.status === 403 && cheat2.status === 403, { actual: `${cheat1.status}/${cheat2.status}` });
+
+    // PRIORITY BOOKING — a REAL window, enforced at the booking route
+    const win = await api("lena", `/api/services/${svc.id}/early-access`, { method: "POST", body: { hours: 24 } });
+    step(c, "provider opens a 24h preferred-first window (holders notified)", win.status === 200 && Number((win.data as any).notified) >= 1, { route: "POST early-access" });
+    // pick a WEEKDAY 5–11 days out so the provider's real scheduling policy
+    // (no-weekend rules) can't interfere with what this step measures
+    const windowDay = (() => {
+      for (let d = 5; d <= 11; d++) {
+        const t = new Date(Date.now() + d * 86400e3);
+        if (t.getDay() >= 1 && t.getDay() <= 5) return t;
+      }
+      return new Date(Date.now() + 5 * 86400e3);
+    })();
+    const tOut = new Date(windowDay); tOut.setHours(11, 0, 0, 0);
+    const outsider = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: tOut.toISOString(), durationMin: 60 } });
+    step(c, "non-preferred client is actually refused during the window", outsider.status === 403 && /Preferred Clients/.test(String((outsider.data as any).error)), { expected: "403 + honest message", actual: `${outsider.status} ${(outsider.data as any).error}` });
+    const tIn = new Date(windowDay); tIn.setHours(15, 0, 0, 0);
+    const insider = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: tIn.toISOString(), durationMin: 60 } });
+    const insiderId = String((insider.data as any).id ?? "");
+    step(c, "preferred client books INSIDE the window", insider.status === 200 && !!insiderId, { record: insiderId });
+
+    // PREFERRED PRICING — server-computed, disclosed on the frozen receipt
+    const myBk = ((await api("rachel", "/api/bookings")).data as any).bookings.find((b: any) => b.id === insiderId);
+    const expectPrice = svc.price - Math.round(svc.price * 0.10);
+    const hasLine = (myBk?.items ?? []).some((l: any) => /Preferred client pricing/.test(l.label));
+    step(c, "10% preferred pricing applied server-side + itemized on the receipt", myBk?.price === expectPrice && hasLine, { expected: `$${expectPrice} + receipt line`, actual: `$${myBk?.price} line=${hasLine}` });
+
+    // REMOVAL — benefits end, client told privately, HISTORY kept
+    const rm = await api("lena", `/api/preferred-clients/${relId}`, { method: "DELETE" });
+    step(c, "provider removes the client", rm.status === 200 && (rm.data as any).status === "removed");
+    step(c, "client privately notified the benefits ended", (((await api("rachel", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "preferred_removed"));
+    const mineAfter = (await api("rachel", "/api/me/preferred")).data as any;
+    step(c, "benefits gone from the client's view", !(mineAfter.preferred ?? []).some((x: any) => x.provider?.handle === "lena"));
+    const dashAfter = (await api("lena", "/api/clients")).data as any;
+    const rAfter = (dashAfter.clients ?? []).find((x: any) => x.handle === "rachel");
+    step(c, "relationship HISTORY intact after removal (bookings + removed record)", rAfter?.preferred?.status === "removed" && !!rAfter?.preferred?.removedAt && (rAfter?.history?.length ?? 0) >= 3, { actual: `status=${rAfter?.preferred?.status} history=${rAfter?.history?.length}` });
+    await api("lena", `/api/services/${svc.id}/early-access`, { method: "DELETE" }); // close the window
+  }
+
+  /* ================= FIRST-TIME ONBOARDING ================= */
+  {
+    const c = cat("ONBOARDING");
+    const mk = async (handle: string, extra: Record<string, unknown> = {}) => {
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Tour ${handle}`, ...extra } });
+      tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
+      return r;
+    };
+    const a = await mk("tonba");
+    const meA = (await api("tonba", "/api/auth/me")).data as any;
+    step(c, "brand-new account starts NOT onboarded", a.status === 200 && meA.user?.onboarding?.completed === false, { route: "POST /api/auth/signup", actual: JSON.stringify(meA.user?.onboarding) });
+    const tourA = (await api("tonba", "/api/onboarding/tour")).data as any;
+    const idsA = (tourA.steps ?? []).map((s: any) => s.id);
+    step(c, "personal tour covers the core navigation (home…my world…settings)", tourA.audience === "creator" && ["home", "discover", "opportunities", "services", "messages", "notifications", "profile", "myworld", "settings"].every((x) => idsA.includes(x)), { actual: idsA.join(",") });
+    await api("tonba", "/api/me/onboarding", { method: "POST", body: { action: "complete" } });
+    step(c, "finishing the tour persists onboardingCompleted", ((await api("tonba", "/api/auth/me")).data as any).user?.onboarding?.completed === true);
+    // logout → login again → the full tour does NOT greet them again
+    await api("tonba", "/api/auth/logout", { method: "POST" });
+    const relog = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "tonba", password: "Tour-walkthrough-99" } });
+    tok.tonba = (relog.data as any).sessionToken ?? "";
+    step(c, "logout → login: still onboarded (no repeat greeting)", ((await api("tonba", "/api/auth/me")).data as any).user?.onboarding?.completed === true, { route: "login again" });
+    const replay = await api("tonba", "/api/onboarding/tour");
+    step(c, "replay stays available anytime (Settings → Help → Take the tour again)", replay.status === 200 && ((replay.data as any).steps ?? []).length > 0);
+
+    await mk("tonbb");
+    await api("tonbb", "/api/me/onboarding", { method: "POST", body: { action: "skip" } });
+    step(c, "Skip Tour also counts as onboarded (never nags)", ((await api("tonbb", "/api/auth/me")).data as any).user?.onboarding?.completed === true);
+
+    await mk("tonbc", { accountType: "business" });
+    const tourC = (await api("tonbc", "/api/onboarding/tour")).data as any;
+    step(c, "business signup → business-oriented tour", tourC.audience === "business" && (tourC.steps ?? []).some((s: any) => /talent|brand|organization/i.test(s.body)), { actual: tourC.audience });
+
+    const nlog = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "nia", password: "upnova123" } });
+    tok.nia = (nlog.data as any).sessionToken ?? "";
+    const tourN = (await api("nia", "/api/onboarding/tour")).data as any;
+    step(c, "verified student → student tour incl. Your Campus", tourN.audience === "student" && (tourN.steps ?? []).some((s: any) => s.id === "campus"), { actual: tourN.audience });
+    await api("nia", "/api/auth/logout", { method: "POST" });
+  }
+
   /* ================= NOTIFICATIONS: no dead destinations ================= */
   {
     const c = cat("NOTIFICATIONS");
@@ -326,7 +569,7 @@ export async function POST(req: NextRequest) {
     const orphanMembers = db.select().from(tables.conversationMembers).all().filter((m) => !db.select().from(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).get()).length;
     step(c, "no orphaned conversation members", orphanMembers === 0, { actual: String(orphanMembers) });
     const dupBookings = db.select().from(tables.bookings).where(and(eq(tables.bookings.clientId, rachel.id), eq(tables.bookings.providerId, lena.id))).all().length;
-    step(c, "no duplicated bookings from the run", dupBookings === 1, { expected: "1", actual: String(dupBookings) });
+    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window)", dupBookings === 5, { expected: "5", actual: String(dupBookings) });
   }
 
   const all = cats.flatMap((c) => c.steps);

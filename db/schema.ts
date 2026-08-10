@@ -55,6 +55,11 @@ export const users = sqliteTable("users", {
   businessVerified: integer("business_verified", { mode: "boolean" }).notNull().default(false),
   mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).notNull().default(false),
   mfaSecret: text("mfa_secret"),
+  // First-run onboarding state: "" = the guided tour has never been
+  // completed (new accounts). JSON {completedAt, skipped} once done.
+  // Education state only — NEVER gates any feature (the app is fully
+  // usable whether or not the tour ran).
+  onboarding: text("onboarding").notNull().default(""),
   isSeed: seed(),
   createdAt: ts("created_at"),
 });
@@ -601,6 +606,11 @@ export const services = sqliteTable("services", {
   // creator's public history instead of being erased
   active: bool("active", true),
   paused: bool("paused", false),
+  // PREFERRED-CLIENT EARLY ACCESS: while set and in the future, ONLY the
+  // owner's active Preferred Clients holding a priority-booking /
+  // early-access benefit can book. Enforced in POST /api/bookings —
+  // never a display-only window.
+  preferredUntil: integer("preferred_until", { mode: "timestamp_ms" }),
   isSeed: seed(),
   createdAt: ts("created_at"),
 });
@@ -746,6 +756,68 @@ export const extensionRequests = sqliteTable(
   },
   (t) => [index("ext_project_status").on(t.projectId, t.status)]
 );
+
+/* ------------------------- progress updates -------------------------
+   Real per-record progress history posted by the person DOING the work
+   (project creator / booking provider). Each row is one event — a
+   status + percent + message update, or an ETA change (kind "eta",
+   which records the previous estimate so deadlines never move
+   silently). The project/booking timeline is generated from these rows
+   plus the other real records (payments, extensions, reviews) — never
+   from one overwritten text field. */
+export const progressUpdates = sqliteTable(
+  "progress_updates",
+  {
+    id: id(),
+    projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    bookingId: text("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id),
+    kind: text("kind").notNull().default("update"), // update | eta
+    // not_started | preparing | in_progress | waiting_on_client |
+    // revision | finalizing | ready_for_review | completed
+    status: text("status").notNull().default(""),
+    percent: integer("percent"), // 0–100, optional
+    message: text("message").notNull().default(""),
+    etaAt: integer("eta_at", { mode: "timestamp_ms" }), // new estimate
+    prevEtaAt: integer("prev_eta_at", { mode: "timestamp_ms" }), // what it replaced (eta rows)
+    attachmentUrl: text("attachment_url").notNull().default(""),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("progress_project").on(t.projectId, t.createdAt), index("progress_booking").on(t.bookingId, t.createdAt)]
+);
+
+/* -------------------------- preferred clients --------------------------
+   PRIVATE provider↔client loyalty relationship. Never public: no badge,
+   no search surface, no cross-provider visibility, no platform score.
+   One row per (provider, client); removal keeps the row (status
+   "removed" + removedAt) so the relationship HISTORY survives.
+   benefits = JSON array of {key, percent?, label?} chosen by the
+   provider — discounts are optional, never mandatory. */
+export const preferredClients = sqliteTable(
+  "preferred_clients",
+  {
+    id: id(),
+    providerId: text("provider_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("active"), // active | removed
+    benefits: text("benefits").notNull().default("[]"),
+    note: text("note").notNull().default(""),
+    addedAt: integer("added_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+    createdAt: ts("created_at"),
+  },
+  (t) => [
+    uniqueIndex("preferred_pair").on(t.providerId, t.clientId),
+    index("preferred_client").on(t.clientId, t.status),
+  ]
+);
+
 
 /* -------------------------------- bookings -------------------------------- */
 

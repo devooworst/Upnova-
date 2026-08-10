@@ -570,6 +570,19 @@ CREATE TABLE IF NOT EXISTS `posts` (
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS `preferred_clients` (
+	`id` text PRIMARY KEY NOT NULL,
+	`provider_id` text NOT NULL,
+	`client_id` text NOT NULL,
+	`status` text DEFAULT 'active' NOT NULL,
+	`benefits` text DEFAULT '[]' NOT NULL,
+	`note` text DEFAULT '' NOT NULL,
+	`added_at` integer NOT NULL,
+	`removed_at` integer,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`provider_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`client_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `products` (
 	`id` text PRIMARY KEY NOT NULL,
 	`seller_id` text NOT NULL,
@@ -637,6 +650,23 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`education` text DEFAULT '[]' NOT NULL,
 	`trust_level` text DEFAULT 'standard' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `progress_updates` (
+	`id` text PRIMARY KEY NOT NULL,
+	`project_id` text,
+	`booking_id` text,
+	`author_id` text NOT NULL,
+	`kind` text DEFAULT 'update' NOT NULL,
+	`status` text DEFAULT '' NOT NULL,
+	`percent` integer,
+	`message` text DEFAULT '' NOT NULL,
+	`eta_at` integer,
+	`prev_eta_at` integer,
+	`attachment_url` text DEFAULT '' NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`booking_id`) REFERENCES `bookings`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 CREATE TABLE IF NOT EXISTS `project_milestones` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -711,7 +741,7 @@ CREATE TABLE IF NOT EXISTS `services` (
 	`active` integer DEFAULT true NOT NULL,
 	`paused` integer DEFAULT false NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, `preferred_until` integer,
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `sessions` (
@@ -741,7 +771,7 @@ CREATE TABLE IF NOT EXISTS "users" (
 	`mfa_secret` text,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
-);
+, `onboarding` text DEFAULT '' NOT NULL);
 CREATE TABLE IF NOT EXISTS `works` (
 	`id` text PRIMARY KEY NOT NULL,
 	`creator_id` text NOT NULL,
@@ -793,7 +823,11 @@ CREATE INDEX IF NOT EXISTS `otp_phone` ON `otp_codes` (`phone`,`created_at`);
 CREATE INDEX IF NOT EXISTS `outbox_user` ON `outbox` (`user_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `password_resets_token_unique` ON `password_resets` (`token`);
 CREATE INDEX IF NOT EXISTS `posts_author_created` ON `posts` (`author_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `preferred_client` ON `preferred_clients` (`client_id`,`status`);
+CREATE UNIQUE INDEX IF NOT EXISTS `preferred_pair` ON `preferred_clients` (`provider_id`,`client_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `profiles_user_id_unique` ON `profiles` (`user_id`);
+CREATE INDEX IF NOT EXISTS `progress_booking` ON `progress_updates` (`booking_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `progress_project` ON `progress_updates` (`project_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `projects_client` ON `projects` (`client_id`);
 CREATE INDEX IF NOT EXISTS `projects_creator` ON `projects` (`creator_id`);
 CREATE INDEX IF NOT EXISTS `pwreset_user` ON `password_resets` (`user_id`);

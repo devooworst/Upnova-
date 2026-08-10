@@ -199,11 +199,14 @@ export default function SimulationPage() {
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-400">
               Plays UpNova as three real people (rachel · lena · Harbor &amp; Oak), each with their own
               authenticated session, over real HTTP: message ↔ reply, booking ↔ both sides, test
-              payment held → released, full project lifecycle with a revision, review, business
-              opportunity ↔ application ↔ selection, notification destinations, activity on both
-              sides, plan/verification gates, logout &amp; session isolation, and database integrity.
-              Time is simulated, never waited for. Designated test records reset at the start of
-              every run — real accounts and auth are never touched.
+              payment held → released, full project lifecycle with a revision, review, provider
+              progress updates ↔ ETA changes ↔ extension approval, the private Preferred Clients
+              loop (eligibility, benefits, preferred-first booking windows, preferred pricing,
+              removal), first-time onboarding state, business opportunity ↔ application ↔ selection,
+              notification destinations, activity on both sides, plan/verification gates, logout &amp;
+              session isolation, and database integrity. Time is simulated, never waited for.
+              Designated test records reset at the start of every run — real accounts and auth are
+              never touched.
             </p>
           </div>
           <button onClick={runFullTest} disabled={ftBusy} className="btn-lime shrink-0 rounded-md px-5 py-2.5 text-sm disabled:opacity-50">

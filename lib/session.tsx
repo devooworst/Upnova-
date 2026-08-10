@@ -65,6 +65,8 @@ export interface SessionUser {
   /** true only on demo deployments — gates tester tooling like /simulation */
   demoTools?: boolean;
   campus?: { name: string; slug: string; program: string; affiliation?: string; gradYear?: string } | null;
+  /** first-run guided tour state — education only, never gates features */
+  onboarding?: { completed: boolean; skipped: boolean };
 }
 
 export const SESSION_EVENT = "upnova:session-changed";

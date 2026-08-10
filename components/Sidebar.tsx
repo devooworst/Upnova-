@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Lock,
   Sparkles,
+  UserCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
@@ -32,14 +33,14 @@ import { COLLEGE_PRICE, ALUMNI_PRO_PRICE } from "@/lib/fees";
 const navGroups: {
   label: string | null;
   dot?: string;
-  items: { href: string; label: string; icon: typeof Home; badge?: number; meta?: string }[];
+  items: { href: string; label: string; icon: typeof Home; badge?: number; meta?: string; tour?: string }[];
 }[] = [
   {
     label: null,
     items: [
-      { href: "/", label: "Home", icon: Home },
-      { href: "/discover", label: "Discover", icon: Search },
-      { href: "/messages", label: "Messages", icon: MessageSquare, badge: 3 },
+      { href: "/", label: "Home", icon: Home, tour: "home" },
+      { href: "/discover", label: "Discover", icon: Search, tour: "discover" },
+      { href: "/messages", label: "Messages", icon: MessageSquare, badge: 3, tour: "messages" },
       { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
     ],
   },
@@ -47,11 +48,12 @@ const navGroups: {
     label: "earn",
     dot: "bg-lime-400",
     items: [
-      { href: "/opportunities", label: "Opportunities", icon: Briefcase },
-      { href: "/services", label: "Services", icon: ShoppingBag },
+      { href: "/opportunities", label: "Opportunities", icon: Briefcase, tour: "opportunities" },
+      { href: "/services", label: "Services", icon: ShoppingBag, tour: "services" },
       { href: "/shop", label: "Shop", icon: Tag },
       { href: "/works", label: "Works", icon: Disc3 },
-      { href: "/calendar", label: "Bookings", icon: CalendarCheck },
+      { href: "/calendar", label: "Bookings", icon: CalendarCheck, tour: "calendar" },
+      { href: "/clients", label: "Clients", icon: UserCheck },
       { href: "/activity", label: "Activity", icon: ActivityIcon },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
@@ -60,7 +62,7 @@ const navGroups: {
     label: "connect",
     dot: "bg-violet-400",
     items: [
-      { href: "/communities", label: "Communities", icon: Users, meta: "joined" },
+      { href: "/communities", label: "Communities", icon: Users, meta: "joined", tour: "communities" },
       { href: "/events", label: "Events", icon: Calendar },
     ],
   },
@@ -130,6 +132,7 @@ export default function Sidebar({
                   <li key={item.label}>
                     <Link
                       href={item.href}
+                      data-tour={item.tour}
                       className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
                         active
                           ? "bg-white/10 text-zinc-50"
@@ -164,6 +167,7 @@ export default function Sidebar({
           <div className="mt-1">
             <Link
               href="/campus"
+              data-tour="campus"
               className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
                 pathname.startsWith("/campus")
                   ? "bg-violet-400/15 text-violet-200"
@@ -333,6 +337,7 @@ export default function Sidebar({
       ) : user ? (
         <Link
           href="/profile"
+          data-tour="profile"
           className="card flex items-center gap-3 p-3 transition hover:border-zinc-600"
         >
           <Avatar src={user.profile.avatarUrl} initials={user.profile.displayName.charAt(0)} size="sm" />

@@ -38,6 +38,9 @@ interface Item {
   conversationId: string | null;
   href: string;
   events?: { label: string; at: string }[];
+  latestUpdate?: { status: string; percent: number | null; message: string; at: string } | null;
+  etaAt?: string | null;
+  workspaceHref?: string;
   updatedAt: string;
 }
 interface Payload {
@@ -143,6 +146,9 @@ function Timeline({ item }: { item: Item }) {
           <Link href={`/messages?c=${item.conversationId}`} className="flex items-center gap-1 text-sky-300 hover:underline">
             <MessageSquare className="h-3 w-3" /> Conversation with {item.with.displayName}
           </Link>
+        )}
+        {item.workspaceHref && (
+          <Link href={item.workspaceHref} className="text-lime-300 hover:underline">Open project workspace →</Link>
         )}
         <Link href={item.href} className="text-zinc-300 hover:underline">Open record →</Link>
       </div>
@@ -290,8 +296,15 @@ export default function ActivityPage() {
                             {i.startsAt ? ` · ${new Date(i.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
                             {i.amount != null ? ` · $${i.amount}` : ""}
                             {i.paymentStatus ? ` · payment ${i.paymentStatus} (test)` : ""}
-                            <span className="text-zinc-600"> · updated {timeAgo(lastAt)}</span>
+                            <span className="text-zinc-600"> · updated {timeAgo(i.latestUpdate?.at && i.latestUpdate.at > lastAt ? i.latestUpdate.at : lastAt)}</span>
                           </p>
+                          {i.latestUpdate && (
+                            <p className="mt-0.5 truncate text-[11px] text-violet-300">
+                              {i.latestUpdate.percent != null ? `${i.latestUpdate.percent}% — ` : ""}
+                              {i.latestUpdate.message || i.latestUpdate.status.replace(/_/g, " ")}
+                              {i.etaAt ? ` · est. ${new Date(i.etaAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                            </p>
+                          )}
                         </div>
                         <CompactBar item={i} />
                       </button>

@@ -8,6 +8,7 @@ import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser, seedBookingProgress } from "@/lib/server/demo";
 import { resolvePairConversation } from "@/lib/server/conversations";
 import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
+import { hasEarlyAccess, discountPercent } from "@/lib/server/preferred";
 import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
 
@@ -96,6 +97,15 @@ export async function POST(req: NextRequest) {
       if (!follows) throw new ApiError(403, "This service is only available to followers");
     }
     if (service.ownerId === user.id) throw new ApiError(400, "You can't book your own service");
+
+    // PREFERRED-CLIENT EARLY ACCESS: while the owner's priority window is
+    // open, only their Preferred Clients holding a priority-booking /
+    // early-access benefit can book. Real enforcement at the money path —
+    // afterwards, appointments open to everyone automatically.
+    if (service.preferredUntil && service.preferredUntil.getTime() > Date.now() && !hasEarlyAccess(service.ownerId, user.id)) {
+      const opens = service.preferredUntil.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      throw new ApiError(403, `This provider opened appointments to their Preferred Clients first — booking opens to everyone ${opens}`);
+    }
     const providerProfile = db
       .select()
       .from(tables.profiles)
@@ -178,6 +188,17 @@ export async function POST(req: NextRequest) {
       if (!menu?.addons.some((a) => a.id === aid)) throw new ApiError(400, "That add-on is no longer on the menu");
     const selection = computeSelection(config, { title: service.title, price: service.price }, { packageId, addonIds });
 
+    // PREFERRED PRICING: if the provider gave this client a discount
+    // benefit, it's applied server-side and disclosed as its own line on
+    // the frozen receipt — the client never has to ask, and the price
+    // can't be spoofed from the request.
+    const prefPct = discountPercent(service.ownerId, user.id);
+    const prefDiscount = prefPct > 0 ? Math.round((selection.payout * prefPct) / 100) : 0;
+    const finalPayout = selection.payout - prefDiscount;
+    const finalLines = prefDiscount > 0
+      ? [...selection.lines, { label: `Preferred client pricing (-${prefPct}%)`, amount: -prefDiscount }]
+      : selection.lines;
+
     // the calendar is the source of truth: no double-booking a taken slot
     const durationMin = selection.durationMin || Math.min(480, Math.max(15, Number(body.durationMin) || 60));
     const conflicts = db
@@ -215,8 +236,8 @@ export async function POST(req: NextRequest) {
         title: selection.title,
         startsAt,
         durationMin,
-        price: selection.payout,
-        items: JSON.stringify(selection.lines),
+        price: finalPayout,
+        items: JSON.stringify(finalLines),
         travelFee,
         location: String(body.location || "").slice(0, 120),
         conversationId,
@@ -228,9 +249,20 @@ export async function POST(req: NextRequest) {
       actorId: user.id,
       type: "booking",
       title: `${user.profile.displayName} requested a booking`,
-      body: `${selection.title} · $${selection.payout}${selection.hasQuoted ? " + quoted items" : ""} · ${durationMin} min`,
+      body: `${selection.title} · $${finalPayout}${selection.hasQuoted ? " + quoted items" : ""}${prefDiscount > 0 ? ` (preferred pricing applied)` : ""} · ${durationMin} min`,
       href: "/calendar",
     });
+
+    if (prefDiscount > 0)
+      notify({
+        userId: user.id,
+        actorId: service.ownerId,
+        type: "preferred_added",
+        title: `You received Preferred Client pricing from ${providerProfileFull.displayName}`,
+        body: `${selection.title} — $${prefDiscount} off (${prefPct}%)`,
+        href: "/calendar",
+        priority: "low",
+      });
 
     recordInteraction(user.id, "service", service.id, "book");
 

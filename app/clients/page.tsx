@@ -1,0 +1,532 @@
+"use client";
+
+/* ------------------------------------------------------------------ */
+/*  Clients — PRIVATE relationship dashboard.                          */
+/*                                                                     */
+/*  Provider side: everyone who has booked/hired you, completed-work   */
+/*  stats, Preferred Client management (add / edit benefits / remove), */
+/*  loyalty history, and real early-access windows on your services.   */
+/*  Client side: providers who personally added YOU, with your         */
+/*  benefits.                                                          */
+/*                                                                     */
+/*  Nothing on this page is public. No badges, no leaderboards, no     */
+/*  scores — just "this provider values this client."                  */
+/* ------------------------------------------------------------------ */
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Lock,
+  Pencil,
+  Star,
+  UserCheck,
+  UserMinus,
+  X,
+} from "lucide-react";
+import Avatar from "@/components/Avatar";
+import { useSession } from "@/lib/session";
+
+type Benefit = { key: string; percent?: number; label?: string };
+
+interface ClientRow {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  completedBookings: number;
+  completedProjects: number;
+  completedTotal: number;
+  completed12mo: number;
+  eligible: boolean;
+  totalSpent: number;
+  lastCompletedAt: string | null;
+  history: { kind: string; title: string; at: string }[];
+  preferred: { id: string; status: string; benefits: Benefit[]; note: string; addedAt: string; removedAt: string | null } | null;
+}
+
+interface MyPreferred {
+  id: string;
+  provider: { id: string; handle: string; displayName: string; avatarUrl: string | null; accountType: string };
+  benefits: Benefit[];
+  since: string;
+  completedBookings: number;
+  completedProjects: number;
+  bookAgainServiceId: string | null;
+  earlyWindows: { serviceId: string; title: string; until: string }[];
+}
+
+interface MyService {
+  id: string;
+  title: string;
+  price: number;
+  preferredUntil: string | null;
+}
+
+const BENEFIT_CHOICES: { key: string; label: string; hint?: string }[] = [
+  { key: "priority_booking", label: "Priority booking" },
+  { key: "early_access", label: "Early access to appointments" },
+  { key: "discount", label: "Preferred pricing / discount" },
+  { key: "free_addon", label: "Free add-on" },
+  { key: "upgrade", label: "Complimentary upgrade" },
+  { key: "recurring_priority", label: "Recurring booking priority", hint: "their usual window stays available" },
+  { key: "priority_response", label: "Priority response" },
+  { key: "exclusive_windows", label: "Exclusive booking windows" },
+  { key: "custom", label: "Custom reward" },
+];
+
+const benefitLabel = (b: Benefit) =>
+  b.key === "discount"
+    ? `${b.percent}% preferred pricing`
+    : b.key === "custom"
+      ? b.label || "Custom reward"
+      : BENEFIT_CHOICES.find((c) => c.key === b.key)?.label ?? b.key;
+
+const fmt = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const fmtShort = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+export default function ClientsPage() {
+  const { user } = useSession();
+  const [data, setData] = useState<{ clients: ClientRow[]; preferredCount: number; services: MyService[] } | null>(null);
+  const [mine, setMine] = useState<MyPreferred[] | null>(null);
+  const [editing, setEditing] = useState<ClientRow | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const [a, b] = await Promise.all([
+      fetch("/api/clients", { cache: "no-store" }),
+      fetch("/api/me/preferred", { cache: "no-store" }),
+    ]);
+    if (a.ok) setData(await a.json());
+    if (b.ok) setMine((await b.json()).preferred);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (!user)
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <p className="text-sm font-semibold text-zinc-200">Sign in to see your client relationships.</p>
+        <Link href="/login" className="btn-lime mt-4 inline-flex px-5 py-2 text-xs">Sign in</Link>
+      </div>
+    );
+
+  const preferred = (data?.clients ?? []).filter((c) => c.preferred?.status === "active");
+  const others = (data?.clients ?? []).filter((c) => c.preferred?.status !== "active");
+
+  const remove = async (c: ClientRow) => {
+    if (!c.preferred) return;
+    const res = await fetch(`/api/preferred-clients/${c.preferred.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setNotice(`${c.displayName} was removed. They were notified privately — the relationship history is kept.`);
+      load();
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Clients</h1>
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+          <Lock className="h-3 w-3" /> Private to you. Nothing here appears on anyone&apos;s public profile, in search, or to other providers.
+        </p>
+      </header>
+
+      {notice && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-line bg-card px-4 py-2.5 text-xs text-zinc-300">
+          <span>{notice}</span>
+          <button onClick={() => setNotice(null)} className="text-zinc-500 hover:text-zinc-300"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      )}
+
+      {/* ================= MY BENEFITS (client side) ================= */}
+      <section className="card p-5">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+          <Star className="h-4 w-4 text-violet-300" /> Where you&apos;re a Preferred Client
+        </h2>
+        <p className="mt-0.5 text-[11px] text-zinc-500">
+          Providers who personally added you. This is between you and them — it never shows publicly.
+        </p>
+        {mine === null ? (
+          <div className="mt-3 h-16 animate-pulse rounded-xl bg-card-raised" />
+        ) : mine.length === 0 ? (
+          <p className="mt-3 text-xs text-zinc-500">
+            No provider has added you yet. Preferred status usually follows repeat completed bookings with the same provider.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2.5">
+            {mine.map((m) => (
+              <div key={m.id} className="rounded-xl border border-violet-400/25 bg-violet-400/5 p-3.5">
+                <div className="flex items-center gap-3">
+                  <Link href={`/creator/${m.provider.handle}`}>
+                    <Avatar src={m.provider.avatarUrl} initials={m.provider.displayName.charAt(0)} size="md" />
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-zinc-100">{m.provider.displayName}</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Preferred Client since {fmt(m.since)} · {m.completedBookings + m.completedProjects} completed together
+                    </p>
+                  </div>
+                  {m.bookAgainServiceId && (
+                    <Link href={`/services/${m.bookAgainServiceId}`} className="btn-lime shrink-0 px-3.5 py-1.5 text-xs">
+                      Book again
+                    </Link>
+                  )}
+                </div>
+                <ul className="mt-2.5 space-y-1">
+                  {m.benefits.map((b) => (
+                    <li key={b.key} className="flex items-center gap-1.5 text-xs text-zinc-300">
+                      <Check className="h-3 w-3 text-violet-300" /> {benefitLabel(b)}
+                    </li>
+                  ))}
+                </ul>
+                {m.earlyWindows.map((w) => (
+                  <Link
+                    key={w.serviceId}
+                    href={`/services/${w.serviceId}`}
+                    className="mt-2 flex items-center gap-1.5 rounded-lg border border-lime-400/30 bg-lime-400/10 px-2.5 py-1.5 text-[11px] font-semibold text-lime-300"
+                  >
+                    <Clock className="h-3 w-3" />
+                    {w.title} is open to Preferred Clients before everyone else — until {fmtShort(w.until)},{" "}
+                    {new Date(w.until).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ================= PREFERRED CLIENTS (provider side) ================= */}
+      <section className="card p-5">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+          <UserCheck className="h-4 w-4 text-lime-300" /> Preferred Clients ({preferred.length})
+        </h2>
+        <p className="mt-0.5 text-[11px] text-zinc-500">
+          Clients you&apos;ve chosen to give special treatment. Only you can see this list.
+        </p>
+        {preferred.length === 0 ? (
+          <p className="mt-3 text-xs text-zinc-500">
+            No Preferred Clients yet. When someone completes 3 bookings with you inside 12 months they become eligible below —
+            or add a loyal client early if you want to.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2.5">
+            {preferred.map((c) => (
+              <div key={c.id} className="rounded-xl border border-line bg-card-raised p-3.5">
+                <div className="flex items-center gap-3">
+                  <Avatar src={c.avatarUrl} initials={c.displayName.charAt(0)} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-zinc-100">{c.displayName}</p>
+                    <p className="font-mono text-[10px] tracking-[0.06em] text-zinc-500">
+                      {c.completedTotal} completed · ${c.totalSpent} total
+                      {c.lastCompletedAt ? ` · last ${fmtShort(c.lastCompletedAt)}` : ""} · preferred since {c.preferred ? fmtShort(c.preferred.addedAt) : ""}
+                    </p>
+                  </div>
+                  <button onClick={() => setEditing(c)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
+                    <Pencil className="h-3 w-3" /> Edit
+                  </button>
+                  <button
+                    onClick={() => remove(c)}
+                    className="shrink-0 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-zinc-500 transition hover:border-rose-400/40 hover:text-rose-300"
+                  >
+                    <UserMinus className="mr-1 inline h-3 w-3 align-[-2px]" /> Remove
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(c.preferred?.benefits ?? []).map((b) => (
+                    <span key={b.key} className="rounded-full border border-lime-400/30 bg-lime-400/10 px-2.5 py-0.5 text-[10px] font-semibold text-lime-300">
+                      {benefitLabel(b)}
+                    </span>
+                  ))}
+                </div>
+                <HistoryToggle c={c} expanded={expanded} setExpanded={setExpanded} />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ================= EARLY ACCESS WINDOWS ================= */}
+      {(data?.services?.length ?? 0) > 0 && (
+        <section className="card p-5">
+          <h2 className="text-sm font-bold text-zinc-100">Preferred-first booking windows</h2>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+            Open a service to your Preferred Clients before everyone else. While a window is open, booking is actually
+            restricted to Preferred Clients with a priority benefit — then it opens to everyone automatically.
+          </p>
+          <div className="mt-3 space-y-2">
+            {data!.services.map((s) => (
+              <EarlyAccessRow key={s.id} s={s} onChanged={load} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ================= ALL CLIENTS ================= */}
+      <section className="card p-5">
+        <h2 className="text-sm font-bold text-zinc-100">All clients ({data?.clients.length ?? 0})</h2>
+        <p className="mt-0.5 text-[11px] text-zinc-500">
+          Everyone who has booked or hired you. Eligibility: 3 completed engagements with you within 12 months — adding them stays your call.
+        </p>
+        {data === null ? (
+          <div className="mt-3 h-16 animate-pulse rounded-xl bg-card-raised" />
+        ) : others.length === 0 && preferred.length === 0 ? (
+          <p className="mt-3 text-xs text-zinc-500">No client history yet — completed bookings and projects appear here.</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {others.map((c) => (
+              <div key={c.id} className="rounded-xl border border-line bg-card-raised p-3.5">
+                <div className="flex items-center gap-3">
+                  <Avatar src={c.avatarUrl} initials={c.displayName.charAt(0)} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-zinc-100">
+                      {c.displayName}
+                      {c.eligible && (
+                        <span className="ml-2 rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-300">
+                          Eligible
+                        </span>
+                      )}
+                      {c.preferred?.status === "removed" && (
+                        <span className="ml-2 rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+                          Formerly preferred
+                        </span>
+                      )}
+                    </p>
+                    <p className="font-mono text-[10px] tracking-[0.06em] text-zinc-500">
+                      {c.completedTotal} completed ({c.completed12mo} in 12 mo) · ${c.totalSpent} total
+                      {c.lastCompletedAt ? ` · last ${fmtShort(c.lastCompletedAt)}` : ""}
+                    </p>
+                  </div>
+                  <button onClick={() => setEditing(c)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
+                    <UserCheck className="h-3.5 w-3.5" /> Add to Preferred
+                  </button>
+                </div>
+                <HistoryToggle c={c} expanded={expanded} setExpanded={setExpanded} />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {editing && (
+        <BenefitsModal
+          client={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------- loyalty history ------------------------- */
+
+function HistoryToggle({
+  c,
+  expanded,
+  setExpanded,
+}: {
+  c: ClientRow;
+  expanded: string | null;
+  setExpanded: (v: string | null) => void;
+}) {
+  if (c.history.length === 0 && !c.preferred) return null;
+  const open = expanded === c.id;
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setExpanded(open ? null : c.id)}
+        className="flex items-center gap-1 text-[11px] font-semibold text-zinc-500 hover:text-zinc-300"
+      >
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} Loyalty history
+      </button>
+      {open && (
+        <div className="mt-2 rounded-lg border border-line bg-black/20 px-3 py-2.5">
+          <ul className="space-y-1">
+            {c.history.map((h, i) => (
+              <li key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                <Check className="h-3 w-3 text-lime-400" /> {fmtShort(h.at)} — {h.title} · completed
+              </li>
+            ))}
+            {c.history.length === 0 && <li className="text-[11px] text-zinc-500">No completed engagements yet.</li>}
+          </ul>
+          {c.preferred && (
+            <p className="mt-2 border-t border-dashed border-line pt-2 text-[11px] text-zinc-500">
+              Preferred Client: added {fmt(c.preferred.addedAt)}
+              {c.preferred.removedAt ? ` · removed ${fmt(c.preferred.removedAt)}` : ""}
+              {c.preferred.status === "active" && (c.preferred.benefits.length > 0)
+                ? ` · ${c.preferred.benefits.map(benefitLabel).join(", ")}`
+                : ""}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------- benefits modal ------------------------- */
+
+function BenefitsModal({ client, onClose, onSaved }: { client: ClientRow; onClose: () => void; onSaved: () => void }) {
+  const existing = client.preferred?.status === "active" ? client.preferred.benefits : [];
+  const [selected, setSelected] = useState<Record<string, boolean>>(
+    Object.fromEntries(existing.map((b) => [b.key, true]))
+  );
+  const [discount, setDiscount] = useState(String(existing.find((b) => b.key === "discount")?.percent ?? 10));
+  const [customLabel, setCustomLabel] = useState(existing.find((b) => b.key === "custom")?.label ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const isEdit = client.preferred?.status === "active";
+
+  const save = async () => {
+    const benefits: Benefit[] = Object.keys(selected)
+      .filter((k) => selected[k])
+      .map((key) =>
+        key === "discount"
+          ? { key, percent: Number(discount) }
+          : key === "custom"
+            ? { key, label: customLabel }
+            : { key }
+      );
+    if (benefits.length === 0) return setErr("Choose at least one benefit");
+    setBusy(true);
+    setErr(null);
+    const res = isEdit
+      ? await fetch(`/api/preferred-clients/${client.preferred!.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ benefits }),
+        })
+      : await fetch("/api/preferred-clients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: client.id, benefits }),
+        });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setErr(d.error || "Couldn't save");
+    onSaved();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-base font-bold text-zinc-50">
+              {isEdit ? "Edit benefits" : "Add to Preferred Clients"}
+            </h3>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {client.displayName} · {client.completedTotal} completed with you
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200"><X className="h-4 w-4" /></button>
+        </div>
+
+        <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">
+          Choose what YOU want to offer — none of it is mandatory. {client.displayName.split(" ")[0]} is notified privately;
+          nothing appears on any public profile.
+        </p>
+
+        <div className="mt-3 space-y-1.5">
+          {BENEFIT_CHOICES.map((b) => (
+            <label key={b.key} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition ${selected[b.key] ? "border-lime-400/40 bg-lime-400/5 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
+              <input
+                type="checkbox"
+                checked={!!selected[b.key]}
+                onChange={(e) => setSelected({ ...selected, [b.key]: e.target.checked })}
+                className="h-3.5 w-3.5 accent-lime-400"
+              />
+              <span className="flex-1">
+                {b.label}
+                {b.hint && <span className="block text-[10px] text-zinc-600">{b.hint}</span>}
+              </span>
+              {b.key === "discount" && selected.discount && (
+                <span className="flex items-center gap-1 font-mono text-xs">
+                  <input
+                    type="number" min={1} max={50} value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="input-dark w-16 py-1 text-xs"
+                  />
+                  %
+                </span>
+              )}
+            </label>
+          ))}
+          {selected.custom && (
+            <input
+              value={customLabel} onChange={(e) => setCustomLabel(e.target.value)}
+              placeholder="Describe the custom reward (e.g. free 30-min consult)"
+              className="input-dark w-full py-2 text-xs"
+            />
+          )}
+        </div>
+
+        {err && <p className="mt-3 text-xs font-medium text-rose-300">{err}</p>}
+        <button disabled={busy} onClick={save} className="btn-lime mt-4 w-full justify-center py-2.5 text-sm">
+          {isEdit ? "Save benefits" : `Add ${client.displayName.split(" ")[0]} as a Preferred Client`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------- early access row ------------------------- */
+
+function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const call = async (method: "POST" | "DELETE") => {
+    setBusy(true);
+    setErr(null);
+    const res = await fetch(`/api/services/${s.id}/early-access`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify({ hours: 24 }) : undefined,
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setErr(d.error || "Couldn't update the window");
+    onChanged();
+  };
+
+  return (
+    <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-zinc-100">{s.title}</p>
+          {s.preferredUntil ? (
+            <p className="text-[11px] font-semibold text-lime-300">
+              Preferred-only until {fmtShort(s.preferredUntil)},{" "}
+              {new Date(s.preferredUntil).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} — then open to everyone
+            </p>
+          ) : (
+            <p className="text-[11px] text-zinc-500">Open to everyone</p>
+          )}
+        </div>
+        {s.preferredUntil ? (
+          <button disabled={busy} onClick={() => call("DELETE")} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
+            Open to everyone now
+          </button>
+        ) : (
+          <button disabled={busy} onClick={() => call("POST")} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
+            <Clock className="h-3 w-3" /> Preferred-first for 24h
+          </button>
+        )}
+      </div>
+      {err && <p className="mt-1.5 text-[11px] font-medium text-amber-300">{err}</p>}
+    </div>
+  );
+}

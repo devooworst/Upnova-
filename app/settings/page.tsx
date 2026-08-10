@@ -17,6 +17,8 @@ import {
   Landmark,
   Receipt,
   Check,
+  HelpCircle,
+  Compass,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import SecurityCard from "@/components/SecurityCard";
@@ -40,6 +42,7 @@ const sections = [
   { id: "hiring", label: "Hiring", icon: Briefcase },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "pro", label: "Plan & Billing", icon: Sparkles },
+  { id: "help", label: "Help", icon: HelpCircle },
   { id: "demo", label: "Demo Controls", icon: FlaskConical },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
@@ -762,6 +765,40 @@ export default function SettingsPage() {
                 </div>
               </section>
             </>
+          )}
+
+          {section === "help" && (
+            <section className="card p-5">
+              <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Help</h2>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl border border-line bg-card-raised p-4">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                    <Compass className="h-4 w-4 text-violet-300" /> Take the tour again
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                    Replay the guided walkthrough of UpNova — Home, Discover, Opportunities, Services,
+                    Messages, your profile, and My World. It highlights the real interface and takes about a minute.
+                  </p>
+                  <button
+                    onClick={() => {
+                      window.location.href = "/?tour=1";
+                    }}
+                    className="btn-lime mt-3 px-4 py-1.5 text-xs"
+                  >
+                    Start the tour
+                  </button>
+                </div>
+                <div className="rounded-xl border border-line bg-card-raised p-4">
+                  <p className="text-sm font-semibold text-zinc-100">Quick answers</p>
+                  <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-500">
+                    <li>· Payments are secured when a project or booking starts, and released when work is approved or completed.</li>
+                    <li>· Campus access comes from free school verification — never from a paid plan.</li>
+                    <li>· Notification channels (in-app, email, SMS) are controlled per category in Settings → Notifications.</li>
+                    <li>· Project and booking progress lives in the project page and booking record — Activity keeps the history.</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
           )}
 
           {section === "appearance" && (

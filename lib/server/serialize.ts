@@ -135,5 +135,14 @@ export function ownProfile(user: User, profile: Profile) {
       })(),
       trustLevel: profile.trustLevel,
     },
+    // first-run guided-tour state — education only, never gates features
+    onboarding: (() => {
+      try {
+        const o = JSON.parse(user.onboarding || "{}");
+        return { completed: !!o.completedAt, skipped: !!o.skipped };
+      } catch {
+        return { completed: false, skipped: false };
+      }
+    })(),
   };
 }

@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
 import { getProjectForParty } from "@/lib/server/authz";
 import { transition, updateTerms } from "@/lib/server/projects";
+import { progressPayload, projectTimeline } from "@/lib/server/progress";
 import { seedStartsWork } from "@/lib/server/demo";
 import { publicUser } from "@/lib/server/serialize";
 
@@ -60,6 +61,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           status: pay.status,
         })),
         reviews: reviewRows.map((r) => ({ rating: r.rating, body: r.body, mine: r.authorId === user.id })),
+        // real progress history + the timeline generated from real records
+        progress: progressPayload("project", p.id, user.id),
+        timeline: projectTimeline(p.id, user.id),
       },
     };
   });

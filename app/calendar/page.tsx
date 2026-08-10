@@ -23,6 +23,7 @@ import {
   MessageSquare,
   X,
   Check,
+  Send,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 
@@ -531,6 +532,10 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
           )}
         </dl>
 
+        {/* live progress — real progress_updates rows; the provider posts
+            updates HERE (the workspace), the client sees them instantly */}
+        {["accepted", "confirmed", "completed"].includes(b.status) && <BookingProgressPanel b={b} />}
+
         {error && (
           <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-rose-300">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> {error}
@@ -599,6 +604,150 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------------- booking progress panel ----------------------
+   The PROVIDER keeps the client informed from inside the booking
+   workspace: status, percent, message, and estimated completion — all
+   stored as real progress_updates rows. The client sees the latest
+   update and the full history; Activity and the conversation mirror
+   the events, but the controls live here. */
+
+const BOOKING_PROGRESS_OPTIONS = [
+  ["not_started", "Not started"],
+  ["preparing", "Preparing"],
+  ["in_progress", "In progress"],
+  ["waiting_on_client", "Waiting on client"],
+  ["finalizing", "Finalizing"],
+  ["ready_for_review", "Ready for review"],
+  ["completed", "Completed"],
+] as const;
+
+function BookingProgressPanel({ b }: { b: Booking }) {
+  const [progress, setProgress] = useState<{
+    latest: { statusLabel: string; percent: number | null; message: string; at: string } | null;
+    etaAt: string | null;
+    updates: { id: string; kind: string; statusLabel: string; percent: number | null; message: string; etaAt: string | null; at: string; mine: boolean }[];
+  } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState("in_progress");
+  const [percent, setPercent] = useState("");
+  const [message, setMessage] = useState("");
+  const [eta, setEta] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/bookings/${b.id}/progress`, { cache: "no-store" });
+    if (res.ok) setProgress((await res.json()).progress);
+  }, [b.id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const post = async () => {
+    setBusy(true);
+    setErr(null);
+    const res = await fetch(`/api/bookings/${b.id}/progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "update",
+        status,
+        percent: percent === "" ? null : Number(percent),
+        message,
+        etaAt: eta ? new Date(eta + "T17:00:00").toISOString() : null,
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setErr(d.error || "Couldn't post the update");
+    setOpen(false);
+    setMessage("");
+    setPercent("");
+    setEta("");
+    load();
+  };
+
+  const latest = progress?.latest ?? null;
+  const canPost = b.myRole === "provider" && ["accepted", "confirmed"].includes(b.status);
+  if (!latest && !canPost) return null;
+
+  const agoTxt = (iso: string) => {
+    const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-line bg-card-raised p-3.5">
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Progress</p>
+        {latest && <span className="font-mono text-[10px] tracking-[0.08em] text-zinc-600">updated {agoTxt(latest.at)}</span>}
+      </div>
+      {latest ? (
+        <>
+          <div className="mt-2 flex items-center gap-2.5">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/40">
+              <div className="h-full rounded-full bg-lime-400 transition-all" style={{ width: `${latest.percent ?? 0}%` }} />
+            </div>
+            <span className="font-mono text-xs font-bold tracking-[0.08em] text-lime-300">
+              {latest.percent != null ? `${latest.percent}%` : "—"}
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs font-semibold text-zinc-200">{latest.statusLabel}</p>
+          {latest.message && <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">&ldquo;{latest.message}&rdquo;</p>}
+          {progress?.etaAt && (
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Est. completion:{" "}
+              <span className="font-mono tracking-[0.08em] text-zinc-300">
+                {new Date(progress.etaAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="mt-1.5 text-xs text-zinc-500">No updates yet — keep {b.with.displayName.split(" ")[0]} in the loop.</p>
+      )}
+
+      {canPost && !open && (
+        <button onClick={() => setOpen(true)} className="btn-ghost mt-2.5 w-full justify-center py-1.5 text-xs">
+          <Send className="h-3.5 w-3.5" /> Post progress update
+        </button>
+      )}
+      {canPost && open && (
+        <div className="mt-2.5 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-dark py-1.5 text-xs">
+              {BOOKING_PROGRESS_OPTIONS.map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+            <input
+              type="number" min={0} max={100} value={percent} onChange={(e) => setPercent(e.target.value)}
+              placeholder="% done" className="input-dark py-1.5 text-xs"
+            />
+          </div>
+          <textarea
+            value={message} onChange={(e) => setMessage(e.target.value)} rows={2}
+            placeholder="What are you currently working on?"
+            className="input-dark w-full resize-none py-1.5 text-xs"
+          />
+          <label className="block">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Estimated completion (optional)</span>
+            <input type="date" value={eta} onChange={(e) => setEta(e.target.value)} className="input-dark mt-1 w-full py-1.5 text-xs" />
+          </label>
+          {err && <p className="text-xs font-medium text-rose-300">{err}</p>}
+          <div className="flex gap-1.5">
+            <button disabled={busy} onClick={post} className="btn-lime flex-1 justify-center py-1.5 text-xs">Post update</button>
+            <button onClick={() => setOpen(false)} className="btn-ghost flex-1 justify-center py-1.5 text-xs">Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

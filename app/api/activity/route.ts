@@ -30,6 +30,29 @@ export async function GET() {
     const counterpart = (id: string) => ({ id, handle: handles.get(id) ?? "?", displayName: names.get(id) ?? "?" });
     const payments = db.select().from(tables.payments).all();
 
+    /* latest progress update per record — Activity MIRRORS the history;
+       the posting controls live in the project/booking workspaces */
+    const allProgress = db.select().from(tables.progressUpdates).all();
+    const latestFor = (key: "projectId" | "bookingId", id: string) => {
+      const rows = allProgress
+        .filter((r) => r[key] === id)
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      const updates = rows.filter((r) => r.kind === "update");
+      const latest = updates.length ? updates[updates.length - 1] : null;
+      let eta: Date | null = null;
+      for (let i = rows.length - 1; i >= 0; i--)
+        if (rows[i].etaAt) {
+          eta = rows[i].etaAt!;
+          break;
+        }
+      return {
+        latestUpdate: latest
+          ? { status: latest.status, percent: latest.percent, message: latest.message, at: latest.createdAt.toISOString() }
+          : null,
+        etaAt: eta?.toISOString() ?? null,
+      };
+    };
+
     /* ---------------- service bookings ---------------- */
     const bookings = db
       .select()
@@ -53,6 +76,7 @@ export async function GET() {
           paymentStatus: pay?.status ?? null,
           conversationId: b.conversationId,
           href: "/calendar",
+          ...latestFor("bookingId", b.id),
           updatedAt: b.createdAt.toISOString(),
         };
       });
@@ -115,6 +139,8 @@ export async function GET() {
           paymentStatus: pay?.status ?? null,
           conversationId: p.conversationId,
           href: p.conversationId ? `/messages?c=${p.conversationId}` : "/messages",
+          workspaceHref: `/projects/${p.id}`,
+          ...latestFor("projectId", p.id),
           updatedAt: p.updatedAt.toISOString(),
         };
       });
