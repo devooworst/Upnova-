@@ -240,7 +240,9 @@ export function preferredWithEarlyAccess(providerId: string): string[] {
 export interface EarlyAccessSetup {
   /** total bookable slots for this drop (active bookings cap), 1–50 */
   slots: number | null;
-  /** max bookings during the preferred window, 1–50 (≤ slots) */
+  /** PER-CLIENT limit during the window: how many appointments each
+      Preferred Client can claim during early access (1–50, or null =
+      no limit). Capacity still binds everyone regardless. */
   preferredLimit: number | null;
   /** when the current window was opened (ISO) — the allocation counts from here */
   startedAt: string | null;
@@ -291,10 +293,10 @@ export function activeBookingsForService(serviceId: string): number {
     .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status)).length;
 }
 
-/** How many slot-holding bookings were created since the window opened —
-    the preferred allocation is measured against THIS, so a cancelled
-    early booking frees allocation too. */
-export function bookingsSinceWindowStart(serviceId: string, startedAtIso: string | null): number {
+/** How many slot-holding bookings a specific client has made since the
+    window opened — the per-client early-access limit is measured against
+    THIS, so a cancelled booking frees that client's allocation too. */
+export function clientBookingsSinceWindowStart(serviceId: string, clientId: string, startedAtIso: string | null): number {
   if (!startedAtIso) return 0;
   const t0 = new Date(startedAtIso).getTime();
   if (!Number.isFinite(t0)) return 0;
@@ -303,5 +305,5 @@ export function bookingsSinceWindowStart(serviceId: string, startedAtIso: string
     .from(tables.bookings)
     .where(eq(tables.bookings.serviceId, serviceId))
     .all()
-    .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status) && b.createdAt.getTime() >= t0).length;
+    .filter((b) => b.clientId === clientId && (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status) && b.createdAt.getTime() >= t0).length;
 }

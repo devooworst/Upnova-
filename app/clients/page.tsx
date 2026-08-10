@@ -63,6 +63,7 @@ interface MyService {
   id: string;
   title: string;
   price: number;
+  horizonDays: number;
   preferredUntil: string | null;
   earlyAccess: {
     slots: number | null;
@@ -73,15 +74,15 @@ interface MyService {
 }
 
 const BENEFIT_CHOICES: { key: string; label: string; hint?: string }[] = [
-  { key: "priority_booking", label: "Priority booking" },
-  { key: "early_access", label: "Early access to appointments" },
-  { key: "discount", label: "Preferred pricing / discount" },
-  { key: "free_addon", label: "Free add-on" },
-  { key: "upgrade", label: "Complimentary upgrade" },
-  { key: "recurring_priority", label: "Recurring booking priority", hint: "their usual window stays available" },
-  { key: "priority_response", label: "Priority response" },
-  { key: "exclusive_windows", label: "Exclusive booking windows" },
-  { key: "custom", label: "Custom reward" },
+  { key: "priority_booking", label: "Priority booking", hint: "Give Preferred Clients priority when booking available services." },
+  { key: "early_access", label: "Early access to appointments", hint: "They can book during your Preferred Early Access windows." },
+  { key: "discount", label: "Preferred pricing / discount", hint: "Applied automatically and itemized on their receipt." },
+  { key: "free_addon", label: "Free add-on", hint: "A menu add-on on the house." },
+  { key: "upgrade", label: "Complimentary upgrade", hint: "A better package at the base price." },
+  { key: "recurring_priority", label: "Recurring booking priority", hint: "Give Preferred Clients priority when scheduling repeat or recurring appointments." },
+  { key: "priority_response", label: "Priority response", hint: "Their messages surface first in your inbox." },
+  { key: "exclusive_windows", label: "Exclusive early-access windows", hint: "Access to windows you open only for Preferred Clients." },
+  { key: "custom", label: "Custom reward", hint: "Anything you want to offer — your words." },
 ];
 
 const benefitLabel = (b: Benefit) =>
@@ -210,12 +211,14 @@ export default function ClientsPage() {
       </section>
 
       {/* ================= PREFERRED CLIENTS (provider side) ================= */}
-      <section className="card p-5">
+      <section className="card p-5" data-tut="clients-preferred">
         <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
           <UserCheck className="h-4 w-4 text-lime-300" /> Preferred Clients ({preferred.length})
         </h2>
-        <p className="mt-0.5 text-[11px] text-zinc-500">
-          Clients you&apos;ve chosen to give special treatment. Only you can see this list.
+        <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+          Clients you&apos;ve intentionally selected for loyalty benefits. Only you can see this list.{" "}
+          <span className="text-zinc-400">Preferred status is a relationship — it never grants unlimited bookings.
+          Preferred Early Access (below) is a separate, temporary access mechanism, and your availability is always the hard limit.</span>
         </p>
         {preferred.length === 0 ? (
           <p className="mt-3 text-xs text-zinc-500">
@@ -261,13 +264,15 @@ export default function ClientsPage() {
 
       {/* ================= EARLY ACCESS WINDOWS ================= */}
       {(data?.services?.length ?? 0) > 0 && (
-        <section className="card p-5">
+        <section className="card p-5" data-tut="clients-early-access">
           <h2 className="text-sm font-bold text-zinc-100">Preferred Early Access</h2>
           <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-            Give your Preferred Clients first access to a service before the general public. <span className="text-zinc-300">Early
-            Access controls who gets access first — your availability and slot count control how many people can actually
-            book.</span> Preferred Clients can never book beyond your available slots; when the window ends, any remaining
-            availability opens to everyone automatically, and cancellations free their slot.
+            Give your Preferred Clients first access to newly released appointments before everyone else.
+            <span className="text-zinc-300"> Three separate dials: your <span className="font-semibold">booking horizon</span> says
+            how far ahead anyone can book · <span className="font-semibold">early access</span> says who gets access first ·
+            <span className="font-semibold"> availability/capacity</span> says how many can actually book.</span>{" "}
+            Preferred Clients can never book beyond your available slots or outside your horizon; when the window ends, any
+            remaining availability opens to everyone automatically, and cancellations free their slot.
           </p>
           <div className="mt-3 space-y-2">
             {data!.services.map((s) => (
@@ -279,9 +284,10 @@ export default function ClientsPage() {
 
       {/* ================= ALL CLIENTS ================= */}
       <section className="card p-5">
-        <h2 className="text-sm font-bold text-zinc-100">All clients ({data?.clients.length ?? 0})</h2>
+        <h2 className="text-sm font-bold text-zinc-100" data-tut="clients-all">All clients ({data?.clients.length ?? 0})</h2>
         <p className="mt-0.5 text-[11px] text-zinc-500">
-          Everyone who has booked or hired you. Eligibility: 3 completed engagements with you within 12 months — adding them stays your call.
+          Your private customer history — everyone who has booked or hired you, with completed engagements, spending, and
+          last booking. Eligibility for Preferred: 3 completed engagements within 12 months — adding them stays your call.
         </p>
         {data === null ? (
           <div className="mt-3 h-16 animate-pulse rounded-xl bg-card-raised" />
@@ -498,6 +504,7 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [hours, setHours] = useState(24);
+  const [customHours, setCustomHours] = useState(false);
   const [slots, setSlots] = useState("");
   const [prefLimit, setPrefLimit] = useState("");
 
@@ -535,7 +542,12 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
     <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-zinc-100">{s.title}</p>
+          <p className="text-sm font-semibold text-zinc-100">
+            {s.title}
+            <span className="ml-2 font-mono text-[9px] font-normal uppercase tracking-wide text-zinc-500" title="Booking horizon — how far into the future customers can book this service. Set it on the service itself; it applies to everyone, Preferred Clients included." data-tut="clients-horizon">
+              horizon {s.horizonDays}d
+            </span>
+          </p>
           {s.preferredUntil ? (
             <p className="text-[11px] font-semibold text-lime-300">
               Preferred Early Access until {opensAt} — remaining slots open to everyone then
@@ -543,7 +555,7 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
                 <span className="text-zinc-400"> · {s.earlyAccess.slotsLeft} of {s.earlyAccess.slots} slots left</span>
               )}
               {s.earlyAccess?.preferredLimit != null && (
-                <span className="text-zinc-400"> · preferred allocation {s.earlyAccess.preferredLimit}</span>
+                <span className="text-zinc-400"> · {s.earlyAccess.preferredLimit} per client</span>
               )}
             </p>
           ) : s.earlyAccess?.slots != null ? (
@@ -579,26 +591,36 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
           </label>
           <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
             Early access
-            <select value={hours} onChange={(e) => setHours(Number(e.target.value))} className="input-dark mt-1 px-2 py-1.5 text-xs">
+            <select value={customHours ? 0 : hours} onChange={(e) => { const v = Number(e.target.value); if (v === 0) setCustomHours(true); else { setCustomHours(false); setHours(v); } }} className="input-dark mt-1 px-2 py-1.5 text-xs" title="How long Preferred Clients book before the public. Public booking opens automatically when this ends.">
               {[6, 12, 24, 48, 72].map((h) => <option key={h} value={h}>{h}h</option>)}
+              <option value={0}>Custom…</option>
             </select>
+            {customHours && (
+              <input
+                value={hours}
+                onChange={(e) => setHours(Math.max(1, Math.min(168, Number(e.target.value.replace(/[^0-9]/g, "")) || 1)))}
+                className="input-dark ml-1 mt-1 w-14 px-2 py-1.5 text-xs"
+                title="Custom duration in hours (1–168)"
+              />
+            )}
           </label>
           <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
-            Preferred limit
+            Per-client limit
             <input
               value={prefLimit}
               onChange={(e) => setPrefLimit(e.target.value.replace(/[^0-9]/g, ""))}
-              placeholder="none"
+              placeholder="no limit"
               className="input-dark mt-1 w-16 px-2 py-1.5 text-xs"
-              title="Optional: max bookings Preferred Clients can take during the window, so slots are left for the public opening."
+              title="Control how many appointments each Preferred Client can claim during an early-access period. Empty = no limit (capacity still applies)."
             />
           </label>
           <button disabled={busy} onClick={start} className="btn-ghost px-3 py-1.5 text-xs">
             <Clock className="h-3 w-3" /> Start early access
           </button>
           <p className="w-full text-[10px] leading-relaxed text-zinc-600">
-            Preferred Clients book first for {hours}h{slots.trim() ? ` · ${slots} total slots (capacity applies to everyone)` : ""}
-            {prefLimit.trim() ? ` · at most ${prefLimit} preferred bookings` : ""} · then remaining availability opens to the public automatically.
+            Preferred Clients book first for {hours}h{slots.trim() ? ` · ${slots} total slots (capacity binds everyone)` : ""}
+            {prefLimit.trim() ? ` · max ${prefLimit} per Preferred Client` : ""} · public booking opens automatically when the window ends ·
+            bookings stay inside your {s.horizonDays}-day horizon.
           </p>
         </div>
       )}

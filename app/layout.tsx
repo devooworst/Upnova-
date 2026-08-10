@@ -5,6 +5,7 @@ import SidebarShell from "@/components/SidebarShell";
 import MobileNav from "@/components/MobileNav";
 import CreateModal from "@/components/CreateModal";
 import GuestGate from "@/components/GuestGate";
+import FeatureTour from "@/components/FeatureTour";
 import OnboardingTour from "@/components/OnboardingTour";
 import QaPersonaBar from "@/components/QaPersonaBar";
 import { FollowProvider } from "@/lib/follow";
@@ -48,6 +49,7 @@ export default function RootLayout({
         <MobileNav />
         <CreateModal />
         <GuestGate />
+        <FeatureTour />
         <OnboardingTour />
         <QaPersonaBar />
         </FollowProvider>

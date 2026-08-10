@@ -47,9 +47,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return n;
     };
     const slots = numOrNull(body.slots, "Available slots");
-    const preferredLimit = numOrNull(body.preferredLimit, "Preferred booking limit");
+    const preferredLimit = numOrNull(body.preferredLimit, "Per-client booking limit");
     if (slots != null && preferredLimit != null && preferredLimit > slots)
-      throw new ApiError(400, "The preferred booking limit can't exceed the available slots");
+      throw new ApiError(400, "The per-client booking limit can't exceed the available slots");
 
     // a slot cap below what's ALREADY booked would be a lie — refuse it honestly
     const alreadyActive = activeBookingsForService(svc.id);

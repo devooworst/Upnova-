@@ -382,6 +382,36 @@ export async function POST(req: NextRequest) {
     // AUTHORIZATION: the CLIENT cannot perform provider-only actions
     const forge = await api("rachel", `/api/bookings/${bookingId}`, { method: "PATCH", body: { action: "accept" } });
     step(c, "authz: client forging a provider action → rejected", forge.status === 403 || forge.status === 409, { route: "PATCH accept as client", actual: String(forge.status) });
+
+    /* ---- BOOKING HORIZON: how far ahead THIS provider releases ----
+       A separate dial from Preferred Early Access (who books first) and
+       capacity (how many). Tested at 7 / 30 / custom-3 days. */
+    {
+      const svcH = ((await api("rachel", "/api/services")).data as any).services.find((s: any) => s.owner?.handle === "lena");
+      const wk = (daysOut: number, hour: number) => {
+        let t = new Date(Date.now() + daysOut * 86400e3);
+        while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3);
+        t.setHours(hour, 0, 0, 0);
+        return t.toISOString();
+      };
+      const set = (days: number) => api("lena", `/api/services/${svcH.id}`, { method: "PATCH", body: { scheduling: { horizonDays: days } } });
+      const h7 = await set(7);
+      const far7 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svcH.id, startsAt: wk(10, 9), durationMin: 60 } });
+      step(c, "horizon 7 days: a booking 10 days out is refused — that date isn't released yet", h7.status === 200 && far7.status === 409 && /days ahead/.test(String((far7.data as any).error)), { actual: `${far7.status} ${String((far7.data as any).error).slice(0, 80)}` });
+      const near7 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svcH.id, startsAt: wk(4, 9), durationMin: 60 } });
+      step(c, "horizon 7 days: a booking 4 days out succeeds", near7.status === 200, { actual: String(near7.status) });
+      if ((near7.data as any).id) await api("rachel", `/api/bookings/${(near7.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+      await set(30);
+      const far30 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svcH.id, startsAt: wk(10, 10), durationMin: 60 } });
+      step(c, "provider widens the horizon to 30 days: the SAME 10-days-out booking now succeeds", far30.status === 200, { actual: String(far30.status) });
+      if ((far30.data as any).id) await api("rachel", `/api/bookings/${(far30.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+      await set(3);
+      const far3 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svcH.id, startsAt: wk(5, 9), durationMin: 60 } });
+      const badSet = await api("lena", `/api/services/${svcH.id}`, { method: "PATCH", body: { scheduling: { horizonDays: 999 } } });
+      step(c, "custom horizon (3 days) enforced · invalid horizon (999) rejected — providers differ, UpNova never assumes one schedule",
+        far3.status === 409 && badSet.status === 400, { actual: `far=${far3.status} badSet=${badSet.status}` });
+      await set(60); // restore the default for later categories
+    }
   }
 
   /* ================= PAYMENTS (TEST) + TIME SIMULATION ================= */
@@ -672,11 +702,13 @@ export async function POST(req: NextRequest) {
     const addPc2 = await api("lena", "/api/preferred-clients", { method: "POST", body: { clientHandle: "tonbpc", benefits: [{ key: "priority_booking" }] } });
     step(c, "EA setup: second Preferred Client added (relationship basis = real conversation)", addPc2.status === 200, { actual: String(addPc2.status) });
 
-    const drop = await api("lena", `/api/services/${svc.id}/early-access`, { method: "POST", body: { hours: 24, slots: 3, preferredLimit: 2 } });
+    const drop = await api("lena", `/api/services/${svc.id}/early-access`, { method: "POST", body: { hours: 24, slots: 3, preferredLimit: 1 } });
     const dropD = drop.data as any;
-    step(c, "provider configures the drop: 3 slots · 24h early access · preferred limit 2 · public opening returned",
-      drop.status === 200 && dropD.slots === 3 && dropD.preferredLimit === 2 && dropD.slotsLeft === 3 && !!dropD.opensToPublicAt, {
-      route: "POST early-access {hours:24, slots:3, preferredLimit:2}", actual: JSON.stringify({ slots: dropD.slots, limit: dropD.preferredLimit, left: dropD.slotsLeft }) });
+    step(c, "provider configures the drop: 3 slots · 24h early access · 1 per Preferred Client · public opening returned",
+      drop.status === 200 && dropD.slots === 3 && dropD.preferredLimit === 1 && dropD.slotsLeft === 3 && !!dropD.opensToPublicAt, {
+      route: "POST early-access {hours:24, slots:3, preferredLimit:1}", actual: JSON.stringify({ slots: dropD.slots, limit: dropD.preferredLimit, left: dropD.slotsLeft }) });
+    step(c, "Preferred Clients notified the moment early access opens",
+      (((await api("rachel", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "preferred_window"), { route: "GET /api/notifications as rachel" });
 
     // weekday slots well out, inside lena's real working hours
     const dropDay = (() => { for (let d = 6; d <= 12; d++) { const t = new Date(Date.now() + d * 86400e3); if (t.getDay() >= 1 && t.getDay() <= 5) return t; } return new Date(Date.now() + 6 * 86400e3); })();
@@ -690,8 +722,8 @@ export async function POST(req: NextRequest) {
     step(c, "two Preferred Clients book the limited slots (real availability rules still applied)", p1.status === 200 && p2.status === 200, { actual: `${p1.status}/${p2.status}` });
 
     const p3 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(14), durationMin: 60 } });
-    step(c, "third preferred attempt → 409: the preferred allocation (2) is used — a slot is GUARANTEED for the public opening",
-      p3.status === 409 && /allocation/.test(String((p3.data as any).error)), { actual: `${p3.status} ${String((p3.data as any).error).slice(0, 80)}` });
+    step(c, "same client's SECOND attempt → 409: per-client limit (1 per Preferred Client) — one client can't sweep the release",
+      p3.status === 409 && /per Preferred Client/.test(String((p3.data as any).error)), { actual: `${p3.status} ${String((p3.data as any).error).slice(0, 90)}` });
 
     await api("lena", `/api/services/${svc.id}/early-access`, { method: "DELETE" }); // public opening (slot cap stays)
     const pub1 = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(15), durationMin: 60 } });
@@ -757,6 +789,24 @@ export async function POST(req: NextRequest) {
     const tourN = (await api("nia", "/api/onboarding/tour")).data as any;
     step(c, "verified student → student tour incl. Your Campus", tourN.audience === "student" && (tourN.steps ?? []).some((s: any) => s.id === "campus"), { actual: tourN.audience });
     await api("nia", "/api/auth/logout", { method: "POST" });
+
+    /* ---- CONTEXTUAL TUTORIALS: tracked per user, per feature ---- */
+    {
+      const t0 = (await api("tonba", "/api/me/tours")).data as any;
+      step(c, "fresh account: no tutorial marked done anywhere", t0.tours && Object.keys(t0.tours).length === 0, { route: "GET /api/me/tours", actual: JSON.stringify(t0.tours) });
+      await api("tonba", "/api/me/tours", { method: "POST", body: { id: "clients", status: "done" } });
+      await api("tonba", "/api/me/tours", { method: "POST", body: { id: "payments", status: "dismissed" } });
+      const t1 = (await api("tonba", "/api/me/tours")).data as any;
+      step(c, "per-feature state: clients=done (finished/skipped) · payments=dismissed (don't show again)", t1.tours?.clients === "done" && t1.tours?.payments === "dismissed", { actual: JSON.stringify(t1.tours) });
+      const t2 = (await api("tonbb", "/api/me/tours")).data as any;
+      step(c, "per-user isolation: another account's tutorial state is untouched", t2.tours && Object.keys(t2.tours).length === 0, { actual: JSON.stringify(t2.tours) });
+      await api("tonba", "/api/me/onboarding", { method: "POST", body: { action: "complete" } });
+      const t3 = (await api("tonba", "/api/me/tours")).data as any;
+      step(c, "finishing the FIRST-RUN tour never wipes per-feature tutorial state", t3.tours?.clients === "done" && t3.tours?.payments === "dismissed", { actual: JSON.stringify(t3.tours) });
+      await api("tonba", "/api/me/tours", { method: "POST", body: { id: "clients", status: "reset" } });
+      const t4 = (await api("tonba", "/api/me/tours")).data as any;
+      step(c, "reset re-offers one feature's tutorial without touching the rest", !t4.tours?.clients && t4.tours?.payments === "dismissed", { actual: JSON.stringify(t4.tours) });
+    }
   }
 
   /* ================= BUSINESS PEOPLE & HIRING ================= */
@@ -1088,7 +1138,7 @@ export async function POST(req: NextRequest) {
     const orphanMembers = db.select().from(tables.conversationMembers).all().filter((m) => !db.select().from(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).get()).length;
     step(c, "no orphaned conversation members", orphanMembers === 0, { actual: String(orphanMembers) });
     const dupBookings = db.select().from(tables.bookings).where(and(eq(tables.bookings.clientId, rachel.id), eq(tables.bookings.providerId, lena.id))).all().length;
-    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window + 1 early-access drop)", dupBookings === 6, { expected: "6", actual: String(dupBookings) });
+    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window + 1 drop + 2 horizon checks)", dupBookings === 8, { expected: "8", actual: String(dupBookings) });
   }
 
   } catch (e) {

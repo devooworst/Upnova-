@@ -35,15 +35,21 @@ export async function POST(req: NextRequest) {
   return guarded(() => {
     const user = requireUser();
     const action = String(body.action);
+    // per-feature tutorial state (the `tours` key) is ALWAYS preserved —
+    // finishing or resetting the first-run tour never wipes it
+    const row = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+    let prev: Record<string, unknown> = {};
+    try { prev = JSON.parse(row.onboarding || "{}") ?? {}; } catch {}
+    const keepTours = typeof prev.tours === "object" && prev.tours !== null ? { tours: prev.tours } : {};
     if (action === "complete" || action === "skip") {
       db.update(tables.users)
-        .set({ onboarding: JSON.stringify({ completedAt: new Date().toISOString(), skipped: action === "skip" }) })
+        .set({ onboarding: JSON.stringify({ completedAt: new Date().toISOString(), skipped: action === "skip", ...keepTours }) })
         .where(eq(tables.users.id, user.id))
         .run();
       return { completed: true, skipped: action === "skip" };
     }
     if (action === "reset") {
-      db.update(tables.users).set({ onboarding: "" }).where(eq(tables.users.id, user.id)).run();
+      db.update(tables.users).set({ onboarding: JSON.stringify({ ...keepTours }) }).where(eq(tables.users.id, user.id)).run();
       return { completed: false, skipped: false };
     }
     throw new ApiError(400, "Unknown action");

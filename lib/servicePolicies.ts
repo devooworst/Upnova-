@@ -102,6 +102,12 @@ export interface ServiceConfig {
     bufferMin?: number; // gap enforced between appointments
     sameDayBooking?: boolean;
     advanceNoticeHours?: number;
+    /** BOOKING HORIZON — how far into the future customers can book,
+        in days. A completely separate concept from Preferred Early
+        Access: the horizon says HOW FAR AHEAD anyone can book; early
+        access says WHO GETS ACCESS FIRST when availability is released.
+        Every provider sets their own (7/14/30/60/custom). */
+    horizonDays?: number;
   };
   pricing?: {
     type: "fixed" | "starting" | "hourly" | "quote";
@@ -130,6 +136,7 @@ export const DEFAULT_CONFIG: ServiceConfig = {
     bufferMin: 0,
     sameDayBooking: true,
     advanceNoticeHours: 2,
+    horizonDays: 60, // sensible default — every provider can change it
   },
   pricing: { type: "starting" },
   policies: {

@@ -9,7 +9,7 @@ import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser, seedBookingProgress } from "@/lib/server/demo";
 import { resolvePairConversation } from "@/lib/server/conversations";
 import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
-import { hasEarlyAccess, discountPercent, readEarlyAccess, activeBookingsForService, bookingsSinceWindowStart } from "@/lib/server/preferred";
+import { hasEarlyAccess, discountPercent, readEarlyAccess, activeBookingsForService, clientBookingsSinceWindowStart } from "@/lib/server/preferred";
 import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
 
@@ -112,9 +112,9 @@ export async function POST(req: NextRequest) {
         2. While the window is open, only the owner's Preferred Clients
            (priority-booking / early-access benefit) may book — still
            inside capacity, schedule, and conflict rules.
-        3. Optional preferred allocation: the window can cap how many
-           bookings Preferred Clients take, so remaining slots are
-           guaranteed to reach the public opening.
+        3. Optional PER-CLIENT limit: each Preferred Client can claim at
+           most N appointments during early access, so one client can't
+           sweep the whole release.
        After the window, remaining availability opens to everyone. */
     const eaSetup = readEarlyAccess(service.config);
     const windowOpen = !!service.preferredUntil && service.preferredUntil.getTime() > Date.now();
@@ -128,9 +128,9 @@ export async function POST(req: NextRequest) {
       if (!hasEarlyAccess(service.ownerId, user.id))
         throw new ApiError(403, `Preferred Early Access is on — this provider's Preferred Clients get first pick. Booking opens to everyone ${opens}`);
       if (eaSetup?.preferredLimit != null) {
-        const takenThisWindow = bookingsSinceWindowStart(service.id, eaSetup.startedAt);
-        if (takenThisWindow >= eaSetup.preferredLimit)
-          throw new ApiError(409, `The Preferred Early Access allocation is used (${eaSetup.preferredLimit} of ${eaSetup.preferredLimit} booked) — remaining slots open to everyone ${opens}`);
+        const mine = clientBookingsSinceWindowStart(service.id, user.id, eaSetup.startedAt);
+        if (mine >= eaSetup.preferredLimit)
+          throw new ApiError(409, `Early-access limit reached — ${eaSetup.preferredLimit} booking${eaSetup.preferredLimit === 1 ? "" : "s"} per Preferred Client during this window. Remaining availability opens to everyone ${opens}`);
       }
     }
     const providerProfile = db
@@ -177,6 +177,15 @@ export async function POST(req: NextRequest) {
     if (sched.startHour != null && sched.endHour != null && (hour < sched.startHour || hour >= sched.endHour))
       throw new ApiError(409, `Outside working hours (${sched.startHour}:00–${sched.endHour}:00)`);
     const hoursOut = (reqStart.getTime() - Date.now()) / 3600_000;
+    // BOOKING HORIZON: how far ahead THIS provider releases availability.
+    // A separate dimension from Preferred Early Access (who books first)
+    // and from capacity (how many can book) — the horizon binds everyone,
+    // Preferred Clients included.
+    const horizon = sched.horizonDays ?? 60;
+    if (reqStart.getTime() > Date.now() + horizon * 86400_000) {
+      const releases = new Date(reqStart.getTime() - horizon * 86400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      throw new ApiError(409, `${providerProfileFull.displayName} opens bookings ${horizon} days ahead — that date isn't released yet (bookable from ${releases})`);
+    }
     if (sched.sameDayBooking === false && reqStart.toDateString() === new Date().toDateString())
       throw new ApiError(409, "Same-day booking isn't available for this service");
     if (sched.advanceNoticeHours && hoursOut < sched.advanceNoticeHours)

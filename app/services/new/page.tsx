@@ -500,6 +500,37 @@ export default function NewServicePage() {
                 </select>
               </label>
             </div>
+            {/* BOOKING HORIZON — its own concept, never mixed with early access */}
+            <div className="mt-3" data-tut="service-horizon">
+              <label className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+                Booking horizon
+                <select
+                  value={[7, 14, 30, 60].includes(config.scheduling.horizonDays ?? 60) ? (config.scheduling.horizonDays ?? 60) : 0}
+                  onChange={(e) => { const v = Number(e.target.value); if (v > 0) setScheduling({ horizonDays: v }); }}
+                  className={`${inputCls} w-auto py-1.5`}
+                >
+                  <option value={7}>7 days</option>
+                  <option value={14}>14 days</option>
+                  <option value={30}>30 days</option>
+                  <option value={60}>60 days</option>
+                  <option value={0}>Custom…</option>
+                </select>
+                {![7, 14, 30, 60].includes(config.scheduling.horizonDays ?? 60) || false ? null : null}
+                {!( [7, 14, 30, 60].includes(config.scheduling.horizonDays ?? 60) ) && (
+                  <input
+                    value={config.scheduling.horizonDays ?? 60}
+                    onChange={(e) => setScheduling({ horizonDays: Math.max(1, Math.min(365, Number(e.target.value.replace(/[^0-9]/g, "")) || 1)) })}
+                    className={`${inputCls} w-16 py-1.5`}
+                    title="Custom horizon in days (1–365)"
+                  />
+                )}
+              </label>
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+                How far into the future customers can book your services. Yours alone — one stylist can open 1 week ahead, another
+                1 month; UpNova never assumes one universal schedule. Separate from Preferred Early Access, which only controls
+                who gets first access when you release availability.
+              </p>
+            </div>
           </div>
         </section>
       )}

@@ -130,6 +130,31 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (typeof body.description === "string") patch.description = body.description.slice(0, 1000);
     if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 80);
 
+    // SCHEDULING updates — booking horizon and friends, sanitized like
+    // creation. Partial: only the keys sent change; the rest stay.
+    if (body.scheduling && typeof body.scheduling === "object") {
+      const svcRow = db.select().from(tables.services).where(eq(tables.services.id, params.id)).get()!;
+      const cur = parseConfig(svcRow.config);
+      const s = body.scheduling as Record<string, unknown>;
+      const num = (v: unknown, lo: number, hi: number) => {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) && n >= lo && n <= hi ? n : undefined;
+      };
+      const nextSched = { ...cur.scheduling };
+      if (s.horizonDays !== undefined) {
+        const h = num(s.horizonDays, 1, 365);
+        if (h === undefined) throw new ApiError(400, "Booking horizon must be 1–365 days");
+        nextSched.horizonDays = h;
+      }
+      if (s.maxPerDay !== undefined) nextSched.maxPerDay = num(s.maxPerDay, 1, 20);
+      if (s.advanceNoticeHours !== undefined) nextSched.advanceNoticeHours = num(s.advanceNoticeHours, 0, 168) ?? nextSched.advanceNoticeHours;
+      if (typeof s.sameDayBooking === "boolean") nextSched.sameDayBooking = s.sameDayBooking;
+      let full: Record<string, unknown> = {};
+      try { full = JSON.parse(svcRow.config || "{}") ?? {}; } catch {}
+      full.scheduling = { ...(typeof full.scheduling === "object" && full.scheduling !== null ? full.scheduling : {}), ...nextSched };
+      patch.config = JSON.stringify(full);
+    }
+
     db.update(tables.services).set(patch).where(eq(tables.services.id, params.id)).run();
     return { ok: true };
   });
