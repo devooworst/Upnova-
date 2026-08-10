@@ -124,8 +124,16 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       apply();
     }
   }, []);
-  // temporary smart-alignment guides — exist only while dragging
-  const [dragGuides, setDragGuides] = useState<{ v: number[]; h: number[]; equal: boolean } | null>(null);
+  // temporary smart-alignment guides — exist only while dragging.
+  // dist = live distance indicators (design-px labels to the nearest
+  // neighbor on each side); equal/equalH = vertical/horizontal even-gap.
+  const [dragGuides, setDragGuides] = useState<{
+    v: number[];
+    h: number[];
+    equal: boolean;
+    equalH: boolean;
+    dist: { axis: "x" | "y"; from: number; to: number; at: number; label: string }[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -639,6 +647,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         const v: number[] = [];
         const hg: number[] = [];
         let equal = false;
+        let equalH = false;
         if (!e.altKey) {
           const TX = 0.9; // % — small threshold: helpful, never sticky
           const TY = 8; // design px
@@ -660,8 +669,8 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
           outerH: for (const [edge, apply] of myH)
             for (const c of hCands)
               if (Math.abs(edge - c) <= TY) { y = Math.max(0, Math.min(4000, apply(c))); hg.push(c); break outerH; }
-          // EQUAL SPACING: nearest neighbor fully above and fully below —
-          // when the two gaps get close, snap to even and say so
+          // EQUAL SPACING (vertical): nearest neighbor fully above and fully
+          // below — when the two gaps get close, snap to even and say so
           const above = d.others.filter((o) => o.b <= y + TY).sort((a, b) => b.b - a.b)[0];
           const below = d.others.filter((o) => o.t >= y + hPx - TY).sort((a, b) => a.t - b.t)[0];
           if (above && below) {
@@ -672,8 +681,44 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
               equal = true;
             }
           }
+          // EQUAL SPACING (horizontal): nearest vertically-overlapping
+          // neighbor on each side — even out the left/right gaps too
+          const overlapsMe = (o: typeof d.others[number]) => o.t < y + hPx && o.b > y;
+          const leftN = d.others.filter((o) => overlapsMe(o) && o.r <= x + TX).sort((a, b) => b.r - a.r)[0];
+          const rightN = d.others.filter((o) => overlapsMe(o) && o.l >= x + wPct - TX).sort((a, b) => a.l - b.l)[0];
+          if (leftN && rightN) {
+            const gapL = x - leftN.r;
+            const gapR = rightN.l - (x + wPct);
+            if (gapL > 0.5 && gapR > 0.5 && Math.abs(gapL - gapR) <= 1.4) {
+              x = Math.max(0, Math.min(100, leftN.r + (rightN.l - leftN.r - wPct) / 2));
+              equalH = true;
+            }
+          }
         }
-        setDragGuides(v.length || hg.length || equal ? { v, h: hg, equal } : null);
+        /* DISTANCE INDICATORS — always-on measurements while dragging
+           (they inform, they never snap; Alt keeps them too). Labels are
+           DESIGN px, the canvas's own unit — nothing screenshot-specific. */
+        const dist: { axis: "x" | "y"; from: number; to: number; at: number; label: string }[] = [];
+        {
+          const hPx = d.el.h > 0 ? d.el.h : d.measuredH;
+          const wPct = d.el.w;
+          const pctToPx = (p: number) => (p * WORLD_DESIGN_WIDTH) / 100;
+          const spansX = (o: typeof d.others[number]) => o.l < x + wPct && o.r > x; // horizontal overlap
+          const spansY = (o: typeof d.others[number]) => o.t < y + hPx && o.b > y; // vertical overlap
+          const nAbove = d.others.filter((o) => spansX(o) && o.b <= y).sort((a, b) => b.b - a.b)[0];
+          if (nAbove && y - nAbove.b >= 2)
+            dist.push({ axis: "y", from: nAbove.b, to: y, at: x + wPct / 2, label: `${Math.round(y - nAbove.b)}px` });
+          const nBelow = d.others.filter((o) => spansX(o) && o.t >= y + hPx).sort((a, b) => a.t - b.t)[0];
+          if (nBelow && nBelow.t - (y + hPx) >= 2)
+            dist.push({ axis: "y", from: y + hPx, to: nBelow.t, at: x + wPct / 2, label: `${Math.round(nBelow.t - (y + hPx))}px` });
+          const nLeft = d.others.filter((o) => spansY(o) && o.r <= x).sort((a, b) => b.r - a.r)[0];
+          if (nLeft && pctToPx(x - nLeft.r) >= 4)
+            dist.push({ axis: "x", from: nLeft.r, to: x, at: y + hPx / 2, label: `${Math.round(pctToPx(x - nLeft.r))}px` });
+          const nRight = d.others.filter((o) => spansY(o) && o.l >= x + wPct).sort((a, b) => a.l - b.l)[0];
+          if (nRight && pctToPx(nRight.l - (x + wPct)) >= 4)
+            dist.push({ axis: "x", from: x + wPct, to: nRight.l, at: y + hPx / 2, label: `${Math.round(pctToPx(nRight.l - (x + wPct)))}px` });
+        }
+        setDragGuides(v.length || hg.length || equal || equalH || dist.length ? { v, h: hg, equal, equalH, dist } : null);
         routePatch(d.id, { x: Math.round(x * 10) / 10, y: Math.round(y) });
       }
       else if (d.mode === "e")
@@ -819,10 +864,22 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                       {dragGuides.h.map((gh, i) => (
                         <span key={`h${i}`} className="pointer-events-none absolute inset-x-0 z-40 h-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ top: gh }} aria-hidden />
                       ))}
-                      {dragGuides.equal && (
+                      {(dragGuides.equal || dragGuides.equalH) && (
                         <span className="pointer-events-none absolute left-1/2 top-2 z-40 -translate-x-1/2 rounded-full bg-rose-400 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-950 shadow">
-                          Equal spacing
+                          {dragGuides.equal && dragGuides.equalH ? "Equal spacing ⇕⇔" : dragGuides.equal ? "Equal spacing ⇕" : "Equal spacing ⇔"}
                         </span>
+                      )}
+                      {/* DISTANCE INDICATORS — dashed rulers with live px labels */}
+                      {dragGuides.dist.map((g, i) =>
+                        g.axis === "y" ? (
+                          <span key={`dy${i}`} className="pointer-events-none absolute z-40 flex w-0 items-center justify-center border-l border-dashed border-rose-300/90" style={{ left: `${g.at}%`, top: g.from, height: Math.max(1, g.to - g.from) }} aria-hidden>
+                            <span className="rounded bg-rose-400/95 px-1 py-px font-mono text-[9px] font-bold leading-tight text-zinc-950 shadow">{g.label}</span>
+                          </span>
+                        ) : (
+                          <span key={`dx${i}`} className="pointer-events-none absolute z-40 flex h-0 items-center justify-center border-t border-dashed border-rose-300/90" style={{ top: g.at, left: `${g.from}%`, width: `${Math.max(0.1, g.to - g.from)}%` }} aria-hidden>
+                            <span className="rounded bg-rose-400/95 px-1 py-px font-mono text-[9px] font-bold leading-tight text-zinc-950 shadow">{g.label}</span>
+                          </span>
+                        )
                       )}
                     </>
                   )}
