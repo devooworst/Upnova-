@@ -206,6 +206,23 @@ export async function POST(req: NextRequest) {
       expected: "user: null",
       actual: bareData.user ? `INHERITED A SESSION: ${JSON.stringify(bareData.user).slice(0, 60)}` : "user: null",
     });
+
+    /* ---- GUEST MODE: logout lands on a browsable public page, never a
+       login form. Sign In / Join are CHOICES in the guest top nav. ---- */
+    const gw = await fetch(BASE + "/welcome", { redirect: "manual" });
+    const gwHtml = await gw.text();
+    step(c, "logout destination /welcome is PUBLIC Guest Mode — 200 with no credentials, no redirect loop",
+      gw.status === 200, { route: "GET /welcome (no credentials, redirect:manual)", actual: String(gw.status) });
+    step(c, "Guest Mode is a browsable landing: Sign In + Join UpNova in the nav, real public content, NO auto-opened or prefilled login form",
+      gwHtml.includes("Guest Mode") && gwHtml.includes('href="/login"') && gwHtml.includes('href="/signup"') &&
+      gwHtml.includes("/creator/") && !gwHtml.includes('value="@devin"') && !gwHtml.includes("You&#x27;ve been logged out"), {
+      expected: "Guest Mode badge · /login + /signup links · public creator links · no prefilled form",
+      actual: `guestBadge=${gwHtml.includes("Guest Mode")} login=${gwHtml.includes('href="/login"')} signup=${gwHtml.includes('href="/signup"')} creators=${gwHtml.includes("/creator/")} prefilled=${gwHtml.includes('value="@devin"')}`,
+    });
+    const gl = await fetch(BASE + "/login", { redirect: "manual" });
+    const gs = await fetch(BASE + "/signup", { redirect: "manual" });
+    step(c, "Sign In and Join pages are public and load directly from Guest Mode (no loop back)",
+      gl.status === 200 && gs.status === 200, { actual: `login=${gl.status} signup=${gs.status}` });
   }
 
   /* ================= PROFILES + SEARCH ================= */

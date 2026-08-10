@@ -46,7 +46,7 @@ export default function Home() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // never render the app shell to an unauthenticated visitor (redirecting)
-  if (user === null) return <div className="mx-auto max-w-md pt-16 text-center text-sm text-zinc-500" aria-busy="true">Taking you to sign in…</div>;
+  if (user === null) return <div className="mx-auto max-w-md pt-16 text-center text-sm text-zinc-500" aria-busy="true">Opening UpNova…</div>;
 
   /* scope place labels come from the signed-in user's real location */
   const cityLabel = user?.profile.city ? `${user.profile.city}, ${user.profile.state}` : "your area";
