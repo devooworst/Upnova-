@@ -5,6 +5,8 @@ import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { ctaFor } from "@/lib/server/cta";
 import { postTrustMap } from "@/lib/server/trust";
+import { parseStudio } from "@/lib/profileStudio";
+import { unrestrictedTester } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +126,17 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
 
     return {
       user: publicUser(user, profile, { viewerIsOwner: isOwner }),
+      // Profile Studio (Pro, appearance-only): shown publicly ONLY while the
+      // owner's plan is actually Pro. On downgrade the config is preserved
+      // but hidden. The owner in DEMO MODE sees their own preview (flagged);
+      // visitors always get the honest, plan-gated view.
+      ...(() => {
+        const saved = parseStudio(profile.studio);
+        if (!saved) return { studio: null, studioDemoPreview: false };
+        if (user.plan === "pro") return { studio: saved, studioDemoPreview: false };
+        if (isOwner && unrestrictedTester(user.id)) return { studio: saved, studioDemoPreview: true };
+        return { studio: null, studioDemoPreview: false };
+      })(),
       // verified academic identity — school + class year, from the VERIFIED
       // affiliation only (never self-claimed). "Class of 2027" is a profile
       // ATTRIBUTE, never a community. The major/program is intentionally

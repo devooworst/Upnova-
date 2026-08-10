@@ -273,6 +273,7 @@ CREATE TABLE IF NOT EXISTS `events` (
 	`title` text NOT NULL,
 	`description` text DEFAULT '' NOT NULL,
 	`campus_id` text,
+	`public_visibility` integer DEFAULT false NOT NULL,
 	`category` text DEFAULT 'Other' NOT NULL,
 	`starts_at` integer NOT NULL,
 	`time_label` text DEFAULT '' NOT NULL,
@@ -290,7 +291,7 @@ CREATE TABLE IF NOT EXISTS `events` (
 	`config` text DEFAULT '{}' NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, `public_visibility` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE set null
 );
@@ -445,6 +446,8 @@ CREATE TABLE IF NOT EXISTS `opportunities` (
 	`lng` real,
 	`remote` integer DEFAULT false NOT NULL,
 	`student_friendly` integer DEFAULT false NOT NULL,
+	`eligibility` text DEFAULT 'anyone' NOT NULL,
+	`eligibility_campus_id` text,
 	`trust_required` text DEFAULT 'standard' NOT NULL,
 	`apply_by` integer,
 	`event_date` integer,
@@ -453,7 +456,7 @@ CREATE TABLE IF NOT EXISTS `opportunities` (
 	`engagement` text DEFAULT '{}' NOT NULL,
 	`status` text DEFAULT 'open' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, `eligibility` text DEFAULT 'anyone' NOT NULL, `eligibility_campus_id` text,
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`poster_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `order_events` (
@@ -612,7 +615,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`show_availability` integer DEFAULT true NOT NULL,
 	`links` text DEFAULT '[]' NOT NULL,
 	`education` text DEFAULT '[]' NOT NULL,
-	`trust_level` text DEFAULT 'standard' NOT NULL,
+	`trust_level` text DEFAULT 'standard' NOT NULL, `studio` text DEFAULT '' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `project_milestones` (

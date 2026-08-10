@@ -6,7 +6,8 @@
 /*  come from the owner's real record.                                 */
 /* ------------------------------------------------------------------ */
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS } from "@/lib/profileStudio";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck, GraduationCap } from "lucide-react";
@@ -38,6 +39,8 @@ interface PublicProfile {
     accountType?: string;
     businessVerified?: boolean;
   };
+  studio?: import("@/lib/profileStudio").StudioConfig | null;
+  studioDemoPreview?: boolean;
   academic?: {
     school: string;
     affiliation: string;
@@ -135,12 +138,22 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
     else if (res.status === 401) promptJoin("message");
   };
 
+  const studio = data.studio ?? null;
+  const theme = THEMES[studio?.theme ?? "none"] ?? THEMES.none;
+  const frame = FRAMES[studio?.frame ?? "none"] ?? FRAMES.none;
+  const accent = ACCENTS[studio?.accent ?? "none"] ?? ACCENTS.none;
+  const headingFont = FONTS[studio?.font ?? "standard"] ?? FONTS.standard;
+  const effect = EFFECTS[studio?.effect ?? "none"] ?? EFFECTS.none;
+
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <header className="card p-5 sm:p-6">
+    <div className={`mx-auto max-w-3xl space-y-4 rounded-2xl ${theme.wash} ${theme.wash ? "p-2 sm:p-3" : ""}`}>
+      {theme.deco && <div className={`h-1 rounded-full ${theme.deco}`} aria-hidden />}
+      <header className={`card p-5 sm:p-6 ${theme.card} ${theme.headerRing} ${effect.cls}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Avatar src={user.avatarUrl} initials={user.displayName.charAt(0)} size="xl" />
+            <span className={`inline-flex ${frame.cls}`}>
+              <Avatar src={user.avatarUrl} initials={user.displayName.charAt(0)} size="xl" />
+            </span>
             <div>
               <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-zinc-50">
                 {user.displayName}
@@ -269,12 +282,25 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
         )}
       </header>
 
+      {/* ---- Profile Studio (Pro, appearance-only): approved design system
+           values only; the header, actions, and every function stay
+           UpNova-controlled. Sections below render in the owner's saved
+           order. ---- */}
+      {data.studioDemoPreview && (
+        <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-2 text-[11px] text-amber-300">
+          DEMO MODE preview — only you see this customization until Pro is active.
+        </p>
+      )}
+      {(() => {
+        const sectionBlocks: Record<string, React.ReactNode> = {
+          trust: (
+            <React.Fragment key="trust">
       {/* ---- Trust & authenticity — what's actually verified, computed from
            records. UpNova shows the evidence; it doesn't tell you who to
            trust. Badges are earned, never part of any subscription. ---- */}
       {data.trust && (
-        <section className="card p-5">
-          <h2 className="flex items-center gap-1.5 text-sm font-bold text-zinc-100">
+        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+          <h2 className={`flex items-center gap-1.5 text-sm font-bold ${accent.text} ${headingFont.cls}`}>
             <ShieldCheck className="h-4 w-4 text-lime-400" /> Trust &amp; authenticity
           </h2>
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -327,9 +353,12 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           </ul>
         </section>
       )}
-
-      <section className="card p-5">
-        <h2 className="text-sm font-bold text-zinc-100">Posts</h2>
+            </React.Fragment>
+          ),
+          posts: (
+            <React.Fragment key="posts">
+      <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+        <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Posts</h2>
         <div className="mt-3">
           <PostsGrid
             handle={user.handle}
@@ -338,10 +367,13 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           />
         </div>
       </section>
-
+            </React.Fragment>
+          ),
+          services: (
+            <React.Fragment key="services">
       {services.length > 0 && (
-        <section className="card p-5">
-          <h2 className="text-sm font-bold text-zinc-100">Services</h2>
+        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+          <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Services</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {services.map((s) => (
               <article key={s.id} className="card-money flex flex-col p-4">
@@ -379,10 +411,13 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           )}
         </section>
       )}
-
+            </React.Fragment>
+          ),
+          reviews: (
+            <React.Fragment key="reviews">
       {(data.reviews ?? []).length > 0 && (
-        <section className="card p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+          <h2 className={`flex items-center gap-2 text-sm font-bold ${accent.text} ${headingFont.cls}`}>
             Reviews
             <span className="font-normal text-zinc-500">from verified projects only</span>
           </h2>
@@ -401,10 +436,13 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           </div>
         </section>
       )}
-
+            </React.Fragment>
+          ),
+          experience: (
+            <React.Fragment key="experience">
       {experience.length > 0 && (
-        <section className="card p-5">
-          <h2 className="text-sm font-bold text-zinc-100">Experience</h2>
+        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+          <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Experience</h2>
           <ol className="mt-4 space-y-4 border-l border-line pl-4">
             {experience.map((e) => (
               <li key={e.id} className="relative">
@@ -421,6 +459,12 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           </ol>
         </section>
       )}
+            </React.Fragment>
+          ),
+        };
+        const order = data.studio?.sections?.length ? data.studio.sections : [...SECTION_IDS];
+        return <>{order.map((id) => sectionBlocks[id] ?? null)}</>;
+      })()}
     </div>
   );
 }

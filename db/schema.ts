@@ -90,6 +90,11 @@ export const profiles = sqliteTable("profiles", {
   avatarUrl: text("avatar_url"),
   coverUrl: text("cover_url"),
   coverPos: integer("cover_pos").notNull().default(50),
+  // Profile Studio (Pro): APPEARANCE-ONLY customization, stored as a
+  // sanitized JSON pick from lib/profileStudio.ts's approved design
+  // system. Preserved on downgrade; display is gated by plan at read
+  // time. Never affects functionality, auth, or other systems.
+  studio: text("studio").notNull().default(""),
   verified: bool("verified"),
 
   // location — lat/lng are used server-side for distance scoping and are

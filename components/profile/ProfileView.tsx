@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, PencilLine } from "lucide-react";
+import Link from "next/link";
+import { Eye, PencilLine, Palette } from "lucide-react";
 import ProfileHeader from "./ProfileHeader";
 import ProfileTabs from "./ProfileTabs";
+import { useSession } from "@/lib/session";
 
 /**
  * Owner vs visitor profile states.
@@ -15,6 +17,7 @@ import ProfileTabs from "./ProfileTabs";
 export default function ProfileView() {
   const [viewAsVisitor, setViewAsVisitor] = useState(false);
   const isOwner = !viewAsVisitor;
+  const { user } = useSession();
 
   return (
     <div className="space-y-5">
@@ -37,6 +40,16 @@ export default function ProfileView() {
             </>
           )}
         </p>
+        {isOwner && user && (
+          <Link
+            href="/profile/studio"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/5 px-3.5 py-1.5 text-xs font-semibold text-lime-300 transition hover:bg-lime-400/15"
+            title="Profile Studio — customize your profile's appearance (UpNova Pro)"
+          >
+            <Palette className="h-3.5 w-3.5" /> Profile Studio
+            <span className="rounded border border-lime-400/40 px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide">pro</span>
+          </Link>
+        )}
         <button
           onClick={() => setViewAsVisitor(!viewAsVisitor)}
           className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
