@@ -25,8 +25,8 @@ export interface WorldElement {
 
 /* ------------------------------------------------------------------ */
 /* THE PARITY RULE — one layout engine for editor AND viewer.          */
-/* Every world canvas is laid out at exactly WORLD_DESIGN_WIDTH design */
-/* pixels, then uniformly SCALED to whatever container it renders in.  */
+/* Every world canvas is laid out at a fixed per-device DESIGN width,  */
+/* then uniformly SCALED to whatever container it renders in.          */
 /* Text wraps identically, card heights are identical, positions are   */
 /* identical — the published profile is pixel-for-pixel the editor,    */
 /* just zoomed. Never hard-coded to any screenshot: the scale factor   */
@@ -36,6 +36,59 @@ export const WORLD_DESIGN_WIDTH = 960;
 /** below this real width the canvas falls back to the clean stacked
     mobile layout (readable > miniature) — editor previews match it */
 export const WORLD_STACK_BELOW = 560;
+
+/* ------------------------------------------------------------------ */
+/* THREE INDEPENDENT DEVICE LAYOUTS — desktop, tablet, phone.          */
+/* Each device is a REAL editing target with its own saved elements    */
+/* and image layers; editing one NEVER touches another. The viewer     */
+/* measures its container and serves the matching layout. Devices      */
+/* without a custom layout fall back safely: tablet → the desktop      */
+/* design (scaled), phone → the clean stacked flow.                    */
+/* ------------------------------------------------------------------ */
+export type WorldDevice = "desktop" | "tablet" | "phone";
+export const WORLD_DEVICES: readonly WorldDevice[] = ["desktop", "tablet", "phone"] as const;
+/** per-device design canvas widths (design px) — realistic viewports */
+export const WORLD_DEVICE_WIDTHS: Record<WorldDevice, number> = { desktop: 960, tablet: 720, phone: 390 };
+/** container-width breakpoints (the world canvas measures its own
+    container, not the window — robust for sidebars and nearby sizes) */
+export const WORLD_BP_PHONE = 560; // container below this → phone layout
+export const WORLD_BP_TABLET = 840; // below this (and ≥ phone) → tablet; else desktop
+
+export function worldDeviceForWidth(w: number): WorldDevice {
+  return w < WORLD_BP_PHONE ? "phone" : w < WORLD_BP_TABLET ? "tablet" : "desktop";
+}
+
+/** an independent per-device arrangement: its own elements AND images */
+export interface WorldDeviceLayout {
+  elements: Record<string, WorldElement>;
+  images?: Record<string, WorldImage>;
+}
+
+/** THE single source of truth for which layout a given device renders —
+    used identically by the editor and the public profile. */
+export function resolveWorldLayout(
+  world: WorldConfig,
+  device: WorldDevice
+): {
+  device: WorldDevice; // the layout actually used (after fallback)
+  designWidth: number;
+  custom: boolean; // true = this device has its own saved layout
+  elements: Record<string, WorldElement>;
+  images: Record<string, WorldImage>;
+  stackedFallback: boolean; // phone without a custom layout → stacked flow
+} {
+  if (device === "tablet" && world.tablet)
+    return { device: "tablet", designWidth: WORLD_DEVICE_WIDTHS.tablet, custom: true, elements: world.tablet.elements, images: world.tablet.images ?? {}, stackedFallback: false };
+  if (device === "phone" && world.phone)
+    return { device: "phone", designWidth: WORLD_DEVICE_WIDTHS.phone, custom: true, elements: world.phone.elements, images: world.phone.images ?? {}, stackedFallback: false };
+  if (device === "desktop")
+    return { device: "desktop", designWidth: WORLD_DEVICE_WIDTHS.desktop, custom: true, elements: world.elements, images: world.images ?? {}, stackedFallback: false };
+  // fallbacks: tablet borrows the desktop design (uniformly scaled —
+  // never broken); phone falls back to the clean stacked flow
+  if (device === "tablet")
+    return { device: "desktop", designWidth: WORLD_DEVICE_WIDTHS.desktop, custom: false, elements: world.elements, images: world.images ?? {}, stackedFallback: false };
+  return { device: "phone", designWidth: WORLD_DEVICE_WIDTHS.phone, custom: false, elements: world.elements, images: world.images ?? {}, stackedFallback: true };
+}
 
 /** Free image/decoration layers — a lightweight design canvas. Images
     are VISUAL LAYERS: they never join the card flow, so they can sit
@@ -55,9 +108,13 @@ export interface WorldImage {
 export interface WorldConfig {
   enabled: boolean;
   environment: string; // ENVIRONMENTS id — the full-bleed backdrop scene
-  elements: Record<string, WorldElement>; // keyed by APPROVED element ids
-  /** free decorative image layers, keyed by generated ids (max 8) */
+  elements: Record<string, WorldElement>; // DESKTOP layout (keyed by APPROVED element ids)
+  /** free decorative image layers for DESKTOP, keyed by generated ids (max 8) */
   images?: Record<string, WorldImage>;
+  /** independent TABLET arrangement — absent = borrow the desktop design */
+  tablet?: WorldDeviceLayout;
+  /** independent PHONE arrangement — absent = the clean stacked flow */
+  phone?: WorldDeviceLayout;
   /** the world headline — custom text ("welcome to my studio…") or the
       default "{name}'s world"; hideable entirely. Plain text only. */
   title?: string;
@@ -170,16 +227,15 @@ const clamp = (v: unknown, lo: number, hi: number, dflt: number) => {
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
 };
 
-export function sanitizeWorld(input: unknown): WorldConfig {
-  const o = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
-  const elsIn = (typeof o.elements === "object" && o.elements !== null ? o.elements : {}) as Record<string, unknown>;
+function sanitizeWorldElements(input: unknown): Record<string, WorldElement> {
+  const elsIn = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
   const elements: Record<string, WorldElement> = {};
   for (const id of WORLD_ELEMENT_IDS) {
     const raw = (typeof elsIn[id] === "object" && elsIn[id] !== null ? elsIn[id] : {}) as Record<string, unknown>;
     const dflt = DEFAULT_WORLD.elements[id];
     elements[id] = {
       x: clamp(raw.x, 0, 100, dflt.x),
-      y: clamp(raw.y, 0, 4000, dflt.y),
+      y: clamp(raw.y, 0, 6000, dflt.y),
       w: clamp(raw.w, 24, 100, dflt.w),
       h: clamp(raw.h, 0, 1600, 0),
       rotate: clamp(raw.rotate, -8, 8, 0),
@@ -187,11 +243,26 @@ export function sanitizeWorld(input: unknown): WorldConfig {
       hidden: id === "hero" ? false : !!raw.hidden, // the hero can NEVER be hidden
     };
   }
+  return elements;
+}
+
+/** per-device layouts go through the exact same rules as desktop —
+    independent data, identical constraints */
+function sanitizeDeviceLayout(input: unknown): WorldDeviceLayout | undefined {
+  if (typeof input !== "object" || input === null) return undefined;
+  const o = input as Record<string, unknown>;
+  return { elements: sanitizeWorldElements(o.elements), images: sanitizeWorldImages(o.images) };
+}
+
+export function sanitizeWorld(input: unknown): WorldConfig {
+  const o = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
   return {
     enabled: !!o.enabled,
     environment: typeof o.environment === "string" && o.environment in ENVIRONMENTS ? o.environment : "cosmic",
-    elements,
+    elements: sanitizeWorldElements(o.elements),
     images: sanitizeWorldImages(o.images),
+    tablet: sanitizeDeviceLayout(o.tablet),
+    phone: sanitizeDeviceLayout(o.phone),
     // plain text only — control chars stripped, length capped; React
     // escaping keeps it inert everywhere it renders
     title: String(o.title ?? "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80),
@@ -219,7 +290,7 @@ function sanitizeWorldImages(input: unknown): Record<string, WorldImage> {
     out[id] = {
       src,
       x: clamp(r.x, 0, 100, 30),
-      y: clamp(r.y, 0, 4000, 80),
+      y: clamp(r.y, 0, 6000, 80),
       w: clamp(r.w, 4, 100, 28),
       rotate: clamp(r.rotate, -180, 180, 0),
       opacity: Math.max(0.05, Math.min(1, Number(r.opacity) || 1)),

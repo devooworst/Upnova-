@@ -3,6 +3,12 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { isSeedUser } from "@/lib/server/demo";
+import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
+
+/* per-run email nonce — throwaway signups get a UNIQUE email every run so
+   the production signup rate limiter (5 per email / 15 min) never trips
+   across repeated suite runs. Handles stay stable and are cleaned at reset. */
+const runNonce = () => Date.now().toString(36).slice(-6);
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -225,7 +231,7 @@ export async function POST(req: NextRequest) {
     const s4 = (await api("rachel", "/api/search?q=zzzznotauser")).data as any;
     step(c, "SEARCH nonexistent account → honest empty PEOPLE (200, never an error)", Array.isArray(s4.people) && s4.people.length === 0, { actual: `people=${s4.people?.length}` });
     // a brand-new account is searchable the moment it exists
-    const nu = await api(null, "/api/auth/signup", { method: "POST", body: { email: "tonbsearch@upnova.dev", password: "Tour-walkthrough-99", handle: "tonbsearch", displayName: "Searchme Fresh" } });
+    const nu = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbsearch.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle: "tonbsearch", displayName: "Searchme Fresh" } });
     const s5 = (await api("rachel", "/api/search?q=tonbsearch")).data as any;
     const s6 = (await api("rachel", "/api/search?q=searchme")).data as any;
     step(c, "NEW account is searchable immediately — by handle AND display name", nu.status === 200 && (s5.people ?? []).some((p: any) => p.handle === "tonbsearch") && (s6.people ?? []).some((p: any) => p.handle === "tonbsearch"), {
@@ -258,7 +264,7 @@ export async function POST(req: NextRequest) {
 
     /* ---- REAL vs SIMULATED accounts: automation NEVER speaks for real people ---- */
     const mkReal = async (handle: string) => {
-      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Real ${handle}` } });
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Real ${handle}` } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
     };
     await mkReal("tonbm1");
@@ -428,7 +434,7 @@ export async function POST(req: NextRequest) {
     // removes it next time. lena is the client — every action below is a
     // real authenticated HTTP call: updates → ETA → extension → approval
     // → delivery → completion → payment → review.
-    const mkProv = await api(null, "/api/auth/signup", { method: "POST", body: { email: "tonbp@upnova.dev", password: "Tour-walkthrough-99", handle: "tonbp", displayName: "Pat Provider" } });
+    const mkProv = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbp.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle: "tonbp", displayName: "Pat Provider" } });
     tok.tonbp = (mkProv.data as { sessionToken?: string }).sessionToken ?? "";
     const deadline = new Date(Date.now() + 4 * 86400e3);
     const pr = await api("tonbp", "/api/projects", {
@@ -598,7 +604,7 @@ export async function POST(req: NextRequest) {
   {
     const c = cat("ONBOARDING");
     const mk = async (handle: string, extra: Record<string, unknown> = {}) => {
-      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Tour ${handle}`, ...extra } });
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Tour ${handle}`, ...extra } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
       return r;
     };
@@ -685,7 +691,7 @@ export async function POST(req: NextRequest) {
     // SIMULATION mode so capacity limits actually enforce (demo mode
     // bypasses gates by doctrine). Cleaned up by the tonb* reset.
     const mkU = async (handle: string, extra: Record<string, unknown> = {}) => {
-      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Cap ${handle}`, ...extra } });
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Cap ${handle}`, ...extra } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
       db.update(tables.users).set({ testerMode: "simulation" }).where(eq(tables.users.handle, handle)).run();
       return r;
@@ -877,10 +883,71 @@ export async function POST(req: NextRequest) {
     await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: { ...layout, images: { evil: { src: "javascript:alert(1)", x: 10, y: 10, w: 20, rotate: 0, opacity: 1, layer: 5, locked: false }, wild: { src: "/images/banner.jpg", x: 400, y: 99999, w: 2, rotate: 720, opacity: 9, layer: 99, locked: false } } } } } });
     const v4 = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
     const wild = v4?.images?.wild;
-    step(c, "sanitizer: script src DROPPED; wild geometry clamped (x≤100, y≤4000, w≥4, rot≤180, op≤1, z≤30)",
-      !v4?.images?.evil && wild && wild.x === 100 && wild.y === 4000 && wild.w === 4 && wild.rotate === 180 && wild.opacity === 1 && wild.layer === 30, {
+    step(c, "sanitizer: script src DROPPED; wild geometry clamped (x≤100, y≤6000, w≥4, rot≤180, op≤1, z≤30)",
+      !v4?.images?.evil && wild && wild.x === 100 && wild.y === 6000 && wild.w === 4 && wild.rotate === 180 && wild.opacity === 1 && wild.layer === 30, {
       actual: JSON.stringify({ evil: v4?.images?.evil ?? null, wild }).slice(0, 140),
     });
+    /* ---- THREE INDEPENDENT DEVICE LAYOUTS: desktop / tablet / phone ----
+       Each device is its own saved arrangement (elements AND images).
+       The viewer picks by measured width through resolveWorldLayout —
+       asserted here with the SAME function the component runs. */
+    const el = (x: number, y: number, w: number, layer = 10) => ({ x, y, w, h: 0, rotate: 0, layer, hidden: false });
+    const threeUp = {
+      ...layout,
+      tablet: {
+        elements: { hero: el(10, 40, 80, 12) },
+        images: { tdec: { src: "/images/banner.jpg", x: 5, y: 30, w: 40, rotate: 0, opacity: 0.5, layer: -4, locked: false } },
+      },
+      phone: {
+        elements: { hero: el(0, 0, 100, 12), trust: el(0, 760, 100, 9) },
+        images: { pdec: { src: "/images/beat-cover.jpg", x: 60, y: 900, w: 30, rotate: 10, opacity: 1, layer: 28, locked: false } },
+      },
+    };
+    await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: threeUp } } });
+    const dv = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
+    step(c, "desktop/tablet/phone layouts SAVE independently and all reach the public payload",
+      dv?.elements?.hero?.x === 4.2 && dv?.elements?.hero?.w === 62.5 &&
+      dv?.tablet?.elements?.hero?.x === 10 && dv?.tablet?.elements?.hero?.w === 80 &&
+      dv?.phone?.elements?.hero?.x === 0 && dv?.phone?.elements?.hero?.w === 100 && dv?.phone?.elements?.trust?.y === 760, {
+      expected: "desktop hero 4.2/62.5 · tablet hero 10/80 · phone hero 0/100 + trust y760",
+      actual: JSON.stringify({ d: dv?.elements?.hero, t: dv?.tablet?.elements?.hero, p: dv?.phone?.elements?.hero }).slice(0, 150),
+    });
+    step(c, "decorative images are independent per device (desktop back1/front1 · tablet tdec z-4 · phone pdec z28)",
+      dv?.images?.back1?.layer === -6 && dv?.images?.front1?.layer === 25 && !dv?.images?.tdec &&
+      dv?.tablet?.images?.tdec?.layer === -4 && !dv?.tablet?.images?.back1 &&
+      dv?.phone?.images?.pdec?.layer === 28 && !dv?.phone?.images?.back1, {
+      actual: JSON.stringify({ d: Object.keys(dv?.images ?? {}), t: Object.keys(dv?.tablet?.images ?? {}), p: Object.keys(dv?.phone?.images ?? {}) }).slice(0, 140),
+    });
+    const rD = resolveWorldLayout(dv, worldDeviceForWidth(1280));
+    const rT = resolveWorldLayout(dv, worldDeviceForWidth(700));
+    const rP = resolveWorldLayout(dv, worldDeviceForWidth(390));
+    step(c, "the viewer's resolver serves each width its own layout (1280→desktop@960 · 700→tablet@720 · 390→phone@390)",
+      rD.device === "desktop" && rD.designWidth === 960 && rD.elements.hero.x === 4.2 &&
+      rT.device === "tablet" && rT.designWidth === 720 && rT.custom && rT.elements.hero.x === 10 &&
+      rP.device === "phone" && rP.designWidth === 390 && rP.custom && !rP.stackedFallback && rP.elements.hero.w === 100, {
+      actual: JSON.stringify({ d: [rD.device, rD.designWidth], t: [rT.device, rT.designWidth, rT.elements.hero.x], p: [rP.device, rP.designWidth, rP.elements.hero.w] }).slice(0, 130),
+    });
+    // edit ONE device — the other two must be byte-identical afterwards
+    const tabletEdit = { ...threeUp, tablet: { ...threeUp.tablet, elements: { hero: el(22, 80, 56, 12) } } };
+    await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: tabletEdit } } });
+    const dv2 = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
+    step(c, "editing the TABLET layout never overwrites desktop or phone (and vice versa)",
+      dv2?.tablet?.elements?.hero?.x === 22 && dv2?.tablet?.elements?.hero?.w === 56 &&
+      JSON.stringify(dv2?.elements) === JSON.stringify(dv?.elements) &&
+      JSON.stringify(dv2?.phone) === JSON.stringify(dv?.phone), {
+      expected: "tablet hero → 22/56 · desktop + phone byte-identical",
+      actual: JSON.stringify({ t: dv2?.tablet?.elements?.hero, dSame: JSON.stringify(dv2?.elements) === JSON.stringify(dv?.elements), pSame: JSON.stringify(dv2?.phone) === JSON.stringify(dv?.phone) }).slice(0, 130),
+    });
+    // no custom tablet/phone saved → safe fallbacks (tablet borrows desktop, phone stacks)
+    await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: layout } } });
+    const dv3 = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
+    const fT = resolveWorldLayout(dv3, "tablet");
+    const fP = resolveWorldLayout(dv3, "phone");
+    step(c, "devices WITHOUT a custom layout fall back safely: tablet borrows desktop (scaled), phone uses the stacked flow",
+      !dv3?.tablet && !dv3?.phone && fT.custom === false && fT.designWidth === 960 && fT.elements.hero.x === 4.2 && fP.custom === false && fP.stackedFallback === true, {
+      actual: JSON.stringify({ t: [fT.custom, fT.designWidth], p: [fP.custom, fP.stackedFallback] }).slice(0, 100),
+    });
+
     await api("rachel", "/api/me/plan", { method: "PATCH", body: { plan: "free" } });
     const hidden = await api("lena", "/api/users/rachel");
     step(c, "downgrade hides but preserves (status ≠ deletion)", (hidden.data as any).studio === null);

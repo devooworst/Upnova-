@@ -7,7 +7,7 @@
 /* ------------------------------------------------------------------ */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, WORLD_ELEMENT_LABELS, BANNERS, WORLD_DESIGN_WIDTH, WORLD_STACK_BELOW, type StudioConfig, type WorldElement, type WorldImage } from "@/lib/profileStudio";
+import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, WORLD_ELEMENT_LABELS, BANNERS, WORLD_DESIGN_WIDTH, worldDeviceForWidth, resolveWorldLayout, type WorldDevice, type StudioConfig, type WorldElement, type WorldImage } from "@/lib/profileStudio";
 import { Star as StarDeco, Heart, Leaf, Sparkles as SparklesIcon, Music2, Zap as ZapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -84,7 +84,7 @@ interface PublicProfile {
 export interface WorldEditProps {
   studio: StudioConfig;
   selected: string;
-  device: "desktop" | "tablet" | "mobile";
+  device: WorldDevice; // the layout being edited — desktop | tablet | phone
   onSelect: (id: string) => void;
   onChange: (id: string, patch: Partial<WorldElement>) => void;
   /** free image layers — same gesture system, separate collection */
@@ -106,11 +106,12 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     others: { l: number; r: number; cx: number; t: number; b: number; cy: number }[];
   } | null>(null);
   const editCanvasRef = useRef<HTMLDivElement>(null);
-  /* ---- ONE LAYOUT ENGINE: the world canvas is laid out at exactly
-     WORLD_DESIGN_WIDTH design px and uniformly scaled to the measured
-     container — in the editor AND on the published profile. Identical
-     text wrapping, identical heights, identical positions, every
-     viewport. The scale is measured live, never hard-coded. ---- */
+  /* ---- ONE LAYOUT ENGINE: the world canvas is laid out at the active
+     device layout's fixed DESIGN width (desktop 960 / tablet 720 /
+     phone 390) and uniformly scaled to the measured container — in the
+     editor AND on the published profile. Identical text wrapping,
+     identical heights, identical positions, every viewport. The scale
+     is measured live, never hard-coded. ---- */
   const [availW, setAvailW] = useState<number | null>(null);
   const worldScaleRef = useRef(1);
   const measureRO = useRef<ResizeObserver | null>(null);
@@ -582,13 +583,19 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
      inside it stays standard UpNova. */
   const world = studio?.world;
   if (world?.enabled) {
-    const DESIGN_W = WORLD_DESIGN_WIDTH;
-    // stacked = the clean mobile flow. Editor's phone preview and REAL
-    // narrow viewports behave identically (same rule, same threshold).
-    const stacked = edit ? edit.device === "mobile" : availW !== null && availW < WORLD_STACK_BELOW;
+    /* WHICH LAYOUT? The editor edits its selected device; the viewer
+       measures its container and picks the matching saved layout —
+       the SAME resolver, so editor and profile can never disagree. */
+    const viewDevice: WorldDevice = edit ? edit.device : worldDeviceForWidth(availW ?? WORLD_DESIGN_WIDTH);
+    const resolved = resolveWorldLayout(world, viewDevice);
+    const DESIGN_W = resolved.designWidth;
+    // stacked = the clean fallback flow for phones WITHOUT a custom
+    // phone layout (readable > miniature). A saved phone design renders
+    // freeform at phone design width instead.
+    const stacked = resolved.stackedFallback;
     const scale = Math.min(1.25, Math.max(0.2, (availW ?? DESIGN_W) / DESIGN_W));
     worldScaleRef.current = scale;
-    const images: Record<string, WorldImage> = world.images ?? {};
+    const images: Record<string, WorldImage> = resolved.images;
     const imgOf = (key: string) => images[key.slice(4)];
     const isImgKey = (key: string) => key.startsWith("img:");
     const routePatch = (key: string, patch: Record<string, number>) => {
@@ -605,7 +612,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       if (img?.locked && mode !== "select") return; // locked layers never drag
       const el: WorldElement = img
         ? { x: img.x, y: img.y, w: img.w, h: 0, rotate: img.rotate, layer: img.layer, hidden: false }
-        : world.elements[id];
+        : resolved.elements[id];
       if (!el) return;
       const host = (e.currentTarget as HTMLElement).closest("[data-world-el]") as HTMLElement | null;
       const canvas = editCanvasRef.current;
@@ -702,7 +709,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         {
           const hPx = d.el.h > 0 ? d.el.h : d.measuredH;
           const wPct = d.el.w;
-          const pctToPx = (p: number) => (p * WORLD_DESIGN_WIDTH) / 100;
+          const pctToPx = (p: number) => (p * DESIGN_W) / 100;
           const spansX = (o: typeof d.others[number]) => o.l < x + wPct && o.r > x; // horizontal overlap
           const spansY = (o: typeof d.others[number]) => o.t < y + hPx && o.b > y; // vertical overlap
           const nAbove = d.others.filter((o) => spansX(o) && o.b <= y).sort((a, b) => b.b - a.b)[0];
@@ -760,7 +767,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
 
     const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
     const els = WORLD_ELEMENT_IDS
-      .map((id) => ({ id, el: world.elements[id] }))
+      .map((id) => ({ id, el: resolved.elements[id] }))
       .filter((x) => x.el && (!x.el.hidden || x.id === "hero"))
       .sort((a, b) => a.el.y - b.el.y);
     const imgEntries = Object.entries(images);
@@ -776,7 +783,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     const layerControls = (key: string) => {
       if (!edit) return null;
       const img = isImgKey(key) ? imgOf(key) : null;
-      const cur = img ? img.layer : world.elements[key]?.layer ?? 10;
+      const cur = img ? img.layer : resolved.elements[key]?.layer ?? 10;
       const [lo, hi] = img ? [-10, 30] : [0, 20];
       const setLayer = (v: number) => {
         const nv = Math.min(hi, Math.max(lo, v));
@@ -827,10 +834,11 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
               The canvas background is the ENVIRONMENT — a separate concept. */}
           <div className="relative p-3 sm:p-4">
             {stacked ? (
-              /* ---- MOBILE / NARROW: the clean stacked flow (readable
-                 always beats miniature). Same rule in editor phone
-                 preview and on real phones. ---- */
-              <div className="relative">
+              /* ---- PHONE FALLBACK: the clean stacked flow (readable
+                 always beats miniature) — used when no custom phone
+                 layout exists. Still measured, so widening the window
+                 switches straight back to the designed canvas. ---- */
+              <div ref={measureNode} className="relative w-full">
                 {els.map(({ id }) => (
                   <div key={id} className="relative mb-4">
                     {id === "hero" ? headerBlock : sectionBlocks[id] ?? null}

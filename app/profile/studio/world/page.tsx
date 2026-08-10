@@ -26,8 +26,11 @@ import {
   DECORATIONS,
   DEFAULT_STUDIO,
   DEFAULT_WORLD,
+  WORLD_ELEMENT_IDS,
   type StudioConfig,
   type WorldConfig,
+  type WorldDevice,
+  type WorldDeviceLayout,
 } from "@/lib/profileStudio";
 
 /* ------------------------------------------------------------------ */
@@ -47,7 +50,7 @@ export default function MyWorldEditor() {
   const [cfg, setCfg] = useState<StudioConfig | null>(null);
   const [cover, setCover] = useState<{ url: string | null; pos: number; touched: boolean } | null>(null);
   const [selected, setSelected] = useState("hero");
-  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [device, setDevice] = useState<WorldDevice>("desktop");
   const [preview, setPreview] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -95,6 +98,67 @@ export default function MyWorldEditor() {
   }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const world: WorldConfig = cfg?.world ?? DEFAULT_WORLD;
+
+  /* ---------- THREE INDEPENDENT DEVICE LAYOUTS ----------
+     desktop lives in world.elements/world.images (unchanged);
+     tablet/phone live in world.tablet / world.phone. Every edit routes
+     ONLY to the device being edited — the others are never touched. */
+  const deviceLayoutOf = (w: WorldConfig, d: WorldDevice): { elements: WorldConfig["elements"]; images: NonNullable<WorldConfig["images"]> } => {
+    if (d !== "desktop" && w[d]) return { elements: w[d]!.elements, images: w[d]!.images ?? {} };
+    return { elements: w.elements, images: w.images ?? {} };
+  };
+  const activeLayout = deviceLayoutOf(world, device);
+  const deviceIsCustom = device === "desktop" || !!world[device];
+
+  /** first switch to tablet/phone seeds an INDEPENDENT copy so the
+      canvas is immediately editable — from then on the layouts diverge */
+  const seedFor = (w: WorldConfig, d: Exclude<WorldDevice, "desktop">): WorldDeviceLayout => {
+    if (d === "tablet") {
+      // start from the desktop design, stretched vertically (720 vs 960
+      // design px → content runs ~4/3 taller)
+      const elements: WorldConfig["elements"] = {};
+      for (const [id, el] of Object.entries(w.elements)) elements[id] = { ...el, y: Math.round(el.y * 4 / 3) };
+      const images: NonNullable<WorldConfig["images"]> = {};
+      for (const [id, im] of Object.entries(w.images ?? {})) images[id] = { ...im, y: Math.round(im.y * 4 / 3) };
+      return { elements, images };
+    }
+    // phone: the clean full-width stack (what phone visitors saw before),
+    // now fully editable — heights are generous estimates at 390 px
+    const est: Record<string, number> = { hero: 700, trust: 480, posts: 620, services: 540, reviews: 480, experience: 480 };
+    const orderedIds = [...WORLD_ELEMENT_IDS].filter((id) => w.elements[id]).sort((a, b) => w.elements[a].y - w.elements[b].y);
+    const elements: WorldConfig["elements"] = {};
+    let yCur = 0;
+    for (const id of orderedIds) {
+      const el = w.elements[id];
+      elements[id] = { ...el, x: 0, w: 100, y: el.hidden && id !== "hero" ? yCur : yCur, rotate: 0 };
+      if (!el.hidden || id === "hero") yCur += (est[id] ?? 480) + 32;
+    }
+    const images: NonNullable<WorldConfig["images"]> = {};
+    for (const [id, im] of Object.entries(w.images ?? {})) images[id] = { ...im, y: Math.round(im.y * 1.6), w: Math.max(im.w, 24) };
+    return { elements, images };
+  };
+  const switchDevice = (d: WorldDevice) => {
+    setDevice(d);
+    setSelected("hero");
+    if (d === "desktop") return;
+    setCfg((c) => {
+      if (!c) return c;
+      const w = c.world ?? DEFAULT_WORLD;
+      if (w[d]) return c; // already customized — NEVER overwrite
+      pushHistory(c);
+      setDirty(true);
+      return { ...c, world: { ...w, [d]: seedFor(w, d) } };
+    });
+  };
+  /** write the active device's layout back into the config */
+  const writeActive = (c: StudioConfig, next: { elements?: WorldConfig["elements"]; images?: NonNullable<WorldConfig["images"]> }): StudioConfig => {
+    const w = c.world ?? DEFAULT_WORLD;
+    if (device === "desktop")
+      return { ...c, world: { ...w, ...(next.elements ? { elements: next.elements } : {}), ...(next.images ? { images: next.images } : {}) } };
+    const cur = w[device] ?? seedFor(w, device);
+    return { ...c, world: { ...w, [device]: { elements: next.elements ?? cur.elements, images: next.images ?? cur.images ?? {} } } };
+  };
+
   const mutate = (fn: (c: StudioConfig) => StudioConfig, recordHistory = true) => {
     setCfg((c) => {
       if (!c) return c;
@@ -116,7 +180,8 @@ export default function MyWorldEditor() {
         setTimeout(() => (gestureOpen.current = false), 400);
       }
       const w = c.world ?? DEFAULT_WORLD;
-      return { ...c, world: { ...w, elements: { ...w.elements, [id]: { ...w.elements[id], ...patch } } } };
+      const lay = deviceLayoutOf(w, device);
+      return writeActive(c, { elements: { ...lay.elements, [id]: { ...lay.elements[id], ...patch } } });
     });
     setDirty(true);
   };
@@ -131,10 +196,10 @@ export default function MyWorldEditor() {
         setTimeout(() => (gestureOpen.current = false), 400);
       }
       const w = c.world ?? DEFAULT_WORLD;
-      const imgs = { ...(w.images ?? {}) };
+      const imgs = { ...deviceLayoutOf(w, device).images };
       if (!imgs[id]) return c;
       imgs[id] = { ...imgs[id], ...patch };
-      return { ...c, world: { ...w, images: imgs } };
+      return writeActive(c, { images: imgs });
     });
     setDirty(true);
   };
@@ -143,24 +208,24 @@ export default function MyWorldEditor() {
     if (!clean) return;
     mutate((c) => {
       const w = c.world ?? DEFAULT_WORLD;
-      const imgs = { ...(w.images ?? {}) };
+      const imgs = { ...deviceLayoutOf(w, device).images };
       if (Object.keys(imgs).length >= 8) {
-        setMsg("Up to 8 image layers per world.");
+        setMsg("Up to 8 image layers per device layout.");
         return c;
       }
       const id = Math.random().toString(36).slice(2, 10);
       imgs[id] = { src: clean, x: 32, y: 120, w: 28, rotate: 0, opacity: 1, layer: 25, locked: false };
       setSelected(`img:${id}`);
-      return { ...c, world: { ...w, images: imgs } };
+      return writeActive(c, { images: imgs });
     });
     setImgUrl("");
   };
   const removeImage = (id: string) => {
     mutate((c) => {
       const w = c.world ?? DEFAULT_WORLD;
-      const imgs = { ...(w.images ?? {}) };
+      const imgs = { ...deviceLayoutOf(w, device).images };
       delete imgs[id];
-      return { ...c, world: { ...w, images: imgs } };
+      return writeActive(c, { images: imgs });
     });
     setSelected("hero");
   };
@@ -213,7 +278,10 @@ export default function MyWorldEditor() {
     if (!cfg) return;
     setDefaultOpen(false);
     pushHistory(cfg);
-    const next: StudioConfig = { ...cfg, world: { ...world, elements: JSON.parse(JSON.stringify(DEFAULT_WORLD.elements)) } };
+    const next: StudioConfig =
+      device === "desktop"
+        ? { ...cfg, world: { ...world, elements: JSON.parse(JSON.stringify(DEFAULT_WORLD.elements)) } }
+        : { ...cfg, world: { ...world, [device]: undefined } }; // back to following desktop / clean stack
     setCfg(next);
     setBusy(true);
     const res = await fetch("/api/me/studio", {
@@ -263,7 +331,7 @@ export default function MyWorldEditor() {
     );
 
   // large screens use the space — the edit view matches the real profile scale
-  const widths = { desktop: "max-w-5xl 2xl:max-w-6xl", tablet: "max-w-3xl", mobile: "max-w-sm" } as const;
+  const widths: Record<WorldDevice, string> = { desktop: "max-w-5xl 2xl:max-w-6xl", tablet: "max-w-3xl", phone: "max-w-sm" };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink">
@@ -283,8 +351,8 @@ export default function MyWorldEditor() {
         <button onClick={undo} disabled={undoStack.current.length === 0} className="icon-btn h-8 w-8 disabled:opacity-30" title="Undo" aria-label="Undo"><Undo2 className="h-4 w-4" /></button>
         <button onClick={redo} disabled={redoStack.current.length === 0} className="icon-btn h-8 w-8 disabled:opacity-30" title="Redo" aria-label="Redo"><Redo2 className="h-4 w-4" /></button>
         <span className="mx-1 h-5 w-px bg-line" />
-        {([["desktop", Monitor], ["tablet", Tablet], ["mobile", Smartphone]] as const).map(([d, Icon]) => (
-          <button key={d} onClick={() => setDevice(d)} className={`icon-btn h-8 w-8 ${device === d ? "bg-lime-400/15 text-lime-300" : ""}`} title={d} aria-label={`${d} preview`}><Icon className="h-4 w-4" /></button>
+        {([["desktop", Monitor], ["tablet", Tablet], ["phone", Smartphone]] as const).map(([d, Icon]) => (
+          <button key={d} onClick={() => switchDevice(d)} className={`icon-btn h-8 w-8 ${device === d ? "bg-lime-400/15 text-lime-300" : ""}`} title={`Edit the ${d} layout — independent from the others`} aria-label={`Edit ${d} layout`}><Icon className="h-4 w-4" /></button>
         ))}
         <span className="mx-1 h-5 w-px bg-line" />
         <button onClick={() => setPreview(!preview)} className={`icon-btn h-8 w-8 ${preview ? "bg-lime-400/15 text-lime-300" : ""}`} title="Preview — exactly what visitors see" aria-label="Preview"><Eye className="h-4 w-4" /></button>
@@ -308,9 +376,24 @@ export default function MyWorldEditor() {
 
       {msg && <p className="mx-auto mt-2 w-fit rounded-full border border-line bg-card px-4 py-1.5 text-[11px] text-zinc-300">{msg}</p>}
       {!preview && (
-        <p className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full bg-card/60 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">
-          <Lock className="h-2.5 w-2.5" /> identity · actions · trust locked inside the profile card — everything else is freeform: rose guides appear when edges, centers, or spacing line up · hold Alt to bypass snapping
-        </p>
+        <>
+          <p className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full bg-card/60 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">
+            <Lock className="h-2.5 w-2.5" /> identity · actions · trust locked inside the profile card — everything else is freeform: rose guides appear when edges, centers, or spacing line up · hold Alt to bypass snapping
+          </p>
+          <p className="mx-auto mt-1.5 flex w-fit items-center gap-1.5 rounded-full border border-line bg-card/80 px-3 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-lime-300">
+            Editing the {device} layout
+            <span className="font-normal text-zinc-500">
+              — independent per device ·{" "}
+              {device === "desktop"
+                ? "shown to desktop visitors"
+                : deviceIsCustom
+                  ? `custom ${device} design — shown to ${device} visitors`
+                  : device === "tablet"
+                    ? "currently follows desktop until you edit here"
+                    : "currently the clean stacked flow until you edit here"}
+            </span>
+          </p>
+        </>
       )}
 
       {/* THE WORLD — your actual profile, full size, in Edit Mode */}
@@ -369,9 +452,12 @@ export default function MyWorldEditor() {
           <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
             <p className="text-[15px] font-bold tracking-tight text-zinc-50">Restore default layout?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-              This resets your My World arrangement to the original UpNova profile — full-width
-              sections in the original order and spacing. Your environment, theme, banner, and
-              decorations stay. Saves immediately.
+              {device === "desktop"
+                ? "This resets your DESKTOP arrangement to the original UpNova profile — full-width sections in the original order and spacing. Tablet and phone layouts are untouched."
+                : device === "tablet"
+                  ? "This removes your custom TABLET arrangement — tablet visitors go back to seeing your desktop design, scaled. Desktop and phone layouts are untouched."
+                  : "This removes your custom PHONE arrangement — phone visitors go back to the clean stacked flow. Desktop and tablet layouts are untouched."}{" "}
+              Your environment, theme, banner, and decorations stay. Saves immediately.
             </p>
             <div className="mt-4 flex gap-2">
               <button onClick={() => setDefaultOpen(false)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
@@ -408,9 +494,9 @@ export default function MyWorldEditor() {
             <ImageIcon className="h-3.5 w-3.5" /> Upload image (≤600 KB)
             <input type="file" accept="image/*" className="hidden" onChange={(e) => pickWorldImage(e.target.files?.[0] ?? null)} />
           </label>
-          {Object.keys(world.images ?? {}).length > 0 && (
+          {Object.keys(activeLayout.images).length > 0 && (
             <ul className="mt-2 space-y-1">
-              {Object.entries(world.images ?? {}).map(([iid, im]) => (
+              {Object.entries(activeLayout.images).map(([iid, im]) => (
                 <li key={iid} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${selected === `img:${iid}` ? "border-sky-400/50 bg-sky-400/5" : "border-line"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={im.src} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
