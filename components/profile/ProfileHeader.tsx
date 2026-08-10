@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { PencilLine, MapPin, MessageSquare, Megaphone, Zap, FolderPlus } from "lucide-react";
+import { PencilLine, MapPin, MessageSquare, Megaphone, Zap, FolderPlus, GraduationCap } from "lucide-react";
 import PromoteModal from "../PromoteModal";
 import FollowListModal from "../FollowListModal";
 import Avatar from "../Avatar";
@@ -51,7 +51,6 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
         });
       });
   }, [user]);
-  const isStudent = !!user?.campus;
 
   const canMessage = profile.whoCanMessage !== "nobody";
   const canHire = profile.hiringEnabled && profile.acceptBookings && profile.allowServiceRequests;
@@ -167,12 +166,15 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
                 Open to Work
               </span>
             )}
-            {isStudent && (
+            {user?.campus && (
               <span
-                className="ml-1 inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
-                title="Platform-verified — earned through school verification, not editable"
+                className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
+                title="Platform-verified school affiliation — earned through verification, never self-claimed. Manage in Settings → School & Education."
               >
-                Verified Student
+                <GraduationCap className="h-3.5 w-3.5" />
+                {user.campus.name}
+                {user.campus.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
+                {user.campus.affiliation === "alumni" ? " · Alumni" : user.campus.affiliation === "faculty_staff" ? " · Faculty / Staff" : ""}
               </span>
             )}
             {(isOwner || profile.showWorkPerformance) && (stats.completedProjects ?? 0) > 0 && (

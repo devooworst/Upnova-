@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
           affiliation,
           gradYear,
           program,
+          showGradYear: true, // school + class year is the public academic identity
           verifiedAt: new Date(),
         })
         .run();

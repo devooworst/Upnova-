@@ -1460,8 +1460,12 @@ export default function EditProfile() {
                   <p className="text-sm font-semibold text-zinc-100">Student status</p>
                   {studentVerified ? (
                     <p className="mt-0.5 text-xs text-zinc-400">
-                      {campus?.name} — <span className="text-violet-300">Verified Student</span> · Verified
-                      through UpNova
+                      <span className="text-violet-300">
+                        {campus?.name}
+                        {campus?.gradYear ? ` · Class of ${campus.gradYear}` : ""}
+                        {campus?.affiliation === "alumni" ? " · Alumni" : ""}
+                      </span>{" "}
+                      — verified through UpNova · manage in Settings → School &amp; Education
                     </p>
                   ) : (
                     <p className="mt-0.5 text-xs text-zinc-500">
@@ -1681,7 +1685,7 @@ export default function EditProfile() {
       )}
 
       {/* ------------------------------ preview ------------------------------ */}
-      {previewOpen && <PublicPreview draft={draft} studentVerified={studentVerified} completedCount={workStats.completedProjects ?? 0} onClose={() => setPreviewOpen(false)} />}
+      {previewOpen && <PublicPreview draft={draft} campus={campus} completedCount={workStats.completedProjects ?? 0} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
 }
@@ -1690,12 +1694,12 @@ export default function EditProfile() {
 
 function PublicPreview({
   draft,
-  studentVerified,
+  campus,
   completedCount,
   onClose,
 }: {
   draft: ProfileData;
-  studentVerified: boolean;
+  campus: { name: string; affiliation?: string; gradYear?: string } | null;
   completedCount: number;
   onClose: () => void;
 }) {
@@ -1763,9 +1767,11 @@ function PublicPreview({
                         <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Open to Work
                       </span>
                     )}
-                    {studentVerified && (
+                    {campus && (
                       <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">
-                        Verified Student
+                        {campus.name}
+                        {campus.gradYear ? ` · Class of ${campus.gradYear}` : ""}
+                        {campus.affiliation === "alumni" ? " · Alumni" : ""}
                       </span>
                     )}
                     {draft.showWorkPerformance && completedCount > 0 && (
@@ -1821,7 +1827,7 @@ function PublicPreview({
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
                     <span>
-                      <span className="font-semibold text-zinc-200">Verified Student</span> — platform-verified
+                      <span className="font-semibold text-zinc-200">School &amp; class year</span> — platform-verified affiliation; the major is never public
                     </span>
                   </li>
                   <li className="flex items-center gap-2">

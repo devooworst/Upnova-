@@ -321,9 +321,11 @@ function seed() {
       .values({
         id: id(), userId: uid[handle], campusId, status: "verified", program, gradYear: "2027",
         affiliation: "current_student",
-        // nia opted into showing her class year + major — visibility is the
-        // member's choice, the verification is stored either way
-        showGradYear: handle === "nia", showProgram: handle === "nia",
+        // school + class year is the public academic identity (default on;
+        // each member can hide the year in Settings). The major is a
+        // visibility choice AND never public regardless — nia opted in for
+        // owner-facing surfaces.
+        showGradYear: true, showProgram: handle === "nia",
         verifiedAt: new Date(),
       })
       .run();

@@ -124,8 +124,10 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
 
     return {
       user: publicUser(user, profile, { viewerIsOwner: isOwner }),
-      // verified academic identity — exactly what the member chose to show.
-      // "Class of 2027" is a profile ATTRIBUTE, never a community.
+      // verified academic identity — school + class year, from the VERIFIED
+      // affiliation only (never self-claimed). "Class of 2027" is a profile
+      // ATTRIBUTE, never a community. The major/program is intentionally
+      // NEVER part of the public payload — it stays private to the owner.
       academic: (() => {
         const v = db
           .select({ v: tables.campusVerifications, c: tables.campuses })
@@ -140,7 +142,6 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
           school: v.c.name,
           affiliation: v.v.affiliation,
           classOf: (v.v.showGradYear || isOwner) && v.v.gradYear ? v.v.gradYear : null,
-          program: (v.v.showProgram || isOwner) && v.v.program ? v.v.program : null,
           verified: true,
         };
       })(),

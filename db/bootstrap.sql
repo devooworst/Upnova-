@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS `campus_listings` (
 	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS `campus_verifications` (
+CREATE TABLE IF NOT EXISTS "campus_verifications" (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`campus_id` text NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS `campus_verifications` (
 	`program` text DEFAULT '' NOT NULL,
 	`grad_year` text DEFAULT '' NOT NULL,
 	`show_school` integer DEFAULT true NOT NULL,
-	`show_grad_year` integer DEFAULT false NOT NULL,
+	`show_grad_year` integer DEFAULT true NOT NULL,
 	`show_program` integer DEFAULT false NOT NULL,
 	`verified_at` integer,
 	`created_at` integer NOT NULL,

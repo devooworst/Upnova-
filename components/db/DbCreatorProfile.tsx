@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck } from "lucide-react";
+import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck, GraduationCap } from "lucide-react";
 import { ACCOUNT_BADGES } from "@/lib/trust";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -42,7 +42,6 @@ interface PublicProfile {
     school: string;
     affiliation: string;
     classOf: string | null;
-    program: string | null;
     verified: boolean;
   } | null;
   stats: {
@@ -165,22 +164,16 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
               </h1>
               <p className="mt-0.5 text-sm font-medium text-zinc-400">{user.roleLine || `@${user.handle}`}</p>
               {data.academic && (
-                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-violet-300">
-                  <span>{data.academic.school}</span>
-                  <span className="text-zinc-600">·</span>
-                  <span>{data.academic.affiliation === "current_student" ? "Student" : data.academic.affiliation === "alumni" ? "Alumni" : "Faculty/Staff"}</span>
-                  {data.academic.classOf && (
-                    <>
-                      <span className="text-zinc-600">·</span>
-                      <span>Class of {data.academic.classOf}</span>
-                    </>
-                  )}
-                  {data.academic.program && (
-                    <>
-                      <span className="text-zinc-600">·</span>
-                      <span>{data.academic.program}</span>
-                    </>
-                  )}
+                <p className="mt-1.5">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
+                    title="Platform-verified school affiliation — earned through verification, never self-claimed. The major is never shown publicly."
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    {data.academic.school}
+                    {data.academic.classOf ? ` · Class of ${data.academic.classOf}` : ""}
+                    {data.academic.affiliation === "alumni" ? " · Alumni" : data.academic.affiliation === "faculty_staff" ? " · Faculty / Staff" : ""}
+                  </span>
                 </p>
               )}
               {user.locationLabel && (

@@ -540,7 +540,7 @@ export const campusVerifications = sqliteTable(
     // the member controls what the public profile shows; the verification
     // itself stays stored for trust/eligibility either way
     showSchool: integer("show_school", { mode: "boolean" }).notNull().default(true),
-    showGradYear: integer("show_grad_year", { mode: "boolean" }).notNull().default(false),
+    showGradYear: integer("show_grad_year", { mode: "boolean" }).notNull().default(true), // school + class year is the public academic identity
     showProgram: integer("show_program", { mode: "boolean" }).notNull().default(false),
     verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
     createdAt: ts("created_at"),

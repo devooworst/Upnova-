@@ -33,6 +33,7 @@ import { currentUser, services, bookings } from "@/lib/data";
 const sections = [
   { id: "account", label: "Account", icon: User },
   { id: "creator", label: "Profile & Creator", icon: Palette },
+  { id: "education", label: "School & Education", icon: GraduationCap },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "privacy", label: "Privacy & Safety", icon: ShieldCheck },
   { id: "payments", label: "Payments & Earnings", icon: Wallet },
@@ -163,6 +164,68 @@ export default function SettingsPage() {
     if (!ok) setDemoMsg("Plan change failed — are you signed in?");
     setDemoBusy(false);
   };
+
+  /* ---- School & Education: profile display of the VERIFIED affiliation.
+     The school itself is a verified fact (never hand-editable); class year
+     and its visibility are the member's choice and NEVER change the
+     verification status. ---- */
+  const [eduYear, setEduYear] = useState("");
+  const [eduShowYear, setEduShowYear] = useState(true);
+  const [eduLoaded, setEduLoaded] = useState(false);
+  const [eduBusy, setEduBusy] = useState(false);
+  const [eduMsg, setEduMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  useEffect(() => {
+    if (!user?.campus) return;
+    fetch("/api/campus/verify", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.verified) {
+          setEduYear(d.gradYear || "");
+          setEduShowYear(!!d.showGradYear);
+        }
+        setEduLoaded(true);
+      })
+      .catch(() => setEduLoaded(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!user?.campus]);
+  const patchEducation = async (body: Record<string, unknown>, okText: string) => {
+    setEduBusy(true);
+    setEduMsg(null);
+    try {
+      const res = await fetch("/api/campus/verify", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) {
+        setEduMsg({ kind: "err", text: (data as { error?: string }).error || "Update failed — try again." });
+        return false;
+      }
+      invalidateSession(); // profile pill updates; verification status untouched
+      setEduMsg({ kind: "ok", text: okText });
+      return true;
+    } catch {
+      setEduMsg({ kind: "err", text: "Network error — try again." });
+      return false;
+    } finally {
+      setEduBusy(false);
+    }
+  };
+  const graduateFromSettings = async () => {
+    if (!window.confirm("Switch your status to Alumni? Everything you built stays — connections, messages, portfolio, history. Student-only areas (Marketplace, Student Groups) close; the alumni environment opens.")) return;
+    setEduBusy(true);
+    setEduMsg(null);
+    const res = await fetch("/api/campus/verify", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "graduate" }) });
+    if (res.ok) {
+      invalidateSession();
+      setEduMsg({ kind: "ok", text: "You're an alum now — your profile shows it, and everything you built stays." });
+    } else {
+      const d = await res.json().catch(() => ({} as { error?: string }));
+      setEduMsg({ kind: "err", text: (d as { error?: string }).error || "Update failed — try again." });
+    }
+    setEduBusy(false);
+  };
   const setT = (k: string) => (v: boolean) => setToggles((s) => ({ ...s, [k]: v }));
 
   const earned = 4850;
@@ -284,6 +347,133 @@ export default function SettingsPage() {
               <div className="mt-2 flex justify-end">
                 <button className="btn-lime rounded-md px-5 py-2 text-xs">Save changes</button>
               </div>
+            </section>
+          )}
+
+          {section === "education" && (
+            <section className="card overflow-hidden">
+              <div className="border-b border-violet-400/20 bg-gradient-to-b from-violet-400/10 to-transparent p-5">
+                <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-violet-300">
+                  <GraduationCap className="h-4 w-4" /> School &amp; Education
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                  What your profile says about your school. The school itself comes from your{" "}
+                  <span className="font-semibold text-zinc-300">verified affiliation</span> — it can
+                  never be claimed by editing a profile. Your major is never shown on your public profile.
+                </p>
+              </div>
+
+              {!user?.campus ? (
+                <div className="p-5">
+                  <p className="text-sm font-semibold text-zinc-200">No verified school yet</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                    Verify your student, alumni, or faculty affiliation — free, and independent of
+                    any plan — and your school and class year appear here and on your profile.
+                  </p>
+                  <a href="/campus" className="mt-3 inline-flex items-center gap-2 rounded-md bg-violet-400 px-5 py-2 text-xs font-bold text-zinc-950 transition hover:bg-violet-300">
+                    <GraduationCap className="h-3.5 w-3.5" /> Verify your school — Free
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-5 p-5">
+                  {/* the school — a verified fact, read-only */}
+                  <div>
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">College / University</p>
+                    <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-line bg-card-raised px-3 py-2.5">
+                      <p className="text-sm font-semibold text-zinc-100">{user.campus.name}</p>
+                      <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">Verified</span>
+                    </div>
+                    <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+                      Locked to your verified affiliation. Transferring schools? Re-verify at the new
+                      school in Your Campus — profile edits can never change it.
+                    </p>
+                  </div>
+
+                  {/* status — student vs alumni */}
+                  <div>
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Status</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+                      <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300">
+                        {user.campus.affiliation === "alumni" ? "Alumni" : user.campus.affiliation === "faculty_staff" ? "Faculty / Staff" : "Current Student"}
+                      </span>
+                      {user.campus.affiliation === "current_student" && (
+                        <button onClick={graduateFromSettings} disabled={eduBusy} className="btn-ghost px-3.5 py-1.5 text-xs disabled:opacity-50">
+                          I graduated — switch to Alumni
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+                      {user.campus.affiliation === "current_student"
+                        ? "Graduating changes ONE thing: student-only areas close and the alumni environment opens. Account, portfolio, connections, and history stay."
+                        : user.campus.affiliation === "alumni"
+                        ? "Alumni status — everything you built as a student stays with your account. (Testing? Demo Mode → Settings → Demo Controls can switch states.)"
+                        : "Faculty/staff affiliation — verified through your school."}
+                    </p>
+                  </div>
+
+                  {/* class year — profile display only, never verification */}
+                  {user.campus.affiliation !== "faculty_staff" && (
+                    <div>
+                      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                        {user.campus.affiliation === "alumni" ? "Class of" : "Expected graduation — Class of"}
+                      </p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <input
+                          value={eduYear}
+                          onChange={(e) => setEduYear(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                          placeholder="e.g. 2028"
+                          inputMode="numeric"
+                          className="w-28 rounded-lg border border-line bg-card-raised px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50"
+                        />
+                        <button
+                          onClick={() => {
+                            if (!/^(19|20)\d{2}$/.test(eduYear)) { setEduMsg({ kind: "err", text: "Enter a 4-digit year, e.g. 2028." }); return; }
+                            patchEducation({ gradYear: eduYear }, "Class year updated on your profile.");
+                          }}
+                          disabled={eduBusy || !eduLoaded}
+                          className="rounded-md bg-violet-400 px-4 py-2 text-xs font-bold text-zinc-950 transition hover:bg-violet-300 disabled:opacity-50"
+                        >
+                          {eduBusy ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">Show class year on profile</p>
+                          <p className="text-[10px] text-zinc-600">Off = only your school shows</p>
+                        </div>
+                        <Toggle
+                          on={eduShowYear}
+                          onChange={(v) => {
+                            setEduShowYear(v);
+                            patchEducation({ showGradYear: v }, v ? "Class year is visible on your profile." : "Class year hidden — your school still shows.");
+                          }}
+                        />
+                      </div>
+                      <p className="mt-2 rounded-md border border-line bg-card-raised px-3 py-2 text-[10px] leading-relaxed text-zinc-500">
+                        Changing or hiding the class year changes your <span className="font-semibold text-zinc-300">profile display only</span> —
+                        your verification status is a separate fact and is never affected.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* live preview of the profile pill */}
+                  <div className="border-t border-line-soft pt-4">
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Profile preview</p>
+                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300">
+                      <GraduationCap className="h-3.5 w-3.5" />
+                      {user.campus.name}
+                      {eduShowYear && eduYear ? ` · Class of ${eduYear}` : ""}
+                      {user.campus.affiliation === "alumni" ? " · Alumni" : user.campus.affiliation === "faculty_staff" ? " · Faculty / Staff" : ""}
+                    </span>
+                  </div>
+
+                  {eduMsg && (
+                    <p className={`rounded-md border px-3 py-2 text-[11px] ${eduMsg.kind === "ok" ? "border-lime-400/30 bg-lime-400/5 text-lime-300" : "border-red-500/30 bg-red-500/5 text-red-300"}`}>
+                      {eduMsg.text}
+                    </p>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
