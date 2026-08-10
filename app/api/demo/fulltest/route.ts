@@ -125,6 +125,8 @@ export async function POST(req: NextRequest) {
     // onboarding/progress test accounts from prior runs (handle prefix "tonb")
     for (const u of db.select().from(tables.users).all())
       if (u.handle.startsWith("tonb")) {
+        for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
+          db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
         for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
           db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
           db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
@@ -221,6 +223,47 @@ export async function POST(req: NextRequest) {
     const ln = await api("lena", "/api/notifications");
     const msgNotif = ((ln.data as any).notifications ?? []).find((n: any) => n.type === "message");
     step(c, "message notification exists and points at the exact thread", !!msgNotif && String(msgNotif.href).includes(convId), { expected: `href contains ${convId}`, actual: msgNotif?.href });
+
+    /* ---- REAL vs SIMULATED accounts: automation NEVER speaks for real people ---- */
+    const mkReal = async (handle: string) => {
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Real ${handle}` } });
+      tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
+    };
+    await mkReal("tonbm1");
+    await mkReal("tonbm2");
+    const plainMsgs = async (who: string, cid: string) =>
+      (((await api(who, `/api/conversations/${cid}/messages`)).data as any).messages ?? []).filter((m: any) => m.kind !== "system");
+
+    // real → real: exactly ONE message, no scripted reply, normal notification
+    const cAB = String(((await api("tonbm1", "/api/conversations", { method: "POST", body: { toHandle: "tonbm2", firstMessage: "[TEST] Hey!" } })).data as any).conversationId ?? "");
+    const abMsgs = await plainMsgs("tonbm2", cAB);
+    const bNotif = (((await api("tonbm2", "/api/notifications")).data as any).notifications ?? []).find((n: any) => n.type === "message");
+    step(c, "REAL → REAL: recipient gets the message + notification and NOBODY auto-replies", abMsgs.length === 1 && !!bNotif, { expected: "exactly 1 message, notification present", actual: `messages=${abMsgs.length} notif=${!!bNotif}`, record: cAB });
+    // the recipient replies MANUALLY (their own real session) — sender receives it
+    await api("tonbm2", `/api/conversations/${cAB}/messages`, { method: "POST", body: { body: "[TEST] What's up?" } });
+    const abAfter = await plainMsgs("tonbm1", cAB);
+    step(c, "REAL → REAL: the manual reply (and ONLY it) arrives back", abAfter.length === 2 && /What's up/.test(abAfter[1]?.body), { expected: "2 messages total", actual: `${abAfter.length} messages` });
+
+    // real → @devin (the ADMIN/PERSONAL account): received, NEVER auto-answered
+    const devinRow = db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get()!;
+    step(c, "@devin is classified REAL (simulated=false) — by the account flag, not the username", devinRow.role === "admin" && !devinRow.simulated, { expected: "simulated=false", actual: `role=${devinRow.role} simulated=${!!devinRow.simulated}` });
+    const cAD = String(((await api("tonbm1", "/api/conversations", { method: "POST", body: { toHandle: "devin", firstMessage: "[TEST] Hey Devin" } })).data as any).conversationId ?? "");
+    const adMsgs = await plainMsgs("tonbm1", cAD);
+    step(c, "@devin RECEIVES the message and does NOT auto-reply — no scripted 'Sounds good…'", adMsgs.length === 1 && adMsgs[0]?.mine === true, { expected: "exactly 1 message (the sender's own)", actual: `${adMsgs.length} messages: ${adMsgs.map((m: any) => `"${m.body.slice(0, 25)}"`).join(", ")}`, record: cAD });
+    // devin replies MANUALLY through his own real session
+    const dl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "devin", password: "upnova123" } });
+    tok.devinq = (dl.data as any).sessionToken ?? "";
+    await api("devinq", `/api/conversations/${cAD}/messages`, { method: "POST", body: { body: "[TEST] What's up?" } });
+    const adAfter = await plainMsgs("tonbm1", cAD);
+    step(c, "devin's MANUAL reply arrives — and it's the only reply that ever will", adAfter.length === 2 && /What's up/.test(adAfter[1]?.body) && !adAfter[1]?.mine, { expected: "2 messages, second from devin", actual: `${adAfter.length} messages` });
+    // clean devin's inbox: this was a test conversation
+    db.delete(tables.conversations).where(eq(tables.conversations.id, cAD)).run();
+    db.delete(tables.notifications).where(eq(tables.notifications.userId, devinRow.id)).run();
+
+    // real → SIMULATED demo character: the scripted counterpart still works
+    const cAL = String(((await api("tonbm1", "/api/conversations", { method: "POST", body: { toHandle: "lena", firstMessage: "[TEST] Hi Lena!" } })).data as any).conversationId ?? "");
+    const alMsgs = await plainMsgs("tonbm1", cAL);
+    step(c, "SIMULATED demo character (lena) still auto-replies — Test Center behavior preserved", alMsgs.length >= 2 && alMsgs.some((m: any) => !m.mine), { expected: ">=2 messages incl. lena's scripted reply", actual: `${alMsgs.length} messages`, record: cAL });
   }
 
   /* ================= FOLLOWING ================= */

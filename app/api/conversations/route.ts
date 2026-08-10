@@ -6,6 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { canMessage } from "@/lib/server/authz";
 import { blockedEitherWay } from "@/lib/server/communities";
 import { publicUser } from "@/lib/server/serialize";
+import { maybeAutoReply } from "@/lib/server/demo";
 import { notify } from "@/lib/server/notify";
 import { resolvePairConversation } from "@/lib/server/conversations";
 
@@ -123,6 +124,10 @@ export async function POST(req: NextRequest) {
         body: first.slice(0, 120),
         href: `/messages?c=${convId}`,
       });
+      // SIMULATED demo characters respond to first contact too (found by
+      // the full-system test: they only replied to follow-ups). REAL
+      // accounts are untouched — maybeAutoReply refuses to speak as them.
+      maybeAutoReply(convId, user.id);
     }
 
     return { conversationId: convId };

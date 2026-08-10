@@ -787,7 +787,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`onboarding` text DEFAULT '' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
-);
+, simulated integer not null default 0);
 CREATE TABLE IF NOT EXISTS `works` (
 	`id` text PRIMARY KEY NOT NULL,
 	`creator_id` text NOT NULL,

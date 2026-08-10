@@ -39,6 +39,18 @@ export const users = sqliteTable("users", {
   // Ignored entirely in production (isDemoMode() false → always realistic).
   // This is feature-access state, NEVER auth state.
   testerMode: text("tester_mode").notNull().default("demo"),
+  // AUTOMATION CLASSIFICATION — the authority for scripted behavior.
+  //   simulated=true  → a DESIGNATED simulation participant (demo-world
+  //                     characters): auto-replies, auto-accepts, and
+  //                     Test-Center counterpart behaviors may act AS
+  //                     this account.
+  //   simulated=false → a REAL/PERSONAL account: the platform NEVER
+  //                     sends messages or performs actions as it —
+  //                     no auto-replies, no scripted responses, ever.
+  // Never inferred from a username; set only by seed config (demo-world
+  // characters) — signups and admin accounts are ALWAYS real. Distinct
+  // from isSeed, which only marks rows as wipeable seed DATA.
+  simulated: integer("simulated", { mode: "boolean" }).notNull().default(false),
   // PHONE LOGIN + SMS — sensitive account data, never public unless the
   // member explicitly opts in elsewhere. Verified via OTP (hashes only).
   phone: text("phone").unique(),

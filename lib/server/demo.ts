@@ -1,7 +1,8 @@
 /* ------------------------------------------------------------------ */
 /*  Demo provider behavior — DEV ONLY.                                 */
 /*                                                                     */
-/*  Seed accounts (users.isSeed) act like responsive counterparts so   */
+/*  SIMULATED accounts (users.simulated — explicit classification,     */
+/*  never a username) act like responsive counterparts so             */
 /*  the full marketplace loop can be demonstrated by one person:       */
 /*                                                                     */
 /*    · you message a seed user        → they reply                    */
@@ -25,9 +26,14 @@ import { notify } from "./notify";
 
 const id = () => randomBytes(12).toString("hex");
 
+/** THE automation authority: may scripted demo behavior act AS this
+    account? Reads users.simulated — the explicit classification — never
+    a username and never the seed-DATA flag. REAL/PERSONAL accounts
+    (admin, signups) are simulated=false: the platform NEVER sends a
+    message or performs an action as them. */
 export function isSeedUser(userId: string): boolean {
-  const u = db.select({ isSeed: tables.users.isSeed }).from(tables.users).where(eq(tables.users.id, userId)).get();
-  return !!u?.isSeed;
+  const u = db.select({ simulated: tables.users.simulated }).from(tables.users).where(eq(tables.users.id, userId)).get();
+  return !!u?.simulated;
 }
 
 function sendAs(conversationId: string, senderId: string, body: string) {
@@ -226,7 +232,10 @@ export function forceAdvanceBooking(bookingId: string, actorUserId: string): { o
   const other = b.clientId === actorUserId ? b.providerId : b.clientId;
   if (!isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
 
+  const providerIsSimulated = other === b.providerId; // (other is already verified simulated)
   if (b.status === "pending") {
+    // accepting is the PROVIDER'S action — if that's YOU, it's your move
+    if (!providerIsSimulated) return { requiresAction: "Accept or decline the request yourself — it's a booking for YOUR service", href: "/calendar" };
     seedAcceptsBooking(bookingId);
     return { ok: true, stage: "Accepted — awaiting your test payment" };
   }
@@ -235,6 +244,9 @@ export function forceAdvanceBooking(bookingId: string, actorUserId: string): { o
     return { requiresAction: "Pay (test payment) in the real UI", href: "/calendar" };
   }
   if (b.status === "confirmed") {
+    // progress + completion are the PROVIDER'S actions — never simulated
+    // when the caller is the provider (a REAL account never auto-speaks)
+    if (!providerIsSimulated) return { requiresAction: "Post progress / mark complete yourself — you're the provider", href: "/calendar" };
     if (b.progress === "") {
       db.update(tables.bookings).set({ progress: "preparing" }).where(eq(tables.bookings.id, bookingId)).run();
       if (b.conversationId) sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
@@ -374,7 +386,7 @@ export function seedApplicantsApplyToRoles(opportunityId: string) {
   let roles: { id: string; title: string }[] = [];
   try { roles = JSON.parse(opp.roles); } catch { return; }
   if (!roles.length) return;
-  const seeds = db.select().from(tables.users).all().filter((u) => u.isSeed && u.id !== opp.posterId && u.status === "active");
+  const seeds = db.select().from(tables.users).all().filter((u) => u.simulated && u.id !== opp.posterId && u.status === "active");
   const MESSAGES = [
     "This is exactly my lane — portfolio's on my profile, happy to share more.",
     "Available that day and local. Would love to be part of this.",
@@ -523,7 +535,7 @@ export function seedRespondsInCommunity(communityId: string) {
       .innerJoin(tables.users, eq(tables.communityMembers.userId, tables.users.id))
       .where(eq(tables.communityMembers.communityId, communityId))
       .all()
-      .filter((r) => r.m.status === "active" && r.u.isSeed && r.u.role !== "admin" && r.u.id !== post.authorId);
+      .filter((r) => r.m.status === "active" && r.u.simulated && r.u.id !== post.authorId);
     if (!members.length) continue;
     const replier = members[Math.floor(Math.random() * members.length)];
 

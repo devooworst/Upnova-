@@ -287,6 +287,10 @@ function seed() {
         // seeded accounts are established members — the first-run tour
         // only greets genuinely new signups
         onboarding: JSON.stringify({ completedAt: new Date().toISOString(), seeded: true }),
+        // AUTOMATION CLASSIFICATION: demo-world characters are SIMULATED
+        // (auto-replies etc. may act as them); the admin/personal account
+        // is REAL — the platform never speaks as it. Config, not username.
+        simulated: !d.admin,
         isSeed: true,
       })
       .run();
