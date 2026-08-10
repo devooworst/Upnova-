@@ -48,10 +48,11 @@ CREATE TABLE IF NOT EXISTS `bookings` (
 	`location` text DEFAULT '' NOT NULL,
 	`travel_fee` integer DEFAULT 0 NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
+	`progress` text DEFAULT '' NOT NULL,
 	`proposed_starts_at` integer,
 	`conversation_id` text,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, `progress` text DEFAULT '' NOT NULL,
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`client_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`provider_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
@@ -94,7 +95,7 @@ CREATE TABLE IF NOT EXISTS `campus_listings` (
 	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "campus_verifications" (
+CREATE TABLE IF NOT EXISTS `campus_verifications` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`campus_id` text NOT NULL,
@@ -289,7 +290,7 @@ CREATE TABLE IF NOT EXISTS `events` (
 	`config` text DEFAULT '{}' NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, `public_visibility` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE set null
 );
@@ -452,7 +453,7 @@ CREATE TABLE IF NOT EXISTS `opportunities` (
 	`engagement` text DEFAULT '{}' NOT NULL,
 	`status` text DEFAULT 'open' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, `eligibility` text DEFAULT 'anyone' NOT NULL, `eligibility_campus_id` text,
 	FOREIGN KEY (`poster_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `order_events` (
@@ -705,6 +706,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`handle` text NOT NULL,
 	`role` text DEFAULT 'user' NOT NULL,
 	`plan` text DEFAULT 'free' NOT NULL,
+	`tester_mode` text DEFAULT 'demo' NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
 	`account_type` text DEFAULT 'individual' NOT NULL,
 	`business_verified` integer DEFAULT false NOT NULL,
@@ -712,7 +714,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`mfa_secret` text,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
-, `tester_mode` text DEFAULT 'demo' NOT NULL);
+);
 CREATE TABLE IF NOT EXISTS `works` (
 	`id` text PRIMARY KEY NOT NULL,
 	`creator_id` text NOT NULL,

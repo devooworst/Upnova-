@@ -8,6 +8,7 @@ import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { recordInteraction } from "@/lib/server/recsys";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
+import { checkApplicantEligibility } from "@/lib/server/eligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (opp.posterId === user.id) throw new ApiError(400, "You can't apply to your own opportunity");
     if (opp.trustRequired === "high-trust" && user.profile.trustLevel !== "high-trust")
       throw new ApiError(403, "This opportunity requires High-Trust verification");
+
+    // ELIGIBILITY — the poster's "who can apply" rule, enforced where it
+    // matters. Visibility was never restricted; application is. DEMO MODE
+    // bypasses for testing; SIMULATION MODE behaves like production.
+    const elig = checkApplicantEligibility(opp, user.id);
+    if (!elig.eligible) throw new ApiError(403, elig.reason || "You aren't eligible for this opportunity");
 
     const existing = db
       .select()

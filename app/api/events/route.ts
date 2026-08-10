@@ -34,10 +34,12 @@ export async function GET(req: NextRequest) {
       .from(tables.events)
       .innerJoin(tables.users, eq(tables.events.hostId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.events.hostId))
-      .where(isNull(tables.events.campusId)) // ← the scope rule
       .orderBy(asc(tables.events.startsAt))
       .all()
-      .filter((r) => r.event.status === "active" && r.u.status === "active");
+      // SCOPE RULE with the visibility/eligibility split: world events
+      // always list; campus events list ONLY when the organizer opted
+      // into public visibility (info only — RSVP stays campus-gated).
+      .filter((r) => (!r.event.campusId || r.event.publicVisibility) && r.event.status === "active" && r.u.status === "active");
 
     // upcoming only (grace: keep events until 6h after start)
     const now = Date.now();
@@ -81,6 +83,7 @@ export async function GET(req: NextRequest) {
       ? new Set(db.select().from(tables.eventRsvps).where(eq(tables.eventRsvps.userId, viewer.id)).all().map((r) => r.eventId))
       : new Set<string>();
 
+    const campusNames = new Map(db.select().from(tables.campuses).all().map((c) => [c.id, c.name]));
     return {
       events: rows.map((r) =>
         serializeEvent(r.event, {
@@ -92,6 +95,7 @@ export async function GET(req: NextRequest) {
           viewerLat: vLat,
           viewerLng: vLng,
           isHost: viewer?.id === r.event.hostId,
+          campusName: r.event.campusId ? campusNames.get(r.event.campusId) ?? null : null,
         })
       ),
       scopeNote,
@@ -115,10 +119,13 @@ export async function POST(req: NextRequest) {
 
     const isCampus = !!body.campus;
     let campusId: string | null = null;
+    let publicVisibility = false;
     if (isCampus) {
       campusId = verifiedCampusOf(user.id);
       if (!campusId && unrestrictedTester(user.id)) campusId = demoCampusId(); // DEMO MODE
       if (!campusId) throw new ApiError(403, "Campus events need verified campus status — verify your school in Your Campus first");
+      // organizer choice: list publicly (info only) while RSVP stays campus-gated
+      publicVisibility = !!body.publicVisibility;
     }
 
     const cats: readonly string[] = isCampus ? CAMPUS_EVENT_CATEGORIES : EVENT_CATEGORIES;
@@ -179,6 +186,7 @@ export async function POST(req: NextRequest) {
         title,
         description,
         campusId,
+        publicVisibility,
         category,
         startsAt,
         timeLabel: startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),

@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin, Users, X, Bookmark } from "lucide-react";
+import { MapPin, Users, X, Bookmark, GraduationCap, Lock } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import PosterBadge, { PosterOverline, type PosterType } from "@/components/PosterBadge";
 import { useSession, fetchSession } from "@/lib/session";
@@ -24,6 +24,9 @@ export interface OpportunityItem {
   location: string;
   remote: boolean;
   studentFriendly: boolean;
+  eligibility?: string;
+  eligibilityLabel?: string | null;
+  viewerEligibility?: { eligible: boolean; reason?: string; verifyFixes?: boolean; demoBypass?: boolean } | null;
   trustRequired: string;
   applyBy: string | null;
   eventDate: string | null;
@@ -125,6 +128,14 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
                 {o.studentFriendly && (
                   <span className="rounded-full border border-violet-400/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-violet-300">
                     Student-Friendly
+                  </span>
+                )}
+                {o.eligibilityLabel && (
+                  <span
+                    className="flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-violet-300"
+                    title="Who can apply — everyone can view; the application system enforces this rule."
+                  >
+                    <GraduationCap className="h-2.5 w-2.5" /> {o.eligibilityLabel}
                   </span>
                 )}
               </div>
@@ -237,6 +248,36 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
   /* Short by design: "I want to be considered for this." Profile, skills,
      and portfolio attach automatically — never re-typed. The poster's
      applyConfig decides what's required beyond that. */
+  // ELIGIBILITY LOCK — visibility was never restricted; applying is.
+  // The server enforces the same rule; this panel just says it kindly.
+  if (opp.viewerEligibility && !opp.viewerEligibility.eligible) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+        <div className="card-people w-full max-w-sm border-violet-400/30 p-5 text-center" onClick={(e) => e.stopPropagation()}>
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-400/10">
+            <Lock className="h-6 w-6 text-violet-400" />
+          </span>
+          <h2 className="mt-3 text-[15px] font-bold tracking-tight text-zinc-50">
+            {opp.viewerEligibility.verifyFixes ? "Student verification required" : "Not eligible for this one"}
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-400">{opp.viewerEligibility.reason}</p>
+          {opp.viewerEligibility.verifyFixes && (
+            <Link
+              href="/campus"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-violet-400 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-300"
+            >
+              <GraduationCap className="h-4 w-4" /> Verify for free
+            </Link>
+          )}
+          <button onClick={onClose} className="btn-ghost mt-2 w-full py-2 text-xs">Close</button>
+          <p className="mt-2 text-[10px] text-zinc-600">
+            Verification is free and independent of any plan — Free members apply to student
+            opportunities the moment they verify.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const [message, setMessage] = useState("");
   const roles = opp.roles ?? [];
   const [roleId, setRoleId] = useState<string | null>(roles.length === 1 ? roles[0].id : null);

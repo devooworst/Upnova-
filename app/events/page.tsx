@@ -18,6 +18,8 @@ import { EVENT_CATEGORIES, EVENT_SCOPES, WHEN_FILTERS } from "@/lib/events";
 interface EventItem {
   id: string;
   slug: string;
+  isCampus?: boolean;
+  campusName?: string | null;
   title: string;
   description: string;
   category: string;
@@ -201,6 +203,14 @@ export default function EventsPage() {
                   <span className="absolute bottom-3 left-3 rounded bg-ink/80 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-300 backdrop-blur">
                     {e.category}
                   </span>
+                  {e.isCampus && (
+                    <span
+                      className="absolute bottom-3 right-3 flex items-center gap-1 rounded border border-violet-400/40 bg-ink/80 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-violet-300 backdrop-blur"
+                      title="Publicly listed campus event — anyone can view; RSVP is for verified members of this school."
+                    >
+                      {(e.campusName ?? "Campus").replace(" University", "")} members
+                    </span>
+                  )}
                 </Link>
 
                 <div className="p-4">

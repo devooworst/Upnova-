@@ -8,6 +8,7 @@ import { requireOpportunityPoster } from "@/lib/server/authz";
 import { requireUser } from "@/lib/server/auth";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 import { parseEngagement } from "@/lib/engagement";
+import { eligibilityLabel, checkApplicantEligibility } from "@/lib/server/eligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         location: opp.location,
         remote: opp.remote,
         studentFriendly: opp.studentFriendly,
+        eligibility: opp.eligibility,
+        eligibilityLabel: eligibilityLabel(opp.eligibility, opp.eligibilityCampusId),
+        viewerEligibility: viewer ? checkApplicantEligibility(opp, viewer.id) : null,
         trustRequired: opp.trustRequired,
         applyBy: opp.applyBy?.toISOString() ?? null,
         eventDate: opp.eventDate?.toISOString() ?? null,

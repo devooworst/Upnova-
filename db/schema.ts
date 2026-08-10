@@ -605,6 +605,13 @@ export const opportunities = sqliteTable("opportunities", {
   lng: real("lng"),
   remote: bool("remote", false),
   studentFriendly: bool("student_friendly", false),
+  // ELIGIBILITY ≠ VISIBILITY: everyone can SEE the listing; this rule
+  // decides who can APPLY. anyone | students (any verified current
+  // student) | my_school (current students at eligibilityCampusId) |
+  // alumni (verified alumni). Enforced at application time, shown as a
+  // badge on the card.
+  eligibility: text("eligibility").notNull().default("anyone"),
+  eligibilityCampusId: text("eligibility_campus_id"),
   trustRequired: text("trust_required").notNull().default("standard"),
   applyBy: integer("apply_by", { mode: "timestamp_ms" }),
   eventDate: integer("event_date", { mode: "timestamp_ms" }),
@@ -1231,6 +1238,10 @@ export const events = sqliteTable("events", {
   // (visible to that campus's verified members only) and NEVER appears in
   // the public Events section. campusId null = the wider world.
   campusId: text("campus_id").references(() => campuses.id, { onDelete: "set null" }),
+  // VISIBILITY ≠ ELIGIBILITY: a campus event may be LISTED publicly
+  // (organizer opt-in; info only) while RSVP stays restricted to
+  // verified members of that campus.
+  publicVisibility: integer("public_visibility", { mode: "boolean" }).notNull().default(false),
   category: text("category").notNull().default("Other"),
   startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
   timeLabel: text("time_label").notNull().default(""),

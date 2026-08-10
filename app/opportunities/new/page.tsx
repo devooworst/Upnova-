@@ -28,6 +28,7 @@ export default function NewOpportunityPage() {
   const [eventDate, setEventDate] = useState("");
   const [applyBy, setApplyBy] = useState("");
   const [studentFriendly, setStudentFriendly] = useState(false);
+  const [eligibility, setEligibility] = useState("anyone");
   // applicant requirements — poster-controlled
   const [requireMessage, setRequireMessage] = useState(true);
   const [question, setQuestion] = useState("");
@@ -116,6 +117,7 @@ export default function NewOpportunityPage() {
         eventDate: eventDate || undefined,
         applyBy: applyBy || undefined,
         studentFriendly,
+        eligibility,
         requireMessage,
         question: question.trim() || undefined,
       }),
@@ -191,6 +193,36 @@ export default function NewOpportunityPage() {
           <input type="checkbox" checked={studentFriendly} onChange={(e) => setStudentFriendly(e.target.checked)} className="accent-violet-400" />
           Student-friendly — flexible with class schedules
         </label>
+
+        {/* WHO CAN APPLY — eligibility is the poster's rule. The listing
+            stays VISIBLE to everyone; this only gates applications. */}
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Who can apply?</p>
+          <div className="space-y-1.5">
+            {[
+              { id: "anyone", label: "Anyone on UpNova" },
+              { id: "students", label: "Verified students only", hint: "any school" },
+              { id: "my_school", label: "Students from my school only", hint: "requires your own verified campus status" },
+              { id: "alumni", label: "Alumni only", hint: "scoped to your school if you're verified" },
+            ].map((o) => (
+              <label
+                key={o.id}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 text-sm transition ${
+                  eligibility === o.id ? "border-violet-400/50 bg-violet-400/5 text-zinc-100" : "border-line text-zinc-400 hover:border-zinc-600"
+                }`}
+              >
+                <input type="radio" checked={eligibility === o.id} onChange={() => setEligibility(o.id)} className="accent-violet-400" />
+                {o.label}
+                {o.hint && <span className="ml-auto text-[10px] text-zinc-600">{o.hint}</span>}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+            Everyone can SEE the listing either way — eligibility only controls who can apply, and
+            it&apos;s enforced when they press Apply. Verification is free; plans never factor in.
+            Multi-school targeting arrives as more schools onboard.
+          </p>
+        </div>
       </section>
 
       {/* ENGAGEMENT — one-time project or ongoing relationship. Type is

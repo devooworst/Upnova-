@@ -3,6 +3,7 @@ import { and, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { getSessionUser, requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { serializeEvent, rsvpCounts, verifiedCampusOf } from "@/lib/server/events";
+import { unrestrictedTester } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const viewer = getSessionUser();
 
     let campusName: string | null = null;
-    if (r.event.campusId) {
+    if (r.event.campusId && r.event.publicVisibility) {
+      // organizer opted into public listing: anyone may VIEW (info only);
+      // eligibility is enforced at RSVP, not here
+      campusName = db.select().from(tables.campuses).where(eq(tables.campuses.id, r.event.campusId)).get()?.name ?? null;
+    } else if (r.event.campusId) {
       const myCampus = verifiedCampusOf(viewer?.id ?? null);
       if (myCampus !== r.event.campusId && viewer?.id !== r.event.hostId)
         throw new ApiError(403, "This is a campus event — it's visible to verified members of that campus");
@@ -75,7 +80,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     if (r.event.campusId) {
       const myCampus = verifiedCampusOf(user.id);
-      if (myCampus !== r.event.campusId) throw new ApiError(403, "This is a campus event — verified members of that campus only");
+      if (myCampus !== r.event.campusId && !unrestrictedTester(user.id) /* DEMO MODE */) {
+        const school = db.select().from(tables.campuses).where(eq(tables.campuses.id, r.event.campusId)).get()?.name ?? "that campus";
+        throw new ApiError(403, `Student verification required — this event is limited to verified ${school} members. Verify your affiliation for free to RSVP.`);
+      }
     }
 
     if (r.event.kind === "ticket") throw new ApiError(409, "This is a ticketed event — ticket checkout is coming; save it for now");

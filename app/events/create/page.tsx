@@ -23,6 +23,7 @@ export default function CreateEventPage() {
   const [campusInfo, setCampusInfo] = useState<{ campusName: string } | null>(null);
 
   const [scope, setScope] = useState<"public" | "campus">("public");
+  const [publicListing, setPublicListing] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>("Networking");
@@ -70,6 +71,7 @@ export default function CreateEventPage() {
         title: name,
         description,
         campus: scope === "campus",
+        publicVisibility: scope === "campus" && publicListing,
         category: cats.includes(category as never) ? category : "Other",
         startsAt: date && time ? `${date}T${time}` : "",
         venue,
@@ -144,11 +146,24 @@ export default function CreateEventPage() {
               <GraduationCap className="h-4 w-4 text-amber-400" /> Campus event{campusInfo ? ` — ${campusInfo.campusName}` : ""}
             </span>
             <span className="block text-xs text-zinc-500">
-              On campus or directly school-associated. Lives in Your Campus, visible to your school&apos;s verified members —
-              never in the public section.{!campusInfo && " Verify your school in Your Campus to unlock this."}
+              On campus or directly school-associated. Lives in Your Campus for your school&apos;s
+              verified members.{!campusInfo && " Verify your school in Your Campus to unlock this."}
             </span>
           </span>
         </label>
+        {scope === "campus" && (
+          <label className="ml-7 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3 transition hover:border-zinc-600">
+            <input type="checkbox" checked={publicListing} onChange={(e) => setPublicListing(e.target.checked)} className="mt-0.5 accent-amber-400" />
+            <span>
+              <span className="text-sm font-semibold text-zinc-200">Also list publicly (info only)</span>
+              <span className="block text-xs leading-relaxed text-zinc-500">
+                VISIBILITY ≠ ELIGIBILITY: anyone can see the event in the public section, badged
+                &quot;{campusInfo?.campusName ?? "Campus"} members&quot; — but RSVP stays restricted to your school&apos;s
+                verified members. Off = campus-only, invisible outside Your Campus.
+              </span>
+            </span>
+          </label>
+        )}
       </section>
 
       {/* ---------------- basics ---------------- */}

@@ -30,6 +30,8 @@ interface Opp {
   location: string;
   remote: boolean;
   studentFriendly: boolean;
+  eligibilityLabel?: string | null;
+  viewerEligibility?: { eligible: boolean; reason?: string; verifyFixes?: boolean; demoBypass?: boolean } | null;
   applyBy: string | null;
   eventDate: string | null;
   createdAt: string;
@@ -142,6 +144,14 @@ export default function OpportunityPage() {
               <GraduationCap className="h-3.5 w-3.5" /> Student friendly
             </span>
           )}
+          {opp.eligibilityLabel && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-violet-300"
+              title="Who can apply — everyone can view; applying enforces this rule."
+            >
+              <GraduationCap className="h-3 w-3" /> {opp.eligibilityLabel}
+            </span>
+          )}
         </div>
 
         {opp.engagement && opp.engagement.type !== "one_time" && (
@@ -243,6 +253,17 @@ export default function OpportunityPage() {
               <button onClick={apply} className="btn-lime w-full justify-center py-2.5 text-sm">
                 {opp.budget == null ? "Express Interest" : "Apply to Opportunity"}
               </button>
+              {opp.viewerEligibility && !opp.viewerEligibility.eligible && (
+                <p className="mt-2 flex items-start gap-1.5 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                  <Lock className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />
+                  <span>{opp.viewerEligibility.reason} {opp.viewerEligibility.verifyFixes && <Link href="/campus" className="font-semibold text-violet-300 hover:underline">Verify for free →</Link>}</span>
+                </p>
+              )}
+              {opp.viewerEligibility?.demoBypass && (
+                <p className="mt-2 rounded-md border border-amber-400/25 bg-amber-400/5 px-3 py-1.5 text-[10px] text-amber-300">
+                  DEMO MODE — eligibility gate opened for testing; Simulation Mode enforces it.
+                </p>
+              )}
               {me === null && (
                 <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-zinc-500">
                   <Lock className="h-3 w-3" /> Create a free account to apply — your profile becomes your application.

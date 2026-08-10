@@ -9,6 +9,8 @@ import { seedApplicantsApplyToRoles } from "@/lib/server/demo";
 import { normalizeEngagement, parseEngagement } from "@/lib/engagement";
 import { createLinkedPost } from "@/lib/server/publish";
 import { FeedScope, inScope, viewerContext, verifiedCampusMap } from "@/lib/server/feed";
+import { ELIGIBILITIES, eligibilityLabel, checkApplicantEligibility } from "@/lib/server/eligibility";
+import { campusVerification } from "@/lib/server/campus";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
@@ -113,6 +115,11 @@ export async function GET(req: NextRequest) {
         location: r.opp.location,
         remote: r.opp.remote,
         studentFriendly: r.opp.studentFriendly,
+        // ELIGIBILITY ≠ VISIBILITY: everyone sees the card; the badge says
+        // who can apply, and the viewer's verdict pre-renders the lock
+        eligibility: r.opp.eligibility,
+        eligibilityLabel: eligibilityLabel(r.opp.eligibility, r.opp.eligibilityCampusId),
+        viewerEligibility: viewer ? checkApplicantEligibility(r.opp, viewer.id) : null,
         trustRequired: r.opp.trustRequired,
         applyBy: r.opp.applyBy?.toISOString() ?? null,
         eventDate: r.opp.eventDate?.toISOString() ?? null,
@@ -162,6 +169,22 @@ export async function POST(req: NextRequest) {
         location: String(body.location || "").slice(0, 80),
         remote: !!body.remote,
         studentFriendly: !!body.studentFriendly,
+        // WHO CAN APPLY — the poster's rule. my_school requires the poster
+        // to actually be verified at a school (you can't gate to a campus
+        // you don't belong to); alumni is campus-scoped when verified.
+        ...(() => {
+          const e = ELIGIBILITIES.includes(body.eligibility) ? body.eligibility : "anyone";
+          if (e === "my_school") {
+            const v = campusVerification(user.id);
+            if (!v) throw new ApiError(400, "Limiting applicants to your school requires your own verified campus status first — verification is free in Your Campus");
+            return { eligibility: "my_school", eligibilityCampusId: v.campusId };
+          }
+          if (e === "alumni") {
+            const v = campusVerification(user.id);
+            return { eligibility: "alumni", eligibilityCampusId: v?.campusId ?? null };
+          }
+          return { eligibility: e, eligibilityCampusId: null };
+        })(),
         applyBy: body.applyBy ? new Date(body.applyBy) : null,
         eventDate: body.eventDate ? new Date(body.eventDate) : null,
         applyConfig: JSON.stringify({

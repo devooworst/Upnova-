@@ -882,6 +882,19 @@ function seed() {
   evPs5("evidence", "Seller: serial + packing evidence, tape mismatch claim", 16, uid["marcusj"]);
   evPs5("escalated", "Seller contested — sent to platform review", 16, uid["marcusj"]);
 
+  /* ---------- eligibility demo: visible to all, apply gated ---------- */
+  db.insert(t.opportunities).values({
+    id: id(), posterId: uid["nia"],
+    title: "Paid Campus Photographer — Bowie State University",
+    description: "Shoot two campus events per month for the student activities board. Gear provided if needed. VISIBLE to everyone on UpNova; applications are limited to verified Bowie State students — verification is free.",
+    budget: 120, type: "campus", location: "Bowie, MD", remote: false,
+    studentFriendly: true,
+    eligibility: "my_school", eligibilityCampusId: campusId,
+    applyConfig: JSON.stringify({ requireMessage: true, notifyUnselected: true }),
+    lat: defs.find((d) => d.handle === "nia")!.lat, lng: defs.find((d) => d.handle === "nia")!.lng,
+    isSeed: true,
+  }).run();
+
   /* ---------- ongoing engagement: the "hire an editor" demo ---------- */
   // Devin (content creator) hires an ONGOING video editor — engagement
   // type + comp schedule are configuration, and the human drives the
@@ -1347,7 +1360,7 @@ function seed() {
      stamped with campusId: they live in Your Campus and never surface in
      the public Events section. */
   const campusEventDefs = [
-    { slug: "bsu-homecoming-kickback", host: "nia", title: "Homecoming Kickback — Student Center", time: "8:00 PM", venue: "Student Center Ballroom", days: 6, cap: 250, att: 118, kind: "rsvp", cat: "Campus Social", desc: "Music, food, and the whole yard in one room. Bring your student ID." },
+    { slug: "bsu-homecoming-kickback", host: "nia", publicVisibility: true, title: "Homecoming Kickback — Student Center", time: "8:00 PM", venue: "Student Center Ballroom", days: 6, cap: 250, att: 118, kind: "rsvp", cat: "Campus Social", desc: "Music, food, and the whole yard in one room. Bring your student ID." },
     { slug: "bsu-creator-fair", host: "imani", title: "Bowie State Creator Fair", time: "12:00 PM", venue: "Fine Arts Quad", days: 13, cap: 400, att: 96, kind: "registration", cat: "Career / Networking", desc: "Student businesses, photographers, designers, and musicians table on the quad. Free to attend, table registration for student vendors." },
     { slug: "bsu-finals-study-night", host: "omar", title: "Late Night Study Jam — Library", time: "9:00 PM", venue: "Thurgood Marshall Library, Floor 2", days: 20, cap: 80, att: 34, kind: "rsvp", cat: "Study / Academic", desc: "Quiet floors, group rooms, and free coffee from the math club. Finals are coming — suffer together." },
   ];
@@ -1369,6 +1382,8 @@ function seed() {
         capacity: e.cap,
         attending: e.att,
         kind: e.kind,
+        // VISIBILITY ≠ ELIGIBILITY: opt-in public listing, RSVP stays campus-gated
+        publicVisibility: !!(e as { publicVisibility?: boolean }).publicVisibility,
         isSeed: true,
       })
       .run();
