@@ -20,8 +20,30 @@ export const maxDuration = 120;
 /* reset deterministically at the start of every run.                  */
 /* ------------------------------------------------------------------ */
 
-type StepResult = { name: string; status: "PASSED" | "FAILED" | "BLOCKED"; expected?: string; actual?: string; route?: string; record?: string };
+type StepResult = { name: string; status: "PASSED" | "FAILED" | "BLOCKED" | "NOT_TESTED"; expected?: string; actual?: string; route?: string; record?: string };
 type Category = { name: string; steps: StepResult[] };
+
+/** every category the full test intends to run — anything that never
+    executes (earlier crash) is reported NOT TESTED, never silently
+    omitted and NEVER assumed passed */
+const PLANNED_CATEGORIES = [
+  "AUTHENTICATION",
+  "PROFILES & SEARCH",
+  "MESSAGING",
+  "FOLLOWING",
+  "BOOKINGS",
+  "PAYMENTS (TEST)",
+  "PROJECTS",
+  "REVIEWS",
+  "OPPORTUNITIES & APPLICATIONS",
+  "PROGRESS & EXTENSIONS",
+  "PREFERRED CLIENTS",
+  "ONBOARDING",
+  "NOTIFICATIONS",
+  "ACTIVITY",
+  "SUBSCRIPTIONS & MY WORLD",
+  "DATABASE INTEGRITY",
+];
 
 export async function POST(req: NextRequest) {
   const gate = await guarded(() => {
@@ -116,6 +138,7 @@ export async function POST(req: NextRequest) {
   };
   resetTestData();
 
+  try {
   /* ================= AUTHENTICATION ================= */
   {
     const c = cat("AUTHENTICATION");
@@ -572,12 +595,39 @@ export async function POST(req: NextRequest) {
     step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window)", dupBookings === 5, { expected: "5", actual: String(dupBookings) });
   }
 
+  } catch (e) {
+    // a crash mid-run is a FAILURE where it happened…
+    const current = cats[cats.length - 1];
+    (current?.steps ?? []).push({
+      name: `category crashed: ${e instanceof Error ? e.message : String(e)}`,
+      status: "FAILED",
+      actual: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  // …and everything that never ran is NOT TESTED — never assumed passed
+  for (const name of PLANNED_CATEGORIES)
+    if (!cats.some((c) => c.name === name))
+      cats.push({ name, steps: [{ name: "did not run — an earlier failure blocked this category", status: "NOT_TESTED" }] });
+
   const all = cats.flatMap((c) => c.steps);
   const summary = {
     passed: all.filter((s) => s.status === "PASSED").length,
     failed: all.filter((s) => s.status === "FAILED").length,
     blocked: all.filter((s) => s.status === "BLOCKED").length,
+    notTested: all.filter((s) => s.status === "NOT_TESTED").length,
     durationMs: Date.now() - started,
   };
-  return Response.json({ summary, categories: cats.map((c) => ({ name: c.name, ok: c.steps.every((s) => s.status === "PASSED"), steps: c.steps })) });
+  return Response.json({
+    summary,
+    categories: cats.map((c) => ({
+      name: c.name,
+      ok: c.steps.every((s) => s.status === "PASSED"),
+      passed: c.steps.filter((s) => s.status === "PASSED").length,
+      failed: c.steps.filter((s) => s.status === "FAILED").length,
+      blocked: c.steps.filter((s) => s.status === "BLOCKED").length,
+      notTested: c.steps.filter((s) => s.status === "NOT_TESTED").length,
+      steps: c.steps,
+    })),
+  });
 }

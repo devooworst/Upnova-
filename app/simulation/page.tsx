@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useSession } from "@/lib/session";
+import QaLab from "@/components/QaLab";
 
 interface ActItem {
   kind: "booking" | "purchase" | "project" | "application";
@@ -60,7 +61,7 @@ export default function SimulationPage() {
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [activity, setActivity] = useState<ActItem[] | null>(null);
   const [ftBusy, setFtBusy] = useState(false);
-  const [ft, setFt] = useState<{ summary: { passed: number; failed: number; blocked: number; durationMs: number }; categories: { name: string; ok: boolean; steps: { name: string; status: string; expected?: string; actual?: string; route?: string; record?: string }[] }[] } | null>(null);
+  const [ft, setFt] = useState<{ summary: { passed: number; failed: number; blocked: number; notTested?: number; durationMs: number }; categories: { name: string; ok: boolean; passed?: number; failed?: number; blocked?: number; notTested?: number; steps: { name: string; status: string; expected?: string; actual?: string; route?: string; record?: string }[] }[] } | null>(null);
   const [ftOpen, setFtOpen] = useState<string | null>(null);
   const runFullTest = async () => {
     setFtBusy(true);
@@ -76,11 +77,11 @@ export default function SimulationPage() {
     setFtBusy(false);
     refresh();
   };
-  const advanceClock = async (ms: number, label: string) => {
+  const advanceClock = async (ms: number, label: string, scope?: "qa") => {
     setBusy(true);
-    const res = await fetch("/api/demo/clock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advanceMs: ms }) });
+    const res = await fetch("/api/demo/clock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advanceMs: ms, ...(scope ? { scope } : {}) }) });
     const d = await res.json();
-    setAdvMsg(res.ok ? `✓ Simulated ${label} passing — ${d.recordsAged} record(s) aged. Reload the relevant views.` : `✗ ${d.error}`);
+    setAdvMsg(res.ok ? `✓ Simulated ${label} passing${scope === "qa" ? " for the QA Lab records" : ""} — ${d.recordsAged} record(s) aged. Reload the relevant views.` : `✗ ${d.error}`);
     setBusy(false);
     refresh();
   };
@@ -191,6 +192,9 @@ export default function SimulationPage() {
         </div>
       </header>
 
+      {/* QA LAB — play both sides yourself; checkpoints verify the real DB */}
+      <QaLab viewerHandle={user.handle} />
+
       {/* FULL SYSTEM TEST — the whole ecosystem, real HTTP, real sessions */}
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lime-400/20 bg-gradient-to-b from-lime-400/10 to-transparent px-5 py-4">
@@ -219,25 +223,28 @@ export default function SimulationPage() {
               <span className="text-lime-300">PASSED {ft.summary.passed}</span>
               <span className={ft.summary.failed ? "text-red-300" : "text-zinc-600"}>FAILED {ft.summary.failed}</span>
               <span className={ft.summary.blocked ? "text-amber-300" : "text-zinc-600"}>BLOCKED {ft.summary.blocked}</span>
+              <span className={ft.summary.notTested ? "text-zinc-300" : "text-zinc-600"}>NOT TESTED {ft.summary.notTested ?? 0}</span>
               <span className="ml-auto font-mono text-[10px] font-medium text-zinc-500">{(ft.summary.durationMs / 1000).toFixed(1)}s</span>
             </p>
             <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
               {ft.categories.map((c) => (
                 <div key={c.name}>
-                  <button onClick={() => setFtOpen(ftOpen === c.name ? null : c.name)} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-bold transition ${c.ok ? "border-lime-400/25 text-lime-300 hover:bg-lime-400/5" : "border-red-500/40 text-red-300 hover:bg-red-500/5"}`}>
-                    <span>{c.ok ? "✓" : "✕"}</span> {c.name}
-                    <span className="ml-auto font-mono text-[9px] font-medium text-zinc-600">{c.steps.length} steps</span>
+                  <button onClick={() => setFtOpen(ftOpen === c.name ? null : c.name)} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-bold transition ${c.ok ? "border-lime-400/25 text-lime-300 hover:bg-lime-400/5" : (c.notTested ?? 0) > 0 && !(c.failed ?? 0) ? "border-line text-zinc-400 hover:bg-card-raised" : "border-red-500/40 text-red-300 hover:bg-red-500/5"}`}>
+                    <span>{c.ok ? "✓" : (c.notTested ?? 0) > 0 && !(c.failed ?? 0) ? "·" : "✕"}</span> {c.name}
+                    <span className="ml-auto font-mono text-[9px] font-medium text-zinc-600">
+                      {c.passed != null ? `${c.passed}✓${c.failed ? ` ${c.failed}✕` : ""}${c.blocked ? ` ${c.blocked}◌` : ""}${c.notTested ? ` ${c.notTested}·` : ""}` : `${c.steps.length} steps`}
+                    </span>
                   </button>
                   {ftOpen === c.name && (
                     <ul className="mt-1 space-y-1 rounded-lg border border-line bg-card-raised p-2">
                       {c.steps.map((st, i) => (
                         <li key={i} className="text-[11px]">
-                          <span className={st.status === "PASSED" ? "text-lime-300" : st.status === "BLOCKED" ? "text-amber-300" : "text-red-300"}>{st.status === "PASSED" ? "✓" : st.status === "BLOCKED" ? "◌" : "✕"}</span>{" "}
+                          <span className={st.status === "PASSED" ? "text-lime-300" : st.status === "BLOCKED" ? "text-amber-300" : st.status === "NOT_TESTED" ? "text-zinc-500" : "text-red-300"}>{st.status === "PASSED" ? "✓" : st.status === "BLOCKED" ? "◌" : st.status === "NOT_TESTED" ? "·" : "✕"}</span>{" "}
                           <span className="text-zinc-300">{st.name}</span>
                           {st.status !== "PASSED" && (
                             <span className="block pl-4 text-[10px] text-zinc-500">
                               {st.expected && <>expected: <span className="text-zinc-300">{st.expected}</span> · </>}
-                              {st.actual && <>actual: <span className="text-red-300">{st.actual}</span> · </>}
+                              {st.actual && <>actual: <span className={st.status === "NOT_TESTED" ? "text-zinc-400" : "text-red-300"}>{st.actual}</span> · </>}
                               {st.route && <>route: {st.route} · </>}
                               {st.record && <>record: {st.record}</>}
                             </span>
@@ -254,14 +261,26 @@ export default function SimulationPage() {
       </section>
 
       {/* TIME SIMULATION — age your test records instead of waiting */}
-      <section className="card flex flex-wrap items-center gap-2 p-4">
-        <p className="mr-2 text-xs font-bold text-zinc-100">Time simulation</p>
-        <p className="mr-2 text-[10px] text-zinc-500">ages YOUR live test records (bookings, protection windows, deadlines) — never the real clock</p>
-        {([["1 minute", 60e3], ["5 minutes", 300e3], ["1 hour", 3600e3], ["1 day", 86400e3]] as const).map(([label, ms]) => (
-          <button key={label} onClick={() => advanceClock(ms, label)} disabled={busy} className="rounded-full border border-line px-3 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-zinc-600 disabled:opacity-50">
-            +{label}
-          </button>
-        ))}
+      <section className="card space-y-2 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="mr-2 text-xs font-bold text-zinc-100">Time simulation</p>
+          <p className="mr-2 text-[10px] text-zinc-500">ages YOUR live test records (bookings, deadlines, protection windows) — never the real clock</p>
+          {(([["1 minute", 60e3], ["5 minutes", 300e3], ["1 hour", 3600e3], ["1 day", 86400e3]]) as const).map(([label, ms]) => (
+            <button key={label} onClick={() => advanceClock(ms, label)} disabled={busy} className="rounded-full border border-line px-3 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-zinc-600 disabled:opacity-50">
+              +{label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line-soft pt-2">
+          <p className="mr-2 text-[10px] text-zinc-500">
+            <span className="font-bold text-violet-300">QA Lab records</span> — ages the TEST personas&apos; bookings, project deadlines &amp; ETAs (test overdue states without waiting)
+          </p>
+          {(([["1 day", 86400e3], ["2 days", 2 * 86400e3], ["1 week", 7 * 86400e3]]) as const).map(([label, ms]) => (
+            <button key={label} onClick={() => advanceClock(ms, label, "qa")} disabled={busy} className="rounded-full border border-violet-400/30 px-3 py-1 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-400/10 disabled:opacity-50">
+              +{label}
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* live transactions — advance the SEED counterpart step by step */}
@@ -273,7 +292,9 @@ export default function SimulationPage() {
             deliver, complete, shortlist…) through the same code the organic flow uses — messages,
             notifications, payment states, and the Activity timeline all update for real. Your own
             steps (like paying) are never simulated: the button points you at the real UI instead.
-            Reset removes only your test records with seed accounts — never auth, verification, or plan.
+            Records with the QA TEST personas don&apos;t belong here — you play both sides of those in
+            the QA Lab above. Reset removes only your test records with seed accounts — never auth,
+            verification, or plan.
           </p>
         </div>
         <div className="p-5">

@@ -1428,6 +1428,59 @@ function seed() {
     }
   } catch {}
 
+  /* --------------------- QA Lab test personas ---------------------
+     Clearly-labeled TEST accounts for the Test Center's interactive
+     scenarios. isSeed = FALSE on purpose: no demo auto-behaviors —
+     the tester personally plays both sides. The QA API also creates
+     these lazily (ensureQaPersonas), this just makes a fresh database
+     lab-ready immediately. */
+  const qaDefs = [
+    { handle: "testcustomer", name: "Test Customer", type: "individual", role: "Client (QA)", desc: "Books services, hires creators, applies to opportunities" },
+    { handle: "testcreator", name: "Test Creator", type: "individual", role: "Service provider (QA)", desc: "Offers a service, receives bookings, delivers projects" },
+    { handle: "testbusiness", name: "Test Business Co.", type: "business", role: "Local business", desc: "Posts opportunities, reviews applicants" },
+  ] as const;
+  for (const q of qaDefs) {
+    if (db.select().from(t.users).where(eq(t.users.handle, q.handle)).get()) continue;
+    const qid = id();
+    db.insert(t.users)
+      .values({
+        id: qid,
+        email: `${q.handle}@upnova.dev`,
+        passwordHash: PASSWORD,
+        handle: q.handle,
+        accountType: q.type,
+        testerMode: "demo",
+        onboarding: JSON.stringify({ completedAt: new Date().toISOString(), qa: true }),
+        isSeed: false,
+      })
+      .run();
+    db.insert(t.profiles)
+      .values({
+        id: id(),
+        userId: qid,
+        displayName: q.name,
+        bio: `QA test account — not a real person. ${q.desc}. Managed by the Test Center; all its transactions are test records.`,
+        primaryRole: q.role,
+        city: "Baltimore",
+        state: "MD",
+        openToWork: q.handle === "testcreator",
+      })
+      .run();
+    if (q.handle === "testcreator")
+      db.insert(t.services)
+        .values({
+          id: id(),
+          ownerId: qid,
+          title: "QA Test Session",
+          description: "A test service owned by the TEST CREATOR account. Book it from the Test Center to walk the real booking + TEST payment flow end to end. No real money ever moves.",
+          price: 100,
+          category: "creative",
+          fulfillment: "appointment",
+          reach: "Remote",
+        })
+        .run();
+  }
+
   console.log("Seeded:", defs.length, "users · password: upnova123 · admin: devin@upnova.dev");
 }
 
