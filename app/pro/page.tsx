@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Perforation from "@/components/Perforation";
 import { getPlan, setPlan } from "@/lib/pro";
-import { PRO_PRICE, COLLEGE_PRICE, ALUMNI_PRO_PRICE, BUSINESS_PRO_PRICE, AGENCY_PRICE, money } from "@/lib/fees";
+import { PRO_PRICE, COLLEGE_PRICE, ALUMNI_PRO_PRICE, BUSINESS_PRO_PRICE, money } from "@/lib/fees";
 import { useSession, invalidateSession } from "@/lib/session";
 
 /* Campus verification is a DATABASE FACT (campus_verifications row) —
@@ -178,15 +178,17 @@ export default function ProPage() {
           <header className="pt-2 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Grow your organization</h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
-              A legitimate business presence is free, always. Paid tiers buy recruiting, reach, and scale.
+              A legitimate business presence is free, always. The Business plan buys recruiting, reach, and scale.
             </p>
+            <Link href="/plans" className="mt-2 inline-block text-xs font-semibold text-lime-400 hover:text-lime-300">
+              Compare all plans &amp; benefits →
+            </Link>
           </header>
           {planError && <p className="mx-auto max-w-md rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="mx-auto grid max-w-3xl gap-4 md:grid-cols-2">
             {[
               { id: "free", name: "Business Free", price: 0, desc: "Establish your presence.", features: ["Business profile, logo & banner", "Post opportunities", "Messaging & booking", "Basic analytics"], cta: "Included" },
-              { id: "business_pro", name: "Business Pro", price: BUSINESS_PRO_PRICE, desc: "For companies actively hiring.", features: ["Expanded opportunities & featured slots", "Talent discovery & applicant management", "Business World customization (full Studio)", "Advanced analytics"], cta: `Upgrade — $${BUSINESS_PRO_PRICE}/mo` },
-              { id: "agency", name: "Agency / Enterprise", price: AGENCY_PRICE, desc: "Recruiting at scale.", features: ["Multi-recruiter teams & permissions (rolling out)", "Large-scale hiring campaigns", "Everything in Business Pro", "Priority support"], cta: `Upgrade — $${AGENCY_PRICE}/mo` },
+              { id: "business_pro", name: "Business", price: BUSINESS_PRO_PRICE, desc: "One plan for hiring, promoting, and scale.", features: ["Expanded opportunities & featured slots", "Talent discovery & applicant management", "Business World customization (full Studio)", "Business analytics & promotion tools", "Team & admin tools (rolling out)"], cta: `Upgrade — $${BUSINESS_PRO_PRICE}/mo` },
             ].map((t) => (
               <section key={t.id} className={`flex flex-col p-5 ${t.id === "business_pro" ? "card-money" : "card"}`}>
                 <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">{t.name}</h2>
@@ -219,6 +221,9 @@ export default function ProPage() {
             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
               Earning is free on UpNova, always. Plans buy growth — never the ability to make money.
             </p>
+            <Link href="/plans" className="mt-2 inline-block text-xs font-semibold text-lime-400 hover:text-lime-300">
+              Compare all plans &amp; benefits →
+            </Link>
           </header>
 
           <div className="grid gap-4 md:grid-cols-3">

@@ -316,7 +316,7 @@ export default function Sidebar({
             <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
               Unlock creator tools and greater reach.
             </p>
-            <Link href="/pro" className="btn-lime mt-3 flex w-full py-1.5 text-xs">
+            <Link href="/plans" className="btn-lime mt-3 flex w-full py-1.5 text-xs">
               View Plans →
             </Link>
             <Link href="/pro" className="mt-2 block text-center text-[10px] font-semibold text-violet-400 hover:text-violet-300">

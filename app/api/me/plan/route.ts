@@ -15,9 +15,11 @@ export async function PATCH(req: NextRequest) {
     // plan sets are per account type: personal (Free -> College+ -> Pro,
     // with Alumni Pro billed at the permanent alumni rate) vs business
     // (presence is FREE; Business Pro / Agency monetize recruiting+scale)
-    const allowed = acct.accountType === "business" ? ["free", "business_pro", "agency"] : ["free", "college", "pro"];
+    // ONE Business subscription (the old Agency tier is merged into it;
+    // legacy 'agency' values are read as Business but never sold)
+    const allowed = acct.accountType === "business" ? ["free", "business_pro"] : ["free", "college", "pro"];
     if (!allowed.includes(plan))
-      throw new ApiError(400, acct.accountType === "business" ? "Business accounts use: free, business_pro, agency" : "Invalid plan");
+      throw new ApiError(400, acct.accountType === "business" ? "Business accounts use: free or business_pro" : "Invalid plan");
     db.update(tables.users).set({ plan }).where(eq(tables.users.id, user.id)).run();
     return { plan };
   });
