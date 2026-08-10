@@ -42,7 +42,7 @@ interface Conv {
   unread: number;
   projectId: string | null;
   projectState: string | null;
-  booking: { id: string; title: string; startsAt: string; status: string; price: number } | null;
+  booking: { id: string; title: string; startsAt: string; status: string; progress?: string; price: number; myRole?: string } | null;
 }
 
 interface Msg {
@@ -116,6 +116,7 @@ export default function DbMessages() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const deepLinked = useRef(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const loadConvos = useCallback(async () => {
     const res = await fetch("/api/conversations", { cache: "no-store" });
@@ -160,15 +161,27 @@ export default function DbMessages() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ toHandle: to }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({} as { error?: string }));
         if (res.ok) {
           await loadConvos();
           setActiveId(data.conversationId);
           return;
         }
+        // NEVER fall back to another person's conversation. The person you
+        // picked is the person you get — or an honest error, nothing else.
+        setLinkError(
+          `Couldn't open a conversation with @${to} — ${(data as { error?: string }).error || "this account isn't on UpNova"}. No other conversation was opened in its place.`
+        );
+        if (list.length > 0) setActiveId(null);
+        return;
       }
       if (c) {
-        setActiveId(c);
+        // only select the requested thread if it's actually YOURS
+        if (list.some((x) => x.id === c)) {
+          setActiveId(c);
+        } else {
+          setLinkError("That conversation link doesn't belong to your account.");
+        }
         return;
       }
       if (proj) {
@@ -291,9 +304,21 @@ export default function DbMessages() {
       {/* ---------------------------- thread ---------------------------- */}
       <section className={`flex min-w-0 flex-1 flex-col ${!activeId ? "hidden sm:flex" : ""}`}>
         {!active ? (
+          linkError ? (
+            <div className="flex flex-1 items-center justify-center p-6">
+              <div className="max-w-sm rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-center">
+                <p className="text-sm font-semibold text-red-300">Couldn&apos;t open that conversation</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{linkError}</p>
+                <button onClick={() => setLinkError(null)} className="btn-ghost mt-3 px-4 py-1.5 text-xs">
+                  Back to your messages
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="flex flex-1 items-center justify-center">
             <p className="text-sm text-zinc-500">Select a conversation.</p>
           </div>
+          )
         ) : (
           <>
             {/* header */}
@@ -329,7 +354,35 @@ export default function DbMessages() {
               </button>
             </div>
 
-            {/* booking context — the conversation and the booking are one record */}
+            {/* booking context — the conversation and the booking are one
+                record, linked by ids. The stage strip shows the live
+                lifecycle: Requested → Accepted → Confirmed → Preparing →
+                In progress → Completed. */}
+            {active.booking && !["cancelled"].includes(active.booking.status) && (
+              <div className="flex items-center gap-1 overflow-x-auto border-b border-line-soft px-4 py-1.5">
+                {(() => {
+                  const b = active.booking!;
+                  const stages = ["Requested", "Accepted", "Confirmed", "Preparing", "In progress", "Completed"];
+                  const idx =
+                    b.status === "completed" ? 5
+                    : b.status === "confirmed" ? (b.progress === "in_progress" ? 4 : b.progress === "preparing" ? 3 : 2)
+                    : b.status === "accepted" ? 1
+                    : 0;
+                  return stages.map((label, i) => (
+                    <span key={label} className="flex shrink-0 items-center gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide ${
+                          i < idx ? "text-zinc-500" : i === idx ? (idx === 5 ? "bg-lime-400/15 text-lime-300" : "bg-violet-400/15 text-violet-300") : "text-zinc-700"
+                        }`}
+                      >
+                        {label}
+                      </span>
+                      {i < stages.length - 1 && <span className="h-px w-2 bg-line" />}
+                    </span>
+                  ));
+                })()}
+              </div>
+            )}
             {active.booking && (
               <div className="flex items-center gap-2.5 border-b border-line-soft px-4 py-2">
                 <span

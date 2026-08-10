@@ -18,7 +18,7 @@
 /* ------------------------------------------------------------------ */
 
 import { randomBytes } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { transition, requestExtension, addReview } from "./projects";
 import { notify } from "./notify";
@@ -76,7 +76,34 @@ export function maybeAutoReply(conversationId: string, fromUserId: string) {
   if (!other || !isSeedUser(other.userId)) return;
 
   const user = db.select().from(tables.users).where(eq(tables.users.id, other.userId)).get()!;
-  const pool = REPLIES[user.handle] ?? REPLIES.default;
+
+  // context first: if this conversation has a live booking, the reply moves
+  // that booking forward instead of being generic chatter
+  const booking = db
+    .select()
+    .from(tables.bookings)
+    .where(eq(tables.bookings.conversationId, conversationId))
+    .orderBy(desc(tables.bookings.createdAt))
+    .get();
+  const contextual = (() => {
+    if (!booking || booking.providerId !== other.userId) return null;
+    const when = booking.startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    if (booking.status === "accepted")
+      return `Whenever you're ready, secure the payment and ${when} is locked in for you. Any questions about the options or add-ons before you do?`;
+    if (booking.status === "confirmed")
+      return `We're all set for ${when}. Are there any special requirements I should plan for?`;
+    if (booking.status === "completed")
+      return "It was great working with you! If everything looks good on your end, a quick review really helps.";
+    return null;
+  })();
+
+  const questionPool = [
+    "Which option would you like to go with?",
+    "What date works best for you?",
+    "Would you like the extended package? It adds more time and deliverables.",
+    "Any special requirements I should know about?",
+  ];
+  const pool = contextual ? [contextual] : (REPLIES[user.handle] ?? REPLIES.default).concat(questionPool);
   const key = `${conversationId}:${other.userId}`;
   const n = replyCounter.get(key) ?? 0;
   replyCounter.set(key, n + 1);
@@ -149,6 +176,29 @@ export function seedAcceptsBooking(bookingId: string) {
       b.providerId,
       `Absolutely — I have that time available. I've accepted your booking request for ${b.title}; once payment is in, you're locked in.`
     );
+  }
+}
+
+/** Demo progress beats for a CONFIRMED seed booking — announced once each,
+    always into the booking's own conversation (by id):
+      confirmed → "preparing" (within 24h of start) → "in progress" (during
+      the slot). Completion + payout release is handled by the bookings GET. */
+export function seedBookingProgress(bookingId: string) {
+  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b || b.status !== "confirmed" || !isSeedUser(b.providerId)) return;
+  const now = Date.now();
+  const start = b.startsAt.getTime();
+  const end = start + b.durationMin * 60_000;
+  const setProgress = (progress: string) =>
+    db.update(tables.bookings).set({ progress }).where(eq(tables.bookings.id, bookingId)).run();
+  if (b.progress === "" && now >= start - 24 * 3600_000 && now < start) {
+    setProgress("preparing");
+    if (b.conversationId)
+      sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
+    notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Preparing for your booking", body: b.title, href: "/calendar" });
+  } else if (b.progress !== "in_progress" && now >= start && now < end) {
+    setProgress("in_progress");
+    if (b.conversationId) sendAs(b.conversationId, b.providerId, `Starting ${b.title} now.`);
   }
 }
 

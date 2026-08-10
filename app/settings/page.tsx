@@ -820,6 +820,9 @@ export default function SettingsPage() {
                 {demoMsg && (
                   <p className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{demoMsg}</p>
                 )}
+                <a href="/simulation" className="flex w-full items-center justify-center rounded-md border border-amber-400/30 bg-amber-400/5 py-2 text-xs font-bold text-amber-300 transition hover:bg-amber-400/10">
+                  Open the Simulation / Test Center →
+                </a>
                 <p className="border-t border-line-soft pt-3 text-[10px] leading-relaxed text-zinc-600">
                   Verification and plan are independent facts: switching plans never removes your
                   verified school identity, and verifying never activates a paid plan.

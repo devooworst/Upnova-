@@ -54,6 +54,7 @@ export async function GET() {
       // tester mode is only meaningful on a demo deployment; production is
       // always the realistic experience (feature access, never auth state)
       testerMode: isDemoMode() ? (user.testerMode === "simulation" ? "simulation" : "demo") : "simulation",
+      demoTools: isDemoMode(), // demo deployment only: Test Center + Demo Controls visibility
       campus: verification
         ? {
             name: verification.c.name,

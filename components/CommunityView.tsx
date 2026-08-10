@@ -309,11 +309,11 @@ export default function CommunityView({ id }: { id: string }) {
                 <Link href={`/creator/${m.id}`} className="btn-ghost px-3 py-1.5 text-xs">
                   View Profile
                 </Link>
-                <Link href={`/messages?to=${m.id}`} className="btn-ghost hidden px-3 py-1.5 text-xs sm:flex">
+                <Link href={`/messages?to=${m.handle}`} className="btn-ghost hidden px-3 py-1.5 text-xs sm:flex">
                   <MessageSquare className="h-3.5 w-3.5" />
                 </Link>
                 {m.startingAt && (
-                  <Link href={`/messages?to=${m.id}`} className="btn-lime px-3.5 py-1.5 text-xs">
+                  <Link href={`/messages?to=${m.handle}`} className="btn-lime px-3.5 py-1.5 text-xs">
                     <Zap className="h-3.5 w-3.5" /> Hire
                   </Link>
                 )}

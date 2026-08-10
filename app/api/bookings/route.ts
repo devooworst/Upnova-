@@ -5,7 +5,8 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
-import { seedAcceptsBooking, isSeedUser } from "@/lib/server/demo";
+import { seedAcceptsBooking, isSeedUser, seedBookingProgress } from "@/lib/server/demo";
+import { resolvePairConversation } from "@/lib/server/conversations";
 import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
 import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
@@ -23,6 +24,9 @@ export async function GET() {
       .orderBy(asc(tables.bookings.startsAt))
       .all();
 
+    // demo progress beats: seed providers announce "preparing" and
+    // "in progress" into the CORRECT conversation (by booking ids), once
+    for (const b of rows) seedBookingProgress(b.id);
     // demo mode: when a seed provider's confirmed appointment time has
     // passed, the appointment "happened" — completed, payout released
     for (const b of rows) {
@@ -194,6 +198,14 @@ export async function POST(req: NextRequest) {
     if (conflicts) throw new ApiError(409, "That time is no longer available — pick another slot");
 
     const id = randomBytes(12).toString("hex");
+    /* THE RELATIONSHIP FIX: the booking's conversation is derived from the
+       two participant IDs — clientId + providerId — never trusted from the
+       client. A stale/mismatched conversationId (the "John's booking opened
+       Sarah's conversation" bug) is ignored: we verify the provided
+       conversation is EXACTLY the 1:1 between these two people, otherwise
+       we find-or-create the correct one. Every downstream auto-message
+       (acceptance, payment, progress) lands in the right thread by ID. */
+    const conversationId = resolvePairConversation(user.id, service.ownerId, body.conversationId ? String(body.conversationId) : null);
     db.insert(tables.bookings)
       .values({
         id,
@@ -207,7 +219,7 @@ export async function POST(req: NextRequest) {
         items: JSON.stringify(selection.lines),
         travelFee,
         location: String(body.location || "").slice(0, 120),
-        conversationId: body.conversationId ? String(body.conversationId) : null,
+        conversationId,
       })
       .run();
 

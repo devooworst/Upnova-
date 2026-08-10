@@ -400,13 +400,13 @@ export default function CampusPage() {
                         </div>
                         <div className="mt-2.5 flex gap-1.5">
                           <FollowButton id={ava.id} size="xs" />
-                          <Link href={`/messages?to=${ava.id}`} className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
+                          <Link href={`/messages?to=${ava.handle}`} className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
                             <MessageSquare className="h-3 w-3" /> Message
                           </Link>
                           <Link href={`/creator/${ava.id}`} className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
                             View Services
                           </Link>
-                          <Link href={`/messages?to=${ava.id}`} className="flex items-center gap-1 rounded-full bg-lime-400 px-2.5 py-1 text-[11px] font-bold text-zinc-950 transition hover:bg-lime-300">
+                          <Link href={`/messages?to=${ava.handle}`} className="flex items-center gap-1 rounded-full bg-lime-400 px-2.5 py-1 text-[11px] font-bold text-zinc-950 transition hover:bg-lime-300">
                             <Zap className="h-3 w-3" /> Hire
                           </Link>
                         </div>

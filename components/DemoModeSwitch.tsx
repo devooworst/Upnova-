@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FlaskConical, Eye, Check } from "lucide-react";
+import Link from "next/link";
+import { FlaskConical, Eye, Check, Beaker } from "lucide-react";
 import { useSession, invalidateSession } from "@/lib/session";
 
 /* ------------------------------------------------------------------ */
@@ -142,6 +143,14 @@ export default function DemoModeSwitch() {
               {error}
             </p>
           )}
+          <Link
+            href="/simulation"
+            onClick={() => setOpen(false)}
+            className="mt-1 flex w-full items-center gap-2.5 rounded-lg p-2.5 text-left transition hover:bg-card-raised"
+          >
+            <Beaker className="h-4 w-4 shrink-0 text-zinc-400" />
+            <span className="text-xs font-semibold text-zinc-200">Open Test Center →</span>
+          </Link>
           <p className="border-t border-line-soft px-2 pb-1 pt-1.5 text-[9px] leading-relaxed text-zinc-600">
             Feature access only — your sign-in session is never touched. Persists across refreshes.
           </p>

@@ -63,13 +63,13 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
           View Profile
         </Link>
         <Link
-          href={`/messages?to=${creator.id}`}
+          href={`/messages?to=${creator.handle}`}
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-violet-400/40 px-2 py-2 text-xs font-medium text-violet-300 transition hover:bg-violet-400/10"
         >
           <MessageSquare className="h-3.5 w-3.5" />
           Message
         </Link>
-        <Link href={`/messages?to=${creator.id}`} className="btn-lime px-2 py-2 text-xs">
+        <Link href={`/messages?to=${creator.handle}`} className="btn-lime px-2 py-2 text-xs">
           <Zap className="h-3.5 w-3.5" />
           Hire
         </Link>

@@ -6,6 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { canMessage } from "@/lib/server/authz";
 import { blockedEitherWay } from "@/lib/server/communities";
 import { publicUser } from "@/lib/server/serialize";
+import { resolvePairConversation } from "@/lib/server/conversations";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export async function GET() {
         projectId: project?.id ?? null,
         projectState: project?.state ?? null,
         booking: booking
-          ? { id: booking.id, title: booking.title, startsAt: booking.startsAt.toISOString(), status: booking.status, price: booking.price }
+          ? { id: booking.id, title: booking.title, startsAt: booking.startsAt.toISOString(), status: booking.status, progress: booking.progress, price: booking.price, myRole: booking.clientId === user.id ? "client" : "provider" }
           : null,
       };
     });
@@ -103,31 +104,8 @@ export async function POST(req: NextRequest) {
     if (blockedEitherWay(user.id, target.id))
       throw new ApiError(403, "This creator isn't accepting messages from you");
 
-    // find existing 1:1 conversation
-    const mine = db
-      .select()
-      .from(tables.conversationMembers)
-      .where(eq(tables.conversationMembers.userId, user.id))
-      .all()
-      .map((m) => m.conversationId);
-    let convId: string | null = null;
-    if (mine.length) {
-      const theirs = db
-        .select()
-        .from(tables.conversationMembers)
-        .where(inArray(tables.conversationMembers.conversationId, mine))
-        .all();
-      convId = theirs.find((m) => m.userId === target.id)?.conversationId ?? null;
-    }
-
-    if (!convId) {
-      convId = randomBytes(12).toString("hex");
-      db.insert(tables.conversations).values({ id: convId }).run();
-      db.insert(tables.conversationMembers).values([
-        { conversationId: convId, userId: user.id },
-        { conversationId: convId, userId: target.id },
-      ]).run();
-    }
+    // ONE resolver for person→conversation everywhere: exact 1:1 by ids
+    const convId = resolvePairConversation(user.id, target.id);
 
     const first = String(body.firstMessage || "").trim();
     if (first) {

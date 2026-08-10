@@ -755,6 +755,9 @@ export const bookings = sqliteTable(
     // pending) → confirmed (payment secured) → completed · cancelled ·
     // reschedule_requested (proposedStartsAt holds the new time)
     status: text("status").notNull().default("pending"),
+    // demo progress beats for confirmed bookings (one-time provider updates
+    // into the conversation): "" -> preparing -> in_progress
+    progress: text("progress").notNull().default(""),
     proposedStartsAt: integer("proposed_starts_at", { mode: "timestamp_ms" }),
     // bookings and their conversation reference the same transaction
     conversationId: text("conversation_id"),

@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS `bookings` (
 	`proposed_starts_at` integer,
 	`conversation_id` text,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, `progress` text DEFAULT '' NOT NULL,
 	FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`client_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`provider_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action

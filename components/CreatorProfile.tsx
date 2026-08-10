@@ -62,12 +62,12 @@ export default function CreatorProfile({ id }: { id: string }) {
             </span>
             <div className="flex items-center gap-2 pb-1">
               <FollowButton id={creator.id} />
-              <Link href={`/messages?to=${creator.id}`} className="btn-ghost px-3.5 py-1.5 text-xs">
+              <Link href={`/messages?to=${creator.handle}`} className="btn-ghost px-3.5 py-1.5 text-xs">
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden sm:inline">Message</span>
               </Link>
               {creator.startingAt && (
-                <Link href={`/messages?to=${creator.id}`} className="btn-lime px-4 py-1.5 text-xs">
+                <Link href={`/messages?to=${creator.handle}`} className="btn-lime px-4 py-1.5 text-xs">
                   <Zap className="h-4 w-4" /> Hire Me
                 </Link>
               )}
@@ -183,7 +183,7 @@ Original Work Available
                   Starting at{" "}
                   <span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${svc.startingAt}</span>
                 </p>
-                <Link href={`/messages?to=${creator.id}`} className="btn-lime px-4 py-1.5 text-xs">
+                <Link href={`/messages?to=${creator.handle}`} className="btn-lime px-4 py-1.5 text-xs">
                   <Zap className="h-3.5 w-3.5" /> Hire Me
                 </Link>
               </div>

@@ -62,6 +62,8 @@ export interface SessionUser {
   /** demo deployments only: "demo" = unrestricted testing, "simulation" =
       realistic user experience. Feature-access state, never auth state. */
   testerMode?: "demo" | "simulation";
+  /** true only on demo deployments — gates tester tooling like /simulation */
+  demoTools?: boolean;
   campus?: { name: string; slug: string; program: string; affiliation?: string; gradYear?: string } | null;
 }
 
