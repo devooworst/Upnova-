@@ -177,7 +177,7 @@ export default function ProfileStudioPage() {
       </div>
     );
 
-  const isPro = user.plan === "pro";
+  const isPro = ["pro", "business_pro", "agency"].includes(user.plan ?? ""); // My World / Business World tiers
   const isCollege = user.plan === "college";
   const demoUnrestricted = user.testerMode !== "simulation" && !!user.demoTools;
   // College+ = "decorate the room" (student themes, frames, accents,

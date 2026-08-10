@@ -133,7 +133,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
       ...(() => {
         const saved = parseStudio(profile.studio);
         if (!saved) return { studio: null, studioDemoPreview: false };
-        if (user.plan === "pro") return { studio: saved, studioDemoPreview: false };
+        if (["pro", "business_pro", "agency"].includes(user.plan)) return { studio: saved, studioDemoPreview: false };
         // College+: student-scope customization shows publicly; Pro-only
         // powers (all themes, layout, My World) stay off — same rule as save
         if (user.plan === "college")
@@ -163,6 +163,19 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
           verified: true,
         };
       })(),
+      // BUSINESS DESTINATION: a company page is a place, not a person —
+      // open roles + a real hiring record, computed from actual records
+      business: user.accountType === "business" ? (() => {
+        const opps = db.select().from(tables.opportunities)
+          .where(eq(tables.opportunities.posterId, user.id)).all()
+          .filter((o) => o.status === "open")
+          .slice(0, 6)
+          .map((o) => ({ id: o.id, title: o.title, budget: o.budget, location: o.location, remote: o.remote, type: o.type }));
+        const allApps = db.select().from(tables.applications).all();
+        const myOppIds = new Set(db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, user.id)).all().map((o) => o.id));
+        const hires = allApps.filter((a) => myOppIds.has(a.opportunityId) && ["selected", "confirmed"].includes(a.status)).length;
+        return { openOpportunities: opps, activeCount: opps.length, hires };
+      })() : null,
       joined: user.createdAt.toISOString(),
       stats: {
         followers: isOwner || profile.showFollowers ? followers : null,

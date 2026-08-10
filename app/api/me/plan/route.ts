@@ -11,7 +11,13 @@ export async function PATCH(req: NextRequest) {
   return guarded(() => {
     const user = requireUser();
     const plan = String(body.plan);
-    if (!["free", "college", "pro"].includes(plan)) throw new ApiError(400, "Invalid plan");
+    const acct = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+    // plan sets are per account type: personal (Free -> College+ -> Pro,
+    // with Alumni Pro billed at the permanent alumni rate) vs business
+    // (presence is FREE; Business Pro / Agency monetize recruiting+scale)
+    const allowed = acct.accountType === "business" ? ["free", "business_pro", "agency"] : ["free", "college", "pro"];
+    if (!allowed.includes(plan))
+      throw new ApiError(400, acct.accountType === "business" ? "Business accounts use: free, business_pro, agency" : "Invalid plan");
     db.update(tables.users).set({ plan }).where(eq(tables.users.id, user.id)).run();
     return { plan };
   });

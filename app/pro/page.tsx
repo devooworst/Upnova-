@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Perforation from "@/components/Perforation";
 import { getPlan, setPlan } from "@/lib/pro";
-import { PRO_PRICE, COLLEGE_PRICE, money } from "@/lib/fees";
+import { PRO_PRICE, COLLEGE_PRICE, ALUMNI_PRO_PRICE, BUSINESS_PRO_PRICE, AGENCY_PRICE, money } from "@/lib/fees";
 import { useSession, invalidateSession } from "@/lib/session";
 
 /* Campus verification is a DATABASE FACT (campus_verifications row) —
@@ -70,6 +70,10 @@ type View = "plans" | "checkout" | "collegeCheckout" | "verify" | "success" | "c
 export default function ProPage() {
   const { user } = useSession();
   const campus = user?.campus ?? null; // DB-backed verification — same fact the sidebar checks
+  const isAlumni = campus?.affiliation === "alumni";
+  // Alumni Pro: the SAME Pro product at a permanent alumni loyalty rate
+  const proPrice = isAlumni ? ALUMNI_PRO_PRICE : PRO_PRICE;
+  const isBusiness = user?.accountType === "business";
   const plan = (user?.plan ?? "free") as ReturnType<typeof getPlan>; // DB-backed subscription — independent of verification
   const [view, setView] = useState<View>("plans");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -168,8 +172,47 @@ export default function ProPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
+      {/* ---------------- business plans (business accounts only) ---------------- */}
+      {view === "plans" && isBusiness && (
+        <>
+          <header className="pt-2 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Grow your organization</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
+              A legitimate business presence is free, always. Paid tiers buy recruiting, reach, and scale.
+            </p>
+          </header>
+          {planError && <p className="mx-auto max-w-md rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>}
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { id: "free", name: "Business Free", price: 0, desc: "Establish your presence.", features: ["Business profile, logo & banner", "Post opportunities", "Messaging & booking", "Basic analytics"], cta: "Included" },
+              { id: "business_pro", name: "Business Pro", price: BUSINESS_PRO_PRICE, desc: "For companies actively hiring.", features: ["Expanded opportunities & featured slots", "Talent discovery & applicant management", "Business World customization (full Studio)", "Advanced analytics"], cta: `Upgrade — $${BUSINESS_PRO_PRICE}/mo` },
+              { id: "agency", name: "Agency / Enterprise", price: AGENCY_PRICE, desc: "Recruiting at scale.", features: ["Multi-recruiter teams & permissions (rolling out)", "Large-scale hiring campaigns", "Everything in Business Pro", "Priority support"], cta: `Upgrade — $${AGENCY_PRICE}/mo` },
+            ].map((t) => (
+              <section key={t.id} className={`flex flex-col p-5 ${t.id === "business_pro" ? "card-money" : "card"}`}>
+                <h2 className="text-[15px] font-bold tracking-tight text-zinc-100">{t.name}</h2>
+                <p className="text-xs text-zinc-500">{t.desc}</p>
+                <p className="mt-1 text-xl font-extrabold tracking-tight text-zinc-50">${t.price}<span className="text-sm font-medium text-zinc-500">/mo</span></p>
+                <ul className="mt-4 flex-1 space-y-2 text-xs text-zinc-400">
+                  {t.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime-400" /> {f}</li>
+                  ))}
+                </ul>
+                {plan === t.id ? (
+                  <p className="mt-4 border-t border-line-soft pt-3 text-center text-xs text-zinc-500">Your current plan</p>
+                ) : (
+                  <button onClick={() => changePlan(t.id as "free")} disabled={planBusy} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm disabled:opacity-50">
+                    {plan !== "free" && t.id === "free" ? "Downgrade to Free" : t.cta}
+                  </button>
+                )}
+              </section>
+            ))}
+          </div>
+          <p className="text-center text-[10px] text-zinc-600">TEST/DEMO PAYMENT — no real money can move. A small business never pays just to exist on UpNova.</p>
+        </>
+      )}
+
       {/* ---------------- plans ---------------- */}
-      {view === "plans" && (
+      {view === "plans" && !isBusiness && (
         <>
           <header className="pt-2 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Choose how you grow</h1>
@@ -268,8 +311,13 @@ export default function ProPage() {
               </h2>
               <p className="text-xs text-zinc-500">Grow your professional career.</p>
               <p className="mt-1 text-xl font-extrabold tracking-tight text-zinc-50">
-                ${PRO_PRICE}
+                ${proPrice}
                 <span className="text-sm font-medium text-zinc-500">/mo</span>
+                {isAlumni && (
+                  <span className="ml-2 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 align-middle text-[10px] font-bold text-lime-300">
+                    your alumni rate · was ${PRO_PRICE}
+                  </span>
+                )}
               </p>
               <ul className="mt-4 flex-1 space-y-2.5">
                 {proBenefits.map((b) => (
@@ -283,8 +331,19 @@ export default function ProPage() {
                 ))}
               </ul>
               <button onClick={() => setView("checkout")} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm">
-                Upgrade to Pro
+                {isAlumni ? "Upgrade to Alumni Pro" : "Upgrade to Pro"}
               </button>
+              {isAlumni && plan === "free" && (
+                <p className="mt-2 text-center text-[10px] text-zinc-500">
+                  Or stay on Free Alumni — your identity, communities, and history are yours either way.
+                </p>
+              )}
+              {plan === "college" && (
+                <p className="mt-2 text-center text-[10px] leading-relaxed text-zinc-500">
+                  Upgrade anytime while you&apos;re a student — your verification and campus access stay
+                  until your student eligibility ends.
+                </p>
+              )}
               <p className="mt-2 text-center text-[10px] text-zinc-600">Cancel anytime. Prices are test prices.</p>
             </section>
           </div>
@@ -475,9 +534,16 @@ export default function ProPage() {
               earnings history remain yours. Want to keep College+ benefits? Continue with Pro.
               No pressure.
             </p>
+            <p className="mt-2 rounded-md border border-violet-400/20 bg-violet-400/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+              <span className="font-semibold text-violet-300">The Alumni transition is a status change, never a bill:</span>{" "}
+              on graduation College+ ends and your account becomes <span className="font-semibold text-zinc-200">free Alumni</span> automatically —
+              profile, followers, posts, portfolio, reviews, messages, and reputation all stay. Alumni
+              Pro is then an optional upgrade at your permanent alumni rate ({money(ALUMNI_PRO_PRICE)}/mo, instead of {money(PRO_PRICE)}).
+              Nobody is auto-charged, ever.
+            </p>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => changePlan("pro", "manage")} disabled={planBusy} className="btn-lime rounded-md px-4 py-1.5 text-xs disabled:opacity-50">
-                Preview Pro transition
+              <button onClick={() => setView("checkout")} className="btn-lime rounded-md px-4 py-1.5 text-xs">
+                Upgrade to Pro now — don&apos;t wait for graduation
               </button>
               {plan === "college" && (
                 <button
@@ -552,12 +618,14 @@ export default function ProPage() {
             </button>
           </div>
           <Perforation className="mt-3" />
-          <h1 className="mt-4 text-[15px] font-bold tracking-tight text-zinc-50">Upgrade to UpNova Pro</h1>
-          <p className="text-xs text-zinc-500">Pro Monthly</p>
+          <h1 className="mt-4 text-[15px] font-bold tracking-tight text-zinc-50">
+            {isAlumni ? "Upgrade to Alumni Pro" : "Upgrade to UpNova Pro"}
+          </h1>
+          <p className="text-xs text-zinc-500">{isAlumni ? `Pro Monthly — permanent alumni rate ($${ALUMNI_PRO_PRICE} instead of $${PRO_PRICE})` : "Pro Monthly"}</p>
           <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
             <span className="font-mono font-medium">•••• 4242</span>
             <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-amber-300">test payment</span>
-            <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${PRO_PRICE}</span>
+            <span className="ml-auto text-lg font-extrabold tracking-tight tabular-nums text-lime-400">${proPrice}</span>
           </div>
           {planError && (
             <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">{planError}</p>

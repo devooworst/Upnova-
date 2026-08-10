@@ -26,7 +26,7 @@ export async function GET() {
     const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
     const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
     const saved = parseStudio(p.studio);
-    const isPro = u.plan === "pro";
+    const isPro = ["pro", "business_pro", "agency"].includes(u.plan);
     const isCollege = u.plan === "college";
     const demoBypass = !isPro && unrestrictedTester(user.id);
     return {
@@ -54,10 +54,13 @@ export async function PATCH(req: NextRequest) {
     //   college   → Studio basics (theme/frame/accent/font/effect/layout);
     //               My World stays Pro (forced off below)
     //   free      → 403 in Simulation/production; DEMO MODE tests everything
-    if (u.plan !== "pro" && u.plan !== "college" && !demoBypass)
+    const fullTier = ["pro", "business_pro", "agency"].includes(u.plan); // My World / Business World
+    if (!fullTier && u.plan !== "college" && !demoBypass)
       throw new ApiError(
         403,
-        "Profile Studio is an UpNova Pro feature. Your saved customization (if any) is preserved — upgrade to Pro to edit and display it."
+        u.accountType === "business"
+          ? "Business World customization comes with Business Pro. Your saved design (if any) is preserved — upgrade to edit and display it."
+          : "Profile Studio is an UpNova Pro feature. Your saved customization (if any) is preserved — upgrade to Pro to edit and display it."
       );
 
     // MERGE-ON-SAVE: changing one thing never erases the rest. The saved
@@ -78,7 +81,7 @@ export async function PATCH(req: NextRequest) {
     // banners, decorations); Pro = design the house (all themes, layout,
     // My World). Enforced HERE, not by hiding buttons.
     let worldNote: string | null = null;
-    if (u.plan !== "pro" && !demoBypass) {
+    if (!fullTier && !demoBypass) {
       const before = clean;
       clean = collegeRestrict(clean);
       if (before.world?.enabled) worldNote = "My World and full layout control are Pro-only — your design is saved but stays off until Pro is active.";
@@ -88,7 +91,7 @@ export async function PATCH(req: NextRequest) {
       .set({ studio: JSON.stringify(clean) })
       .where(eq(tables.profiles.userId, user.id))
       .run();
-    return { ok: true, studio: clean, active: u.plan === "pro" || u.plan === "college", worldNote };
+    return { ok: true, studio: clean, active: fullTier || u.plan === "college", worldNote };
   });
 }
 

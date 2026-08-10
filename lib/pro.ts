@@ -11,7 +11,11 @@
 /* legitimate campus access.                                           */
 /* ------------------------------------------------------------------ */
 
-export type Plan = "free" | "college" | "pro";
+export type Plan = "free" | "college" | "pro" | "business_pro" | "agency";
+// personal ladder: free -> college -> pro (alumni pay the permanent
+// alumni rate for the same pro product); business ladder: free ->
+// business_pro -> agency. Status transitions (student -> alumni) are
+// never billing events.
 
 export const PRO_EVENT = "upnova:account-changed";
 

@@ -26,7 +26,7 @@ import Avatar from "./Avatar";
 import { communities } from "@/lib/data";
 import { useSession } from "@/lib/session";
 import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
-import { COLLEGE_PRICE } from "@/lib/fees";
+import { COLLEGE_PRICE, ALUMNI_PRO_PRICE } from "@/lib/fees";
 
 /* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
 const navGroups: {
@@ -221,7 +221,15 @@ export default function Sidebar({
         <p className="px-3 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
           Your account
         </p>
-        {plan === "pro" ? (
+        {plan === "business_pro" || plan === "agency" ? (
+          <div className="relative overflow-hidden rounded-2xl border border-sky-400/30 bg-gradient-to-b from-sky-400/10 to-card p-4">
+            <p className="text-sm font-bold text-sky-300">{plan === "agency" ? "Agency / Enterprise ✓" : "Business Pro ✓"}</p>
+            <p className="mt-0.5 text-xs text-zinc-400">Recruiting tools active · Business World unlocked</p>
+            <Link href="/pro" className="btn-ghost mt-3 flex w-full border-sky-400/40 py-1.5 text-xs text-sky-300">
+              Manage Subscription →
+            </Link>
+          </div>
+        ) : plan === "pro" ? (
           <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-gradient-to-b from-lime-400/10 to-card p-4">
             <Sparkles className="absolute -right-3 -top-3 h-16 w-16 text-lime-400/10" />
             <p className="text-sm font-bold text-lime-300">✦ UpNova Pro ✓</p>
@@ -257,6 +265,9 @@ export default function Sidebar({
             <Link href="/pro" className="btn-ghost mt-3 flex w-full border-violet-400/40 py-1.5 text-xs text-violet-300">
               Manage Subscription →
             </Link>
+            <Link href="/pro" className="mt-2 block text-center text-[10px] font-semibold text-lime-400 hover:text-lime-300">
+              Want the full professional experience? Upgrade to Pro anytime →
+            </Link>
           </div>
         ) : campus ? (
           /* Free plan + VERIFIED identity — two separate facts, shown separately:
@@ -270,7 +281,21 @@ export default function Sidebar({
             <Link href="/pro" className="btn-ghost mt-3 flex w-full py-1.5 text-xs">
               Manage Account →
             </Link>
-            {campus.affiliation !== "faculty_staff" && (
+            {campus.affiliation === "alumni" ? (
+              /* alumni are never sold the student plan — Alumni Pro is the
+                 permanent loyalty rate, and staying free is always fine */
+              <div className="mt-2 border-t border-line-soft pt-2">
+                <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-600">
+                  Alumni Pro — your rate
+                </p>
+                <Link
+                  href="/pro"
+                  className="mt-1.5 flex w-full items-center justify-center rounded-md bg-lime-400/15 py-1.5 text-[11px] font-bold text-lime-300 transition hover:bg-lime-400/25"
+                >
+                  Upgrade to Alumni Pro — ${ALUMNI_PRO_PRICE}/mo
+                </Link>
+              </div>
+            ) : campus.affiliation !== "faculty_staff" ? (
               <div className="mt-2 border-t border-line-soft pt-2">
                 <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-600">
                   College+ — Not Active
@@ -282,7 +307,7 @@ export default function Sidebar({
                   Add College+ — ${COLLEGE_PRICE}/mo
                 </Link>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="relative overflow-hidden rounded-2xl border border-line bg-card p-4">

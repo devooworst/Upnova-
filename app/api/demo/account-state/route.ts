@@ -54,6 +54,13 @@ export async function POST(req: NextRequest) {
       .get();
     if (!campus) throw new ApiError(404, "School not found");
 
+    // same status rule as real graduation: becoming alumni ends College+
+    // (plan -> free); it NEVER auto-enrolls anyone in Pro
+    if (state === "alumni") {
+      const acct = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+      if (acct.plan === "college")
+        db.update(tables.users).set({ plan: "free" }).where(eq(tables.users.id, user.id)).run();
+    }
     const existing = rows.find((r) => r.campusId === campus.id);
     if (existing) {
       db.update(tables.campusVerifications)

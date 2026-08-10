@@ -42,6 +42,7 @@ interface PublicProfile {
     accountType?: string;
     businessVerified?: boolean;
   };
+  business?: { openOpportunities: { id: string; title: string; budget: number | null; location: string; remote: boolean; type: string }[]; activeCount: number; hires: number } | null;
   studio?: import("@/lib/profileStudio").StudioConfig | null;
   studioDemoPreview?: boolean;
   academic?: {
@@ -334,6 +335,36 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
             ))}
           </div>
         )}
+          {data.business && (
+            <div className="mt-4 border-t border-line-soft pt-3">
+              <div className="grid grid-cols-3 gap-3 text-center sm:max-w-sm">
+                <div>
+                  <p className="font-mono text-base font-semibold tracking-tight text-sky-300">{data.stats?.followers ?? 0}</p>
+                  <p className="font-mono text-[8px] font-medium uppercase tracking-[0.1em] text-zinc-500">followers</p>
+                </div>
+                <div>
+                  <p className="font-mono text-base font-semibold tracking-tight text-lime-300">{data.business.activeCount}</p>
+                  <p className="font-mono text-[8px] font-medium uppercase tracking-[0.1em] text-zinc-500">open roles</p>
+                </div>
+                <div>
+                  <p className="font-mono text-base font-semibold tracking-tight text-zinc-100">{data.business.hires}</p>
+                  <p className="font-mono text-[8px] font-medium uppercase tracking-[0.1em] text-zinc-500">hires made</p>
+                </div>
+              </div>
+              {data.business.openOpportunities.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Open opportunities</p>
+                  {data.business.openOpportunities.map((o) => (
+                    <Link key={o.id} href={`/opportunities/${o.id}`} className="flex items-center gap-2 rounded-lg border border-line bg-card-raised px-3 py-2 text-xs transition hover:border-zinc-600">
+                      <span className="min-w-0 flex-1 truncate font-semibold text-zinc-100">{o.title}</span>
+                      <span className="shrink-0 text-zinc-500">{o.remote ? "Remote" : o.location}</span>
+                      {o.budget != null && <span className="shrink-0 font-bold tabular-nums text-lime-400">${o.budget}</span>}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
     </>

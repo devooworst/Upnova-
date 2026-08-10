@@ -36,6 +36,15 @@ export function money(n: number): string {
    professional career. Core earning ability is never paywalled. */
 export const PRO_PRICE = 12.99;
 export const COLLEGE_PRICE = 4.99;
+/* Alumni Pro — a PERMANENT loyalty rate for verified alumni who came
+   through College+. Not a promo that expires: graduation should feel
+   like "we've got you", not "now pay full price". Admin-configurable
+   here (env override supported for deployments). */
+export const ALUMNI_PRO_PRICE = Number(process.env.NEXT_PUBLIC_ALUMNI_PRO_PRICE ?? 7.99);
+/* Business tiers — presence is FREE (a legit small business never pays
+   just to exist); money comes from recruiting, reach, and scale. */
+export const BUSINESS_PRO_PRICE = Number(process.env.NEXT_PUBLIC_BUSINESS_PRO_PRICE ?? 29);
+export const AGENCY_PRICE = Number(process.env.NEXT_PUBLIC_AGENCY_PRICE ?? 99);
 
 /* ---- Promotion products (clearly labeled, never override relevance) ---- */
 export const promoProducts = [

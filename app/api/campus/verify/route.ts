@@ -119,6 +119,21 @@ export async function PATCH(req: NextRequest) {
         .set({ affiliation: "alumni" })
         .where(eq(tables.campusVerifications.id, v.id))
         .run();
+      // STATUS TRANSITION, never a billing event: College+ ends with student
+      // life, the account becomes FREE Alumni. Nobody is auto-charged for
+      // Pro — Alumni Pro (permanent alumni rate) is an offer, not a default.
+      const acct = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+      if (acct.plan === "college") {
+        db.update(tables.users).set({ plan: "free" }).where(eq(tables.users.id, user.id)).run();
+        notify({
+          userId: user.id,
+          type: "campus",
+          title: "Welcome to UpNova Alumni",
+          body: "Your College+ journey is complete — your free Alumni account is ready and everything you built stays. Alumni Pro is available anytime at your permanent alumni rate.",
+          href: "/pro",
+          category: "campus",
+        });
+      }
       const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, v.campusId)).get()!;
       notify({
         userId: user.id,

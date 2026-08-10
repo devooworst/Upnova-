@@ -193,7 +193,7 @@ export default function MyWorldEditor() {
     );
 
   const demoUnrestricted = user.testerMode !== "simulation" && !!user.demoTools;
-  if (meta && !(user.plan === "pro" || demoUnrestricted))
+  if (meta && !(["pro", "business_pro", "agency"].includes(user.plan ?? "") || demoUnrestricted))
     return (
       <div className="mx-auto max-w-md pt-12 text-center">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10"><Paintbrush className="h-7 w-7 text-lime-400" /></span>
