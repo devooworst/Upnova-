@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { desc, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { seedRespondsToDraft } from "@/lib/server/demo";
@@ -74,6 +75,10 @@ export async function POST(req: NextRequest) {
       if (!creatorProfile.hiringEnabled || !creatorProfile.acceptOffers)
         throw new ApiError(403, "This creator isn't accepting project offers");
     }
+
+    // BUSINESS CAPACITY: hiring someone new counts toward active
+    // hires/projects (talent, never "employees") — creation-only gate
+    if (!asCreator) assertCapacityById(user.id, "activeHires");
 
     const amount = Math.round(Number(body.amount));
     if (!Number.isFinite(amount) || amount < 1) throw new ApiError(400, "Amount must be at least $1");

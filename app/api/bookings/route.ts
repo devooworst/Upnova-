@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { asc, and, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
@@ -97,6 +98,10 @@ export async function POST(req: NextRequest) {
       if (!follows) throw new ApiError(403, "This service is only available to followers");
     }
     if (service.ownerId === user.id) throw new ApiError(400, "You can't book your own service");
+
+    // BUSINESS CAPACITY: a business booking talent adds an active hire —
+    // creation-only gate, never blocks anyone from booking THE business
+    assertCapacityById(user.id, "activeHires");
 
     // PREFERRED-CLIENT EARLY ACCESS: while the owner's priority window is
     // open, only their Preferred Clients holding a priority-booking /

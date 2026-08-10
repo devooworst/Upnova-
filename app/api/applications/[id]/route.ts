@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { requireOpportunityPoster } from "@/lib/server/authz";
 import { notify } from "@/lib/server/notify";
@@ -185,6 +186,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     /* ------------------------------ select ------------------------------ */
+    // BUSINESS CAPACITY: selecting an applicant creates an active hire —
+    // creation-only gate (existing engagements are never touched)
+    if (action === "select") assertCapacityById(user.id, "activeHires");
     if (roles.length > 0) {
       // role opportunity: select = OFFER. Capacity is enforced here — the
       // server, not the screen, decides when a role is full.

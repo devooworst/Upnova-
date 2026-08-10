@@ -29,6 +29,26 @@ interface Hiring {
   activity: { id: string; applicant: { handle: string; displayName: string; avatarUrl: string | null }; opportunityId: string; opportunityTitle: string; status: string; at: string }[];
 }
 
+interface Limits {
+  plan: "free" | "business_pro";
+  enforced: boolean;
+  limits: Record<string, number>;
+  proLimits: Record<string, number>;
+  usage: Record<string, number>;
+  atLimit: Record<string, boolean>;
+}
+interface SavedTalent {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  primaryRole: string;
+  skills: string[];
+  openToWork: boolean;
+  serviceId: string | null;
+  savedAt: string;
+}
+
 const timeAgo = (iso: string) => {
   const s = (Date.now() - Date.parse(iso)) / 1000;
   if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m ago`;
@@ -51,15 +71,42 @@ const APP_TONE: Record<string, string> = {
 export default function HiringPage() {
   const { user } = useSession();
   const [data, setData] = useState<Hiring | null>(null);
+  const [limits, setLimits] = useState<Limits | null>(null);
+  const [saved, setSaved] = useState<SavedTalent[] | null>(null);
+  const [saveHandle, setSaveHandle] = useState("");
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  const load = () =>
+  const load = () => {
     fetch("/api/business/hiring", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => d.counts && setData(d))
       .catch(() => {});
+    fetch("/api/business/limits", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.limits && setLimits(d))
+      .catch(() => {});
+    fetch("/api/business/talent-saves", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.saved && setSaved(d.saved))
+      .catch(() => {});
+  };
   useEffect(() => {
     if (user) load();
   }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveTalent = async () => {
+    if (!saveHandle.trim()) return;
+    setSaveMsg(null);
+    const res = await fetch("/api/business/talent-saves", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ handle: saveHandle.replace(/^@/, "").trim() }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) return setSaveMsg(d.error || "Couldn't save");
+    setSaveHandle("");
+    load();
+  };
 
   if (!user)
     return (
@@ -94,6 +141,49 @@ export default function HiringPage() {
           </button>
         </div>
       </header>
+
+      {/* capacity — honest numbers, never a deletion, never a surprise */}
+      {limits && (
+        <div className={`rounded-xl border px-4 py-2.5 ${Object.values(limits.atLimit).some(Boolean) && limits.enforced ? "border-amber-400/40 bg-amber-400/5" : "border-line bg-card"}`}>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-sky-300">
+              {limits.plan === "business_pro" ? "Business Pro" : "Business Free"}
+            </span>
+            {(
+              [
+                ["activeOpportunities", "Opportunities"],
+                ["activeHires", "Active hires"],
+                ["teamMembers", "Team"],
+                ["savedTalent", "Saved talent"],
+                ["admins", "Admins"],
+              ] as const
+            ).map(([k, label]) => (
+              <span key={k} className={limits.atLimit[k] ? "font-semibold text-amber-300" : "text-zinc-400"}>
+                {label}{" "}
+                <span className="font-mono tracking-[0.06em]">
+                  {limits.usage[k]}/{limits.limits[k]}
+                </span>
+              </span>
+            ))}
+            {limits.plan === "free" && (
+              <Link href="/plans" className="ml-auto font-semibold text-sky-300 hover:underline">
+                Business Pro raises these to {limits.proLimits.activeOpportunities}/{limits.proLimits.activeHires}/{limits.proLimits.teamMembers}/{limits.proLimits.savedTalent}/{limits.proLimits.admins} →
+              </Link>
+            )}
+            {!limits.enforced && (
+              <span className="text-[10px] text-zinc-600">Demo Mode: limits shown, not enforced — Simulation Mode enforces them</span>
+            )}
+          </p>
+          {limits.enforced && limits.atLimit.activeOpportunities && (
+            <p className="mt-1.5 text-[11px] text-amber-200">
+              You&apos;ve reached your {limits.plan === "free" ? "Business Free" : "Business Pro"} limit — active opportunities:{" "}
+              {limits.usage.activeOpportunities}/{limits.limits.activeOpportunities}.
+              {limits.plan === "free" && <> Business Pro: up to {limits.proLimits.activeOpportunities} active opportunities.</>}{" "}
+              Existing records stay fully accessible — nothing is ever deleted.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* the strip — every number reads from real rows */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -176,6 +266,60 @@ export default function HiringPage() {
                   <ExternalLink className="h-3 w-3" /> Open
                 </Link>
                 <Link href={`/messages?to=${e.with.handle}`} className="btn-ghost px-3 py-1.5 text-xs">Message</Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* saved talent — the private prospect pool */}
+      <section className="card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+              <Search className="h-4 w-4 text-violet-300" /> Saved talent
+            </h2>
+            <p className="mt-0.5 text-[11px] text-zinc-500">
+              Your private prospect pool — nobody sees who you save.
+              {limits && <span className="ml-1 font-mono text-[10px] text-zinc-600">{limits.usage.savedTalent}/{limits.limits.savedTalent}</span>}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              value={saveHandle}
+              onChange={(e) => setSaveHandle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveTalent()}
+              placeholder="@handle"
+              className="input-dark w-36 py-1.5 text-xs"
+            />
+            <button onClick={saveTalent} className="btn-ghost px-3 py-1.5 text-xs">Save</button>
+          </div>
+        </div>
+        {saveMsg && <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-200">{saveMsg}</p>}
+        {saved === null ? (
+          <div className="mt-3 h-12 animate-pulse rounded-xl bg-card-raised" />
+        ) : saved.length === 0 ? (
+          <p className="mt-3 text-xs text-zinc-500">Nobody saved yet — find someone in Discover and save them here for later.</p>
+        ) : (
+          <ul className="mt-3 space-y-1.5">
+            {saved.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-card-raised px-3 py-2">
+                <Link href={`/creator/${s.handle}`}><Avatar src={s.avatarUrl} initials={s.displayName.charAt(0)} size="xs" /></Link>
+                <div className="min-w-0 flex-1">
+                  <Link href={`/creator/${s.handle}`} className="text-xs font-semibold text-zinc-100 hover:underline">{s.displayName}</Link>
+                  <span className="ml-1.5 text-[10px] text-zinc-500">{s.primaryRole}{s.openToWork ? " · open to work" : ""}</span>
+                </div>
+                <Link href={`/messages?to=${s.handle}`} className="text-[11px] font-semibold text-sky-300 hover:underline">Message</Link>
+                {s.serviceId && <Link href={`/services/${s.serviceId}`} className="text-[11px] font-semibold text-lime-300 hover:underline">Hire</Link>}
+                <button
+                  onClick={async () => {
+                    await fetch("/api/business/talent-saves", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: s.id }) });
+                    load();
+                  }}
+                  className="text-[11px] font-semibold text-zinc-500 hover:text-rose-300"
+                >
+                  Remove
+                </button>
               </li>
             ))}
           </ul>

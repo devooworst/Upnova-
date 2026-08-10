@@ -45,6 +45,7 @@ interface TeamRow extends BasePerson {
   rowId: string;
   title: string;
   status: string;
+  isAdmin?: boolean;
   compensation: string;
   notes: string;
   addedAt: string;
@@ -189,6 +190,11 @@ function PeopleInner() {
                             <span className={`ml-2 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${t.status === "active" ? "border-lime-400/40 bg-lime-400/10 text-lime-300" : "border-line text-zinc-500"}`}>
                               {t.status}
                             </span>
+                            {t.isAdmin && (
+                              <span className="ml-1.5 rounded-full border border-sky-400/40 bg-sky-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-300">
+                                Admin seat
+                              </span>
+                            )}
                           </p>
                           <p className="font-mono text-[10px] tracking-[0.06em] text-zinc-500">
                             {t.title || "Team member"} · since {fmtShort(t.addedAt)}
@@ -370,6 +376,7 @@ function TeamModal({ row, onClose, onSaved }: { row: TeamRow | null; onClose: ()
   const [title, setTitle] = useState(row?.title ?? "");
   const [compensation, setCompensation] = useState(row?.compensation ?? "");
   const [status, setStatus] = useState(row?.status ?? "active");
+  const [isAdmin, setIsAdmin] = useState(!!row?.isAdmin);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -380,12 +387,12 @@ function TeamModal({ row, onClose, onSaved }: { row: TeamRow | null; onClose: ()
       ? await fetch(`/api/business/team/${row.rowId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, compensation, status }),
+          body: JSON.stringify({ title, compensation, status, isAdmin }),
         })
       : await fetch("/api/business/team", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ handle: handle.replace(/^@/, ""), title, compensation }),
+          body: JSON.stringify({ handle: handle.replace(/^@/, ""), title, compensation, isAdmin }),
         });
     const d = await res.json().catch(() => ({}));
     setBusy(false);
@@ -417,6 +424,12 @@ function TeamModal({ row, onClose, onSaved }: { row: TeamRow | null; onClose: ()
           <label className="block">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Compensation note (private)</span>
             <input value={compensation} onChange={(e) => setCompensation(e.target.value)} placeholder="e.g. contract day-rate" className="input-dark mt-1 w-full py-2 text-sm" />
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs text-zinc-300">
+            <input type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} className="h-3.5 w-3.5 accent-sky-400" />
+            <span>
+              Admin seat <span className="text-zinc-500">(capacity-tracked per plan; delegated account access is rolling out)</span>
+            </span>
           </label>
           {row && (
             <div className="flex gap-1.5">

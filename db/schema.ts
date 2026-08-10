@@ -837,6 +837,10 @@ export const businessTeam = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull().default(""),
     status: text("status").notNull().default("active"), // active | inactive
+    // admin SEAT registration (capacity-tracked per plan). Delegated
+    // acting-on-behalf access is a separate rolling-out feature — this
+    // flag never grants login rights to the business account.
+    isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
     compensation: text("compensation").notNull().default(""), // private note
     notes: text("notes").notNull().default(""),
     addedAt: integer("added_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
@@ -1370,7 +1374,7 @@ export const bookmarks = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    targetType: text("target_type").notNull(), // post | opportunity | service | event | community
+    targetType: text("target_type").notNull(), // post | opportunity | service | event | community | user (saved talent)
     targetId: text("target_id").notNull(),
     createdAt: ts("created_at"),
   },

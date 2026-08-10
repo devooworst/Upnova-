@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS `business_team` (
 	`notes` text DEFAULT '' NOT NULL,
 	`added_at` integer NOT NULL,
 	`ended_at` integer,
-	`created_at` integer NOT NULL,
+	`created_at` integer NOT NULL, `is_admin` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`business_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`person_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );

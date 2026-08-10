@@ -40,6 +40,7 @@ const PLANNED_CATEGORIES = [
   "PREFERRED CLIENTS",
   "ONBOARDING",
   "BUSINESS PEOPLE & HIRING",
+  "BUSINESS SUBSCRIPTION & CAPACITY",
   "NOTIFICATIONS",
   "ACTIVITY",
   "SUBSCRIPTIONS & MY WORLD",
@@ -574,6 +575,119 @@ export async function POST(req: NextRequest) {
     step(c, "payments view: totals + every transaction tied to a real record & counterpart", (pay.summary?.totalSpent ?? 0) > 0 && (pay.transactions ?? []).length >= 2 && allTitled, {
       route: "GET /api/me/payments", actual: `spent=$${pay.summary?.totalSpent} tx=${pay.transactions?.length} titled=${allTitled}`,
     });
+  }
+
+  /* ================= BUSINESS SUBSCRIPTION & CAPACITY ================= */
+  {
+    const c = cat("BUSINESS SUBSCRIPTION & CAPACITY");
+    // Fresh throwaway BUSINESS (tonbz) + creator (tonbc2), both set to
+    // SIMULATION mode so capacity limits actually enforce (demo mode
+    // bypasses gates by doctrine). Cleaned up by the tonb* reset.
+    const mkU = async (handle: string, extra: Record<string, unknown> = {}) => {
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Cap ${handle}`, ...extra } });
+      tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
+      db.update(tables.users).set({ testerMode: "simulation" }).where(eq(tables.users.handle, handle)).run();
+      return r;
+    };
+    await mkU("tonbz", { accountType: "business" });
+    await mkU("tonbc2");
+
+    // ---- BUSINESS FREE is a real hiring account: the FULL economic loop ----
+    await api("tonbz", "/api/conversations", { method: "POST", body: { toHandle: "tonbc2", firstMessage: "[TEST] Interested in hiring you." } });
+    const opp1 = await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 1", description: "x", budget: 100, type: "gig", location: "Baltimore, MD", remote: true } });
+    const pr1 = await api("tonbz", "/api/projects", { method: "POST", body: { creatorHandle: "tonbc2", title: "[TEST] Free-tier hire", amount: 60, brief: "One deliverable." } });
+    const pid1 = String((pr1.data as any).id ?? "");
+    await api("tonbc2", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "send_offer" } });
+    await api("tonbz", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "accept_offer" } });
+    await api("tonbz", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "start" } });
+    await api("tonbc2", `/api/projects/${pid1}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 50, message: "[TEST] Halfway." } });
+    await api("tonbc2", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "submit" } });
+    await api("tonbz", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "approve" } });
+    await api("tonbz", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "complete" } });
+    const rv1 = await api("tonbz", `/api/projects/${pid1}/review`, { method: "POST", body: { rating: 5, body: "[TEST] Free tier works." } });
+    const pay1 = db.select().from(tables.payments).all().find((p) => p.projectId === pid1);
+    const st1 = ((await api("tonbz", `/api/projects/${pid1}`)).data as any).project;
+    step(c, "BUSINESS FREE runs the whole loop: message → post → hire → progress → TEST pay → complete → review", opp1.status === 200 && st1?.state === "completed" && pay1?.status === "released" && rv1.status === 200, {
+      expected: "everything 200, payment released — Free is never a paywall", actual: `opp=${opp1.status} project=${st1?.state} payment=${pay1?.status} review=${rv1.status}`,
+    });
+
+    // ---- capacity: active opportunities 3 → honest 409, nothing deleted ----
+    await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 2", description: "x", type: "gig", location: "Remote", remote: true } });
+    await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 3", description: "x", type: "gig", location: "Remote", remote: true } });
+    const opp4 = await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 4", description: "x", type: "gig", location: "Remote", remote: true } });
+    const hir1 = (await api("tonbz", "/api/business/hiring")).data as any;
+    step(c, "4th opportunity refused with the honest limit message; the 3 existing remain open", opp4.status === 409 && /Business Free limit/.test(String((opp4.data as any).error)) && /3\/3/.test(String((opp4.data as any).error)) && /15/.test(String((opp4.data as any).error)) && hir1.counts?.openOpportunities === 3, {
+      expected: "409 '3/3 … Pro raises to 15' + 3 still open", actual: `${opp4.status} "${(opp4.data as any).error}" open=${hir1.counts?.openOpportunities}`,
+    });
+
+    // ---- capacity: active hires 5 (drafts in flight count; completed never do) ----
+    let hireOk = true;
+    for (let i = 0; i < 5; i++) {
+      const r = await api("tonbz", "/api/projects", { method: "POST", body: { creatorHandle: "tonbc2", title: `[TEST] Hire slot ${i + 1}`, amount: 10, brief: "x" } });
+      hireOk = hireOk && r.status === 200;
+    }
+    const hire6 = await api("tonbz", "/api/projects", { method: "POST", body: { creatorHandle: "tonbc2", title: "[TEST] Hire slot 6", amount: 10, brief: "x" } });
+    step(c, "5 active hires fit on Free (completed history never counts); the 6th is refused honestly", hireOk && hire6.status === 409 && /active hires/.test(String((hire6.data as any).error)) && /25/.test(String((hire6.data as any).error)), {
+      expected: "5×200 then 409 '5/5 … Pro raises to 25'", actual: `ok=${hireOk} sixth=${hire6.status} "${(hire6.data as any).error}"`,
+    });
+
+    // ---- capacity: team 3 + admin seats (owner = seat #1) ----
+    await api("tonbz", "/api/conversations", { method: "POST", body: { toHandle: "rachel", firstMessage: "[TEST] hello" } });
+    await api("tonbz", "/api/conversations", { method: "POST", body: { toHandle: "lena", firstMessage: "[TEST] hello" } });
+    const t1 = await api("tonbz", "/api/business/team", { method: "POST", body: { handle: "tonbc2", title: "Editor" } });
+    const t2 = await api("tonbz", "/api/business/team", { method: "POST", body: { handle: "rachel", title: "Producer" } });
+    const t3 = await api("tonbz", "/api/business/team", { method: "POST", body: { handle: "lena", title: "Designer" } });
+    await api("tonbz", "/api/conversations", { method: "POST", body: { toHandle: "harboroak", firstMessage: "[TEST] hello" } });
+    const t4 = await api("tonbz", "/api/business/team", { method: "POST", body: { handle: "harboroak", title: "Fourth" } });
+    step(c, "3 team members fit on Free; the 4th is refused honestly (talent NEVER counted here)", t1.status === 200 && t2.status === 200 && t3.status === 200 && t4.status === 409 && /team members/.test(String((t4.data as any).error)), {
+      expected: "3×200 then 409 '3/3 … Pro raises to 25'", actual: `${t1.status}/${t2.status}/${t3.status} then ${t4.status}`,
+    });
+    const adm = await api("tonbz", `/api/business/team/${(t1.data as any).id}`, { method: "PATCH", body: { isAdmin: true } });
+    step(c, "admin seats: Free = 1 (the owner) — granting a second seat is refused honestly", adm.status === 409 && /admins: 1\/1/.test(String((adm.data as any).error)) && /5/.test(String((adm.data as any).error)), {
+      expected: "409 'admins: 1/1 … Pro raises to 5'", actual: `${adm.status} "${(adm.data as any).error}"`,
+    });
+
+    // ---- saved talent + limits payload sanity ----
+    const sv = await api("tonbz", "/api/business/talent-saves", { method: "POST", body: { handle: "tonbc2" } });
+    const lim = (await api("tonbz", "/api/business/limits")).data as any;
+    step(c, "limits API reports the exact Free numbers + live usage (saved talent 25 → Pro 250)", sv.status === 200 && lim.plan === "free" && lim.enforced === true && lim.limits.savedTalent === 25 && lim.proLimits.savedTalent === 250 && lim.usage.savedTalent === 1 && lim.usage.teamMembers === 3 && lim.usage.activeOpportunities === 3 && lim.atLimit.activeOpportunities === true, {
+      route: "GET /api/business/limits", actual: JSON.stringify({ plan: lim.plan, usage: lim.usage }),
+    });
+
+    // ---- UPGRADE: capacity rises immediately; old data untouched ----
+    const up = await api("tonbz", "/api/me/plan", { method: "PATCH", body: { plan: "business_pro" } });
+    const opp4b = await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 4 (pro)", description: "x", type: "gig", location: "Remote", remote: true } });
+    const t4b = await api("tonbz", "/api/business/team", { method: "POST", body: { handle: "harboroak", title: "Fourth (pro)" } });
+    const admB = await api("tonbz", `/api/business/team/${(t1.data as any).id}`, { method: "PATCH", body: { isAdmin: true } });
+    const lim2 = (await api("tonbz", "/api/business/limits")).data as any;
+    step(c, "UPGRADE → Pro: 4th opportunity, 4th team member, 2nd admin seat all open up; limits read Pro", up.status === 200 && opp4b.status === 200 && t4b.status === 200 && admB.status === 200 && lim2.plan === "business_pro" && lim2.limits.activeOpportunities === 15 && lim2.limits.teamMembers === 25, {
+      expected: "all 200; limits 15/25/25/250/5/500/500", actual: `up=${up.status} opp=${opp4b.status} team=${t4b.status} admin=${admB.status} plan=${lim2.plan}`,
+    });
+    step(c, "everything created on Free is still intact after upgrading", ((await api("tonbz", "/api/business/hiring")).data as any).counts?.openOpportunities === 4 && (((await api("tonbz", "/api/business/people")).data as any).team ?? []).length === 4);
+
+    // ---- DOWNGRADE while OVER the Free limits: preserve, never delete ----
+    const down = await api("tonbz", "/api/me/plan", { method: "PATCH", body: { plan: "free" } });
+    const hir2 = (await api("tonbz", "/api/business/hiring")).data as any;
+    const ppl2 = (await api("tonbz", "/api/business/people")).data as any;
+    const detailOk = ((await api("tonbz", `/api/projects/${pid1}`)).data as any).project?.state === "completed";
+    const manageOk = (await api("tonbz", `/api/business/team/${(t1.data as any).id}`, { method: "PATCH", body: { title: "Editor (still manageable)" } })).status === 200;
+    step(c, "DOWNGRADE with 4/3 opportunities + 4/3 team: NOTHING deleted, everything still accessible & manageable", down.status === 200 && hir2.counts?.openOpportunities === 4 && (ppl2.team ?? []).length === 4 && detailOk && manageOk, {
+      expected: "4 opps open, 4 team rows, project detail 200, team edit 200", actual: `open=${hir2.counts?.openOpportunities} team=${(ppl2.team ?? []).length} detail=${detailOk} manage=${manageOk}`,
+    });
+    const opp5 = await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 5", description: "x", type: "gig", location: "Remote", remote: true } });
+    step(c, "over-limit after downgrade → only NEW creation is refused, with the over-limit numbers", opp5.status === 409 && /4\/3/.test(String((opp5.data as any).error)), {
+      expected: "409 mentioning 4/3", actual: `${opp5.status} "${(opp5.data as any).error}"`,
+    });
+    const up2 = await api("tonbz", "/api/me/plan", { method: "PATCH", body: { plan: "business_pro" } });
+    const opp5b = await api("tonbz", "/api/opportunities", { method: "POST", body: { title: "[TEST] Cap gig 5 (pro again)", description: "x", type: "gig", location: "Remote", remote: true } });
+    step(c, "upgrading again restores the additional capacity immediately", up2.status === 200 && opp5b.status === 200, { actual: `${up2.status}/${opp5b.status}` });
+
+    // ---- individuals are untouched by business capacity ----
+    const rOpp = await api("rachel", "/api/opportunities", { method: "POST", body: { title: "[TEST] rachel is not a business", description: "x", type: "gig", location: "Remote", remote: true } });
+    step(c, "capacity gates apply to business accounts ONLY — individuals unaffected", rOpp.status === 200, { actual: String(rOpp.status) });
+    if (rOpp.status === 200) {
+      db.delete(tables.opportunities).where(eq(tables.opportunities.id, String((rOpp.data as any).id))).run();
+    }
   }
 
   /* ================= NOTIFICATIONS: no dead destinations ================= */

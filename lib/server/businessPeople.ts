@@ -111,6 +111,7 @@ export function peopleFor(businessId: string) {
         ...p,
         title: t.title,
         status: t.status,
+        isAdmin: !!t.isAdmin,
         compensation: t.compensation,
         notes: t.notes,
         addedAt: t.addedAt.toISOString(),

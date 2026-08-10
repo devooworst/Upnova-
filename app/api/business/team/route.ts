@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 import { interactionBasis } from "@/lib/server/businessPeople";
@@ -28,25 +29,33 @@ export async function POST(req: NextRequest) {
     if (!interactionBasis(user.id, target.id))
       throw new ApiError(409, "Team members are people you've actually interacted with — no booking, project, application, or conversation exists yet");
 
-    const title = String(body.title ?? "").trim().slice(0, 80);
-    const compensation = String(body.compensation ?? "").trim().slice(0, 200);
-    const notes = String(body.notes ?? "").trim().slice(0, 400);
-
-    const existing = db
+    // BUSINESS CAPACITY: team seats are creation-gated per plan (Free 3 /
+    // Pro 25). Admin seats include the owner (Free 1 / Pro 5). Existing
+    // members are never touched.
+    const existingRow = db
       .select()
       .from(tables.businessTeam)
       .where(and(eq(tables.businessTeam.businessId, user.id), eq(tables.businessTeam.personId, target.id)))
       .get();
+    if (!existingRow || existingRow.status !== "active") assertCapacityById(user.id, "teamMembers");
+    const wantAdmin = !!body.isAdmin;
+    if (wantAdmin && !existingRow?.isAdmin) assertCapacityById(user.id, "admins");
+
+    const title = String(body.title ?? "").trim().slice(0, 80);
+    const compensation = String(body.compensation ?? "").trim().slice(0, 200);
+    const notes = String(body.notes ?? "").trim().slice(0, 400);
+
+    const existing = existingRow;
     let rowId: string;
     if (existing) {
       db.update(tables.businessTeam)
-        .set({ status: "active", title: title || existing.title, compensation: compensation || existing.compensation, notes: notes || existing.notes, endedAt: null, addedAt: existing.status === "active" ? existing.addedAt : new Date() })
+        .set({ status: "active", title: title || existing.title, compensation: compensation || existing.compensation, notes: notes || existing.notes, isAdmin: wantAdmin || existing.isAdmin, endedAt: null, addedAt: existing.status === "active" ? existing.addedAt : new Date() })
         .where(eq(tables.businessTeam.id, existing.id))
         .run();
       rowId = existing.id;
     } else {
       rowId = randomBytes(12).toString("hex");
-      db.insert(tables.businessTeam).values({ id: rowId, businessId: user.id, personId: target.id, title, compensation, notes }).run();
+      db.insert(tables.businessTeam).values({ id: rowId, businessId: user.id, personId: target.id, title, compensation, notes, isAdmin: wantAdmin }).run();
     }
 
     notify({
@@ -60,6 +69,6 @@ export async function POST(req: NextRequest) {
     });
 
     const row = db.select().from(tables.businessTeam).where(eq(tables.businessTeam.id, rowId)).get()!;
-    return { id: row.id, personId: row.personId, title: row.title, status: row.status, addedAt: row.addedAt.toISOString() };
+    return { id: row.id, personId: row.personId, title: row.title, status: row.status, isAdmin: !!row.isAdmin, addedAt: row.addedAt.toISOString() };
   });
 }

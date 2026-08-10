@@ -13,6 +13,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useSession } from "@/lib/session";
+import { BUSINESS_LIMITS, LIMIT_ROWS } from "@/lib/businessPlans";
 import { PRO_PRICE, COLLEGE_PRICE, ALUMNI_PRO_PRICE, BUSINESS_PRO_PRICE } from "@/lib/fees";
 
 /* ------------------------------------------------------------------ */
@@ -236,6 +237,75 @@ export default function PlansPage() {
             <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">{p.why}</p>
           </div>
         ))}
+      </section>
+
+      {/* ---------------- Business: two tiers, Pro = scale not access ---------------- */}
+      <section className="card border-sky-400/25 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-sky-300">
+              <Building2 className="h-4 w-4" /> Business: Free vs Business Pro
+            </h2>
+            <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-zinc-400">
+              Business Free is a genuinely usable hiring account — find talent, post opportunities,
+              receive applications, hire, run projects, pay, and get reviewed, all at $0.{" "}
+              <span className="font-semibold text-zinc-200">Business Pro (${BUSINESS_PRO_PRICE}/mo) buys scale, never basic access.</span>{" "}
+              Hitting a limit never deletes or locks anything — it only pauses creating new records.
+            </p>
+          </div>
+        </div>
+
+        {/* the capacity table — the honest core of the comparison */}
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[420px] text-left text-xs">
+            <thead>
+              <tr className="border-b border-line text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+                <th className="py-2 pr-3 font-mono">Capacity</th>
+                <th className="py-2 pr-3">Business Free · $0</th>
+                <th className="py-2 text-sky-300">Business Pro · ${BUSINESS_PRO_PRICE}/mo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line-soft">
+              {LIMIT_ROWS.map((r) => (
+                <tr key={r.key}>
+                  <td className="py-2 pr-3 text-zinc-300">{r.label}</td>
+                  <td className="py-2 pr-3 font-mono tracking-[0.06em] text-zinc-200">{BUSINESS_LIMITS.free[r.key]}</td>
+                  <td className="py-2 font-mono font-semibold tracking-[0.06em] text-sky-300">{BUSINESS_LIMITS.business_pro[r.key]}</td>
+                </tr>
+              ))}
+              <tr>
+                <td className="py-2 pr-3 text-zinc-300">Completed history</td>
+                <td className="py-2 pr-3 font-mono tracking-[0.06em] text-zinc-200">Unlimited</td>
+                <td className="py-2 font-mono font-semibold tracking-[0.06em] text-sky-300">Unlimited</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 grid gap-3 border-t border-line-soft pt-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-bold text-zinc-200">Business Free — the full economic loop</p>
+            <ul className="mt-1.5 space-y-1 text-[11px] text-zinc-400">
+              {["Business profile, posts & basic branding", "Browse & discover talent, message anyone", "Post opportunities, review applications, hire", "Projects, bookings & TEST payments end to end", "People dashboard (team · clients · talent · contacts)", "Basic analytics & Business World", "Organic community visibility"].map((x) => (
+                <li key={x} className="flex items-start gap-1.5"><Check className="mt-0.5 h-3 w-3 shrink-0 text-lime-400" /> {x}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-zinc-200">Business Pro adds</p>
+            <ul className="mt-1.5 space-y-1 text-[11px] text-zinc-400">
+              {["All the capacity above — scale for real volume", "Advanced talent discovery & applicant organization", "Advanced project, client & talent management", "Team & admin seats (delegated access rolling out)", "Advanced Business World customization", "Advanced analytics, promotion & visibility tools"].map((x) => (
+                <li key={x} className="flex items-start gap-1.5"><Check className="mt-0.5 h-3 w-3 shrink-0 text-sky-400" /> {x}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
+          Downgrading never deletes anything — team, clients, talent, projects, messages, bookings,
+          payments, reviews, and history all stay fully accessible. If you&apos;re over a Free limit after
+          downgrading, existing records keep working; only creating new ones pauses until you&apos;re back
+          under the limit or upgrade again.
+        </p>
       </section>
 
       {/* ---------------- Alumni: a status, never a fifth subscription ---------------- */}

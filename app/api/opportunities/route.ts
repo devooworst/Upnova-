@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { desc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { normalizeRoles, parseRoles, openingsLeft } from "@/lib/opportunityRoles";
@@ -148,6 +149,11 @@ export async function POST(req: NextRequest) {
     const user = requireUser();
     const title = String(body.title || "").trim();
     if (!title) throw new ApiError(400, "Title is required");
+
+    // BUSINESS CAPACITY: creation-only gate — 409 with the honest
+    // current/limit + Pro numbers. Existing opportunities are never
+    // touched; individuals are unaffected.
+    assertCapacityById(user.id, "activeOpportunities");
 
     // budget guard, enforced SERVER-side: total role compensation
     // (pay × openings) can never exceed the stated maximum budget

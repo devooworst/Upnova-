@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
+import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 
@@ -25,6 +26,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.title != null) patch.title = String(body.title).trim().slice(0, 80);
     if (body.compensation != null) patch.compensation = String(body.compensation).trim().slice(0, 200);
     if (body.notes != null) patch.notes = String(body.notes).trim().slice(0, 400);
+    if (body.isAdmin != null) {
+      const flag = !!body.isAdmin;
+      // granting an admin seat is capacity-gated (owner is always seat #1)
+      if (flag && !row.isAdmin) assertCapacityById(user.id, "admins");
+      patch.isAdmin = flag;
+    }
     if (body.status != null) {
       const s = String(body.status);
       if (!["active", "inactive"].includes(s)) throw new ApiError(400, "Status must be active or inactive");
@@ -33,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     db.update(tables.businessTeam).set(patch).where(eq(tables.businessTeam.id, row.id)).run();
     const fresh = db.select().from(tables.businessTeam).where(eq(tables.businessTeam.id, row.id)).get()!;
-    return { id: fresh.id, title: fresh.title, status: fresh.status };
+    return { id: fresh.id, title: fresh.title, status: fresh.status, isAdmin: !!fresh.isAdmin };
   });
 }
 
