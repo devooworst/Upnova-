@@ -6,6 +6,7 @@ import MobileNav from "@/components/MobileNav";
 import CreateModal from "@/components/CreateModal";
 import GuestGate from "@/components/GuestGate";
 import FeatureTour from "@/components/FeatureTour";
+import LearnGuide from "@/components/LearnGuide";
 import OnboardingTour from "@/components/OnboardingTour";
 import QaPersonaBar from "@/components/QaPersonaBar";
 import { FollowProvider } from "@/lib/follow";
@@ -50,6 +51,7 @@ export default function RootLayout({
         <CreateModal />
         <GuestGate />
         <FeatureTour />
+        <LearnGuide />
         <OnboardingTour />
         <QaPersonaBar />
         </FollowProvider>

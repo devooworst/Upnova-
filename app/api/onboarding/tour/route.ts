@@ -46,6 +46,13 @@ export async function GET() {
       href: "/discover",
     });
     add({
+      id: "search",
+      target: "search",
+      title: "Search",
+      body: "Want to find someone? Search people by username or name — plus opportunities, services, communities, and posts, all from one box.",
+      href: "/search",
+    });
+    add({
       id: "communities",
       target: "communities",
       title: "Communities",

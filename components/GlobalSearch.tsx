@@ -36,6 +36,7 @@ interface Results {
 }
 
 export default function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
+  // data-tour anchor added on the wrapper below (New Member Tour: "Search")
   const router = useRouter();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -110,7 +111,7 @@ export default function GlobalSearch({ variant = "desktop" }: { variant?: "deskt
     (results.people.length > 0 || results.opportunities.length > 0 || results.services.length > 0 || results.communities.length > 0);
 
   return (
-    <div ref={boxRef} className={variant === "desktop" ? "relative mx-auto hidden w-full max-w-xl md:block" : "relative"}>
+    <div ref={boxRef} data-tour={variant === "desktop" ? "search" : undefined} className={variant === "desktop" ? "relative mx-auto hidden w-full max-w-xl md:block" : "relative"}>
       <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-zinc-500" />
       <input
         ref={inputRef}

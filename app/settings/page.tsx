@@ -789,6 +789,17 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 <div className="rounded-xl border border-line bg-card-raised p-4">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                    <HelpCircle className="h-4 w-4 text-violet-300" /> Learn UpNova — real-world guides
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                    Scenario-based walkthroughs of the deeper features — Clients, Preferred Clients, bookings,
+                    releases, payments, hiring, and more. Pick a path (client, provider, business, creator) and
+                    learn through actual situations, at your own pace.
+                  </p>
+                  <a href="/learn" className="btn-ghost mt-3 inline-flex px-4 py-1.5 text-xs">Open Learn UpNova</a>
+                </div>
+                <div className="rounded-xl border border-line bg-card-raised p-4">
                   <p className="text-sm font-semibold text-zinc-100">Quick answers</p>
                   <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-500">
                     <li>· Payments are secured when a project or booking starts, and released when work is approved or completed.</li>

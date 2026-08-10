@@ -5,6 +5,7 @@ import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
 import { readEarlyAccess, writeEarlyAccess, readRelease, writeRelease } from "@/lib/server/preferred";
+import { LEARN_SCENARIOS, LEARN_PATHS, TOUR_TO_SCENARIO } from "@/lib/learnScenarios";
 
 /* per-run email nonce — throwaway signups get a UNIQUE email every run so
    the production signup rate limiter (5 per email / 15 min) never trips
@@ -823,7 +824,7 @@ export async function POST(req: NextRequest) {
     step(c, "brand-new account starts NOT onboarded", a.status === 200 && meA.user?.onboarding?.completed === false, { route: "POST /api/auth/signup", actual: JSON.stringify(meA.user?.onboarding) });
     const tourA = (await api("tonba", "/api/onboarding/tour")).data as any;
     const idsA = (tourA.steps ?? []).map((s: any) => s.id);
-    step(c, "personal tour covers the core navigation (home…my world…settings)", tourA.audience === "creator" && ["home", "discover", "opportunities", "services", "messages", "notifications", "profile", "myworld", "settings"].every((x) => idsA.includes(x)), { actual: idsA.join(",") });
+    step(c, "personal tour covers the core navigation (home…my world…settings)", tourA.audience === "creator" && ["home", "search", "discover", "opportunities", "services", "messages", "notifications", "profile", "myworld", "settings"].every((x) => idsA.includes(x)), { actual: idsA.join(",") });
     await api("tonba", "/api/me/onboarding", { method: "POST", body: { action: "complete" } });
     step(c, "finishing the tour persists onboardingCompleted", ((await api("tonba", "/api/auth/me")).data as any).user?.onboarding?.completed === true);
     // logout → login again → the full tour does NOT greet them again
@@ -864,6 +865,24 @@ export async function POST(req: NextRequest) {
       await api("tonba", "/api/me/tours", { method: "POST", body: { id: "clients", status: "reset" } });
       const t4 = (await api("tonba", "/api/me/tours")).data as any;
       step(c, "reset re-offers one feature's tutorial without touching the rest", !t4.tours?.clients && t4.tours?.payments === "dismissed", { actual: JSON.stringify(t4.tours) });
+
+      /* ---- LEVEL 2: scenario-based learning — content integrity ----
+         The suite imports the REAL registry the app renders: every
+         required system covered, every guide complete (what / why /
+         how / who / story / visual flow), every path and Learn-more
+         mapping pointing at guides that exist. */
+      const required = ["clients", "preferred-clients", "booking-horizon", "early-access", "scheduled-releases", "services", "bookings", "cancellations", "payments", "opportunities", "applications", "messaging", "hiring", "team", "business", "myworld", "profile", "subscriptions", "notifications", "progress", "extensions", "reviews", "loyalty"];
+      const ids = new Set(LEARN_SCENARIOS.map((s) => s.id));
+      const missing = required.filter((r) => !ids.has(r));
+      step(c, `scenario guides cover every major system (${required.length} required areas)`, missing.length === 0, { expected: required.join(","), actual: missing.length ? `MISSING: ${missing.join(",")}` : `${ids.size} guides present` });
+      const incomplete = LEARN_SCENARIOS.filter((s) => !(s.what && s.why && s.how && s.who && s.story && s.flow.length >= 3 && s.tagline));
+      step(c, "every guide answers what/why/how/who + a real-world story + a visual flow (≥3 steps)", incomplete.length === 0, { actual: incomplete.length ? incomplete.map((s) => s.id).join(",") : "all complete" });
+      const badPaths = LEARN_PATHS.flatMap((pp) => pp.scenarioIds.filter((sid) => !ids.has(sid)).map((sid) => `${pp.id}:${sid}`));
+      const badMap = Object.entries(TOUR_TO_SCENARIO).filter(([, sid]) => !ids.has(sid)).map(([k]) => k);
+      step(c, "all 4 learning paths (client/provider/business/creator) + every Learn-more mapping reference real guides", LEARN_PATHS.length === 4 && badPaths.length === 0 && badMap.length === 0, { actual: badPaths.concat(badMap).join(",") || "all valid" });
+      await api("tonba", "/api/me/tours", { method: "POST", body: { id: "learn-preferred-clients", status: "done" } });
+      const t5 = (await api("tonba", "/api/me/tours")).data as any;
+      step(c, "scenario completion is tracked per user (learn-* keys) alongside page tours, without conflict", t5.tours?.["learn-preferred-clients"] === "done" && t5.tours?.payments === "dismissed", { actual: JSON.stringify(t5.tours) });
     }
   }
 

@@ -21,6 +21,8 @@ import { usePathname } from "next/navigation";
 import { HelpCircle, X } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { tourForPath, type FeatureTourDef } from "@/lib/tours";
+import { TOUR_TO_SCENARIO } from "@/lib/learnScenarios";
+import { openLearnGuide } from "@/components/LearnGuide";
 
 type Rect = { top: number; left: number; width: number; height: number } | null;
 
@@ -188,6 +190,15 @@ export default function FeatureTour() {
               >
                 {last ? "Finish" : "Next"}
               </button>
+              {TOUR_TO_SCENARIO[running.id] && (
+                <button
+                  onClick={() => { setRunning(null); openLearnGuide(TOUR_TO_SCENARIO[running.id]); }}
+                  className="text-[10px] font-semibold text-violet-300 hover:text-violet-200"
+                  title="Open the deeper scenario guide for this feature"
+                >
+                  Learn more
+                </button>
+              )}
               <button onClick={() => { persist(running.id, "done"); setRunning(null); }} className="ml-auto text-[10px] text-zinc-500 hover:text-zinc-300">
                 Skip tour
               </button>

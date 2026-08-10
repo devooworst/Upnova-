@@ -216,6 +216,28 @@ export default function OnboardingTour() {
             <p className="mt-2 text-[10px] text-zinc-600">Every step is optional — come back to any of it later.</p>
           </div>
 
+          {/* LEVEL 2: now you know the basics — learn by scenario */}
+          <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-400/5 p-3.5">
+            <p className="text-xs font-bold text-zinc-100">Want to see how UpNova works for you?</p>
+            <p className="mt-0.5 text-[11px] text-zinc-500">Short real-world walkthroughs — pick your path:</p>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {[
+                { label: "I'm here to book", path: "client" },
+                { label: "I provide services", path: "provider" },
+                { label: "I'm a business", path: "business" },
+                { label: "I'm a creator", path: "creator" },
+              ].map((p) => (
+                <button
+                  key={p.path}
+                  onClick={async () => { await finish(false); router.push(`/learn?path=${p.path}`); }}
+                  className="rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-semibold text-zinc-200 transition hover:border-violet-400/40 hover:text-violet-200"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-4 grid grid-cols-2 gap-2">
             {[
               { label: "Complete your profile", href: "/profile/edit" },
