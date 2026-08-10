@@ -168,6 +168,17 @@ export async function POST(req: NextRequest) {
     step(c, "logout revokes the presented session; the other survives", !(dead.data as any).user && !!(alive.data as any).user, { route: "POST /api/auth/logout", expected: "revoked token → user:null; sibling token → user", actual: `dead=${!!(dead.data as any).user} alive=${!!(alive.data as any).user}` });
     const anon = await api(null, "/api/me/notifications");
     step(c, "protected route rejects no/invalid credentials", anon.status === 401, { route: "GET /api/me/notifications", actual: String(anon.status) });
+    // THE FRIEND'S-COMPUTER TEST: a request with NO credentials of any
+    // kind (no cookie, no bearer, no storage — a brand-new browser)
+    // must resolve to NOBODY. No sticky fallback, no default account,
+    // no inherited session — ever.
+    const bare = await fetch(BASE + "/api/auth/me", { headers: {} });
+    const bareData = (await bare.json().catch(() => ({}))) as { user?: unknown };
+    step(c, "fresh browser/device (zero credentials) inherits NO session — sign-in screen, not someone's account", bare.status === 200 && bareData.user == null, {
+      route: "GET /api/auth/me (no credentials at all)",
+      expected: "user: null",
+      actual: bareData.user ? `INHERITED A SESSION: ${JSON.stringify(bareData.user).slice(0, 60)}` : "user: null",
+    });
   }
 
   /* ================= PROFILES + SEARCH ================= */

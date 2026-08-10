@@ -7,6 +7,7 @@ import DbComposer from "@/components/db/DbComposer";
 import DbFeed, { type FeedTab } from "@/components/db/DbFeed";
 import type { FeedScope } from "@/components/Feed";
 import RightSidebar from "@/components/RightSidebar";
+import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 
 /* ------------------------------------------------------------------ */
@@ -31,11 +32,21 @@ const scopes: { id: FeedScope; label: string; studentOnly?: boolean }[] = [
 
 export default function Home() {
   const { user } = useSession();
+  const router = useRouter();
+  // PRODUCTION AUTH FLOW: a fresh visitor (no session in THEIR browser)
+  // lands on Sign In / Sign Up — never on anyone's feed or account.
+  // Signed-in members boot straight into their own home.
+  useEffect(() => {
+    if (user === null) router.replace("/welcome");
+  }, [user, router]);
   const [scope, setScope] = useState<FeedScope>("foryou");
   const [tab, setTab] = useState<FeedTab>("For You");
   const [menuOpen, setMenuOpen] = useState(false);
   const isStudent = !!user?.campus;
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // never render the app shell to an unauthenticated visitor (redirecting)
+  if (user === null) return <div className="mx-auto max-w-md pt-16 text-center text-sm text-zinc-500" aria-busy="true">Taking you to sign in…</div>;
 
   /* scope place labels come from the signed-in user's real location */
   const cityLabel = user?.profile.city ? `${user.profile.city}, ${user.profile.state}` : "your area";
