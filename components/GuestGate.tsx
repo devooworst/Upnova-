@@ -121,9 +121,6 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
 
 /** How many page views a guest gets before the one soft banner. */
 const BROWSE_BUDGET = 6;
-/** …and how many before the hard preview gate. Browsing is free at first —
-    the gate arrives naturally after a real amount of exploring. */
-const HARD_BUDGET = 15;
 
 export default function GuestGate() {
   const { user } = useSession();
@@ -131,7 +128,6 @@ export default function GuestGate() {
   const [action, setAction] = useState<JoinAction | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [banner, setBanner] = useState(false);
-  const [hardGate, setHardGate] = useState(false);
 
   /* contextual modal, opened by promptJoin() anywhere in the app */
   useEffect(() => {
@@ -150,15 +146,12 @@ export default function GuestGate() {
     if (user !== null) return; // signed in or still loading
     if (["/login", "/signup", "/forgot", "/reset", "/welcome"].some((p) => pathname?.startsWith(p))) return;
     try {
+      // NEVER a full-screen wall: browsing stays free. The browse meter
+      // only powers ONE dismissible banner; the real "you've seen the
+      // preview" gate lives INLINE at the end of the capped guest feed.
+      if (sessionStorage.getItem("upnova-guest-banner") === "done") return;
       const n = Number(sessionStorage.getItem("upnova-guest-views") || "0") + 1;
       sessionStorage.setItem("upnova-guest-views", String(n));
-      // stage 2: the preview gate — after generous browsing, joining is
-      // the way to keep going (auth pages stay reachable, of course)
-      if (n >= HARD_BUDGET) {
-        setHardGate(true);
-        return;
-      }
-      if (sessionStorage.getItem("upnova-guest-banner") === "done") return;
       if (n >= BROWSE_BUDGET) setBanner(true);
     } catch {
       /* storage unavailable — never block browsing over it */
@@ -184,26 +177,6 @@ export default function GuestGate() {
 
   return (
     <>
-      {/* ---------- the preview gate: after generous browsing ---------- */}
-      {hardGate && !copy && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 text-center" role="dialog" aria-modal="true">
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-lime-400/10">
-              <Sparkles className="h-6 w-6 text-lime-400" />
-            </span>
-            <h3 className="mt-3 text-lg font-bold tracking-tight text-zinc-50">You&apos;re seeing a preview of UpNova.</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-              Join to keep exploring — follow creators, save posts, message people, book services, and apply to opportunities. It&apos;s free.
-            </p>
-            <div className="mt-5 space-y-2">
-              <Link href={`/signup${q}`} className="btn-lime w-full justify-center py-2.5 text-sm">Sign Up</Link>
-              <Link href={`/login${q}`} className="btn-ghost w-full justify-center py-2.5 text-sm">Sign In</Link>
-            </div>
-            <p className="mt-3 text-[10px] text-zinc-600">You&apos;ll come right back to this page.</p>
-          </div>
-        </div>
-      )}
-
       {/* ---------- contextual join modal ---------- */}
       {copy && (
         <div

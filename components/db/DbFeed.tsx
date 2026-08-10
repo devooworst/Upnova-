@@ -403,20 +403,23 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
               )}
             </span>
           ))}
-          {/* guest conversion — after the browse, not before it */}
+          {/* guest conversion — INLINE at the end of the preview, after the
+              browse, not before it. Never a full-screen trap: the guest can
+              scroll past it, navigate anywhere public, or join right here. */}
           {guest && posts.length > 0 && (
             <aside className="card p-6 text-center">
-              <p className="text-sm font-bold text-zinc-100">You&apos;re exploring UpNova as a guest.</p>
+              <p className="text-sm font-bold text-zinc-100">
+                {guestTotal > posts.length ? "You've seen the preview." : "You're exploring UpNova as a guest."}
+              </p>
               <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-400">
                 {guestTotal > posts.length
-                  ? `That's ${posts.length} of ${guestTotal} public posts. `
-                  : ""}
-                Create a free account to keep exploring, follow creators, save posts, message people, book
-                services, and apply to opportunities.
+                  ? `That's ${posts.length} of ${guestTotal} public posts. Create a free UpNova account to keep exploring — `
+                  : "Create a free UpNova account to keep exploring — "}
+                follow creators, save posts, message people, book services, and apply to opportunities.
               </p>
               <div className="mt-4 flex justify-center gap-2">
-                <Link href="/signup" className="btn-lime px-5 py-2 text-sm">Create account</Link>
-                <Link href="/login" className="btn-ghost px-4 py-2 text-sm">Sign in</Link>
+                <Link href="/signup" className="btn-lime px-5 py-2 text-sm">Sign Up</Link>
+                <Link href="/login" className="btn-ghost px-4 py-2 text-sm">Sign In</Link>
               </div>
             </aside>
           )}

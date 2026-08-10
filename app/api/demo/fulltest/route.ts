@@ -222,6 +222,10 @@ export async function POST(req: NextRequest) {
     step(c, "guests browse the REAL feed — capped preview (guest:true, items present, ≤ guest limit of 12), not unlimited",
       gFeed.guest === true && Array.isArray(gFeed.items) && gFeed.items.length >= 1 && gFeed.items.length <= 12, {
       route: "GET /api/feed (no credentials)", actual: `guest=${gFeed.guest} items=${gFeed.items?.length}` });
+    step(c, "the browsing limit is an INLINE end-of-feed gate (totalPublic meta for the join card) — never a full-screen modal trap",
+      typeof gFeed.totalPublic === "number" && gFeed.totalPublic >= (gFeed.items?.length ?? 0), {
+      expected: "totalPublic ≥ items shown (powers 'You've seen the preview' card in the feed)",
+      actual: `totalPublic=${gFeed.totalPublic} shown=${gFeed.items?.length}` });
     const gOpp = await fetch(BASE + "/api/opportunities");
     const gSvc = await fetch(BASE + "/api/services");
     const gSearch = await (await fetch(BASE + "/api/search?q=lena")).json();
