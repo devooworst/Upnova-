@@ -212,6 +212,54 @@ export default function SettingsPage() {
       setEduBusy(false);
     }
   };
+  /* ---- Phone & Login + real Notification Preferences (DB-backed) ---- */
+  const [np, setNp] = useState<{ prefs: Record<string, { inapp: boolean; email: boolean; sms: boolean }>; phone: string | null; phoneVerified: boolean; smsConsent: boolean } | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpDemo, setOtpDemo] = useState<string | null>(null);
+  const [npBusy, setNpBusy] = useState(false);
+  const [npMsg, setNpMsg] = useState<string | null>(null);
+  const loadNp = () => fetch("/api/me/notifications", { cache: "no-store" }).then((r) => r.json()).then((d) => d.prefs && setNp(d)).catch(() => {});
+  useEffect(() => { if (user) loadNp(); }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sendPhoneOtp = async () => {
+    setNpBusy(true); setNpMsg(null);
+    const res = await fetch("/api/auth/otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: phoneInput }) });
+    const d = await res.json();
+    setNpBusy(false);
+    if (!res.ok) return setNpMsg(d.error || "Couldn't send a code");
+    setOtpSent(true); setOtpDemo(d.demoCode ?? null);
+  };
+  const verifyPhoneOtp = async () => {
+    setNpBusy(true); setNpMsg(null);
+    const res = await fetch("/api/auth/otp/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: phoneInput, code: otpCode }) });
+    const d = await res.json();
+    setNpBusy(false);
+    if (!res.ok) return setNpMsg(d.error || "That code didn't work");
+    setOtpSent(false); setOtpCode(""); setOtpDemo(null); setPhoneInput("");
+    setNpMsg("Your phone number is verified.");
+    loadNp();
+  };
+  const removePhone = async () => {
+    if (!window.confirm("Remove your phone number? Phone login and all SMS alerts stop immediately.")) return;
+    await fetch("/api/me/notifications", { method: "DELETE" });
+    setNpMsg("Phone number removed."); loadNp();
+  };
+  const patchNp = async (body: Record<string, unknown>) => {
+    setNpBusy(true);
+    const res = await fetch("/api/me/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await res.json();
+    setNpBusy(false);
+    if (!res.ok) setNpMsg(d.error || "Update failed");
+    else loadNp();
+  };
+  const togglePref = (cat: string, ch: "inapp" | "email" | "sms") => {
+    if (!np) return;
+    const prefs = { ...np.prefs, [cat]: { ...np.prefs[cat], [ch]: !np.prefs[cat][ch] } };
+    setNp({ ...np, prefs });
+    patchNp({ prefs });
+  };
+
   const graduateFromSettings = async () => {
     if (!window.confirm("Switch your status to Alumni? Everything you built stays — connections, messages, portfolio, history. Student-only areas (Marketplace, Student Groups) close; the alumni environment opens.")) return;
     setEduBusy(true);
@@ -287,6 +335,44 @@ export default function SettingsPage() {
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                     Security
                   </p>
+                  <section className="card p-5">
+                    <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Phone &amp; Login</h2>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Sign in with your email, username, or a verified phone number. Your number is
+                      never shown publicly.
+                    </p>
+                    {npMsg && <p className="mt-2 rounded-md border border-line bg-card-raised px-3 py-1.5 text-[11px] text-zinc-300">{npMsg}</p>}
+                    {np?.phoneVerified ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm text-zinc-200">{np.phone}</span>
+                        <span className="rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[10px] font-bold text-lime-300">Your phone number is verified.</span>
+                        <button onClick={removePhone} className="ml-auto rounded-full border border-red-500/30 px-3 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/10">Remove</button>
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-2">
+                          <input type="tel" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} placeholder="+1 555 123 4567" className="flex-1 rounded-lg border border-line bg-card-raised px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+                          <button onClick={sendPhoneOtp} disabled={npBusy || !phoneInput.trim()} className="btn-lime rounded-md px-4 py-2 text-xs disabled:opacity-50">Text a code</button>
+                        </div>
+                        {otpSent && (
+                          <div className="flex gap-2">
+                            <input value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" inputMode="numeric" className="flex-1 rounded-lg border border-line bg-card-raised px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+                            <button onClick={verifyPhoneOtp} disabled={npBusy || otpCode.length !== 6} className="btn-lime rounded-md px-4 py-2 text-xs disabled:opacity-50">Verify</button>
+                          </div>
+                        )}
+                        {otpDemo && <p className="rounded border border-amber-400/25 bg-amber-400/5 px-2 py-1 font-mono text-[10px] text-amber-300">DEMO — no SMS provider in this sandbox, your code: {otpDemo}</p>}
+                      </div>
+                    )}
+                    {np?.phoneVerified && (
+                      <label className="mt-3 flex items-center justify-between gap-3 border-t border-line-soft pt-3">
+                        <span>
+                          <span className="block text-xs font-medium text-zinc-200">SMS alerts</span>
+                          <span className="block text-[10px] text-zinc-600">Explicit consent — a verified number alone never opts you in. Non-essential SMS always tells you how to manage alerts.</span>
+                        </span>
+                        <Toggle on={np.smsConsent} onChange={(v) => patchNp({ smsConsent: v })} />
+                      </label>
+                    )}
+                  </section>
                   <SecurityCard />
                 </div>
                 <Select
@@ -479,16 +565,65 @@ export default function SettingsPage() {
 
           {section === "notifications" && (
             <section className="card p-5">
-              <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Notifications</h2>
-              <div className="mt-2 divide-y divide-line-soft">
-                <Row label="Messages" hint="New DMs and project messages"><Toggle on={t("notifMessages")} onChange={setT("notifMessages")} /></Row>
-                <Row label="New followers"><Toggle on={t("notifFollowers")} onChange={setT("notifFollowers")} /></Row>
-                <Row label="Likes & comments"><Toggle on={t("notifLikes")} onChange={setT("notifLikes")} /></Row>
-                <Row label="Opportunity alerts" hint="Paid work inside your radius that matches your skills"><Toggle on={t("notifOpps")} onChange={setT("notifOpps")} /></Row>
-                <Row label="Application updates" hint="Status changes on gigs you applied to"><Toggle on={t("notifApps")} onChange={setT("notifApps")} /></Row>
-                <Row label="Payment notifications" hint="Offers, payments secured, payouts released"><Toggle on={t("notifPayments")} onChange={setT("notifPayments")} /></Row>
-                <Row label="Event reminders"><Toggle on={t("notifEvents")} onChange={setT("notifEvents")} /></Row>
-              </div>
+              <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Notification Preferences</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Per category, per channel — saved to your account. SMS needs a verified phone and
+                explicit consent (Settings → Account → Phone &amp; Login). Projects, payments and
+                bookings SMS look like: &quot;UpNova: Payment submitted for your project. Open UpNova to review.&quot;
+              </p>
+              {np ? (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[420px]">
+                    <thead>
+                      <tr className="border-b border-line-soft text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                        <th className="py-2 text-left">Category</th>
+                        <th className="py-2 text-center">In-app</th>
+                        <th className="py-2 text-center">Email</th>
+                        <th className="py-2 text-center">SMS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-soft">
+                      {([
+                        ["projects", "Project & payment updates", "Started, milestones, submissions, revisions, payments, confirmations, completion"],
+                        ["opportunities", "Opportunities", "Matches, application status, deadlines"],
+                        ["bookings", "Bookings", "Requests, confirmations, changes, reminders"],
+                        ["messages", "Messages", "New messages & important thread updates"],
+                        ["security", "Account & security", "Sign-ins, password/phone changes, MFA — always on in-app"],
+                      ] as const).map(([cat, label, hint]) => (
+                        <tr key={cat}>
+                          <td className="py-2.5 pr-3">
+                            <p className="text-xs font-medium text-zinc-200">{label}</p>
+                            <p className="text-[10px] text-zinc-600">{hint}</p>
+                          </td>
+                          {(["inapp", "email", "sms"] as const).map((ch) => {
+                            const locked = cat === "security" && ch === "inapp";
+                            const smsBlocked = ch === "sms" && !(np.phoneVerified && np.smsConsent);
+                            return (
+                              <td key={ch} className="text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={np.prefs[cat]?.[ch] ?? false}
+                                  disabled={npBusy || locked || smsBlocked}
+                                  onChange={() => togglePref(cat, ch)}
+                                  className="h-4 w-4 accent-lime-400 disabled:opacity-40"
+                                  title={locked ? "Security notifications are always visible in-app" : smsBlocked ? "Verify a phone and turn on SMS alerts first" : undefined}
+                                />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="mt-3 h-24 animate-pulse rounded-lg bg-card-raised" />
+              )}
+              <p className="mt-3 border-t border-line-soft pt-2.5 text-[10px] leading-relaxed text-zinc-600">
+                No spam, by design: unmapped social noise never leaves the app, deliveries are
+                rate-capped per hour, there is no marketing SMS at all, and security alerts stay on
+                so your account is never silently taken over.
+              </p>
             </section>
           )}
 

@@ -26,6 +26,13 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [accountType, setAccountType] = useState<"individual" | "business">("individual");
   const [mfaCode, setMfaCode] = useState("");
   const [mfaStep, setMfaStep] = useState(false);
+  // phone-OTP login: identifier looks like a phone → passwordless code flow
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
+  const looksPhone = /^\+?[\d\s()-]{7,}$/.test(email.trim()) && !email.includes("@") && /\d{7,}/.test(email.replace(/\D/g, ""));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +42,40 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("next")
       ? `?next=${encodeURIComponent(new URLSearchParams(window.location.search).get("next")!)}`
       : "";
+
+  const finishLogin = (data: Record<string, unknown> & { sessionToken?: string }) => {
+    if (data.sessionToken) setFallbackToken(data.sessionToken);
+    primeSession(data as unknown as Parameters<typeof primeSession>[0]);
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.push(next && next.startsWith("/") ? next : "/");
+  };
+  const requestOtp = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/auth/otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: email }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) return setError(data.error || "Couldn't send a code");
+    setOtpStep(true);
+    setDemoCode(data.demoCode ?? null);
+  };
+  const verifyOtp = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/auth/otp/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: email, code: otpCode }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) return setError(data.error || "That code didn't work");
+    finishLogin(data);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +99,8 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
         mode === "login"
-          ? { email, password, ...(mfaStep ? { code: mfaCode } : {}) }
-          : { email, password, displayName, handle, accountType }
+          ? { identifier: email, email, password, ...(mfaStep ? { code: mfaCode } : {}) }
+          : { email, password, displayName, handle, accountType, phone: phone || undefined, smsConsent }
       ),
     });
     const data = await res.json();
@@ -176,15 +217,52 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
               </>
             )}
             <input
-              type="email"
+              type={mode === "signup" ? "email" : "text"}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              autoComplete="email"
+              onChange={(e) => { setEmail(e.target.value); setOtpStep(false); setDemoCode(null); }}
+              placeholder={mode === "signup" ? "Email" : "Email, username, or phone number"}
+              autoComplete={mode === "signup" ? "email" : "username"}
               className={inputCls}
               required
             />
-            <div>
+
+            {/* PHONE LOGIN: identifier looks like a number → passwordless code */}
+            {mode === "login" && looksPhone && !mfaStep && (
+              <div className="rounded-lg border border-line bg-card-raised p-3">
+                {!otpStep ? (
+                  <>
+                    <p className="text-[11px] leading-relaxed text-zinc-500">
+                      Sign in with a one-time code — no password needed. Codes expire in 5 minutes.
+                    </p>
+                    <button type="button" onClick={requestOtp} disabled={busy} className="btn-lime mt-2 w-full rounded-md py-2 text-xs disabled:opacity-50">
+                      {busy ? "Sending…" : "Text me a sign-in code"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="6-digit code"
+                      inputMode="numeric"
+                      className={inputCls}
+                    />
+                    {demoCode && (
+                      <p className="mt-1.5 rounded border border-amber-400/25 bg-amber-400/5 px-2 py-1 font-mono text-[10px] text-amber-300">
+                        DEMO — no SMS provider in this sandbox, your code: {demoCode}
+                      </p>
+                    )}
+                    <button type="button" onClick={verifyOtp} disabled={busy || otpCode.length !== 6} className="btn-lime mt-2 w-full rounded-md py-2 text-xs disabled:opacity-50">
+                      {busy ? "Checking…" : "Verify & sign in"}
+                    </button>
+                    <button type="button" onClick={requestOtp} disabled={busy} className="mt-1.5 w-full text-center text-[10px] text-zinc-500 hover:text-zinc-300">
+                      Resend code
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            <div className={mode === "login" && looksPhone ? "hidden" : undefined}>
               <PasswordField
                 value={password}
                 onChange={setPassword}
@@ -199,6 +277,32 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 </p>
               )}
             </div>
+            {mode === "signup" && (
+              <>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Phone number (optional)"
+                  autoComplete="tel"
+                  className={inputCls}
+                />
+                <div className="rounded-lg border border-line bg-card-raised p-3">
+                  <p className="text-[11px] font-semibold text-zinc-300">How would you like to receive important updates?</p>
+                  <div className="mt-1.5 space-y-1 text-[11px] text-zinc-400">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked disabled className="accent-lime-400" /> In UpNova</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked disabled className="accent-lime-400" /> Email</label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="accent-lime-400" /> SMS
+                    </label>
+                  </div>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+                    SMS alerts can keep you updated about projects, payments, bookings and
+                    opportunities. Requires verifying your number. You can change this anytime in Settings.
+                  </p>
+                </div>
+              </>
+            )}
             {mode === "signup" && (
               <div>
                 <PasswordField

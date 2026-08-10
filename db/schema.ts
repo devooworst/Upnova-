@@ -39,6 +39,15 @@ export const users = sqliteTable("users", {
   // Ignored entirely in production (isDemoMode() false → always realistic).
   // This is feature-access state, NEVER auth state.
   testerMode: text("tester_mode").notNull().default("demo"),
+  // PHONE LOGIN + SMS — sensitive account data, never public unless the
+  // member explicitly opts in elsewhere. Verified via OTP (hashes only).
+  phone: text("phone").unique(),
+  phoneVerified: integer("phone_verified", { mode: "boolean" }).notNull().default(false),
+  // SMS requires EXPLICIT consent — a verified number alone never opts
+  // anyone in. Notification prefs: JSON {category: {inapp,email,sms}}
+  // per projects|opportunities|bookings|messages|security.
+  smsConsent: integer("sms_consent", { mode: "boolean" }).notNull().default(false),
+  notifyPrefs: text("notify_prefs").notNull().default(""),
   status: text("status").notNull().default("active"), // active | suspended
   // individual | business. businessVerified is EARNED through UpNova's
   // business-verification process — it is never granted by a subscription.
@@ -777,6 +786,43 @@ export const bookings = sqliteTable(
     createdAt: ts("created_at"),
   },
   (t) => [index("bookings_provider_starts").on(t.providerId, t.startsAt)]
+);
+
+/* ------------------------------ OTP + outbox ------------------------------ */
+
+/* One-time codes for phone verification & phone login. SECURITY: only a
+   sha256 HASH of the code is ever stored; 5-minute expiry; 5 attempts;
+   request rate limiting lives in the route. */
+export const otpCodes = sqliteTable(
+  "otp_codes",
+  {
+    id: id(),
+    phone: text("phone").notNull(),
+    codeHash: text("code_hash").notNull(),
+    purpose: text("purpose").notNull().default("login"), // login | verify
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("otp_phone").on(t.phone, t.createdAt)]
+);
+
+/* Outbound email/SMS delivery log. In this demo it IS the delivery
+   channel (inspectable, honest); production swaps the writer for a real
+   provider (Twilio/SES) behind the same dispatch call. OTP codes are
+   NEVER written here in plaintext. */
+export const outbox = sqliteTable(
+  "outbox",
+  {
+    id: id(),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(), // sms | email
+    to: text("to").notNull(),
+    body: text("body").notNull(),
+    kind: text("kind").notNull().default(""), // pref category or 'otp' | 'security'
+    createdAt: ts("created_at"),
+  },
+  (t) => [index("outbox_user").on(t.userId, t.createdAt)]
 );
 
 /* ------------------------- portfolio / experience ------------------------- */

@@ -25,19 +25,28 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
-    const email = String(body.email || "").trim().toLowerCase();
+    // ONE identifier field: email, username, or phone number — the type
+    // is detected automatically. Every failure uses the same generic
+    // message so nothing about account existence leaks.
+    const identifier = String(body.identifier ?? body.email ?? "").trim();
     const password = String(body.password || "");
     const code = body.code != null ? String(body.code) : null;
 
-    // rate limit: 5 failed attempts per account per 15 minutes
-    const rlKey = `login:${email}`;
+    // rate limit: 5 failed attempts per identifier per 15 minutes
+    const rlKey = `login:${identifier.toLowerCase()}`;
     const rl = rateLimit(rlKey, 5, 15 * 60_000);
     if (!rl.ok)
       throw new ApiError(429, `Too many attempts. Try again in ${Math.max(1, Math.ceil(rl.retryAfterSec / 60))} min.`);
 
-    const user = db.select().from(tables.users).where(eq(tables.users.email, email)).get();
+    const phoneDigits = identifier.replace(/[^\d+]/g, "");
+    const looksPhone = /^\+?\d{7,15}$/.test(phoneDigits);
+    const user = identifier.includes("@")
+      ? db.select().from(tables.users).where(eq(tables.users.email, identifier.toLowerCase())).get()
+      : looksPhone
+        ? db.select().from(tables.users).where(eq(tables.users.phone, `+${phoneDigits.replace(/^\+/, "")}`)).get()
+        : db.select().from(tables.users).where(eq(tables.users.handle, identifier.toLowerCase())).get();
     if (!user || !verifyPassword(password, user.passwordHash))
-      throw new ApiError(401, "Invalid email or password");
+      throw new ApiError(401, "Invalid credentials — check your email, username, or phone and password");
     if (user.status !== "active") throw new ApiError(403, "This account is suspended");
 
     // MFA: password checked out — now the second factor, if enabled

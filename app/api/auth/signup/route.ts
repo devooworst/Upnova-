@@ -45,6 +45,15 @@ export async function POST(req: NextRequest) {
         // business accounts start UNVERIFIED — verification is a separate
         // process, never granted by signup or any subscription
         accountType: body.accountType === "business" ? "business" : "individual",
+        // optional phone at signup — stored UNVERIFIED; OTP verification
+        // happens in Settings. SMS consent is recorded but SMS only ever
+        // sends once the number is verified AND consent is on.
+        ...(() => {
+          const digits = String(body.phone ?? "").replace(/[^\d+]/g, "");
+          const m = digits.match(/^\+?(\d{7,15})$/);
+          return m ? { phone: `+${m[1]}`, smsConsent: !!body.smsConsent } : {};
+        })(),
+        ...(body.notifyEmail === false ? { notifyPrefs: JSON.stringify({ projects: { email: false }, opportunities: { email: false }, bookings: { email: false } }) } : {}),
       })
       .run();
     db.insert(tables.profiles)

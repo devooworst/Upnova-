@@ -490,6 +490,25 @@ CREATE TABLE IF NOT EXISTS `orders` (
 	FOREIGN KEY (`buyer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS `otp_codes` (
+	`id` text PRIMARY KEY NOT NULL,
+	`phone` text NOT NULL,
+	`code_hash` text NOT NULL,
+	`purpose` text DEFAULT 'login' NOT NULL,
+	`attempts` integer DEFAULT 0 NOT NULL,
+	`expires_at` integer NOT NULL,
+	`created_at` integer NOT NULL
+);
+CREATE TABLE IF NOT EXISTS `outbox` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text,
+	`channel` text NOT NULL,
+	`to` text NOT NULL,
+	`body` text NOT NULL,
+	`kind` text DEFAULT '' NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `password_resets` (
 	`id` text PRIMARY KEY NOT NULL,
 	`token` text NOT NULL,
@@ -579,6 +598,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`avatar_url` text,
 	`cover_url` text,
 	`cover_pos` integer DEFAULT 50 NOT NULL,
+	`studio` text DEFAULT '' NOT NULL,
 	`verified` integer DEFAULT false NOT NULL,
 	`location_visibility` text DEFAULT 'city' NOT NULL,
 	`city` text DEFAULT '' NOT NULL,
@@ -615,7 +635,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`show_availability` integer DEFAULT true NOT NULL,
 	`links` text DEFAULT '[]' NOT NULL,
 	`education` text DEFAULT '[]' NOT NULL,
-	`trust_level` text DEFAULT 'standard' NOT NULL, `studio` text DEFAULT '' NOT NULL,
+	`trust_level` text DEFAULT 'standard' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `project_milestones` (
@@ -702,7 +722,7 @@ CREATE TABLE IF NOT EXISTS `sessions` (
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS `users` (
+CREATE TABLE IF NOT EXISTS "users" (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL,
 	`password_hash` text NOT NULL,
@@ -710,6 +730,10 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`role` text DEFAULT 'user' NOT NULL,
 	`plan` text DEFAULT 'free' NOT NULL,
 	`tester_mode` text DEFAULT 'demo' NOT NULL,
+	`phone` text,
+	`phone_verified` integer DEFAULT false NOT NULL,
+	`sms_consent` integer DEFAULT false NOT NULL,
+	`notify_prefs` text DEFAULT '' NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
 	`account_type` text DEFAULT 'individual' NOT NULL,
 	`business_verified` integer DEFAULT false NOT NULL,
@@ -765,6 +789,8 @@ CREATE INDEX IF NOT EXISTS `notif_user_read` ON `notifications` (`user_id`,`read
 CREATE INDEX IF NOT EXISTS `order_events_order` ON `order_events` (`order_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `orders_buyer` ON `orders` (`buyer_id`,`created_at`);
 CREATE INDEX IF NOT EXISTS `orders_seller` ON `orders` (`seller_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `otp_phone` ON `otp_codes` (`phone`,`created_at`);
+CREATE INDEX IF NOT EXISTS `outbox_user` ON `outbox` (`user_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `password_resets_token_unique` ON `password_resets` (`token`);
 CREATE INDEX IF NOT EXISTS `posts_author_created` ON `posts` (`author_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `profiles_user_id_unique` ON `profiles` (`user_id`);
@@ -776,3 +802,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS `sessions_token_unique` ON `sessions` (`token`
 CREATE INDEX IF NOT EXISTS `sessions_user` ON `sessions` (`user_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `users_email_unique` ON `users` (`email`);
 CREATE UNIQUE INDEX IF NOT EXISTS `users_handle_unique` ON `users` (`handle`);
+CREATE UNIQUE INDEX IF NOT EXISTS `users_phone_unique` ON `users` (`phone`);
