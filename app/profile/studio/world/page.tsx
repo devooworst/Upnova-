@@ -254,7 +254,7 @@ export default function MyWorldEditor() {
       {msg && <p className="mx-auto mt-2 w-fit rounded-full border border-line bg-card px-4 py-1.5 text-[11px] text-zinc-300">{msg}</p>}
       {!preview && (
         <p className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full bg-card/60 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">
-          <Lock className="h-2.5 w-2.5" /> identity · actions · trust locked inside the profile card — everything else: grab it, move it, resize it
+          <Lock className="h-2.5 w-2.5" /> identity · actions · trust locked inside the profile card — everything else is freeform: rose guides appear when edges, centers, or spacing line up · hold Alt to bypass snapping
         </p>
       )}
 
@@ -331,6 +331,22 @@ export default function MyWorldEditor() {
             <h2 className="text-sm font-bold text-zinc-100">Design</h2>
             <button onClick={() => setDrawer(false)} className="icon-btn h-7 w-7" aria-label="Close design panel"><X className="h-3.5 w-3.5" /></button>
           </div>
+
+          <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">World headline</p>
+          <input
+            value={world.title ?? ""}
+            onChange={(e) => mutate((c) => ({ ...c, world: { ...(c.world ?? DEFAULT_WORLD), title: e.target.value.slice(0, 80) } }), false)}
+            placeholder={`${user.profile.displayName}'s world`}
+            className="mt-1.5 w-full rounded-lg border border-line bg-card-raised px-3 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+          />
+          <label className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-zinc-500">Show the headline (and the &quot;built on UpNova&quot; mark)</span>
+            <input type="checkbox" checked={world.showTitle !== false} onChange={(e) => mutate((c) => ({ ...c, world: { ...(c.world ?? DEFAULT_WORLD), showTitle: e.target.checked } }))} className="h-4 w-4 accent-lime-400" />
+          </label>
+          <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
+            Say what your world is — &quot;welcome to my studio&quot;, &quot;the print shop&quot;, anything (plain text).
+            Hide it entirely and the top of the canvas is all yours.
+          </p>
 
           <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Environment</p>
           <div className="mt-2 grid grid-cols-2 gap-2">

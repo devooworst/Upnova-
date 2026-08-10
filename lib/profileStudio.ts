@@ -27,6 +27,10 @@ export interface WorldConfig {
   enabled: boolean;
   environment: string; // ENVIRONMENTS id — the full-bleed backdrop scene
   elements: Record<string, WorldElement>; // keyed by APPROVED element ids
+  /** the world headline — custom text ("welcome to my studio…") or the
+      default "{name}'s world"; hideable entirely. Plain text only. */
+  title?: string;
+  showTitle?: boolean;
 }
 
 export interface StudioConfig {
@@ -156,6 +160,10 @@ export function sanitizeWorld(input: unknown): WorldConfig {
     enabled: !!o.enabled,
     environment: typeof o.environment === "string" && o.environment in ENVIRONMENTS ? o.environment : "cosmic",
     elements,
+    // plain text only — control chars stripped, length capped; React
+    // escaping keeps it inert everywhere it renders
+    title: String(o.title ?? "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80),
+    showTitle: o.showTitle !== false,
   };
 }
 

@@ -98,8 +98,13 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
   const { user: me } = useSession();
   const [data, setData] = useState<PublicProfile | null>(null);
   // WYSIWYG edit interaction state (only used when `edit` is provided)
-  const editDrag = useRef<{ id: string; mode: string; startX: number; startY: number; el: WorldElement; measuredH: number } | null>(null);
+  const editDrag = useRef<{
+    id: string; mode: string; startX: number; startY: number; el: WorldElement; measuredH: number;
+    others: { l: number; r: number; cx: number; t: number; b: number; cy: number }[];
+  } | null>(null);
   const editCanvasRef = useRef<HTMLDivElement>(null);
+  // temporary smart-alignment guides — exist only while dragging
+  const [dragGuides, setDragGuides] = useState<{ v: number[]; h: number[]; equal: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -558,7 +563,18 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       edit.onSelect(id);
       const el = world.elements[id];
       const host = (e.currentTarget as HTMLElement).closest("[data-world-el]") as HTMLElement | null;
-      editDrag.current = { id, mode, startX: e.clientX, startY: e.clientY, el: { ...el }, measuredH: host?.offsetHeight ?? 200 };
+      const canvas = editCanvasRef.current;
+      const others: { l: number; r: number; cx: number; t: number; b: number; cy: number }[] = [];
+      if (canvas) {
+        const cw = canvas.clientWidth || 1;
+        canvas.querySelectorAll<HTMLElement>("[data-world-el]").forEach((n) => {
+          if (n.dataset.worldEl === id) return;
+          const l = (n.offsetLeft / cw) * 100;
+          const r = ((n.offsetLeft + n.offsetWidth) / cw) * 100;
+          others.push({ l, r, cx: (l + r) / 2, t: n.offsetTop, b: n.offsetTop + n.offsetHeight, cy: n.offsetTop + n.offsetHeight / 2 });
+        });
+      }
+      editDrag.current = { id, mode, startX: e.clientX, startY: e.clientY, el: { ...el }, measuredH: host?.offsetHeight ?? 200, others };
       (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     };
     const onCanvasMove = (e: React.PointerEvent) => {
@@ -568,18 +584,63 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       const dxPct = ((e.clientX - d.startX) / rect.width) * 100;
       const dy = e.clientY - d.startY;
       const baseH = d.el.h > 0 ? d.el.h : d.measuredH;
-      const clampH = (v: number) => snap20(Math.min(1600, Math.max(0, v)));
-      if (d.mode === "move")
-        edit.onChange(d.id, {
-          x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
-          y: snap20(Math.min(4000, Math.max(0, d.el.y + dy))),
-        });
+      const clampH = (v: number) => Math.round(Math.min(1600, Math.max(0, v)));
+      if (d.mode === "move") {
+        /* FREEFORM canvas + smart assistance: positions are free (no grid
+           quantization). When an edge/center comes close to another
+           element's edge/center — or the canvas edges/center — a rose
+           guide appears and the card gently snaps. Alt/Option bypasses
+           all magnetism for raw placement. */
+        let x = Math.min(100, Math.max(0, d.el.x + dxPct));
+        let y = Math.min(4000, Math.max(0, d.el.y + dy));
+        const wPct = d.el.w;
+        const hPx = d.el.h > 0 ? d.el.h : d.measuredH;
+        const v: number[] = [];
+        const hg: number[] = [];
+        let equal = false;
+        if (!e.altKey) {
+          const TX = 0.9; // % — small threshold: helpful, never sticky
+          const TY = 8; // px
+          const vCands = [0, 50, 100, ...d.others.flatMap((o) => [o.l, o.r, o.cx])];
+          const myV: [number, (c: number) => number][] = [
+            [x, (c) => c],
+            [x + wPct, (c) => c - wPct],
+            [x + wPct / 2, (c) => c - wPct / 2],
+          ];
+          outerV: for (const [edge, apply] of myV)
+            for (const c of vCands)
+              if (Math.abs(edge - c) <= TX) { x = Math.max(0, Math.min(100, apply(c))); v.push(c); break outerV; }
+          const hCands = [0, ...d.others.flatMap((o) => [o.t, o.b, o.cy])];
+          const myH: [number, (c: number) => number][] = [
+            [y, (c) => c],
+            [y + hPx, (c) => c - hPx],
+            [y + hPx / 2, (c) => c - hPx / 2],
+          ];
+          outerH: for (const [edge, apply] of myH)
+            for (const c of hCands)
+              if (Math.abs(edge - c) <= TY) { y = Math.max(0, Math.min(4000, apply(c))); hg.push(c); break outerH; }
+          // EQUAL SPACING: nearest neighbor fully above and fully below —
+          // when the two gaps get close, snap to even and say so
+          const above = d.others.filter((o) => o.b <= y + TY).sort((a, b) => b.b - a.b)[0];
+          const below = d.others.filter((o) => o.t >= y + hPx - TY).sort((a, b) => a.t - b.t)[0];
+          if (above && below) {
+            const gapUp = y - above.b;
+            const gapDown = below.t - (y + hPx);
+            if (gapUp > 4 && gapDown > 4 && Math.abs(gapUp - gapDown) <= 12) {
+              y = Math.max(0, above.b + (below.t - above.b - hPx) / 2);
+              equal = true;
+            }
+          }
+        }
+        setDragGuides(v.length || hg.length || equal ? { v, h: hg, equal } : null);
+        edit.onChange(d.id, { x: Math.round(x * 10) / 10, y: Math.round(y) });
+      }
       else if (d.mode === "e")
-        edit.onChange(d.id, { w: snap2(Math.min(100, Math.max(24, d.el.w + dxPct))) });
+        edit.onChange(d.id, { w: Math.round(Math.min(100, Math.max(24, d.el.w + dxPct)) * 10) / 10 });
       else if (d.mode === "w")
         edit.onChange(d.id, {
-          w: snap2(Math.min(100, Math.max(24, d.el.w - dxPct))),
-          x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
+          w: Math.round(Math.min(100, Math.max(24, d.el.w - dxPct)) * 10) / 10,
+          x: Math.round(Math.min(100, Math.max(0, d.el.x + dxPct)) * 10) / 10,
         });
       else if (d.mode === "rot")
         edit.onChange(d.id, { rotate: Math.round(Math.min(8, Math.max(-8, d.el.rotate + (e.clientX - d.startX) / 14))) });
@@ -587,38 +648,39 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         // any edge/corner combination: n/s adjust height (n also moves y),
         // e/w adjust width (w also moves x) — composable like a real design tool
         const patch: Partial<WorldElement> = {};
-        if (d.mode.includes("e")) patch.w = snap2(Math.min(100, Math.max(24, d.el.w + dxPct)));
+        const fine = (v: number) => Math.round(v * 10) / 10;
+        if (d.mode.includes("e")) patch.w = fine(Math.min(100, Math.max(24, d.el.w + dxPct)));
         if (d.mode.includes("w")) {
-          patch.w = snap2(Math.min(100, Math.max(24, d.el.w - dxPct)));
-          patch.x = snap2(Math.min(100, Math.max(0, d.el.x + dxPct)));
+          patch.w = fine(Math.min(100, Math.max(24, d.el.w - dxPct)));
+          patch.x = fine(Math.min(100, Math.max(0, d.el.x + dxPct)));
         }
         if (d.mode.includes("s")) patch.h = clampH(baseH + dy);
         if (d.mode.includes("n")) {
           patch.h = clampH(baseH - dy);
-          patch.y = snap20(Math.min(4000, Math.max(0, d.el.y + dy)));
+          patch.y = Math.round(Math.min(4000, Math.max(0, d.el.y + dy)));
         }
         edit.onChange(d.id, patch);
       }
     };
-    const endInteraction = () => (editDrag.current = null);
+    const endInteraction = () => {
+      editDrag.current = null;
+      setDragGuides(null); // guides never linger
+    };
     const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
     const els = WORLD_ELEMENT_IDS
       .map((id) => ({ id, el: world.elements[id] }))
       .filter((x) => x.el && (!x.el.hidden || x.id === "hero"))
       .sort((a, b) => a.el.y - b.el.y);
-    const canvasH = Math.max(...els.map((x) => x.el.y)) + 640;
+    const canvasH = Math.max(900, Math.max(...els.map((x) => x.el.y)) + 640);
+    const worldTitle = (world.title ?? "").trim() || `${user.displayName}'s world`;
+    const showTitle = world.showTitle !== false;
     return (
       <div className="mx-auto max-w-5xl">
         <div className="relative overflow-hidden rounded-2xl border border-line" style={{ backgroundImage: env.css }}>
           {env.overlay !== "none" && (
             <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: env.overlay }} aria-hidden />
           )}
-          <div className="relative flex items-center justify-between gap-2 px-4 pt-3">
-            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-zinc-400/90">
-              {user.displayName}&apos;s world
-            </p>
-            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on UpNova</p>
-          </div>
+
           {data.studioDemoPreview && (
             <p className="relative mx-4 mt-2 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[10px] text-amber-300">
               DEMO MODE preview — only you see this world until Pro is active.
@@ -635,6 +697,30 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
               className={stacked ? "relative" : "relative sm:h-[var(--wh)]"}
               style={stacked ? undefined : ({ "--wh": `${canvasH}px`, touchAction: edit ? "none" : undefined } as React.CSSProperties)}
             >
+              {/* world headline — an overlay, not a flow block: the whole
+                  canvas (including this top area) is placeable space */}
+              {showTitle && (
+                <div className="pointer-events-none absolute inset-x-1 top-0 z-0 flex items-center justify-between px-3 pt-1" aria-hidden={!worldTitle}>
+                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-zinc-400/90">{worldTitle}</p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on UpNova</p>
+                </div>
+              )}
+              {/* SMART GUIDES — rose lines while dragging, gone on release */}
+              {edit && !stacked && dragGuides && (
+                <>
+                  {dragGuides.v.map((gv, i) => (
+                    <span key={`v${i}`} className="pointer-events-none absolute bottom-0 top-0 z-40 w-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ left: `${gv}%` }} aria-hidden />
+                  ))}
+                  {dragGuides.h.map((gh, i) => (
+                    <span key={`h${i}`} className="pointer-events-none absolute inset-x-0 z-40 h-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ top: gh }} aria-hidden />
+                  ))}
+                  {dragGuides.equal && (
+                    <span className="pointer-events-none absolute left-1/2 top-2 z-40 -translate-x-1/2 rounded-full bg-rose-400 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-950 shadow">
+                      Equal spacing
+                    </span>
+                  )}
+                </>
+              )}
               {els.map(({ id, el }) => {
                 const isSel = edit && edit.selected === id;
                 return (
