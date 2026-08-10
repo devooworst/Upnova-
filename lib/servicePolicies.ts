@@ -108,6 +108,14 @@ export interface ServiceConfig {
         access says WHO GETS ACCESS FIRST when availability is released.
         Every provider sets their own (7/14/30/60/custom). */
     horizonDays?: number;
+    /** HOW AVAILABILITY IS RELEASED:
+        "rolling"   — the bookable window moves forward continuously
+                      (horizonDays ahead, the default), or
+        "scheduled" — the provider releases availability on specific
+                      dates ("September opens August 25 at 9 AM"),
+                      optionally with Preferred Early Access first.
+        Both modes: capacity is always the hard limit. */
+    releaseMode?: "rolling" | "scheduled";
   };
   pricing?: {
     type: "fixed" | "starting" | "hourly" | "quote";

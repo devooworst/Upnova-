@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
         advanceNoticeHours: num(inC.scheduling?.advanceNoticeHours, 168) ?? 2,
         // booking horizon: 1–365 days, provider-chosen — never a platform-wide assumption
         horizonDays: (() => { const h = num(inC.scheduling?.horizonDays, 365); return h && h >= 1 ? h : 60; })(),
+        releaseMode: inC.scheduling?.releaseMode === "scheduled" ? "scheduled" : "rolling",
       },
       pricing: {
         type: ["fixed", "starting", "hourly", "quote"].includes(inC.pricing?.type as string)

@@ -9,7 +9,7 @@ import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser, seedBookingProgress } from "@/lib/server/demo";
 import { resolvePairConversation } from "@/lib/server/conversations";
 import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
-import { hasEarlyAccess, discountPercent, readEarlyAccess, activeBookingsForService, clientBookingsSinceWindowStart } from "@/lib/server/preferred";
+import { hasEarlyAccess, discountPercent, readEarlyAccess, readRelease, activeBookingsForService, clientBookingsSinceWindowStart } from "@/lib/server/preferred";
 import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
 
@@ -177,14 +177,47 @@ export async function POST(req: NextRequest) {
     if (sched.startHour != null && sched.endHour != null && (hour < sched.startHour || hour >= sched.endHour))
       throw new ApiError(409, `Outside working hours (${sched.startHour}:00–${sched.endHour}:00)`);
     const hoursOut = (reqStart.getTime() - Date.now()) / 3600_000;
-    // BOOKING HORIZON: how far ahead THIS provider releases availability.
-    // A separate dimension from Preferred Early Access (who books first)
-    // and from capacity (how many can book) — the horizon binds everyone,
-    // Preferred Clients included.
-    const horizon = sched.horizonDays ?? 60;
-    if (reqStart.getTime() > Date.now() + horizon * 86400_000) {
-      const releases = new Date(reqStart.getTime() - horizon * 86400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      throw new ApiError(409, `${providerProfileFull.displayName} opens bookings ${horizon} days ahead — that date isn't released yet (bookable from ${releases})`);
+    /* HOW AVAILABILITY IS RELEASED — the provider's choice of model.
+       Rolling: the window moves forward continuously (horizonDays).
+       Scheduled: dates open at a specific moment ("September opens
+       Aug 25, 9 AM"), Preferred Clients first when early access is set.
+       Either way this only decides WHEN dates become bookable —
+       capacity below still decides HOW MANY, for everyone. */
+    if (sched.releaseMode === "scheduled") {
+      const rel = readRelease(service.config);
+      const reqT = reqStart.getTime();
+      const fmtT = (t: number) => new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      let releasedThrough = rel?.releasedUntil ? Date.parse(rel.releasedUntil) : 0;
+      const relAt = rel?.releaseAt ? Date.parse(rel.releaseAt) : null;
+      const relUntil = rel?.releaseUntil ? Date.parse(rel.releaseUntil) : null;
+      if (relAt != null && relUntil != null) {
+        const publicAt = relAt + (rel?.eaHours ?? 0) * 3600_000;
+        if (Date.now() >= publicAt) {
+          releasedThrough = Math.max(releasedThrough, relUntil); // fully open
+        } else if (Date.now() >= relAt && reqT > releasedThrough && reqT <= relUntil) {
+          // the release is in its Preferred Early Access phase
+          if (!hasEarlyAccess(service.ownerId, user.id))
+            throw new ApiError(403, `This new availability is in Preferred Early Access — it opens to everyone ${fmtT(publicAt)}`);
+          const eaRel = readEarlyAccess(service.config);
+          if (eaRel?.preferredLimit != null) {
+            const mine = clientBookingsSinceWindowStart(service.id, user.id, rel!.releaseAt);
+            if (mine >= eaRel.preferredLimit)
+              throw new ApiError(409, `Early-access limit reached — ${eaRel.preferredLimit} booking${eaRel.preferredLimit === 1 ? "" : "s"} per Preferred Client for this release. It opens to everyone ${fmtT(publicAt)}`);
+          }
+          releasedThrough = relUntil; // this Preferred Client may book the new range
+        } else if (Date.now() < relAt && reqT > releasedThrough && reqT <= relUntil) {
+          throw new ApiError(409, `These dates aren't released yet — they open ${fmtT(relAt)}${rel?.eaHours ? ` (Preferred Clients book first for ${rel.eaHours}h)` : ""}`);
+        }
+      }
+      if (reqT > releasedThrough)
+        throw new ApiError(409, `${providerProfileFull.displayName} releases availability on specific dates — that date isn't part of any released or scheduled batch yet`);
+    } else {
+      // ROLLING HORIZON: how far ahead THIS provider releases availability.
+      const horizon = sched.horizonDays ?? 60;
+      if (reqStart.getTime() > Date.now() + horizon * 86400_000) {
+        const releases = new Date(reqStart.getTime() - horizon * 86400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        throw new ApiError(409, `${providerProfileFull.displayName} opens bookings ${horizon} days ahead — that date isn't released yet (bookable from ${releases})`);
+      }
     }
     if (sched.sameDayBooking === false && reqStart.toDateString() === new Date().toDateString())
       throw new ApiError(409, "Same-day booking isn't available for this service");

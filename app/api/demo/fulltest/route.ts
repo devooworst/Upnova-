@@ -4,7 +4,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
-import { readEarlyAccess, writeEarlyAccess } from "@/lib/server/preferred";
+import { readEarlyAccess, writeEarlyAccess, readRelease, writeRelease } from "@/lib/server/preferred";
 
 /* per-run email nonce — throwaway signups get a UNIQUE email every run so
    the production signup rate limiter (5 per email / 15 min) never trips
@@ -130,7 +130,14 @@ export async function POST(req: NextRequest) {
     // any drop bookings by the designated non-preferred tester (harboroak)
     for (const s of db.select().from(tables.services).where(eq(tables.services.ownerId, lena.id)).all()) {
       if (s.preferredUntil) db.update(tables.services).set({ preferredUntil: null }).where(eq(tables.services.id, s.id)).run();
-      if (readEarlyAccess(s.config)) db.update(tables.services).set({ config: writeEarlyAccess(s.config, null) }).where(eq(tables.services.id, s.id)).run();
+      let cfg = s.config;
+      if (readEarlyAccess(cfg)) cfg = writeEarlyAccess(cfg, null);
+      if (readRelease(cfg)) cfg = writeRelease(cfg, null);
+      try { // scheduled mode left by a crashed run would block every booking below
+        const o = JSON.parse(cfg || "{}");
+        if (o?.scheduling?.releaseMode === "scheduled") { o.scheduling.releaseMode = "rolling"; cfg = JSON.stringify(o); }
+      } catch {}
+      if (cfg !== s.config) db.update(tables.services).set({ config: cfg }).where(eq(tables.services.id, s.id)).run();
     }
     for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all())
       if (b.providerId === lena.id) {
@@ -750,6 +757,57 @@ export async function POST(req: NextRequest) {
     await api("lena", `/api/services/${svc.id}/early-access?full=1`, { method: "DELETE" });
     const relAgain = ((await api("lena", "/api/clients")).data as any).clients?.find((x: any) => x.handle === "rachel")?.preferred?.id;
     if (relAgain) await api("lena", `/api/preferred-clients/${relAgain}`, { method: "DELETE" });
+
+    /* ===== SCHEDULED RELEASE mode — "September opens August 25, 9 AM" =====
+       Rolling stays the default and untouched; scheduled is opt-in.
+       Before the release NOBODY books (preferred included) · at release
+       Preferred Clients book first (per-client limits hold) · at the
+       public moment everyone books · beyond coverage stays closed ·
+       switching back to rolling restores continuous booking. */
+    {
+      const wkAt = (daysOut: number, hour: number) => {
+        let t = new Date(Date.now() + daysOut * 86400e3);
+        while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3);
+        t.setHours(hour, 0, 0, 0);
+        return t.toISOString();
+      };
+      const covers = new Date(Date.now() + 40 * 86400e3).toISOString();
+      // 1) future release with 24h Preferred Early Access
+      const fut = await api("lena", `/api/services/${svc.id}/release`, { method: "POST", body: { releaseAt: new Date(Date.now() + 2 * 3600e3).toISOString(), coversUntil: covers, earlyAccessHours: 24 } });
+      const futD = fut.data as any;
+      step(c, "SCHEDULED RELEASE: provider schedules 'new availability opens in 2h · covers 40 days · Preferred first for 24h' (holders notified)",
+        fut.status === 200 && futD.releaseMode === "scheduled" && Number(futD.notified) >= 1 && !!futD.publicAt, {
+        route: "POST /api/services/[id]/release", actual: JSON.stringify({ mode: futD.releaseMode, notified: futD.notified }) });
+      const preA = await api("tonbpc", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(20, 10), durationMin: 60 } });
+      const preB = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(20, 12), durationMin: 60 } });
+      step(c, "before the release: NOBODY can book the new dates — Preferred Clients included (with the opening time in the message)",
+        preA.status === 409 && /open/.test(String((preA.data as any).error)) && preB.status === 409, {
+        actual: `preferred=${preA.status} public=${preB.status} · ${String((preA.data as any).error).slice(0, 70)}` });
+      // 2) release opened 1h ago → Preferred Early Access phase (1 per client)
+      await api("lena", `/api/services/${svc.id}/release`, { method: "POST", body: { releaseAt: new Date(Date.now() - 3600e3).toISOString(), coversUntil: covers, earlyAccessHours: 24, perClientLimit: 1 } });
+      const eaOut = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(20, 12), durationMin: 60 } });
+      const eaIn = await api("tonbpc", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(20, 10), durationMin: 60 } });
+      const eaIn2 = await api("tonbpc", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(22, 11), durationMin: 60 } });
+      step(c, "release in Early Access: outsider 403 (public time shown) · Preferred Client books · their SECOND booking hits the 1-per-client limit",
+        eaOut.status === 403 && eaIn.status === 200 && eaIn2.status === 409 && /per Preferred Client/.test(String((eaIn2.data as any).error)), {
+        actual: `out=${eaOut.status} in=${eaIn.status} second=${eaIn2.status}` });
+      // 3) early access over (released 30h ago) → public
+      await api("lena", `/api/services/${svc.id}/release`, { method: "POST", body: { releaseAt: new Date(Date.now() - 30 * 3600e3).toISOString(), coversUntil: covers, earlyAccessHours: 24 } });
+      const pubOk = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(21, 12), durationMin: 60 } });
+      const beyond = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(50, 12), durationMin: 60 } });
+      step(c, "early access over: the public books the released dates — but dates BEYOND the release stay closed",
+        pubOk.status === 200 && beyond.status === 409 && /released/.test(String((beyond.data as any).error)), {
+        actual: `public=${pubOk.status} beyond=${beyond.status}` });
+      // 4) cancellations free slots; switch back to rolling restores continuous booking
+      if ((eaIn.data as any).id) await api("tonbpc", `/api/bookings/${(eaIn.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+      if ((pubOk.data as any).id) await api("harboroak", `/api/bookings/${(pubOk.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+      await api("lena", `/api/services/${svc.id}/release`, { method: "DELETE" });
+      await api("lena", `/api/services/${svc.id}`, { method: "PATCH", body: { scheduling: { releaseMode: "rolling", horizonDays: 60 } } });
+      const backRolling = await api("tonbpc", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(10, 14), durationMin: 60 } });
+      step(c, "switching back to ROLLING restores continuous booking (10 days out books under the 60-day horizon)",
+        backRolling.status === 200, { actual: String(backRolling.status) });
+      if ((backRolling.data as any).id) await api("tonbpc", `/api/bookings/${(backRolling.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+    }
   }
 
   /* ================= FIRST-TIME ONBOARDING ================= */

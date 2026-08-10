@@ -500,7 +500,44 @@ export default function NewServicePage() {
                 </select>
               </label>
             </div>
+            {/* HOW BOOKINGS ARE RELEASED — plain words, no scheduling jargon */}
+            <div className="mt-4" data-tut="service-release-mode">
+              <p className="text-xs font-semibold text-zinc-300">How do you want to release bookings?</p>
+              <div className="mt-1.5 space-y-1.5">
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-zinc-300">
+                  <input
+                    type="radio"
+                    name="releaseMode"
+                    checked={(config.scheduling.releaseMode ?? "rolling") === "rolling"}
+                    onChange={() => setScheduling({ releaseMode: "rolling" })}
+                    className="mt-0.5 accent-lime-400"
+                  />
+                  <span>
+                    <span className="font-semibold">Rolling availability</span>
+                    <span className="block text-[10px] leading-relaxed text-zinc-600">
+                      Customers can always book up to {config.scheduling.horizonDays ?? 60} days ahead — the window moves forward every day. Right for continuous businesses (a producer taking bookings year-round, a barber open every week).
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-zinc-300">
+                  <input
+                    type="radio"
+                    name="releaseMode"
+                    checked={config.scheduling.releaseMode === "scheduled"}
+                    onChange={() => setScheduling({ releaseMode: "scheduled" })}
+                    className="mt-0.5 accent-lime-400"
+                  />
+                  <span>
+                    <span className="font-semibold">Scheduled releases</span>
+                    <span className="block text-[10px] leading-relaxed text-zinc-600">
+                      You release new availability on specific dates — &quot;September opens August 25 at 9 AM.&quot; Nothing is bookable until you release it. Right for monthly books, seasonal dates, limited drops. You schedule each release from your Clients page, optionally with Preferred Early Access first.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
             {/* BOOKING HORIZON — its own concept, never mixed with early access */}
+            {(config.scheduling.releaseMode ?? "rolling") === "rolling" && (
             <div className="mt-3" data-tut="service-horizon">
               <label className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
                 Booking horizon
@@ -531,6 +568,7 @@ export default function NewServicePage() {
                 who gets first access when you release availability.
               </p>
             </div>
+            )}
           </div>
         </section>
       )}

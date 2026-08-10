@@ -149,6 +149,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (s.maxPerDay !== undefined) nextSched.maxPerDay = num(s.maxPerDay, 1, 20);
       if (s.advanceNoticeHours !== undefined) nextSched.advanceNoticeHours = num(s.advanceNoticeHours, 0, 168) ?? nextSched.advanceNoticeHours;
       if (typeof s.sameDayBooking === "boolean") nextSched.sameDayBooking = s.sameDayBooking;
+      if (s.releaseMode !== undefined) {
+        if (s.releaseMode !== "rolling" && s.releaseMode !== "scheduled") throw new ApiError(400, "Release mode must be rolling or scheduled");
+        nextSched.releaseMode = s.releaseMode;
+      }
       let full: Record<string, unknown> = {};
       try { full = JSON.parse(svcRow.config || "{}") ?? {}; } catch {}
       full.scheduling = { ...(typeof full.scheduling === "object" && full.scheduling !== null ? full.scheduling : {}), ...nextSched };

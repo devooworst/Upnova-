@@ -37,6 +37,7 @@ export const TOURS: { prefix: string; tour: FeatureTourDef }[] = [
         { sel: "clients-preferred", title: "Preferred benefits", body: "Each benefit does one thing: Priority booking (first pick of open services) · Preferred pricing (auto-applied, itemized on receipts) · Priority response · Recurring booking priority (repeat appointments) · Complimentary upgrades — all your call, per client." },
         { sel: "clients-early-access", title: "Preferred Early Access", body: "A temporary access mechanism: when you release new availability, Preferred Clients get first access for a window you choose (12–72h or custom). When it ends, remaining appointments open to everyone automatically." },
         { sel: "clients-horizon", title: "Booking horizon", body: "How far into the future customers can book — set per service (7, 14, 30, 60 days or custom). Completely separate from early access: horizon says HOW FAR AHEAD, early access says WHO'S FIRST." },
+        { sel: "clients-release", title: "Rolling vs. scheduled releases", body: "Two ways to release bookings: ROLLING — customers can always book up to X days ahead (the window moves daily). SCHEDULED — you open availability on specific dates ('September opens August 25 at 9 AM'), optionally with Preferred Clients first. Pick whichever fits your business." },
         { title: "Availability is the hard limit", body: "Capacity (your slots, schedule, and buffers) controls how many people can actually book. Nobody — Preferred Clients included — can ever book beyond it, and cancellations free their slot automatically." },
       ],
     },
@@ -73,7 +74,8 @@ export const TOURS: { prefix: string; tour: FeatureTourDef }[] = [
       title: "Services",
       steps: [
         { title: "Your menu, your rules", body: "Each service carries its own pricing, packages, add-ons, travel policy, and scheduling rules — all enforced server-side when someone books." },
-        { sel: "service-horizon", title: "Booking horizon", body: "How far into the future customers can book this service — 7, 14, 30, 60 days or custom. Every provider sets their own; UpNova never assumes one universal schedule." },
+        { sel: "service-release-mode", title: "How bookings are released", body: "Rolling availability: customers can always book up to X days ahead — right for continuous businesses. Scheduled releases: you open availability on specific dates ('September opens August 25 at 9 AM') — right for monthly books, seasonal dates, and limited drops." },
+        { sel: "service-horizon", title: "Booking horizon", body: "In rolling mode: how far into the future customers can book — 7, 14, 30, 60 days or custom. Every provider sets their own; UpNova never assumes one universal schedule." },
         { title: "Availability is the hard limit", body: "Working days, hours, buffers, daily caps, and slot capacity decide how many bookings exist. Preferred Early Access only decides who gets access first — never how many." },
       ],
     },

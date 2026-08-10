@@ -307,3 +307,53 @@ export function clientBookingsSinceWindowStart(serviceId: string, clientId: stri
     .all()
     .filter((b) => b.clientId === clientId && (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status) && b.createdAt.getTime() >= t0).length;
 }
+
+/* ------------------------------------------------------------------ */
+/*  SCHEDULED RELEASES — the optional alternative to a rolling horizon.*/
+/*                                                                     */
+/*  "September bookings open August 25 at 9 AM." Dates up to           */
+/*  releasedUntil are already open; the pending release (releaseAt →   */
+/*  releaseUntil) opens at its moment — Preferred Clients first when   */
+/*  eaHours is set, everyone once the early-access phase ends.         */
+/*  Capacity and per-client limits keep binding exactly as before.     */
+/* ------------------------------------------------------------------ */
+
+export interface ReleaseSetup {
+  /** dates up to here are already released (ISO) */
+  releasedUntil: string | null;
+  /** when the pending release opens (ISO) */
+  releaseAt: string | null;
+  /** the pending release covers dates up to here (ISO) */
+  releaseUntil: string | null;
+  /** Preferred Early Access length at the release moment, hours (0 = none) */
+  eaHours: number | null;
+}
+
+export function readRelease(rawConfig: string | null | undefined): ReleaseSetup | null {
+  try {
+    const o = JSON.parse(rawConfig || "{}");
+    const r = o?.release;
+    if (!r || typeof r !== "object") return null;
+    const iso = (v: unknown) => (typeof v === "string" && Number.isFinite(Date.parse(v)) ? v : null);
+    const rr = r as Record<string, unknown>;
+    const eaN = Math.round(Number(rr.eaHours));
+    return {
+      releasedUntil: iso(rr.releasedUntil),
+      releaseAt: iso(rr.releaseAt),
+      releaseUntil: iso(rr.releaseUntil),
+      eaHours: Number.isFinite(eaN) && eaN >= 1 ? Math.min(168, eaN) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeRelease(rawConfig: string | null | undefined, setup: ReleaseSetup | null): string {
+  let o: Record<string, unknown> = {};
+  try {
+    o = JSON.parse(rawConfig || "{}") ?? {};
+  } catch {}
+  if (setup == null) delete o.release;
+  else o.release = setup;
+  return JSON.stringify(o);
+}

@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
-import { clientIdsOf, clientStats, parseBenefits, readEarlyAccess, activeBookingsForService } from "@/lib/server/preferred";
+import { clientIdsOf, clientStats, parseBenefits, readEarlyAccess, readRelease, activeBookingsForService } from "@/lib/server/preferred";
 import { parseConfig } from "@/lib/servicePolicies";
 
 export const dynamic = "force-dynamic";
@@ -56,8 +56,10 @@ export async function GET() {
         id: s.id,
         title: s.title,
         price: s.price,
-        // BOOKING HORIZON — a separate dimension from early access
+        // BOOKING HORIZON + RELEASE MODE — separate dimensions from early access
         horizonDays: parseConfig(s.config).scheduling.horizonDays ?? 60,
+        releaseMode: parseConfig(s.config).scheduling.releaseMode ?? "rolling",
+        release: readRelease(s.config),
         preferredUntil: s.preferredUntil && s.preferredUntil.getTime() > Date.now() ? s.preferredUntil.toISOString() : null,
         // Preferred Early Access setup: the slot cap counts for EVERYONE;
         // the preferred limit bounds bookings during the window only

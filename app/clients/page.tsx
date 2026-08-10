@@ -64,6 +64,8 @@ interface MyService {
   title: string;
   price: number;
   horizonDays: number;
+  releaseMode: "rolling" | "scheduled";
+  release: { releasedUntil: string | null; releaseAt: string | null; releaseUntil: string | null; eaHours: number | null } | null;
   preferredUntil: string | null;
   earlyAccess: {
     slots: number | null;
@@ -544,8 +546,8 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-zinc-100">
             {s.title}
-            <span className="ml-2 font-mono text-[9px] font-normal uppercase tracking-wide text-zinc-500" title="Booking horizon — how far into the future customers can book this service. Set it on the service itself; it applies to everyone, Preferred Clients included." data-tut="clients-horizon">
-              horizon {s.horizonDays}d
+            <span className="ml-2 font-mono text-[9px] font-normal uppercase tracking-wide text-zinc-500" title={s.releaseMode === "scheduled" ? "Scheduled releases — you open availability on specific dates. Nothing beyond a release is bookable until it opens." : "Rolling availability — customers can always book up to this many days ahead; the window moves forward every day."} data-tut="clients-horizon">
+              {s.releaseMode === "scheduled" ? "scheduled releases" : `rolling · ${s.horizonDays}d ahead`}
             </span>
           </p>
           {s.preferredUntil ? (
@@ -621,6 +623,98 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
             Preferred Clients book first for {hours}h{slots.trim() ? ` · ${slots} total slots (capacity binds everyone)` : ""}
             {prefLimit.trim() ? ` · max ${prefLimit} per Preferred Client` : ""} · public booking opens automatically when the window ends ·
             bookings stay inside your {s.horizonDays}-day horizon.
+          </p>
+        </div>
+      )}
+      {s.releaseMode === "scheduled" && <ReleaseScheduler s={s} onChanged={onChanged} />}
+      {err && <p className="mt-1.5 text-[11px] font-medium text-amber-300">{err}</p>}
+    </div>
+  );
+}
+
+/* --------------------- scheduled release control ---------------------
+   "September bookings open August 25 at 9 AM" — pick when the release
+   opens, which dates it covers, and (optionally) how long Preferred
+   Clients book first. Capacity still binds everyone. */
+function ReleaseScheduler({ s, onChanged }: { s: MyService; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [openAt, setOpenAt] = useState("");
+  const [covers, setCovers] = useState("");
+  const [ea, setEa] = useState("");
+  const [slots, setSlots] = useState("");
+  const [perClient, setPerClient] = useState("");
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  const schedule = async () => {
+    setBusy(true);
+    setErr(null);
+    const res = await fetch(`/api/services/${s.id}/release`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        releaseAt: openAt,
+        coversUntil: covers ? `${covers}T23:59:59` : "",
+        earlyAccessHours: ea.trim() === "" ? null : Number(ea),
+        slots: slots.trim() === "" ? null : Number(slots),
+        perClientLimit: perClient.trim() === "" ? null : Number(perClient),
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setErr(d.error || "Couldn't schedule the release");
+    onChanged();
+  };
+  const cancel = async () => {
+    setBusy(true);
+    setErr(null);
+    const res = await fetch(`/api/services/${s.id}/release`, { method: "DELETE" });
+    setBusy(false);
+    if (!res.ok) return setErr("Couldn't cancel the release");
+    onChanged();
+  };
+
+  const pending = s.release?.releaseAt && s.release.releaseUntil;
+  return (
+    <div className="mt-2 border-t border-line-soft pt-2" data-tut="clients-release">
+      {s.release?.releasedUntil && (
+        <p className="text-[10px] text-zinc-500">Released so far: dates through {fmt(s.release.releasedUntil)}.</p>
+      )}
+      {pending ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1 text-[11px] font-semibold text-sky-300">
+            Next release: opens {fmt(s.release!.releaseAt!)} · covers dates through {fmt(s.release!.releaseUntil!)}
+            {s.release!.eaHours ? ` · Preferred Clients first for ${s.release!.eaHours}h` : " · opens to everyone at once"}
+          </p>
+          <button disabled={busy} onClick={cancel} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">Cancel release</button>
+        </div>
+      ) : (
+        <div className="mt-1 flex flex-wrap items-end gap-2">
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Opens at
+            <input type="datetime-local" value={openAt} onChange={(e) => setOpenAt(e.target.value)} className="input-dark mt-1 px-2 py-1.5 text-xs" title="The moment this release opens for booking" />
+          </label>
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Covers dates through
+            <input type="date" value={covers} onChange={(e) => setCovers(e.target.value)} className="input-dark mt-1 px-2 py-1.5 text-xs" title="Appointments up to this date become bookable when the release opens" />
+          </label>
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Preferred first (h)
+            <input value={ea} onChange={(e) => setEa(e.target.value.replace(/[^0-9]/g, ""))} placeholder="off" className="input-dark mt-1 w-14 px-2 py-1.5 text-xs" title="Optional: how many hours Preferred Clients book before everyone else" />
+          </label>
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Slots
+            <input value={slots} onChange={(e) => setSlots(e.target.value.replace(/[^0-9]/g, ""))} placeholder="any" className="input-dark mt-1 w-14 px-2 py-1.5 text-xs" title="Optional capacity cap — binds everyone, Preferred Clients included" />
+          </label>
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Per client
+            <input value={perClient} onChange={(e) => setPerClient(e.target.value.replace(/[^0-9]/g, ""))} placeholder="no limit" className="input-dark mt-1 w-14 px-2 py-1.5 text-xs" title="Optional: max bookings per Preferred Client during early access" />
+          </label>
+          <button disabled={busy || !openAt || !covers} onClick={schedule} className="btn-ghost px-3 py-1.5 text-xs">Schedule release</button>
+          <p className="w-full text-[10px] leading-relaxed text-zinc-600">
+            Nothing beyond your released dates is bookable until this opens{ea.trim() ? ` — then Preferred Clients book first for ${ea}h, everyone after` : " — then it opens to everyone at once"}. Capacity always binds everyone.
           </p>
         </div>
       )}
