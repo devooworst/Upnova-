@@ -7,7 +7,8 @@
 /* ------------------------------------------------------------------ */
 
 import React, { useCallback, useEffect, useState } from "react";
-import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS } from "@/lib/profileStudio";
+import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, BANNERS } from "@/lib/profileStudio";
+import { Star as StarDeco, Heart, Leaf, Sparkles as SparklesIcon, Music2, Zap as ZapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck, GraduationCap } from "lucide-react";
@@ -145,10 +146,25 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
   const accent = ACCENTS[studio?.accent ?? "none"] ?? ACCENTS.none;
   const headingFont = FONTS[studio?.font ?? "standard"] ?? FONTS.standard;
   const effect = EFFECTS[studio?.effect ?? "none"] ?? EFFECTS.none;
+  const banner = BANNERS[studio?.banner ?? "none"] ?? BANNERS.none;
+  const DECO_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+    stars: StarDeco, hearts: Heart, vines: Leaf, sparkles: SparklesIcon, notes: Music2, bolts: ZapIcon,
+  };
+  const decorations = (studio?.decorations ?? []).filter((d) => DECO_ICONS[d]);
+  const decoStrip = decorations.length > 0 && (
+    <span className="pointer-events-none absolute right-3 top-2 flex gap-1.5 opacity-70" aria-hidden>
+      {decorations.map((d) => {
+        const I = DECO_ICONS[d];
+        return <I key={d} className="h-3.5 w-3.5 text-zinc-300" />;
+      })}
+    </span>
+  );
 
   const headerBlock = (
     <>
-      <header className={`card p-5 sm:p-6 ${theme.card} ${theme.headerRing} ${effect.cls}`}>
+      <header className={`card relative overflow-hidden p-5 sm:p-6 ${theme.card} ${theme.headerRing} ${effect.cls}`}>
+        {banner.css && <span className="absolute inset-x-0 top-0 h-2.5" style={{ backgroundImage: banner.css }} aria-hidden />}
+        {decoStrip}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <span className={`inline-flex ${frame.cls}`}>

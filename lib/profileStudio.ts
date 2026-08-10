@@ -33,6 +33,10 @@ export interface StudioConfig {
   font: string; // FONTS id — heading typeface (approved families only)
   effect: string; // EFFECTS id — subtle cosmetic effect
   sections: string[]; // order of APPROVED section ids
+  /** approved banner strip above the profile header */
+  banner?: string;
+  /** approved decorative ornaments (max 3) */
+  decorations?: string[];
   /** My World — free placement of approved elements on desktop; mobile
       always falls back to a clean stacked layout so small screens never
       break. Move/rotate/layer/hide only — never markup or scripts. */
@@ -233,7 +237,76 @@ export const THEMES: Record<string, { label: string; desc: string; wash: string;
     deco: "bg-zinc-700",
     headerRing: "",
   },
+  campus: {
+    label: "Campus",
+    desc: "School colors, student energy",
+    wash: "bg-gradient-to-b from-violet-950/40 via-transparent to-amber-950/20",
+    card: "border-violet-400/25",
+    deco: "bg-gradient-to-r from-violet-400/70 via-amber-400/50 to-violet-400/70",
+    headerRing: "ring-1 ring-violet-400/30",
+  },
+  creative: {
+    label: "Creative",
+    desc: "Studio energy, maker vibes",
+    wash: "bg-gradient-to-b from-rose-950/30 via-transparent to-sky-950/25",
+    card: "border-rose-400/20",
+    deco: "bg-gradient-to-r from-rose-400/60 via-amber-300/50 to-sky-400/60",
+    headerRing: "ring-1 ring-rose-400/25",
+  },
+  academic: {
+    label: "Academic",
+    desc: "Library calm, ink and paper",
+    wash: "bg-gradient-to-b from-sky-950/35 via-transparent to-zinc-950",
+    card: "border-sky-400/20",
+    deco: "bg-gradient-to-r from-sky-400/50 via-zinc-400/30 to-sky-400/50",
+    headerRing: "ring-1 ring-sky-400/25",
+  },
+  artist: {
+    label: "Artist",
+    desc: "Gallery walls, paint accents",
+    wash: "bg-gradient-to-b from-fuchsia-950/25 via-transparent to-emerald-950/20",
+    card: "border-fuchsia-400/20",
+    deco: "bg-gradient-to-r from-fuchsia-400/60 via-emerald-400/40 to-amber-400/60",
+    headerRing: "ring-1 ring-fuchsia-400/25",
+  },
 };
+
+/* approved banner strips (header top) — CSS only, from this file */
+export const BANNERS: Record<string, { label: string; css: string }> = {
+  none: { label: "None", css: "" },
+  sunset: { label: "Sunset", css: "linear-gradient(90deg, #7c2d12, #be185d, #7c3aed)" },
+  ocean: { label: "Ocean", css: "linear-gradient(90deg, #0c4a6e, #0e7490, #065f46)" },
+  gold: { label: "Gold hour", css: "linear-gradient(90deg, #713f12, #d97706, #fbbf24)" },
+  orchid: { label: "Orchid", css: "linear-gradient(90deg, #4a044e, #a21caf, #6d28d9)" },
+  meadow: { label: "Meadow", css: "linear-gradient(90deg, #14532d, #4d7c0f, #a3e635)" },
+  midnight: { label: "Midnight", css: "linear-gradient(90deg, #0f172a, #1e293b, #334155)" },
+};
+
+/* approved decorative elements — rendered as small lucide ornaments on the
+   header; ids map to icons in the renderer. Max 3 at once. */
+export const DECORATIONS: Record<string, { label: string }> = {
+  stars: { label: "Stars" },
+  hearts: { label: "Hearts" },
+  vines: { label: "Vines" },
+  sparkles: { label: "Sparkles" },
+  notes: { label: "Music notes" },
+  bolts: { label: "Lightning" },
+};
+
+/* ---- tier scopes: College+ decorates the room, Pro designs the house ---- */
+export const COLLEGE_THEMES = ["none", "campus", "creative", "academic", "minimal", "artist"] as const;
+
+/** Coerce a config to what College+ may SAVE and DISPLAY: student preset
+    themes only, fixed section structure, no My World. Frames, accents,
+    fonts, effects, banners, and decorations are theirs to play with. */
+export function collegeRestrict(cfg: StudioConfig): StudioConfig {
+  return {
+    ...cfg,
+    theme: (COLLEGE_THEMES as readonly string[]).includes(cfg.theme) ? cfg.theme : "none",
+    sections: [...SECTION_IDS], // the house structure stays fixed
+    world: cfg.world ? { ...cfg.world, enabled: false } : undefined,
+  };
+}
 
 /* avatar frames */
 export const FRAMES: Record<string, { label: string; cls: string }> = {
@@ -285,6 +358,10 @@ export function sanitizeStudio(input: unknown): StudioConfig {
     font: pick(o.font, FONTS, "standard"),
     effect: pick(o.effect, EFFECTS, "none"),
     sections,
+    banner: pick(o.banner, BANNERS, "none"),
+    decorations: (Array.isArray(o.decorations) ? o.decorations.map(String) : [])
+      .filter((d, i, arr) => d in DECORATIONS && arr.indexOf(d) === i)
+      .slice(0, 3),
     world: o.world !== undefined ? sanitizeWorld(o.world) : undefined,
   };
 }

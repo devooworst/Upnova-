@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { unrestrictedTester } from "@/lib/server/campus";
-import { sanitizeStudio, parseStudio, DEFAULT_STUDIO } from "@/lib/profileStudio";
+import { sanitizeStudio, parseStudio, collegeRestrict, DEFAULT_STUDIO } from "@/lib/profileStudio";
 
 export const dynamic = "force-dynamic";
 
@@ -73,12 +73,16 @@ export async function PATCH(req: NextRequest) {
           ? incoming.world
           : saved?.world,
     };
-    const clean = sanitizeStudio(merged);
-    // My World is Pro-only: College+ saves keep the design but it stays off
+    let clean = sanitizeStudio(merged);
+    // College+ = decorate the room (student themes, frames, accents,
+    // banners, decorations); Pro = design the house (all themes, layout,
+    // My World). Enforced HERE, not by hiding buttons.
     let worldNote: string | null = null;
-    if (clean.world?.enabled && u.plan !== "pro" && !demoBypass) {
-      clean.world = { ...clean.world, enabled: false };
-      worldNote = "My World is Pro-only — your design is saved but stays off until Pro is active.";
+    if (u.plan !== "pro" && !demoBypass) {
+      const before = clean;
+      clean = collegeRestrict(clean);
+      if (before.world?.enabled) worldNote = "My World and full layout control are Pro-only — your design is saved but stays off until Pro is active.";
+      else if (before.theme !== clean.theme) worldNote = "That theme is Pro-only — College+ uses the student preset themes.";
     }
     db.update(tables.profiles)
       .set({ studio: JSON.stringify(clean) })

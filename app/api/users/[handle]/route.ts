@@ -5,7 +5,7 @@ import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { ctaFor } from "@/lib/server/cta";
 import { postTrustMap } from "@/lib/server/trust";
-import { parseStudio } from "@/lib/profileStudio";
+import { parseStudio, collegeRestrict } from "@/lib/profileStudio";
 import { unrestrictedTester } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
@@ -134,9 +134,10 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         const saved = parseStudio(profile.studio);
         if (!saved) return { studio: null, studioDemoPreview: false };
         if (user.plan === "pro") return { studio: saved, studioDemoPreview: false };
-        // College+: Studio basics show publicly; My World stays Pro-only
+        // College+: student-scope customization shows publicly; Pro-only
+        // powers (all themes, layout, My World) stay off — same rule as save
         if (user.plan === "college")
-          return { studio: { ...saved, world: saved.world ? { ...saved.world, enabled: false } : undefined }, studioDemoPreview: false };
+          return { studio: collegeRestrict(saved), studioDemoPreview: false };
         if (isOwner && unrestrictedTester(user.id)) return { studio: saved, studioDemoPreview: true };
         return { studio: null, studioDemoPreview: false };
       })(),

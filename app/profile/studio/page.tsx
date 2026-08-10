@@ -8,6 +8,9 @@ import { useSession } from "@/lib/session";
 import { useRef } from "react";
 import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff } from "lucide-react";
 import {
+  BANNERS,
+  DECORATIONS,
+  COLLEGE_THEMES,
   THEMES,
   FRAMES,
   ACCENTS,
@@ -155,8 +158,9 @@ export default function ProfileStudioPage() {
   const isPro = user.plan === "pro";
   const isCollege = user.plan === "college";
   const demoUnrestricted = user.testerMode !== "simulation" && !!user.demoTools;
-  // College+ gets Studio basics; My World stays Pro. Backend enforces the
-  // same rules — this gate is UX, never the security.
+  // College+ = "decorate the room" (student themes, frames, accents,
+  // banners, decorations); Pro = "design the house" (all themes, layout,
+  // My World). Backend enforces the same rules — this gate is UX only.
   const canEdit = isPro || isCollege || demoUnrestricted;
   const canWorld = isPro || demoUnrestricted;
 
@@ -241,8 +245,15 @@ export default function ProfileStudioPage() {
           {/* theme */}
           <section className="card p-5">
             <h2 className="text-sm font-bold text-zinc-100">Theme</h2>
+            {isCollege && !demoUnrestricted && (
+              <p className="mt-1 text-[10px] text-zinc-500">
+                College+ — student preset themes. The full set (and My World) comes with Pro.
+              </p>
+            )}
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {Object.entries(THEMES).map(([id, t]) => (
+              {Object.entries(THEMES)
+                .filter(([id]) => canWorld || (COLLEGE_THEMES as readonly string[]).includes(id))
+                .map(([id, t]) => (
                 <button key={id} onClick={() => set("theme", id)} className={pickBtn(cfg.theme === id)}>
                   <span className={`block h-2 w-full rounded-full ${t.deco || "bg-zinc-800"}`} />
                   <span className="mt-2 block text-xs font-semibold text-zinc-100">{t.label}</span>
@@ -294,6 +305,43 @@ export default function ProfileStudioPage() {
                     {e.label}
                   </button>
                 ))}
+              </div>
+            </div>
+          </section>
+
+          {/* banner + decorations — the "decorate your room" layer */}
+          <section className="card grid gap-5 p-5 sm:grid-cols-2">
+            <div>
+              <h2 className="text-sm font-bold text-zinc-100">Banner</h2>
+              <p className="mt-0.5 text-[10px] text-zinc-600">An approved color strip across the top of your profile card.</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {Object.entries(BANNERS).map(([id, b]) => (
+                  <button key={id} onClick={() => set("banner", id)} className={`overflow-hidden rounded-lg border text-left transition ${(cfg.banner ?? "none") === id ? "border-lime-400/60" : "border-line hover:border-zinc-600"}`}>
+                    <span className="block h-4 w-full" style={b.css ? { backgroundImage: b.css } : { background: "#27272a" }} />
+                    <span className="block px-2 py-1 text-[10px] font-semibold text-zinc-300">{b.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-zinc-100">Decorations</h2>
+              <p className="mt-0.5 text-[10px] text-zinc-600">Up to three ornaments on your profile card — stars, hearts, vines…</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {Object.entries(DECORATIONS).map(([id, d]) => {
+                  const on = (cfg.decorations ?? []).includes(id);
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => {
+                        const cur = cfg.decorations ?? [];
+                        set("decorations", on ? cur.filter((x) => x !== id) : cur.length >= 3 ? cur : [...cur, id]);
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${on ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -427,7 +475,17 @@ export default function ProfileStudioPage() {
             )}
           </section>
 
-          {/* layout */}
+          {/* layout — Pro designs the house; College+ keeps the structure */}
+          {!canWorld ? (
+            <section className="card p-5">
+              <h2 className="text-sm font-bold text-zinc-100">Section layout</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Reordering sections (and My World) is part of the full Pro Studio — College+ keeps
+                the standard UpNova structure while you decorate it.
+              </p>
+              <Link href="/pro" className="btn-lime mt-3 inline-flex rounded-md px-4 py-1.5 text-xs">Upgrade to Pro</Link>
+            </section>
+          ) : (
           <section className="card p-5">
             <h2 className="text-sm font-bold text-zinc-100">Section layout</h2>
             <p className="mt-1 text-xs text-zinc-500">
@@ -449,6 +507,7 @@ export default function ProfileStudioPage() {
               ))}
             </ul>
           </section>
+          )}
         </div>
 
         {/* live preview */}
