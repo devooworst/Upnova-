@@ -38,7 +38,7 @@ export const BENEFIT_LABEL: Record<BenefitKey, string> = {
   upgrade: "Complimentary upgrade",
   recurring_priority: "Recurring booking priority",
   priority_response: "Priority response",
-  exclusive_windows: "Exclusive booking windows",
+  exclusive_windows: "Exclusive early-access windows",
   custom: "Custom reward",
 };
 
@@ -225,4 +225,83 @@ export function preferredWithEarlyAccess(providerId: string): string[] {
     .all()
     .filter((r) => parseBenefits(r.benefits).some((b) => b.key === "priority_booking" || b.key === "early_access"))
     .map((r) => r.clientId);
+}
+
+/* ------------------------------------------------------------------ */
+/*  PREFERRED EARLY ACCESS — who gets access FIRST.                    */
+/*                                                                     */
+/*  The window (services.preferredUntil) controls WHO can book first;  */
+/*  the provider's real availability controls HOW MANY can book.       */
+/*  The optional slot cap and preferred-allocation limit below are     */
+/*  enforced at the booking route for EVERYONE — a Preferred Client    */
+/*  can never book beyond the provider's available slots.              */
+/* ------------------------------------------------------------------ */
+
+export interface EarlyAccessSetup {
+  /** total bookable slots for this drop (active bookings cap), 1–50 */
+  slots: number | null;
+  /** max bookings during the preferred window, 1–50 (≤ slots) */
+  preferredLimit: number | null;
+  /** when the current window was opened (ISO) — the allocation counts from here */
+  startedAt: string | null;
+}
+
+/** Read the early-access setup stored inside the service's config JSON.
+    Tolerant: unknown/invalid shapes read as "no setup". */
+export function readEarlyAccess(rawConfig: string | null | undefined): EarlyAccessSetup | null {
+  try {
+    const o = JSON.parse(rawConfig || "{}");
+    const ea = o?.earlyAccess;
+    if (!ea || typeof ea !== "object") return null;
+    const num = (v: unknown) => {
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) && n >= 1 ? Math.min(50, n) : null;
+    };
+    const slots = num((ea as Record<string, unknown>).slots);
+    const preferredLimit = num((ea as Record<string, unknown>).preferredLimit);
+    const startedAt = typeof (ea as Record<string, unknown>).startedAt === "string" ? String((ea as Record<string, unknown>).startedAt) : null;
+    if (slots == null && preferredLimit == null) return null;
+    return { slots, preferredLimit, startedAt };
+  } catch {
+    return null;
+  }
+}
+
+/** Write (or clear) the early-access setup, preserving every other config key. */
+export function writeEarlyAccess(rawConfig: string | null | undefined, setup: EarlyAccessSetup | null): string {
+  let o: Record<string, unknown> = {};
+  try {
+    o = JSON.parse(rawConfig || "{}") ?? {};
+  } catch {}
+  if (setup == null) delete o.earlyAccess;
+  else o.earlyAccess = setup;
+  return JSON.stringify(o);
+}
+
+/** Booking statuses that HOLD a slot. Cancelled/declined/completed free it. */
+export const SLOT_HOLDING_STATUSES = ["pending", "accepted", "confirmed", "reschedule_requested"] as const;
+
+/** How many active bookings currently hold slots on this service. */
+export function activeBookingsForService(serviceId: string): number {
+  return db
+    .select()
+    .from(tables.bookings)
+    .where(eq(tables.bookings.serviceId, serviceId))
+    .all()
+    .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status)).length;
+}
+
+/** How many slot-holding bookings were created since the window opened —
+    the preferred allocation is measured against THIS, so a cancelled
+    early booking frees allocation too. */
+export function bookingsSinceWindowStart(serviceId: string, startedAtIso: string | null): number {
+  if (!startedAtIso) return 0;
+  const t0 = new Date(startedAtIso).getTime();
+  if (!Number.isFinite(t0)) return 0;
+  return db
+    .select()
+    .from(tables.bookings)
+    .where(eq(tables.bookings.serviceId, serviceId))
+    .all()
+    .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status) && b.createdAt.getTime() >= t0).length;
 }

@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
-import { clientIdsOf, clientStats, parseBenefits } from "@/lib/server/preferred";
+import { clientIdsOf, clientStats, parseBenefits, readEarlyAccess, activeBookingsForService } from "@/lib/server/preferred";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,19 @@ export async function GET() {
         title: s.title,
         price: s.price,
         preferredUntil: s.preferredUntil && s.preferredUntil.getTime() > Date.now() ? s.preferredUntil.toISOString() : null,
+        // Preferred Early Access setup: the slot cap counts for EVERYONE;
+        // the preferred limit bounds bookings during the window only
+        earlyAccess: (() => {
+          const ea = readEarlyAccess(s.config);
+          if (!ea) return null;
+          const active = activeBookingsForService(s.id);
+          return {
+            slots: ea.slots,
+            preferredLimit: ea.preferredLimit,
+            activeBookings: active,
+            slotsLeft: ea.slots != null ? Math.max(0, ea.slots - active) : null,
+          };
+        })(),
       }));
 
     rows.sort((a, b) => (b.lastCompletedAt ?? "").localeCompare(a.lastCompletedAt ?? ""));

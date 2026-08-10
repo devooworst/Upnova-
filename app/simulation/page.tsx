@@ -205,7 +205,7 @@ export default function SimulationPage() {
               authenticated session, over real HTTP: message ↔ reply, booking ↔ both sides, test
               payment held → released, full project lifecycle with a revision, review, provider
               progress updates ↔ ETA changes ↔ extension approval, the private Preferred Clients
-              loop (eligibility, benefits, preferred-first booking windows, preferred pricing,
+              loop (eligibility, benefits, Preferred Early Access windows, preferred pricing,
               removal), first-time onboarding state, business opportunity ↔ application ↔ selection,
               business People categorization (talent ≠ employee) + team authz + payments view,
               notification destinations, activity on both sides, plan/verification gates, logout &amp;

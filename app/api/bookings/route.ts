@@ -9,7 +9,7 @@ import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser, seedBookingProgress } from "@/lib/server/demo";
 import { resolvePairConversation } from "@/lib/server/conversations";
 import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
-import { hasEarlyAccess, discountPercent } from "@/lib/server/preferred";
+import { hasEarlyAccess, discountPercent, readEarlyAccess, activeBookingsForService, bookingsSinceWindowStart } from "@/lib/server/preferred";
 import { recordInteraction } from "@/lib/server/recsys";
 import { haversineMi } from "@/lib/server/feed";
 
@@ -103,13 +103,35 @@ export async function POST(req: NextRequest) {
     // creation-only gate, never blocks anyone from booking THE business
     assertCapacityById(user.id, "activeHires");
 
-    // PREFERRED-CLIENT EARLY ACCESS: while the owner's priority window is
-    // open, only their Preferred Clients holding a priority-booking /
-    // early-access benefit can book. Real enforcement at the money path —
-    // afterwards, appointments open to everyone automatically.
-    if (service.preferredUntil && service.preferredUntil.getTime() > Date.now() && !hasEarlyAccess(service.ownerId, user.id)) {
-      const opens = service.preferredUntil.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-      throw new ApiError(403, `This provider opened appointments to their Preferred Clients first — booking opens to everyone ${opens}`);
+    /* ---- PREFERRED EARLY ACCESS ----------------------------------
+       Early Access controls WHO gets access first; availability controls
+       HOW MANY can book. Enforcement order matters:
+        1. SLOT CAPACITY applies to EVERYONE — Preferred Clients included.
+           A full service is unavailable to all; a cancellation frees its
+           slot automatically (slot-holding statuses only).
+        2. While the window is open, only the owner's Preferred Clients
+           (priority-booking / early-access benefit) may book — still
+           inside capacity, schedule, and conflict rules.
+        3. Optional preferred allocation: the window can cap how many
+           bookings Preferred Clients take, so remaining slots are
+           guaranteed to reach the public opening.
+       After the window, remaining availability opens to everyone. */
+    const eaSetup = readEarlyAccess(service.config);
+    const windowOpen = !!service.preferredUntil && service.preferredUntil.getTime() > Date.now();
+    if (eaSetup?.slots != null) {
+      const activeNow = activeBookingsForService(service.id);
+      if (activeNow >= eaSetup.slots)
+        throw new ApiError(409, `Fully booked — all ${eaSetup.slots} slots for this service are taken. If a slot opens up (a cancellation), booking reopens automatically.`);
+    }
+    if (windowOpen) {
+      const opens = service.preferredUntil!.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      if (!hasEarlyAccess(service.ownerId, user.id))
+        throw new ApiError(403, `Preferred Early Access is on — this provider's Preferred Clients get first pick. Booking opens to everyone ${opens}`);
+      if (eaSetup?.preferredLimit != null) {
+        const takenThisWindow = bookingsSinceWindowStart(service.id, eaSetup.startedAt);
+        if (takenThisWindow >= eaSetup.preferredLimit)
+          throw new ApiError(409, `The Preferred Early Access allocation is used (${eaSetup.preferredLimit} of ${eaSetup.preferredLimit} booked) — remaining slots open to everyone ${opens}`);
+      }
     }
     const providerProfile = db
       .select()

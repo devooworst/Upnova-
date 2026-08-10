@@ -4,6 +4,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
+import { readEarlyAccess, writeEarlyAccess } from "@/lib/server/preferred";
 
 /* per-run email nonce — throwaway signups get a UNIQUE email every run so
    the production signup rate limiter (5 per email / 15 min) never trips
@@ -125,9 +126,17 @@ export async function POST(req: NextRequest) {
         db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
       }
     db.delete(tables.notifications).where(eq(tables.notifications.userId, lena.id)).run();
-    // preferred-first windows from prior runs
-    for (const s of db.select().from(tables.services).where(eq(tables.services.ownerId, lena.id)).all())
+    // Preferred Early Access state from prior runs: window + slot caps +
+    // any drop bookings by the designated non-preferred tester (harboroak)
+    for (const s of db.select().from(tables.services).where(eq(tables.services.ownerId, lena.id)).all()) {
       if (s.preferredUntil) db.update(tables.services).set({ preferredUntil: null }).where(eq(tables.services.id, s.id)).run();
+      if (readEarlyAccess(s.config)) db.update(tables.services).set({ config: writeEarlyAccess(s.config, null) }).where(eq(tables.services.id, s.id)).run();
+    }
+    for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all())
+      if (b.providerId === lena.id) {
+        db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+        db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+      }
     // onboarding/progress test accounts from prior runs (handle prefix "tonb")
     for (const u of db.select().from(tables.users).all())
       if (u.handle.startsWith("tonb")) {
@@ -141,6 +150,14 @@ export async function POST(req: NextRequest) {
           db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
           db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
         }
+        // bookings in either role (the early-access drop books as tonbpc)
+        for (const b of db.select().from(tables.bookings).all())
+          if (b.clientId === u.id || b.providerId === u.id) {
+            db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+            db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+          }
+        db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
+        db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
         db.delete(tables.payments).where(eq(tables.payments.payeeId, u.id)).run();
         db.delete(tables.payments).where(eq(tables.payments.payerId, u.id)).run();
         db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run();
@@ -602,7 +619,7 @@ export async function POST(req: NextRequest) {
 
     // PRIORITY BOOKING — a REAL window, enforced at the booking route
     const win = await api("lena", `/api/services/${svc.id}/early-access`, { method: "POST", body: { hours: 24 } });
-    step(c, "provider opens a 24h preferred-first window (holders notified)", win.status === 200 && Number((win.data as any).notified) >= 1, { route: "POST early-access" });
+    step(c, "provider opens 24h Preferred Early Access (holders notified)", win.status === 200 && Number((win.data as any).notified) >= 1, { route: "POST early-access" });
     // pick a WEEKDAY 5–11 days out so the provider's real scheduling policy
     // (no-weekend rules) can't interfere with what this step measures
     const windowDay = (() => {
@@ -636,6 +653,71 @@ export async function POST(req: NextRequest) {
     const rAfter = (dashAfter.clients ?? []).find((x: any) => x.handle === "rachel");
     step(c, "relationship HISTORY intact after removal (bookings + removed record)", rAfter?.preferred?.status === "removed" && !!rAfter?.preferred?.removedAt && (rAfter?.history?.length ?? 0) >= 3, { actual: `status=${rAfter?.preferred?.status} history=${rAfter?.history?.length}` });
     await api("lena", `/api/services/${svc.id}/early-access`, { method: "DELETE" }); // close the window
+
+    // the earlier window booking still holds a slot (pending) — release it
+    // so the drop starts from clean capacity. Slot-freeing on cancel is
+    // itself re-verified below.
+    await api("rachel", `/api/bookings/${insiderId}`, { method: "PATCH", body: { action: "cancel" } });
+
+    /* ===== PREFERRED EARLY ACCESS — the capacity drop =====
+       Service → 3 slots → 24h early access → preferred limit 2 → public
+       opening. Slots bind EVERYONE (preferred included); the preferred
+       allocation guarantees the public opening isn't empty; cancellation
+       reopens a slot; no overbooking, no duplicates. */
+    // two preferred clients + one outsider
+    await api("lena", "/api/preferred-clients", { method: "POST", body: { clientId: rachel.id, benefits: [{ key: "priority_booking" }] } });
+    const pc2 = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbpc.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle: "tonbpc", displayName: "Second Preferred" } });
+    tok.tonbpc = (pc2.data as { sessionToken?: string }).sessionToken ?? "";
+    await api("tonbpc", "/api/conversations", { method: "POST", body: { toHandle: "lena", firstMessage: "Hi! Interested in your work." } });
+    const addPc2 = await api("lena", "/api/preferred-clients", { method: "POST", body: { clientHandle: "tonbpc", benefits: [{ key: "priority_booking" }] } });
+    step(c, "EA setup: second Preferred Client added (relationship basis = real conversation)", addPc2.status === 200, { actual: String(addPc2.status) });
+
+    const drop = await api("lena", `/api/services/${svc.id}/early-access`, { method: "POST", body: { hours: 24, slots: 3, preferredLimit: 2 } });
+    const dropD = drop.data as any;
+    step(c, "provider configures the drop: 3 slots · 24h early access · preferred limit 2 · public opening returned",
+      drop.status === 200 && dropD.slots === 3 && dropD.preferredLimit === 2 && dropD.slotsLeft === 3 && !!dropD.opensToPublicAt, {
+      route: "POST early-access {hours:24, slots:3, preferredLimit:2}", actual: JSON.stringify({ slots: dropD.slots, limit: dropD.preferredLimit, left: dropD.slotsLeft }) });
+
+    // weekday slots well out, inside lena's real working hours
+    const dropDay = (() => { for (let d = 6; d <= 12; d++) { const t = new Date(Date.now() + d * 86400e3); if (t.getDay() >= 1 && t.getDay() <= 5) return t; } return new Date(Date.now() + 6 * 86400e3); })();
+    const at = (h: number) => { const t = new Date(dropDay); t.setHours(h, 0, 0, 0); return t.toISOString(); };
+
+    const out1 = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(9), durationMin: 60 } });
+    step(c, "outsider during the window → 403 with the public opening time (never a silent fail)", out1.status === 403 && /Preferred Clients/.test(String((out1.data as any).error)), { actual: `${out1.status}` });
+
+    const p1 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(10), durationMin: 60 } });
+    const p2 = await api("tonbpc", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(12), durationMin: 60 } });
+    step(c, "two Preferred Clients book the limited slots (real availability rules still applied)", p1.status === 200 && p2.status === 200, { actual: `${p1.status}/${p2.status}` });
+
+    const p3 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(14), durationMin: 60 } });
+    step(c, "third preferred attempt → 409: the preferred allocation (2) is used — a slot is GUARANTEED for the public opening",
+      p3.status === 409 && /allocation/.test(String((p3.data as any).error)), { actual: `${p3.status} ${String((p3.data as any).error).slice(0, 80)}` });
+
+    await api("lena", `/api/services/${svc.id}/early-access`, { method: "DELETE" }); // public opening (slot cap stays)
+    const pub1 = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(15), durationMin: 60 } });
+    step(c, "public opening: the remaining slot is bookable by anyone", pub1.status === 200, { actual: String(pub1.status) });
+
+    const pub2 = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(16), durationMin: 60 } });
+    const pref4 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(17), durationMin: 60 } });
+    step(c, "fully booked (3/3) → unavailable to EVERYONE — preferred status never bypasses capacity",
+      pub2.status === 409 && /Fully booked/.test(String((pub2.data as any).error)) && pref4.status === 409 && /Fully booked/.test(String((pref4.data as any).error)), {
+      actual: `public=${pub2.status} preferred=${pref4.status}` });
+
+    const cancel = await api("harboroak", `/api/bookings/${(pub1.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+    const rebook = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(15), durationMin: 60 } });
+    step(c, "cancellation frees its slot → the same time rebooks cleanly (no duplicate, no ghost hold)", cancel.status === 200 && rebook.status === 200, { actual: `cancel=${cancel.status} rebook=${rebook.status}` });
+
+    const dropActive = db.select().from(tables.bookings).where(eq(tables.bookings.serviceId, svc.id)).all()
+      .filter((b) => ["pending", "accepted", "confirmed", "reschedule_requested"].includes(b.status));
+    const uniqueIds = new Set(dropActive.map((b) => b.id));
+    step(c, "INTEGRITY: exactly 3 active bookings hold slots — no overbooking, no duplicate reservations",
+      dropActive.length === 3 && uniqueIds.size === 3, { actual: `active=${dropActive.length} unique=${uniqueIds.size}` });
+
+    // leave the stage clean: cancel drop bookings, remove the cap, remove preferred
+    for (const b of dropActive) await api(b.clientId === rachel.id ? "rachel" : b.clientId === biz.id ? "harboroak" : "tonbpc", `/api/bookings/${b.id}`, { method: "PATCH", body: { action: "cancel" } });
+    await api("lena", `/api/services/${svc.id}/early-access?full=1`, { method: "DELETE" });
+    const relAgain = ((await api("lena", "/api/clients")).data as any).clients?.find((x: any) => x.handle === "rachel")?.preferred?.id;
+    if (relAgain) await api("lena", `/api/preferred-clients/${relAgain}`, { method: "DELETE" });
   }
 
   /* ================= FIRST-TIME ONBOARDING ================= */
@@ -1006,7 +1088,7 @@ export async function POST(req: NextRequest) {
     const orphanMembers = db.select().from(tables.conversationMembers).all().filter((m) => !db.select().from(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).get()).length;
     step(c, "no orphaned conversation members", orphanMembers === 0, { actual: String(orphanMembers) });
     const dupBookings = db.select().from(tables.bookings).where(and(eq(tables.bookings.clientId, rachel.id), eq(tables.bookings.providerId, lena.id))).all().length;
-    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window)", dupBookings === 5, { expected: "5", actual: String(dupBookings) });
+    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window + 1 early-access drop)", dupBookings === 6, { expected: "6", actual: String(dupBookings) });
   }
 
   } catch (e) {

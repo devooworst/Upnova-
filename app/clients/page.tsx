@@ -64,6 +64,12 @@ interface MyService {
   title: string;
   price: number;
   preferredUntil: string | null;
+  earlyAccess: {
+    slots: number | null;
+    preferredLimit: number | null;
+    activeBookings: number;
+    slotsLeft: number | null;
+  } | null;
 }
 
 const BENEFIT_CHOICES: { key: string; label: string; hint?: string }[] = [
@@ -256,10 +262,12 @@ export default function ClientsPage() {
       {/* ================= EARLY ACCESS WINDOWS ================= */}
       {(data?.services?.length ?? 0) > 0 && (
         <section className="card p-5">
-          <h2 className="text-sm font-bold text-zinc-100">Preferred-first booking windows</h2>
+          <h2 className="text-sm font-bold text-zinc-100">Preferred Early Access</h2>
           <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-            Open a service to your Preferred Clients before everyone else. While a window is open, booking is actually
-            restricted to Preferred Clients with a priority benefit — then it opens to everyone automatically.
+            Give your Preferred Clients first access to a service before the general public. <span className="text-zinc-300">Early
+            Access controls who gets access first — your availability and slot count control how many people can actually
+            book.</span> Preferred Clients can never book beyond your available slots; when the window ends, any remaining
+            availability opens to everyone automatically, and cancellations free their slot.
           </p>
           <div className="mt-3 space-y-2">
             {data!.services.map((s) => (
@@ -483,49 +491,117 @@ function BenefitsModal({ client, onClose, onSaved }: { client: ClientRow; onClos
 }
 
 /* ------------------------- early access row ------------------------- */
+/* Setup flow: service → available slots → preferred-access duration →
+   optional preferred booking limit → public opening time (shown live). */
 
 function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [hours, setHours] = useState(24);
+  const [slots, setSlots] = useState("");
+  const [prefLimit, setPrefLimit] = useState("");
 
-  const call = async (method: "POST" | "DELETE") => {
+  const start = async () => {
     setBusy(true);
     setErr(null);
     const res = await fetch(`/api/services/${s.id}/early-access`, {
-      method,
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: method === "POST" ? JSON.stringify({ hours: 24 }) : undefined,
+      body: JSON.stringify({
+        hours,
+        slots: slots.trim() === "" ? null : Number(slots),
+        preferredLimit: prefLimit.trim() === "" ? null : Number(prefLimit),
+      }),
     });
     const d = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) return setErr(d.error || "Couldn't update the window");
+    if (!res.ok) return setErr(d.error || "Couldn't start Preferred Early Access");
+    onChanged();
+  };
+  const end = async (full = false) => {
+    setBusy(true);
+    setErr(null);
+    const res = await fetch(`/api/services/${s.id}/early-access${full ? "?full=1" : ""}`, { method: "DELETE" });
+    setBusy(false);
+    if (!res.ok) return setErr("Couldn't update Preferred Early Access");
     onChanged();
   };
 
+  const opensAt = s.preferredUntil
+    ? `${fmtShort(s.preferredUntil)}, ${new Date(s.preferredUntil).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+    : null;
+
   return (
     <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-zinc-100">{s.title}</p>
           {s.preferredUntil ? (
             <p className="text-[11px] font-semibold text-lime-300">
-              Preferred-only until {fmtShort(s.preferredUntil)},{" "}
-              {new Date(s.preferredUntil).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} — then open to everyone
+              Preferred Early Access until {opensAt} — remaining slots open to everyone then
+              {s.earlyAccess?.slots != null && (
+                <span className="text-zinc-400"> · {s.earlyAccess.slotsLeft} of {s.earlyAccess.slots} slots left</span>
+              )}
+              {s.earlyAccess?.preferredLimit != null && (
+                <span className="text-zinc-400"> · preferred allocation {s.earlyAccess.preferredLimit}</span>
+              )}
+            </p>
+          ) : s.earlyAccess?.slots != null ? (
+            <p className="text-[11px] text-zinc-400">
+              Open to everyone · {s.earlyAccess.slotsLeft} of {s.earlyAccess.slots} slots left
             </p>
           ) : (
             <p className="text-[11px] text-zinc-500">Open to everyone</p>
           )}
         </div>
         {s.preferredUntil ? (
-          <button disabled={busy} onClick={() => call("DELETE")} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
+          <button disabled={busy} onClick={() => end(false)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs" title="End early access now — remaining slots open to the public immediately (the slot cap stays)">
             Open to everyone now
           </button>
-        ) : (
-          <button disabled={busy} onClick={() => call("POST")} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
-            <Clock className="h-3 w-3" /> Preferred-first for 24h
+        ) : s.earlyAccess?.slots != null ? (
+          <button disabled={busy} onClick={() => end(true)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs" title="Remove the slot cap — normal availability rules only">
+            Remove slot cap
           </button>
-        )}
+        ) : null}
       </div>
+
+      {!s.preferredUntil && (
+        <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-line-soft pt-2">
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Slots
+            <input
+              value={slots}
+              onChange={(e) => setSlots(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="any"
+              className="input-dark mt-1 w-16 px-2 py-1.5 text-xs"
+              title="Total bookable slots for this drop (optional). Applies to EVERYONE — Preferred Clients can never book beyond it."
+            />
+          </label>
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Early access
+            <select value={hours} onChange={(e) => setHours(Number(e.target.value))} className="input-dark mt-1 px-2 py-1.5 text-xs">
+              {[6, 12, 24, 48, 72].map((h) => <option key={h} value={h}>{h}h</option>)}
+            </select>
+          </label>
+          <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
+            Preferred limit
+            <input
+              value={prefLimit}
+              onChange={(e) => setPrefLimit(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="none"
+              className="input-dark mt-1 w-16 px-2 py-1.5 text-xs"
+              title="Optional: max bookings Preferred Clients can take during the window, so slots are left for the public opening."
+            />
+          </label>
+          <button disabled={busy} onClick={start} className="btn-ghost px-3 py-1.5 text-xs">
+            <Clock className="h-3 w-3" /> Start early access
+          </button>
+          <p className="w-full text-[10px] leading-relaxed text-zinc-600">
+            Preferred Clients book first for {hours}h{slots.trim() ? ` · ${slots} total slots (capacity applies to everyone)` : ""}
+            {prefLimit.trim() ? ` · at most ${prefLimit} preferred bookings` : ""} · then remaining availability opens to the public automatically.
+          </p>
+        </div>
+      )}
       {err && <p className="mt-1.5 text-[11px] font-medium text-amber-300">{err}</p>}
     </div>
   );
