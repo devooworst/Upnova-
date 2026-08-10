@@ -221,7 +221,7 @@ export default function Navbar() {
                 onClick={async () => {
                   setLogoutOpen(false);
                   await logout();
-                  router.push("/welcome");
+                  router.push("/"); // land in the REAL app as a guest — never a login form
                 }}
                 className="flex-1 rounded-full bg-red-500 py-2 text-xs font-bold text-white transition hover:bg-red-400"
               >

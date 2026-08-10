@@ -207,21 +207,38 @@ export async function POST(req: NextRequest) {
       actual: bareData.user ? `INHERITED A SESSION: ${JSON.stringify(bareData.user).slice(0, 60)}` : "user: null",
     });
 
-    /* ---- GUEST MODE: logout lands on a browsable public page, never a
-       login form. Sign In / Join are CHOICES in the guest top nav. ---- */
-    const gw = await fetch(BASE + "/welcome", { redirect: "manual" });
-    const gwHtml = await gw.text();
-    step(c, "logout destination /welcome is PUBLIC Guest Mode — 200 with no credentials, no redirect loop",
-      gw.status === 200, { route: "GET /welcome (no credentials, redirect:manual)", actual: String(gw.status) });
-    step(c, "Guest Mode is a browsable landing: Sign In + Join UpNova in the nav, real public content, NO auto-opened or prefilled login form",
-      gwHtml.includes("Guest Mode") && gwHtml.includes('href="/login"') && gwHtml.includes('href="/signup"') &&
-      gwHtml.includes("/creator/") && !gwHtml.includes('value="@devin"') && !gwHtml.includes("You&#x27;ve been logged out"), {
-      expected: "Guest Mode badge · /login + /signup links · public creator links · no prefilled form",
-      actual: `guestBadge=${gwHtml.includes("Guest Mode")} login=${gwHtml.includes('href="/login"')} signup=${gwHtml.includes('href="/signup"')} creators=${gwHtml.includes("/creator/")} prefilled=${gwHtml.includes('value="@devin"')}`,
-    });
+    /* ---- GUEST MODE = the REAL app, read-only. Logout lands in the
+       actual application as a guest — same layout, nav, feed, search —
+       with participation gated by contextual Sign Up / Sign In prompts.
+       No separate landing page, no auto-opened login form. ---- */
+    const gHome = await fetch(BASE + "/", { redirect: "manual" });
+    step(c, "the app itself is public: GET / with zero credentials serves the REAL app shell (200, no redirect to any landing/login)",
+      gHome.status === 200, { route: "GET / (no credentials, redirect:manual)", actual: String(gHome.status) });
+    const gWel = await fetch(BASE + "/welcome", { redirect: "manual" });
+    step(c, "/welcome (old landing + logout destination) now redirects INTO the app — Guest Mode is not a separate page",
+      gWel.status >= 300 && gWel.status < 400 && (gWel.headers.get("location") ?? "").replace(BASE, "") === "/", {
+      expected: "3xx → /", actual: `${gWel.status} → ${gWel.headers.get("location")}` });
+    const gFeed = await (await fetch(BASE + "/api/feed?tab=foryou")).json();
+    step(c, "guests browse the REAL feed — capped preview (guest:true, items present, ≤ guest limit of 12), not unlimited",
+      gFeed.guest === true && Array.isArray(gFeed.items) && gFeed.items.length >= 1 && gFeed.items.length <= 12, {
+      route: "GET /api/feed (no credentials)", actual: `guest=${gFeed.guest} items=${gFeed.items?.length}` });
+    const gOpp = await fetch(BASE + "/api/opportunities");
+    const gSvc = await fetch(BASE + "/api/services");
+    const gSearch = await (await fetch(BASE + "/api/search?q=lena")).json();
+    step(c, "guests browse opportunities, services, and search public people — same APIs members use",
+      gOpp.status === 200 && gSvc.status === 200 && (gSearch.people ?? []).some((p: any) => p.handle === "lena"), {
+      actual: `opps=${gOpp.status} services=${gSvc.status} search=${(gSearch.people ?? []).length}` });
+    // every participating action requires an account: server enforces 401,
+    // the client turns it into the contextual join prompt (never silent)
+    const gPost = await fetch(BASE + "/api/posts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "guest post attempt" }) });
+    const gConv = await fetch(BASE + "/api/conversations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ withHandle: "lena" }) });
+    const gFollow = await fetch(BASE + "/api/follow/" + lena.id, { method: "POST" });
+    step(c, "guest restrictions hold server-side: post / message / follow all 401 without an account (apply, book, buy gated the same way)",
+      gPost.status === 401 && gConv.status === 401 && gFollow.status === 401, {
+      actual: `post=${gPost.status} conversation=${gConv.status} follow=${gFollow.status}` });
     const gl = await fetch(BASE + "/login", { redirect: "manual" });
     const gs = await fetch(BASE + "/signup", { redirect: "manual" });
-    step(c, "Sign In and Join pages are public and load directly from Guest Mode (no loop back)",
+    step(c, "Sign In and Join pages load directly from Guest Mode (200 each, no loop back)",
       gl.status === 200 && gs.status === 200, { actual: `login=${gl.status} signup=${gs.status}` });
   }
 
