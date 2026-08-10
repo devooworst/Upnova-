@@ -818,6 +818,37 @@ export const preferredClients = sqliteTable(
   ]
 );
 
+/* ---------------------------- business team ----------------------------
+   EXPLICIT internal-team membership for business accounts — deliberately
+   separate from derived relationships: a creator hired for one project
+   is TALENT, a customer who booked is a CLIENT, and neither ever becomes
+   "staff" implicitly. Team rows are created only by the business, are
+   private to it, and removal keeps the row (endedAt) so history holds.
+   compensation is a PRIVATE note for the business — never public. */
+export const businessTeam = sqliteTable(
+  "business_team",
+  {
+    id: id(),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default(""),
+    status: text("status").notNull().default("active"), // active | inactive
+    compensation: text("compensation").notNull().default(""), // private note
+    notes: text("notes").notNull().default(""),
+    addedAt: integer("added_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+    createdAt: ts("created_at"),
+  },
+  (t) => [
+    uniqueIndex("business_team_pair").on(t.businessId, t.personId),
+    index("business_team_person").on(t.personId, t.status),
+  ]
+);
+
 
 /* -------------------------------- bookings -------------------------------- */
 

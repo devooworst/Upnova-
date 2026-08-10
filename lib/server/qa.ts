@@ -110,20 +110,50 @@ export function ensureQaPersonas() {
           })
           .run();
     }
+    // Test Business too — so the CLIENTS category can be exercised
+    if (p.handle === "testbusiness") {
+      const svc = db
+        .select()
+        .from(tables.services)
+        .where(eq(tables.services.ownerId, user.id))
+        .all()
+        .find((s) => s.active);
+      if (!svc)
+        db.insert(tables.services)
+          .values({
+            id: uid(),
+            ownerId: user.id,
+            title: "QA Studio Rental",
+            description:
+              "A test service owned by the TEST BUSINESS account, so customer→business bookings can be tested. All payments are TEST payments.",
+            price: 80,
+            category: "creative",
+            fulfillment: "appointment",
+            reach: "Baltimore, MD",
+          })
+          .run();
+    }
   }
 }
 
-export function qaIds(): { customer: string; creator: string; business: string; serviceId: string } {
+export function qaIds(): { customer: string; creator: string; business: string; serviceId: string; businessServiceId: string } {
   ensureQaPersonas();
   const get = (h: string) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()!.id;
   const creator = get("testcreator");
+  const business = get("testbusiness");
   const svc = db
     .select()
     .from(tables.services)
     .where(eq(tables.services.ownerId, creator))
     .all()
     .find((s) => s.active)!;
-  return { customer: get("testcustomer"), creator, business: get("testbusiness"), serviceId: svc.id };
+  const bsvc = db
+    .select()
+    .from(tables.services)
+    .where(eq(tables.services.ownerId, business))
+    .all()
+    .find((s) => s.active)!;
+  return { customer: get("testcustomer"), creator, business, serviceId: svc.id, businessServiceId: bsvc.id };
 }
 
 /* ----------------------------- reset ----------------------------- */
@@ -167,6 +197,7 @@ export function resetQaData(): number {
     db.delete(tables.notifications).where(eq(tables.notifications.userId, id)).run();
     db.delete(tables.follows).where(or(eq(tables.follows.followerId, id), eq(tables.follows.followingId, id))).run();
     db.delete(tables.preferredClients).where(or(eq(tables.preferredClients.providerId, id), eq(tables.preferredClients.clientId, id))).run();
+    db.delete(tables.businessTeam).where(or(eq(tables.businessTeam.businessId, id), eq(tables.businessTeam.personId, id))).run();
     db.delete(tables.interactions).where(eq(tables.interactions.userId, id)).run();
   }
   return removed;

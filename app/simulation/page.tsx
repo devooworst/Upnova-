@@ -207,6 +207,7 @@ export default function SimulationPage() {
               progress updates ↔ ETA changes ↔ extension approval, the private Preferred Clients
               loop (eligibility, benefits, preferred-first booking windows, preferred pricing,
               removal), first-time onboarding state, business opportunity ↔ application ↔ selection,
+              business People categorization (talent ≠ employee) + team authz + payments view,
               notification destinations, activity on both sides, plan/verification gates, logout &amp;
               session isolation, and database integrity. Time is simulated, never waited for.
               Designated test records reset at the start of every run — real accounts and auth are

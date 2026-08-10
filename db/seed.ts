@@ -1479,6 +1479,19 @@ function seed() {
           reach: "Remote",
         })
         .run();
+    if (q.handle === "testbusiness")
+      db.insert(t.services)
+        .values({
+          id: id(),
+          ownerId: qid,
+          title: "QA Studio Rental",
+          description: "A test service owned by the TEST BUSINESS account, so customer→business bookings can be tested. All payments are TEST payments.",
+          price: 80,
+          category: "creative",
+          fulfillment: "appointment",
+          reach: "Baltimore, MD",
+        })
+        .run();
   }
 
   console.log("Seeded:", defs.length, "users · password: upnova123 · admin: devin@upnova.dev");

@@ -39,6 +39,7 @@ const PLANNED_CATEGORIES = [
   "PROGRESS & EXTENSIONS",
   "PREFERRED CLIENTS",
   "ONBOARDING",
+  "BUSINESS PEOPLE & HIRING",
   "NOTIFICATIONS",
   "ACTIVITY",
   "SUBSCRIPTIONS & MY WORLD",
@@ -99,6 +100,9 @@ export async function POST(req: NextRequest) {
       // preferred-client relationships involving the test persona
       db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
       db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
+      // business-team rows involving the test persona (prior runs)
+      db.delete(tables.businessTeam).where(eq(tables.businessTeam.personId, u.id)).run();
+      db.delete(tables.businessTeam).where(eq(tables.businessTeam.businessId, u.id)).run();
       db.delete(tables.applications).where(eq(tables.applications.applicantId, u.id)).run();
       for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
         db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
@@ -525,6 +529,51 @@ export async function POST(req: NextRequest) {
     const tourN = (await api("nia", "/api/onboarding/tour")).data as any;
     step(c, "verified student → student tour incl. Your Campus", tourN.audience === "student" && (tourN.steps ?? []).some((s: any) => s.id === "campus"), { actual: tourN.audience });
     await api("nia", "/api/auth/logout", { method: "POST" });
+  }
+
+  /* ================= BUSINESS PEOPLE & HIRING ================= */
+  {
+    const c = cat("BUSINESS PEOPLE & HIRING");
+    // rachel was SELECTED on harboroak's opportunity earlier in this run —
+    // the People engine must therefore classify her as TALENT, and NEVER
+    // as an employee (team is explicit-only).
+    const ppl = (await api("harboroak", "/api/business/people")).data as any;
+    const asTalent = (ppl.talent ?? []).find((x: any) => x.handle === "rachel");
+    const asTeam = (ppl.team ?? []).find((x: any) => x.handle === "rachel");
+    const asClient = (ppl.clients ?? []).find((x: any) => x.handle === "rachel");
+    step(c, "hired applicant is TALENT — not employee, not client", !!asTalent && !asTeam && !asClient, {
+      route: "GET /api/business/people",
+      expected: "talent=yes team=no client=no",
+      actual: `talent=${!!asTalent} team=${!!asTeam} client=${!!asClient} (via ${asTalent?.hiredVia?.join("+")})`,
+    });
+    const hir = (await api("harboroak", "/api/business/hiring")).data as any;
+    step(c, "hiring dashboard counts follow the real rows", (hir.counts?.applications ?? 0) >= 1 && (hir.counts?.peopleHired ?? 0) >= 1, {
+      route: "GET /api/business/hiring",
+      actual: JSON.stringify(hir.counts ?? {}),
+    });
+    // EXPLICIT team add — the only way anyone becomes staff
+    const add = await api("harboroak", "/api/business/team", { method: "POST", body: { handle: "rachel", title: "[TEST] Contract Photographer" } });
+    const teamId = String((add.data as any).id ?? "");
+    const ppl2 = (await api("harboroak", "/api/business/people")).data as any;
+    const nowTeam = (ppl2.team ?? []).find((x: any) => x.handle === "rachel");
+    step(c, "explicit add → TEAM (and still talent — categories coexist, never merge)", add.status === 200 && !!nowTeam && nowTeam.status === "active" && (ppl2.talent ?? []).some((x: any) => x.handle === "rachel"), {
+      route: "POST /api/business/team", record: teamId, actual: `team=${nowTeam?.status} title="${nowTeam?.title}"`,
+    });
+    // AUTHORIZATION: the person cannot manage their own team record
+    const cheatA = await api("rachel", `/api/business/team/${teamId}`, { method: "PATCH", body: { title: "CEO" } });
+    const cheatB = await api("rachel", `/api/business/team/${teamId}`, { method: "DELETE" });
+    step(c, "authz: a person cannot edit or remove their own team listing", cheatA.status === 403 && cheatB.status === 403, { actual: `${cheatA.status}/${cheatB.status}` });
+    // ending membership keeps history
+    await api("harboroak", `/api/business/team/${teamId}`, { method: "DELETE" });
+    const ppl3 = (await api("harboroak", "/api/business/people")).data as any;
+    const ended = (ppl3.team ?? []).find((x: any) => x.handle === "rachel");
+    step(c, "ending membership → inactive with endedAt, history preserved", !!ended && ended.status === "inactive" && !!ended.endedAt, { actual: `status=${ended?.status} endedAt=${!!ended?.endedAt}` });
+    // payments view adds up from the same rows
+    const pay = (await api("rachel", "/api/me/payments")).data as any;
+    const allTitled = (pay.transactions ?? []).every((t: any) => t.title && t.with?.handle && ["in", "out"].includes(t.direction));
+    step(c, "payments view: totals + every transaction tied to a real record & counterpart", (pay.summary?.totalSpent ?? 0) > 0 && (pay.transactions ?? []).length >= 2 && allTitled, {
+      route: "GET /api/me/payments", actual: `spent=$${pay.summary?.totalSpent} tx=${pay.transactions?.length} titled=${allTitled}`,
+    });
   }
 
   /* ================= NOTIFICATIONS: no dead destinations ================= */

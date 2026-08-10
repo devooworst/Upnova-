@@ -21,6 +21,9 @@ import {
   Lock,
   Sparkles,
   UserCheck,
+  UserPlus,
+  ContactRound,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
@@ -97,6 +100,24 @@ export default function Sidebar({
   const pro = plan === "pro";
   // campus access is a database fact (verified school), never a local flag
   const campus = user?.campus ?? null;
+  // BUSINESS accounts are hiring accounts, not profile pages: their nav
+  // swaps "Clients" for Hiring · People · Payments (sky = business).
+  // Same real routes, different lens — nothing is hidden from anyone.
+  const isBusiness = user?.accountType === "business";
+  const groups = navGroups.map((g) => ({
+    ...g,
+    items: isBusiness ? g.items.filter((i) => i.href !== "/clients") : g.items,
+  }));
+  if (isBusiness)
+    groups.push({
+      label: "business",
+      dot: "bg-sky-400",
+      items: [
+        { href: "/hiring", label: "Hiring", icon: UserPlus },
+        { href: "/people", label: "People", icon: ContactRound },
+        { href: "/payments", label: "Payments", icon: Wallet },
+      ],
+    });
 
   return (
     <aside
@@ -113,7 +134,7 @@ export default function Sidebar({
     >
       {/* Main nav — unboxed; grouping does the work */}
       <nav className="space-y-4 px-1">
-        {navGroups.map((g) => (
+        {groups.map((g) => (
           <div key={g.label ?? "base"}>
             {g.label && (
               <p className="flex items-center gap-1.5 px-3 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">

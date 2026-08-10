@@ -65,6 +65,20 @@ CREATE TABLE IF NOT EXISTS `bookmarks` (
 	PRIMARY KEY(`user_id`, `target_type`, `target_id`),
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS `business_team` (
+	`id` text PRIMARY KEY NOT NULL,
+	`business_id` text NOT NULL,
+	`person_id` text NOT NULL,
+	`title` text DEFAULT '' NOT NULL,
+	`status` text DEFAULT 'active' NOT NULL,
+	`compensation` text DEFAULT '' NOT NULL,
+	`notes` text DEFAULT '' NOT NULL,
+	`added_at` integer NOT NULL,
+	`ended_at` integer,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`business_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`person_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `campus_listings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`seller_id` text NOT NULL,
@@ -740,8 +754,9 @@ CREATE TABLE IF NOT EXISTS `services` (
 	`visibility` text DEFAULT 'public' NOT NULL,
 	`active` integer DEFAULT true NOT NULL,
 	`paused` integer DEFAULT false NOT NULL,
+	`preferred_until` integer,
 	`is_seed` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL, `preferred_until` integer,
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `sessions` (
@@ -752,7 +767,7 @@ CREATE TABLE IF NOT EXISTS `sessions` (
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
-CREATE TABLE IF NOT EXISTS "users" (
+CREATE TABLE IF NOT EXISTS `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL,
 	`password_hash` text NOT NULL,
@@ -769,9 +784,10 @@ CREATE TABLE IF NOT EXISTS "users" (
 	`business_verified` integer DEFAULT false NOT NULL,
 	`mfa_enabled` integer DEFAULT false NOT NULL,
 	`mfa_secret` text,
+	`onboarding` text DEFAULT '' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
-, `onboarding` text DEFAULT '' NOT NULL);
+);
 CREATE TABLE IF NOT EXISTS `works` (
 	`id` text PRIMARY KEY NOT NULL,
 	`creator_id` text NOT NULL,
@@ -793,6 +809,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS `app_opp_applicant` ON `applications` (`opport
 CREATE INDEX IF NOT EXISTS `bids_listing` ON `bids` (`listing_id`,`amount`);
 CREATE UNIQUE INDEX IF NOT EXISTS `blocks_pair` ON `blocks` (`blocker_id`,`blocked_id`);
 CREATE INDEX IF NOT EXISTS `bookings_provider_starts` ON `bookings` (`provider_id`,`starts_at`);
+CREATE UNIQUE INDEX IF NOT EXISTS `business_team_pair` ON `business_team` (`business_id`,`person_id`);
+CREATE INDEX IF NOT EXISTS `business_team_person` ON `business_team` (`person_id`,`status`);
 CREATE INDEX IF NOT EXISTS `campus_listings_campus` ON `campus_listings` (`campus_id`,`created_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campus_verif_user_campus` ON `campus_verifications` (`user_id`,`campus_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `campuses_slug_unique` ON `campuses` (`slug`);
