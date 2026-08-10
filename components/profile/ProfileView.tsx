@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, PencilLine, Palette } from "lucide-react";
+import { useEffect } from "react";
+import { Eye, PencilLine, Palette, Globe2 } from "lucide-react";
 import ProfileHeader from "./ProfileHeader";
 import ProfileTabs from "./ProfileTabs";
+import DbCreatorProfile from "@/components/db/DbCreatorProfile";
 import { useSession } from "@/lib/session";
+import { THEMES, type StudioConfig } from "@/lib/profileStudio";
 
 /**
  * Owner vs visitor profile states.
@@ -18,6 +21,18 @@ export default function ProfileView() {
   const [viewAsVisitor, setViewAsVisitor] = useState(false);
   const isOwner = !viewAsVisitor;
   const { user } = useSession();
+  /* ONE source of truth: the same saved config the public page renders.
+     The owner view shows the theme + a live banner; the visitor preview
+     below renders the ACTUAL public profile component. */
+  const [studio, setStudio] = useState<{ cfg: StudioConfig; active: boolean } | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/me/studio", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.saved && setStudio({ cfg: d.studio, active: d.active }))
+      .catch(() => {});
+  }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
+  const theme = studio ? THEMES[studio.cfg.theme] ?? THEMES.none : THEMES.none;
 
   return (
     <div className="space-y-5">
@@ -70,8 +85,37 @@ export default function ProfileView() {
         </button>
       </div>
 
-      <ProfileHeader isOwner={isOwner} />
-      <ProfileTabs isOwner={isOwner} />
+      {!isOwner && user ? (
+        /* visitor preview = the REAL public profile renderer — exactly what
+           others see, My World and all. Never a copy that can drift. */
+        <DbCreatorProfile handle={user.handle} />
+      ) : (
+        <div className={`space-y-5 rounded-2xl ${theme.wash} ${theme.wash ? "p-2 sm:p-3" : ""}`}>
+          {studio?.active && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-lime-400/25 bg-lime-400/5 px-4 py-2.5">
+              <p className="flex items-center gap-2 text-xs text-zinc-300">
+                <Globe2 className="h-3.5 w-3.5 text-lime-400" />
+                <span>
+                  <span className="font-semibold text-lime-300">
+                    {studio.cfg.world?.enabled ? "My World is live" : "Your Studio design is live"}
+                  </span>{" "}
+                  on your public profile — this owner view keeps the management layout.
+                </span>
+              </p>
+              <span className="flex gap-2">
+                <button onClick={() => setViewAsVisitor(true)} className="rounded-full border border-line px-3 py-1 text-[11px] font-semibold text-zinc-300 hover:border-zinc-600">
+                  See it →
+                </button>
+                <Link href="/profile/studio" className="rounded-full border border-lime-400/40 bg-lime-400/10 px-3 py-1 text-[11px] font-semibold text-lime-300 hover:bg-lime-400/20">
+                  Edit in Studio
+                </Link>
+              </span>
+            </div>
+          )}
+          <ProfileHeader isOwner={isOwner} />
+          <ProfileTabs isOwner={isOwner} />
+        </div>
+      )}
     </div>
   );
 }

@@ -119,7 +119,7 @@ export default function ProfileStudioPage() {
       if (!res.ok) setMsg({ kind: "err", text: d.error || "Save failed" });
       else {
         setDirty(false);
-        setMsg({ kind: "ok", text: d.active ? "Saved — live on your public profile." : "Saved — will display as soon as Pro is active. Nothing was lost." });
+        setMsg({ kind: "ok", text: d.worldNote ? `Saved. ${d.worldNote}` : d.active ? "Saved — live on your public profile." : "Saved — will display as soon as Pro is active. Nothing was lost." });
         setMeta((m) => (m ? { ...m, saved: true, active: d.active } : m));
       }
     } catch {
@@ -153,8 +153,12 @@ export default function ProfileStudioPage() {
     );
 
   const isPro = user.plan === "pro";
+  const isCollege = user.plan === "college";
   const demoUnrestricted = user.testerMode !== "simulation" && !!user.demoTools;
-  const canEdit = isPro || demoUnrestricted;
+  // College+ gets Studio basics; My World stays Pro. Backend enforces the
+  // same rules — this gate is UX, never the security.
+  const canEdit = isPro || isCollege || demoUnrestricted;
+  const canWorld = isPro || demoUnrestricted;
 
   // SIMULATION MODE + not Pro → the real gate, config preserved
   if (meta && !canEdit)
@@ -307,15 +311,21 @@ export default function ProfileStudioPage() {
                   version — your world never breaks mobile.
                 </p>
               </div>
-              <button
-                onClick={() => setWorld({ enabled: !world.enabled })}
-                className={`rounded-full border px-4 py-1.5 text-xs font-bold transition ${world.enabled ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
-              >
-                {world.enabled ? "My World is ON" : "Turn on My World"}
-              </button>
+              {canWorld ? (
+                <button
+                  onClick={() => setWorld({ enabled: !world.enabled })}
+                  className={`rounded-full border px-4 py-1.5 text-xs font-bold transition ${world.enabled ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
+                >
+                  {world.enabled ? "My World is ON" : "Turn on My World"}
+                </button>
+              ) : (
+                <Link href="/pro" className="flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/5 px-4 py-1.5 text-xs font-bold text-lime-300 hover:bg-lime-400/15">
+                  <Lock className="h-3 w-3" /> My World is Pro — upgrade
+                </Link>
+              )}
             </div>
 
-            {world.enabled && (
+            {world.enabled && canWorld && (
               <>
                 {/* environment scenes */}
                 <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Environment</p>

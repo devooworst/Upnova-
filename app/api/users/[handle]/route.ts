@@ -134,6 +134,9 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         const saved = parseStudio(profile.studio);
         if (!saved) return { studio: null, studioDemoPreview: false };
         if (user.plan === "pro") return { studio: saved, studioDemoPreview: false };
+        // College+: Studio basics show publicly; My World stays Pro-only
+        if (user.plan === "college")
+          return { studio: { ...saved, world: saved.world ? { ...saved.world, enabled: false } : undefined }, studioDemoPreview: false };
         if (isOwner && unrestrictedTester(user.id)) return { studio: saved, studioDemoPreview: true };
         return { studio: null, studioDemoPreview: false };
       })(),

@@ -55,6 +55,33 @@ const KIND_META = {
   application: { label: "Opportunities", icon: Briefcase, color: "text-amber-400" },
 } as const;
 
+const timeAgo = (iso: string) => {
+  const sec = (Date.now() - Date.parse(iso)) / 1000;
+  if (sec < 60) return "just now";
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
+};
+/** the operational question: does this need YOUR next move right now? */
+const attentionFor = (i: Item): string | null => {
+  if (i.kind === "booking") {
+    if (i.status === "accepted" && i.myRole === "client") return "Pay to confirm";
+    if (i.status === "pending" && i.myRole === "provider") return "Respond to request";
+    if (i.status === "reschedule_requested") return "Reschedule proposed";
+  }
+  if (i.kind === "purchase") {
+    if (i.status === "placed" && i.myRole === "buyer") return "Pay to start";
+    if (i.status === "paid" && i.myRole === "seller") return "Prepare & ship";
+    if (i.status === "delivered" && i.myRole === "buyer") return "Confirm received";
+  }
+  if (i.kind === "project") {
+    if (i.status === "submitted" && i.myRole === "client") return "Review delivery";
+    if (i.status === "offer_sent" && i.myRole === "client") return "Review offer";
+    if (i.status === "extension_requested" && i.myRole === "client") return "Extension requested";
+  }
+  return null;
+};
+
 const doneIndex = (i: Item) => i.stages.length - 1;
 const isDone = (i: Item) => i.stageIndex >= doneIndex(i);
 const isCancelled = (i: Item) => i.stageIndex < 0;
@@ -187,7 +214,10 @@ export default function ActivityPage() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400/10"><ActivityIcon className="h-5 w-5 text-lime-400" /></span>
             Activity
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">Everything in motion — live, from your real records.</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            What&apos;s happening right now — live workflows, money in motion, and the next action
+            that needs you. (Performance over time lives in Analytics.)
+          </p>
         </div>
         <button onClick={load} className="btn-ghost px-3 py-1.5 text-xs"><RefreshCw className="h-3.5 w-3.5" /> Refresh</button>
       </header>
@@ -236,19 +266,31 @@ export default function ActivityPage() {
                 <span className="ml-auto font-mono text-[10px] text-zinc-600">{visible.length}</span>
               </p>
               <ul className="divide-y divide-line-soft">
-                {visible.map((i) => {
+                {[...visible]
+                  .sort((a, b) => (attentionFor(b) ? 1 : 0) - (attentionFor(a) ? 1 : 0))
+                  .map((i) => {
                   const key = `${i.kind}:${i.id}`;
                   const expanded = open === key;
+                  const attn = attentionFor(i);
+                  const lastAt = i.events?.length ? i.events[i.events.length - 1].at : i.updatedAt;
                   return (
                     <li key={key} className="px-4 py-3">
                       <button onClick={() => setOpen(expanded ? null : key)} className="flex w-full items-center gap-3 text-left">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-zinc-100">{i.title}</p>
+                          <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
+                            <span className="truncate">{i.title}</span>
+                            {attn && (
+                              <span className="shrink-0 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">
+                                {attn}
+                              </span>
+                            )}
+                          </p>
                           <p className="mt-0.5 truncate text-[11px] text-zinc-500">
                             {i.myRole} · with {i.with.displayName} (@{i.with.handle})
                             {i.startsAt ? ` · ${new Date(i.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
                             {i.amount != null ? ` · $${i.amount}` : ""}
                             {i.paymentStatus ? ` · payment ${i.paymentStatus} (test)` : ""}
+                            <span className="text-zinc-600"> · updated {timeAgo(lastAt)}</span>
                           </p>
                         </div>
                         <CompactBar item={i} />

@@ -1,13 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart3, ArrowUpRight, Sparkles, FlaskConical } from "lucide-react";
 import { analytics } from "@/lib/data";
 import { useSession } from "@/lib/session";
 
+interface Summary {
+  revenue: { thisMonth: number; lastMonth: number; delta: number; allTime: number };
+  avgValue: number;
+  clients: number;
+  repeatClients: number;
+  completedEngagements: number;
+  followers: number;
+  followersNewThisMonth: number;
+}
+
 export default function AnalyticsPage() {
   const max = Math.max(...analytics.weeklyReach.map((d) => d.value));
   const { user } = useSession();
+  const [summary, setSummary] = useState<Summary | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/analytics/summary", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.revenue && setSummary(d))
+      .catch(() => {});
+  }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
   // Advanced Analytics is a PRO feature. SIMULATION MODE enforces it like
   // production; DEMO MODE opens it for testing (clearly labeled below).
   const demoUnrestricted = !!user && user.testerMode !== "simulation";
@@ -55,8 +74,53 @@ export default function AnalyticsPage() {
           </span>
           Analytics
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">Last 7 days • UpNova Pro unlocks deeper insights.</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          How you&apos;re performing over time — trends, growth, and business insight.
+          (Live workflows and money in motion live in Activity.)
+        </p>
       </header>
+
+      {/* YOUR REAL PERFORMANCE — computed from your actual records */}
+      {summary && (
+        <section className="card p-5">
+          <h2 className="flex items-center justify-between text-sm font-bold text-zinc-100">
+            Your performance
+            <span className="font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-lime-400">real records</span>
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div>
+              <p className="text-2xl font-extrabold tabular-nums tracking-tight text-lime-400">${summary.revenue.thisMonth}</p>
+              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">revenue this month</p>
+              <p className={`mt-0.5 text-[11px] font-semibold ${summary.revenue.delta >= 0 ? "text-lime-400" : "text-red-400"}`}>
+                {summary.revenue.delta >= 0 ? "+" : "−"}${Math.abs(summary.revenue.delta)} vs last month (${summary.revenue.lastMonth})
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold tabular-nums tracking-tight text-zinc-50">${summary.revenue.allTime}</p>
+              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">released all-time</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500">avg ${summary.avgValue} / engagement</p>
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold tabular-nums tracking-tight text-zinc-50">{summary.repeatClients}<span className="text-sm text-zinc-500">/{summary.clients}</span></p>
+              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">repeat clients</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500">{summary.completedEngagements} completed engagements</p>
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold tabular-nums tracking-tight text-violet-300">{summary.followers}</p>
+              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">followers</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500">+{summary.followersNewThisMonth} this month</p>
+            </div>
+          </div>
+          <p className="mt-3 border-t border-line-soft pt-2 text-[10px] text-zinc-600">
+            Computed live from your payments, bookings, projects, and follows. Views/reach tracking
+            isn&apos;t collected yet — the sample dashboard below shows what it will look like.
+          </p>
+        </section>
+      )}
+
+      <p className="px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-600">
+        Sample dashboard — demo visuals until view tracking ships
+      </p>
 
       {!hasPro && demoUnrestricted && (
         <div className="flex items-start gap-2.5 rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-3">
