@@ -7,7 +7,7 @@
 /* ------------------------------------------------------------------ */
 
 import React, { useCallback, useEffect, useState } from "react";
-import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS } from "@/lib/profileStudio";
+import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS } from "@/lib/profileStudio";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck, GraduationCap } from "lucide-react";
@@ -43,6 +43,7 @@ interface PublicProfile {
   studioDemoPreview?: boolean;
   academic?: {
     school: string;
+    schoolSlug?: string;
     affiliation: string;
     classOf: string | null;
     verified: boolean;
@@ -145,9 +146,8 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
   const headingFont = FONTS[studio?.font ?? "standard"] ?? FONTS.standard;
   const effect = EFFECTS[studio?.effect ?? "none"] ?? EFFECTS.none;
 
-  return (
-    <div className={`mx-auto max-w-3xl space-y-4 rounded-2xl ${theme.wash} ${theme.wash ? "p-2 sm:p-3" : ""}`}>
-      {theme.deco && <div className={`h-1 rounded-full ${theme.deco}`} aria-hidden />}
+  const headerBlock = (
+    <>
       <header className={`card p-5 sm:p-6 ${theme.card} ${theme.headerRing} ${effect.cls}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -178,15 +178,16 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
               <p className="mt-0.5 text-sm font-medium text-zinc-400">{user.roleLine || `@${user.handle}`}</p>
               {data.academic && (
                 <p className="mt-1.5">
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
-                    title="Platform-verified school affiliation — earned through verification, never self-claimed. The major is never shown publicly."
+                  <Link
+                    href={data.academic.schoolSlug ? `/schools/${data.academic.schoolSlug}` : "#"}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300 transition hover:bg-violet-400/20"
+                    title="Platform-verified school affiliation. Tap to see everyone at this school on UpNova."
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
                     {data.academic.school}
                     {data.academic.classOf ? ` · Class of ${data.academic.classOf}` : ""}
                     {data.academic.affiliation === "alumni" ? " · Alumni" : data.academic.affiliation === "faculty_staff" ? " · Faculty / Staff" : ""}
-                  </span>
+                  </Link>
                 </p>
               )}
               {user.locationLabel && (
@@ -281,6 +282,232 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
           </div>
         )}
       </header>
+    </>
+  );
+
+  const sectionBlocks: Record<string, React.ReactNode> = {
+    trust: (
+      <React.Fragment key="trust">
+      {/* ---- Trust & authenticity — what's actually verified, computed from
+     records. UpNova shows the evidence; it doesn't tell you who to
+     trust. Badges are earned, never part of any subscription. ---- */}
+      {data.trust && (
+  <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+    <h2 className={`flex items-center gap-1.5 text-sm font-bold ${accent.text} ${headingFont.cls}`}>
+      <ShieldCheck className="h-4 w-4 text-lime-400" /> Trust &amp; authenticity
+    </h2>
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {data.trust.badges.identityVerified && (
+        <span title={ACCOUNT_BADGES.identity_verified.description} className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-300">
+          <BadgeCheck className="h-3 w-3" /> Identity Verified
+        </span>
+      )}
+      {data.trust.badges.businessVerified && (
+        <span title={ACCOUNT_BADGES.business_verified.description} className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-300">
+          <BadgeCheck className="h-3 w-3" /> Business Verified
+        </span>
+      )}
+      {data.trust.badges.studentVerified && (
+        <span title={ACCOUNT_BADGES.student_verified.description} className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-300">
+          <BadgeCheck className="h-3 w-3" /> Student Verified
+        </span>
+      )}
+      {!data.trust.badges.identityVerified && !data.trust.badges.businessVerified && !data.trust.badges.studentVerified && (
+        <span className="text-xs text-zinc-500">No verifications yet — badges are earned, never bought.</span>
+      )}
+    </div>
+    <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-line-soft pt-3 text-xs text-zinc-400 sm:grid-cols-4">
+      <li>
+        <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
+          {data.trust.completedProjects + data.trust.completedBookings}
+        </span>
+        Completed on UpNova
+      </li>
+      <li>
+        <span className="block font-mono text-base font-semibold tracking-[0.05em] text-lime-300">{data.trust.verifiedWorkPosts}</span>
+        Verified work posts
+      </li>
+      <li>
+        <span className="block font-mono text-base font-semibold tracking-[0.05em] text-violet-300">{data.trust.clientConfirmedPosts}</span>
+        Client confirmations
+      </li>
+      <li>
+        <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
+          {data.trust.rating != null ? `${data.trust.rating.toFixed(1)}` : "—"}
+        </span>
+        {data.trust.reviewsCount} review{data.trust.reviewsCount === 1 ? "" : "s"}
+      </li>
+      {(data.trust.licensesIssued ?? 0) > 0 && (
+        <li>
+          <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">{data.trust.licensesIssued}</span>
+          Licenses issued
+        </li>
+      )}
+    </ul>
+  </section>
+      )}
+      </React.Fragment>
+    ),
+    posts: (
+      <React.Fragment key="posts">
+      <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+  <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Posts</h2>
+  <div className="mt-3">
+    <PostsGrid
+      handle={user.handle}
+      displayName={user.displayName}
+      services={services.map((s) => ({ id: s.id, title: s.title, price: s.price, category: s.category ?? "", cta: s.cta }))}
+    />
+  </div>
+      </section>
+      </React.Fragment>
+    ),
+    services: (
+      <React.Fragment key="services">
+      {services.length > 0 && (
+  <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+    <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Services</h2>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      {services.map((s) => (
+        <article key={s.id} className="card-money flex flex-col p-4">
+          <h3 className="text-sm font-bold text-zinc-100">
+            <Link href={`/services/${s.id}`} className="transition hover:text-lime-300">{s.title}</Link>
+          </h3>
+          <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">From ${s.price}</p>
+          <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
+          <p className="mt-2 text-[10px] text-zinc-500">{s.reach}</p>
+          {!isMe && me && (
+            <Link href="/services" className="btn-lime mt-3 w-full justify-center py-1.5 text-xs">
+              <Zap className="h-3.5 w-3.5" /> View on Services
+            </Link>
+          )}
+        </article>
+      ))}
+    </div>
+    {/* deactivated services stay part of the record — history, not erasure */}
+    {(data.pastServices ?? []).length > 0 && (
+      <div className="mt-4 border-t border-line-soft pt-3">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Past services</p>
+        <ul className="mt-1.5 flex flex-wrap gap-1.5">
+          {data.pastServices!.map((s) => (
+            <li key={s.id}>
+              <Link
+                href={`/services/${s.id}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
+              >
+                {s.title} <span className="text-zinc-700">· {s.category}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </section>
+      )}
+      </React.Fragment>
+    ),
+    reviews: (
+      <React.Fragment key="reviews">
+      {(data.reviews ?? []).length > 0 && (
+  <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+    <h2 className={`flex items-center gap-2 text-sm font-bold ${accent.text} ${headingFont.cls}`}>
+      Reviews
+      <span className="font-normal text-zinc-500">from verified projects only</span>
+    </h2>
+    <div className="mt-3 space-y-2.5">
+      {(data.reviews ?? []).map((r, i) => (
+        <div key={i} className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+          <p className="flex items-center gap-1 text-xs font-semibold text-amber-300">
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
+            <span className="ml-1 font-normal text-zinc-600">
+              {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+            </span>
+          </p>
+          {r.body && <p className="mt-1 text-xs leading-relaxed text-zinc-300">{r.body}</p>}
+        </div>
+      ))}
+    </div>
+  </section>
+      )}
+      </React.Fragment>
+    ),
+    experience: (
+      <React.Fragment key="experience">
+      {experience.length > 0 && (
+  <section className={`card p-5 ${theme.card} ${effect.cls}`}>
+    <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Experience</h2>
+    <ol className="mt-4 space-y-4 border-l border-line pl-4">
+      {experience.map((e) => (
+        <li key={e.id} className="relative">
+          <span className="absolute -left-[23px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-card bg-lime-400" />
+          <p className="text-sm font-semibold text-zinc-100">
+            {e.position} <span className="font-normal text-zinc-400">— {e.organization}</span>
+          </p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+            {e.start} — {e.end || "Now"}
+          </p>
+          {e.description && <p className="mt-1 text-xs leading-relaxed text-zinc-400">{e.description}</p>}
+        </li>
+      ))}
+    </ol>
+  </section>
+      )}
+      </React.Fragment>
+    ),
+  };
+
+  /* ---------------- MY WORLD (Pro): the owner-designed environment ----------------
+     Free placement of APPROVED elements on desktop; below sm everything
+     stacks in top-to-bottom order so mobile never breaks. The hero (name,
+     identity, actions) is indivisible and always visible; every function
+     inside it stays standard UpNova. */
+  const world = studio?.world;
+  if (world?.enabled) {
+    const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
+    const els = WORLD_ELEMENT_IDS
+      .map((id) => ({ id, el: world.elements[id] }))
+      .filter((x) => x.el && (!x.el.hidden || x.id === "hero"))
+      .sort((a, b) => a.el.y - b.el.y);
+    const canvasH = Math.max(...els.map((x) => x.el.y)) + 640;
+    return (
+      <div className="mx-auto max-w-5xl">
+        <div className="relative overflow-hidden rounded-2xl border border-line" style={{ backgroundImage: env.css }}>
+          {env.overlay !== "none" && (
+            <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: env.overlay }} aria-hidden />
+          )}
+          <div className="relative flex items-center justify-between gap-2 px-4 pt-3">
+            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-zinc-400/90">
+              {user.displayName}&apos;s world
+            </p>
+            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on UpNova</p>
+          </div>
+          {data.studioDemoPreview && (
+            <p className="relative mx-4 mt-2 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[10px] text-amber-300">
+              DEMO MODE preview — only you see this world until Pro is active.
+            </p>
+          )}
+          <div className="relative p-3 sm:p-4">
+            <div className="relative sm:h-[var(--wh)]" style={{ "--wh": `${canvasH}px` } as React.CSSProperties}>
+              {els.map(({ id, el }) => (
+                <div
+                  key={id}
+                  className="relative mb-4 sm:absolute sm:mb-0 sm:left-[var(--wx)] sm:top-[var(--wy)] sm:w-[var(--ww)] sm:z-[var(--wz)] sm:rotate-[var(--wr)]"
+                  style={{ "--wx": `${el.x}%`, "--wy": `${el.y}px`, "--ww": `${el.w}%`, "--wz": String(el.layer), "--wr": `${el.rotate}deg` } as React.CSSProperties}
+                >
+                  {id === "hero" ? headerBlock : sectionBlocks[id] ?? null}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mx-auto max-w-3xl space-y-4 rounded-2xl ${theme.wash} ${theme.wash ? "p-2 sm:p-3" : ""}`}>
+      {theme.deco && <div className={`h-1 rounded-full ${theme.deco}`} aria-hidden />}
+      {headerBlock}
 
       {/* ---- Profile Studio (Pro, appearance-only): approved design system
            values only; the header, actions, and every function stay
@@ -292,176 +519,6 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
         </p>
       )}
       {(() => {
-        const sectionBlocks: Record<string, React.ReactNode> = {
-          trust: (
-            <React.Fragment key="trust">
-      {/* ---- Trust & authenticity — what's actually verified, computed from
-           records. UpNova shows the evidence; it doesn't tell you who to
-           trust. Badges are earned, never part of any subscription. ---- */}
-      {data.trust && (
-        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
-          <h2 className={`flex items-center gap-1.5 text-sm font-bold ${accent.text} ${headingFont.cls}`}>
-            <ShieldCheck className="h-4 w-4 text-lime-400" /> Trust &amp; authenticity
-          </h2>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {data.trust.badges.identityVerified && (
-              <span title={ACCOUNT_BADGES.identity_verified.description} className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-300">
-                <BadgeCheck className="h-3 w-3" /> Identity Verified
-              </span>
-            )}
-            {data.trust.badges.businessVerified && (
-              <span title={ACCOUNT_BADGES.business_verified.description} className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-300">
-                <BadgeCheck className="h-3 w-3" /> Business Verified
-              </span>
-            )}
-            {data.trust.badges.studentVerified && (
-              <span title={ACCOUNT_BADGES.student_verified.description} className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-300">
-                <BadgeCheck className="h-3 w-3" /> Student Verified
-              </span>
-            )}
-            {!data.trust.badges.identityVerified && !data.trust.badges.businessVerified && !data.trust.badges.studentVerified && (
-              <span className="text-xs text-zinc-500">No verifications yet — badges are earned, never bought.</span>
-            )}
-          </div>
-          <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-line-soft pt-3 text-xs text-zinc-400 sm:grid-cols-4">
-            <li>
-              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
-                {data.trust.completedProjects + data.trust.completedBookings}
-              </span>
-              Completed on UpNova
-            </li>
-            <li>
-              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-lime-300">{data.trust.verifiedWorkPosts}</span>
-              Verified work posts
-            </li>
-            <li>
-              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-violet-300">{data.trust.clientConfirmedPosts}</span>
-              Client confirmations
-            </li>
-            <li>
-              <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
-                {data.trust.rating != null ? `${data.trust.rating.toFixed(1)}` : "—"}
-              </span>
-              {data.trust.reviewsCount} review{data.trust.reviewsCount === 1 ? "" : "s"}
-            </li>
-            {(data.trust.licensesIssued ?? 0) > 0 && (
-              <li>
-                <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">{data.trust.licensesIssued}</span>
-                Licenses issued
-              </li>
-            )}
-          </ul>
-        </section>
-      )}
-            </React.Fragment>
-          ),
-          posts: (
-            <React.Fragment key="posts">
-      <section className={`card p-5 ${theme.card} ${effect.cls}`}>
-        <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Posts</h2>
-        <div className="mt-3">
-          <PostsGrid
-            handle={user.handle}
-            displayName={user.displayName}
-            services={services.map((s) => ({ id: s.id, title: s.title, price: s.price, category: s.category ?? "", cta: s.cta }))}
-          />
-        </div>
-      </section>
-            </React.Fragment>
-          ),
-          services: (
-            <React.Fragment key="services">
-      {services.length > 0 && (
-        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
-          <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Services</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {services.map((s) => (
-              <article key={s.id} className="card-money flex flex-col p-4">
-                <h3 className="text-sm font-bold text-zinc-100">
-                  <Link href={`/services/${s.id}`} className="transition hover:text-lime-300">{s.title}</Link>
-                </h3>
-                <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">From ${s.price}</p>
-                <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
-                <p className="mt-2 text-[10px] text-zinc-500">{s.reach}</p>
-                {!isMe && me && (
-                  <Link href="/services" className="btn-lime mt-3 w-full justify-center py-1.5 text-xs">
-                    <Zap className="h-3.5 w-3.5" /> View on Services
-                  </Link>
-                )}
-              </article>
-            ))}
-          </div>
-          {/* deactivated services stay part of the record — history, not erasure */}
-          {(data.pastServices ?? []).length > 0 && (
-            <div className="mt-4 border-t border-line-soft pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Past services</p>
-              <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                {data.pastServices!.map((s) => (
-                  <li key={s.id}>
-                    <Link
-                      href={`/services/${s.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300"
-                    >
-                      {s.title} <span className="text-zinc-700">· {s.category}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-      )}
-            </React.Fragment>
-          ),
-          reviews: (
-            <React.Fragment key="reviews">
-      {(data.reviews ?? []).length > 0 && (
-        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
-          <h2 className={`flex items-center gap-2 text-sm font-bold ${accent.text} ${headingFont.cls}`}>
-            Reviews
-            <span className="font-normal text-zinc-500">from verified projects only</span>
-          </h2>
-          <div className="mt-3 space-y-2.5">
-            {(data.reviews ?? []).map((r, i) => (
-              <div key={i} className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
-                <p className="flex items-center gap-1 text-xs font-semibold text-amber-300">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
-                  <span className="ml-1 font-normal text-zinc-600">
-                    {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                  </span>
-                </p>
-                {r.body && <p className="mt-1 text-xs leading-relaxed text-zinc-300">{r.body}</p>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-            </React.Fragment>
-          ),
-          experience: (
-            <React.Fragment key="experience">
-      {experience.length > 0 && (
-        <section className={`card p-5 ${theme.card} ${effect.cls}`}>
-          <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Experience</h2>
-          <ol className="mt-4 space-y-4 border-l border-line pl-4">
-            {experience.map((e) => (
-              <li key={e.id} className="relative">
-                <span className="absolute -left-[23px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-card bg-lime-400" />
-                <p className="text-sm font-semibold text-zinc-100">
-                  {e.position} <span className="font-normal text-zinc-400">— {e.organization}</span>
-                </p>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                  {e.start} — {e.end || "Now"}
-                </p>
-                {e.description && <p className="mt-1 text-xs leading-relaxed text-zinc-400">{e.description}</p>}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-            </React.Fragment>
-          ),
-        };
         const order = data.studio?.sections?.length ? data.studio.sections : [...SECTION_IDS];
         return <>{order.map((id) => sectionBlocks[id] ?? null)}</>;
       })()}

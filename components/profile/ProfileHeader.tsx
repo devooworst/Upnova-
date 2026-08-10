@@ -167,15 +167,16 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
               </span>
             )}
             {user?.campus && (
-              <span
-                className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
-                title="Platform-verified school affiliation — earned through verification, never self-claimed. Manage in Settings → School & Education."
+              <Link
+                href={`/schools/${user.campus.slug}`}
+                className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300 transition hover:bg-violet-400/20"
+                title="Platform-verified school affiliation. Tap to see everyone at this school on UpNova. Manage in Settings → School & Education."
               >
                 <GraduationCap className="h-3.5 w-3.5" />
                 {user.campus.name}
                 {user.campus.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
                 {user.campus.affiliation === "alumni" ? " · Alumni" : user.campus.affiliation === "faculty_staff" ? " · Faculty / Staff" : ""}
-              </span>
+              </Link>
             )}
             {(isOwner || profile.showWorkPerformance) && (stats.completedProjects ?? 0) > 0 && (
               <span

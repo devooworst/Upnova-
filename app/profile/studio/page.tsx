@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Palette, Sparkles, Check, RotateCcw, Eye, ArrowUp, ArrowDown, Lock, FlaskConical } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
+import { useRef } from "react";
+import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff } from "lucide-react";
 import {
   THEMES,
   FRAMES,
@@ -13,7 +15,12 @@ import {
   EFFECTS,
   SECTION_LABELS,
   DEFAULT_STUDIO,
+  DEFAULT_WORLD,
+  ENVIRONMENTS,
+  WORLD_ELEMENT_IDS,
+  WORLD_ELEMENT_LABELS,
   type StudioConfig,
+  type WorldConfig,
 } from "@/lib/profileStudio";
 
 /* ------------------------------------------------------------------ */
@@ -59,6 +66,45 @@ export default function ProfileStudioPage() {
     });
     setDirty(true);
   };
+
+  /* ---------------- MY WORLD editor ---------------- */
+  const world: WorldConfig = cfg.world ?? DEFAULT_WORLD;
+  const setWorld = (patch: Partial<WorldConfig>) => {
+    setCfg((c) => ({ ...c, world: { ...(c.world ?? DEFAULT_WORLD), ...patch } }));
+    setDirty(true);
+    setMsg(null);
+  };
+  const patchEl = (id: string, patch: Partial<WorldConfig["elements"][string]>) => {
+    setCfg((c) => {
+      const w = c.world ?? DEFAULT_WORLD;
+      return { ...c, world: { ...w, elements: { ...w.elements, [id]: { ...w.elements[id], ...patch } } } };
+    });
+    setDirty(true);
+  };
+  const [selected, setSelected] = useState<string>("hero");
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
+  const onElPointerDown = (id: string) => (e: React.PointerEvent) => {
+    setSelected(id);
+    const canvas = canvasRef.current;
+    if (!canvas || device === "mobile") return;
+    const rect = canvas.getBoundingClientRect();
+    const el = world.elements[id];
+    dragRef.current = { id, dx: e.clientX - rect.left - (el.x / 100) * rect.width, dy: e.clientY - rect.top - el.y * 0.28 };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const onCanvasPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    const canvas = canvasRef.current;
+    if (!d || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    // snap: 2% grid horizontally, 20px vertically (canvas shows at 0.28 scale)
+    const x = Math.round(Math.min(100, Math.max(0, ((e.clientX - rect.left - d.dx) / rect.width) * 100)) / 2) * 2;
+    const y = Math.round(Math.min(4000, Math.max(0, (e.clientY - rect.top - d.dy) / 0.28)) / 20) * 20;
+    patchEl(d.id, { x, y });
+  };
+  const onCanvasPointerUp = () => (dragRef.current = null);
 
   const save = async () => {
     setBusy(true);
@@ -246,6 +292,129 @@ export default function ProfileStudioPage() {
                 ))}
               </div>
             </div>
+          </section>
+
+          {/* MY WORLD — the owner-designed environment */}
+          <section className="card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+                  <Globe2 className="h-4 w-4 text-lime-400" /> My World
+                </h2>
+                <p className="mt-1 max-w-md text-xs leading-relaxed text-zinc-500">
+                  Turn your profile into your own environment: pick a scene, then move, rotate,
+                  layer, and hide approved elements. Visitors on phones always get a clean stacked
+                  version — your world never breaks mobile.
+                </p>
+              </div>
+              <button
+                onClick={() => setWorld({ enabled: !world.enabled })}
+                className={`rounded-full border px-4 py-1.5 text-xs font-bold transition ${world.enabled ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
+              >
+                {world.enabled ? "My World is ON" : "Turn on My World"}
+              </button>
+            </div>
+
+            {world.enabled && (
+              <>
+                {/* environment scenes */}
+                <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Environment</p>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {Object.entries(ENVIRONMENTS).map(([id, env]) => (
+                    <button
+                      key={id}
+                      onClick={() => setWorld({ environment: id })}
+                      className={`overflow-hidden rounded-lg border text-left transition ${world.environment === id ? "border-lime-400/60" : "border-line hover:border-zinc-600"}`}
+                    >
+                      <span className="block h-12 w-full" style={{ backgroundImage: env.css }} />
+                      <span className="block px-2 py-1.5">
+                        <span className="block text-[11px] font-semibold text-zinc-100">{env.label}</span>
+                        <span className="block truncate text-[9px] text-zinc-500">{env.desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* device preview switch */}
+                <div className="mt-4 flex items-center gap-1.5">
+                  <p className="mr-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Canvas</p>
+                  {([["desktop", Monitor], ["tablet", Tablet], ["mobile", Smartphone]] as const).map(([d, Icon]) => (
+                    <button key={d} onClick={() => setDevice(d)} className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize transition ${device === d ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400"}`}>
+                      <Icon className="h-3 w-3" /> {d}
+                    </button>
+                  ))}
+                  <span className="ml-auto font-mono text-[9px] text-zinc-600">drag to move · 2% / 20px snap</span>
+                </div>
+
+                {/* the canvas — drag to place; mobile shows the real stacked order */}
+                <div className={`mx-auto mt-2 ${device === "tablet" ? "max-w-md" : device === "mobile" ? "max-w-[240px]" : ""}`}>
+                  <div
+                    ref={canvasRef}
+                    onPointerMove={onCanvasPointerMove}
+                    onPointerUp={onCanvasPointerUp}
+                    className="relative overflow-hidden rounded-xl border border-line"
+                    style={{ backgroundImage: ENVIRONMENTS[world.environment].css, height: device === "mobile" ? "auto" : 420, touchAction: "none" }}
+                  >
+                    {device === "mobile" ? (
+                      <div className="space-y-2 p-3">
+                        <p className="text-center font-mono text-[8px] uppercase tracking-wide text-zinc-500">phones always stack top-to-bottom</p>
+                        {WORLD_ELEMENT_IDS.filter((id) => !world.elements[id].hidden || id === "hero")
+                          .sort((a, b) => world.elements[a].y - world.elements[b].y)
+                          .map((id) => (
+                            <div key={id} className="rounded border border-line bg-card/90 px-2 py-1.5 text-[9px] font-semibold text-zinc-300">{WORLD_ELEMENT_LABELS[id]}</div>
+                          ))}
+                      </div>
+                    ) : (
+                      WORLD_ELEMENT_IDS.map((id) => {
+                        const el = world.elements[id];
+                        if (el.hidden && id !== "hero") return null;
+                        return (
+                          <div
+                            key={id}
+                            onPointerDown={onElPointerDown(id)}
+                            className={`absolute cursor-grab select-none rounded-lg border px-2 py-1.5 text-[9px] font-bold active:cursor-grabbing ${selected === id ? "border-lime-400 bg-lime-400/15 text-lime-200" : "border-zinc-500/60 bg-card/85 text-zinc-300"}`}
+                            style={{ left: `${el.x}%`, top: el.y * 0.28, width: `${el.w}%`, zIndex: el.layer, transform: `rotate(${el.rotate}deg)`, minHeight: 34 }}
+                          >
+                            {WORLD_ELEMENT_LABELS[id]}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* inspector for the selected element */}
+                <div className="mt-3 rounded-lg border border-line bg-card-raised p-3">
+                  <p className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                    <Layers className="h-3.5 w-3.5 text-zinc-500" /> {WORLD_ELEMENT_LABELS[selected]}
+                    {selected === "hero" && <span className="font-mono text-[8px] uppercase text-zinc-600">always visible · functions locked</span>}
+                  </p>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                    <label className="text-[10px] text-zinc-500">
+                      Width — {world.elements[selected].w}%
+                      <input type="range" min={24} max={100} value={world.elements[selected].w} onChange={(e) => patchEl(selected, { w: Number(e.target.value) })} className="mt-1 w-full accent-lime-400" />
+                    </label>
+                    <label className="text-[10px] text-zinc-500">
+                      Rotate — {world.elements[selected].rotate}°
+                      <input type="range" min={-8} max={8} value={world.elements[selected].rotate} onChange={(e) => patchEl(selected, { rotate: Number(e.target.value) })} className="mt-1 w-full accent-lime-400" />
+                    </label>
+                    <div className="flex items-end gap-2">
+                      <button onClick={() => patchEl(selected, { layer: Math.min(20, world.elements[selected].layer + 1) })} className="btn-ghost px-2.5 py-1 text-[10px]">Layer +</button>
+                      <button onClick={() => patchEl(selected, { layer: Math.max(0, world.elements[selected].layer - 1) })} className="btn-ghost px-2.5 py-1 text-[10px]">Layer −</button>
+                      {selected !== "hero" && (
+                        <button onClick={() => patchEl(selected, { hidden: !world.elements[selected].hidden })} className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${world.elements[selected].hidden ? "border-amber-400/40 text-amber-300" : "border-line text-zinc-400"}`}>
+                          <EyeOff className="h-3 w-3" /> {world.elements[selected].hidden ? "Hidden" : "Hide"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
+                  Approved elements only — messaging, booking, payments, verification, reporting,
+                  and your identity badges live inside the profile card and can&apos;t be altered or hidden.
+                </p>
+              </>
+            )}
           </section>
 
           {/* layout */}

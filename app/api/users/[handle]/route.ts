@@ -153,6 +153,7 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
         if (!v.v.showSchool && !isOwner) return null;
         return {
           school: v.c.name,
+          schoolSlug: v.c.slug,
           affiliation: v.v.affiliation,
           classOf: (v.v.showGradYear || isOwner) && v.v.gradYear ? v.v.gradYear : null,
           verified: true,
