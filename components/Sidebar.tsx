@@ -64,7 +64,20 @@ const navGroups: {
   },
 ];
 
-export default function Sidebar() {
+/**
+ * variant "desktop" — the classic sticky column (collapsible via the
+ *   hamburger; `collapsed` animates it away and gives content the width)
+ * variant "drawer"  — the same sidebar, unchanged content, rendered
+ *   inside the mobile slide-in panel
+ * Navigation items and functionality are IDENTICAL in both.
+ */
+export default function Sidebar({
+  variant = "desktop",
+  collapsed = false,
+}: {
+  variant?: "desktop" | "drawer";
+  collapsed?: boolean;
+} = {}) {
   const pathname = usePathname();
   const { user } = useSession();
   const myCommunities = communities.filter((c) => c.joined);
@@ -82,7 +95,18 @@ export default function Sidebar() {
   const campus = user?.campus ?? null;
 
   return (
-    <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-60 shrink-0 flex-col gap-4 self-start overflow-y-auto pb-6 lg:flex">
+    <aside
+      className={
+        variant === "drawer"
+          ? "flex h-full w-full flex-col gap-4 overflow-y-auto p-4 pb-10"
+          : `sticky top-20 hidden max-h-[calc(100vh-6rem)] shrink-0 flex-col gap-4 self-start pb-6 transition-[width,opacity,margin] duration-300 ease-in-out lg:flex ${
+              collapsed
+                ? "w-0 -translate-x-2 overflow-hidden opacity-0 lg:-mr-6"
+                : "w-60 overflow-y-auto opacity-100"
+            }`
+      }
+      aria-hidden={variant === "desktop" && collapsed ? true : undefined}
+    >
       {/* Main nav — unboxed; grouping does the work */}
       <nav className="space-y-4 px-1">
         {navGroups.map((g) => (

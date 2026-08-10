@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  Menu,
   Search,
   Plus,
   MessageSquare,
@@ -26,6 +27,7 @@ import Avatar from "./Avatar";
 import { promptJoin } from "./GuestGate";
 import { useSession, logout } from "@/lib/session";
 import { openCreateModal } from "./CreateModalTrigger";
+import { toggleSidebar } from "@/lib/sidebarStore";
 import DemoModeSwitch from "./DemoModeSwitch";
 
 export default function Navbar() {
@@ -48,6 +50,16 @@ export default function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-3 px-3 sm:gap-4 sm:px-4 lg:px-6">
+        {/* Sidebar toggle — collapses the column on desktop, opens the
+            drawer on mobile. Navigation items are untouched. */}
+        <button
+          onClick={toggleSidebar}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition hover:bg-card-raised hover:text-zinc-100"
+          aria-label="Toggle navigation menu"
+          title="Toggle navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-1.5" aria-label="UpNova home">
           <span className="text-xl leading-none text-lime-400" aria-hidden>

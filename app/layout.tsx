@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import Sidebar from "@/components/Sidebar";
+import SidebarShell from "@/components/SidebarShell";
 import MobileNav from "@/components/MobileNav";
 import CreateModal from "@/components/CreateModal";
 import GuestGate from "@/components/GuestGate";
@@ -40,7 +40,7 @@ export default function RootLayout({
         <FollowProvider>
         <Navbar />
         <div className="mx-auto flex w-full max-w-[1440px] gap-6 px-3 pb-24 pt-[8rem] sm:px-4 md:pb-10 md:pt-20 lg:px-6">
-          <Sidebar />
+          <SidebarShell />
           <main className="min-w-0 flex-1">{children}</main>
         </div>
         <MobileNav />
