@@ -743,6 +743,12 @@ export async function POST(req: NextRequest) {
       pub2.status === 409 && /Fully booked/.test(String((pub2.data as any).error)) && pref4.status === 409 && /Fully booked/.test(String((pref4.data as any).error)), {
       actual: `public=${pub2.status} preferred=${pref4.status}` });
 
+    // the CALENDAR tells the truth while full: fully_booked ≠ not_released
+    const avFull = ((await api("harboroak", `/api/services/${svc.id}/availability?days=30`)).data as any).days ?? [];
+    const fullDay = avFull.find((x: any, i: number) => i >= 5 && ["fully_booked"].includes(x.status));
+    step(c, "CALENDAR: while 3/3 slots are taken the calendar shows FULLY BOOKED (never 'not released' — different truths)",
+      !!fullDay && /taken|fully booked/i.test(String(fullDay?.note ?? "")), { route: "GET availability", actual: JSON.stringify(fullDay).slice(0, 110) });
+
     const cancel = await api("harboroak", `/api/bookings/${(pub1.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
     const rebook = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(15), durationMin: 60 } });
     step(c, "cancellation frees its slot → the same time rebooks cleanly (no duplicate, no ghost hold)", cancel.status === 200 && rebook.status === 200, { actual: `cancel=${cancel.status} rebook=${rebook.status}` });
@@ -779,6 +785,14 @@ export async function POST(req: NextRequest) {
       step(c, "SCHEDULED RELEASE: provider schedules 'new availability opens in 2h · covers 40 days · Preferred first for 24h' (holders notified)",
         fut.status === 200 && futD.releaseMode === "scheduled" && Number(futD.notified) >= 1 && !!futD.publicAt, {
         route: "POST /api/services/[id]/release", actual: JSON.stringify({ mode: futD.releaseMode, notified: futD.notified }) });
+      const wd = (arr: any[], lo: number, hi: number) => arr.find((x: any, i: number) => { if (i < lo || i > hi) return false; const g = new Date(x.date + "T12:00:00").getDay(); return g >= 1 && g <= 5; });
+      const avFut = ((await api(null, `/api/services/${svc.id}/availability?days=60`)).data as any).days ?? [];
+      const shaded = wd(avFut, 15, 35);
+      const beyondCov = wd(avFut, 45, 58);
+      step(c, "CALENDAR before the release: covered dates SHADED as 'not released' WITH the opening time · beyond coverage shaded WITHOUT one",
+        shaded?.status === "not_released" && !!shaded?.opensAt && beyondCov?.status === "not_released" && !beyondCov?.opensAt, {
+        route: "GET availability (guest)", actual: JSON.stringify({ shaded: { s: shaded?.status, opens: !!shaded?.opensAt }, beyond: { s: beyondCov?.status, opens: !!beyondCov?.opensAt } }) });
+
       const preA = await api("tonbpc", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(20, 10), durationMin: 60 } });
       const preB = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(20, 12), durationMin: 60 } });
       step(c, "before the release: NOBODY can book the new dates — Preferred Clients included (with the opening time in the message)",
@@ -792,6 +806,13 @@ export async function POST(req: NextRequest) {
       step(c, "release in Early Access: outsider 403 (public time shown) · Preferred Client books · their SECOND booking hits the 1-per-client limit",
         eaOut.status === 403 && eaIn.status === 200 && eaIn2.status === 409 && /per Preferred Client/.test(String((eaIn2.data as any).error)), {
         actual: `out=${eaOut.status} in=${eaIn.status} second=${eaIn2.status}` });
+      const avEaPref = ((await api("tonbpc", `/api/services/${svc.id}/availability?days=60`)).data as any).days ?? [];
+      const avEaOut = ((await api("harboroak", `/api/services/${svc.id}/availability?days=60`)).data as any).days ?? [];
+      const dPref = wd(avEaPref, 15, 35);
+      const dOut = wd(avEaOut, 15, 35);
+      step(c, "CALENDAR during Early Access is per-viewer honest: Preferred sees BOOKABLE · everyone else sees 'preferred first' with the public time",
+        ["available", "limited"].includes(dPref?.status) && dOut?.status === "early_access" && !!dOut?.publicAt, {
+        actual: JSON.stringify({ preferred: dPref?.status, public: dOut?.status, publicAt: !!dOut?.publicAt }) });
       // 3) early access over (released 30h ago) → public
       await api("lena", `/api/services/${svc.id}/release`, { method: "POST", body: { releaseAt: new Date(Date.now() - 30 * 3600e3).toISOString(), coversUntil: covers, earlyAccessHours: 24 } });
       const pubOk = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: wkAt(21, 12), durationMin: 60 } });
@@ -799,6 +820,23 @@ export async function POST(req: NextRequest) {
       step(c, "early access over: the public books the released dates — but dates BEYOND the release stay closed",
         pubOk.status === 200 && beyond.status === 409 && /released/.test(String((beyond.data as any).error)), {
         actual: `public=${pubOk.status} beyond=${beyond.status}` });
+      const avPub = ((await api(null, `/api/services/${svc.id}/availability?days=60`)).data as any).days ?? [];
+      const dOpen = wd(avPub, 15, 35);
+      const dSun = avPub.find((x: any) => new Date(x.date + "T12:00:00").getDay() === 0);
+      step(c, "CALENDAR after the public opening: released dates GREEN · closed weekdays show 'closed' (not 'unavailable') — every state distinct",
+        ["available", "limited"].includes(dOpen?.status) && dSun?.status === "booking_closed", {
+        actual: JSON.stringify({ released: dOpen?.status, sunday: dSun?.status }) });
+      // multiple services, different schedules: a second (rolling 14d) service
+      // coexists with the scheduled one — each calendar independent
+      const svc2 = await api("lena", "/api/services", { method: "POST", body: { title: "[TEST] Rolling Cuts", price: 40, category: "creative", visibility: "public", fulfillment: "appointment", config: { scheduling: { horizonDays: 14, durationMin: 60 } } } });
+      const svc2Id = String((svc2.data as any).id ?? "");
+      const avRoll = svc2Id ? ((await api(null, `/api/services/${svc2Id}/availability?days=40`)).data as any).days ?? [] : [];
+      const rNear = wd(avRoll, 2, 10);
+      const rFar = wd(avRoll, 20, 35);
+      step(c, "MULTIPLE SERVICES, different schedules: the rolling-14d service is green near / 'outside horizon' far — while its sibling stays scheduled",
+        svc2.status === 200 && ["available", "limited"].includes(rNear?.status) && rFar?.status === "outside_horizon" && !!rFar?.opensAt, {
+        actual: JSON.stringify({ near: rNear?.status, far: rFar?.status, opens: !!rFar?.opensAt }) });
+      if (svc2Id) await api("lena", `/api/services/${svc2Id}`, { method: "DELETE" });
       // 4) cancellations free slots; switch back to rolling restores continuous booking
       if ((eaIn.data as any).id) await api("tonbpc", `/api/bookings/${(eaIn.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
       if ((pubOk.data as any).id) await api("harboroak", `/api/bookings/${(pubOk.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });

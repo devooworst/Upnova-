@@ -10,6 +10,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import AvailabilityStrip from "@/components/AvailabilityStrip";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Star, Lock, Link2, Check, CalendarDays, Zap, BadgeCheck } from "lucide-react";
@@ -238,6 +239,18 @@ export default function ServicePage() {
             </ul>
           )}
         </div>
+
+        {/* THE HONEST CALENDAR — the future is visible, each state explains
+            itself: available · limited · preferred-first · not released yet ·
+            closed · fully booked. Click any date for the why. */}
+        {svc.fulfillment === "appointment" && !svc.deactivated && (
+          <div className="mt-5 border-t border-dashed border-line pt-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Booking availability — next 6 weeks</p>
+            <div className="mt-2">
+              <AvailabilityStrip serviceId={svc.id} />
+            </div>
+          </div>
+        )}
 
         {/* CTA — the conversion moment comes AFTER they've seen everything */}
         <div className="mt-5 border-t border-dashed border-line pt-4">

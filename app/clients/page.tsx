@@ -14,6 +14,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useState } from "react";
+import AvailabilityStrip from "@/components/AvailabilityStrip";
 import Link from "next/link";
 import {
   Check,
@@ -509,6 +510,7 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
   const [customHours, setCustomHours] = useState(false);
   const [slots, setSlots] = useState("");
   const [prefLimit, setPrefLimit] = useState("");
+  const [showCal, setShowCal] = useState(false);
 
   const start = async () => {
     setBusy(true);
@@ -627,6 +629,12 @@ function EarlyAccessRow({ s, onChanged }: { s: MyService; onChanged: () => void 
         </div>
       )}
       {s.releaseMode === "scheduled" && <ReleaseScheduler s={s} onChanged={onChanged} />}
+      {/* the provider sees the SAME honest calendar customers see —
+          unreleased periods shaded, one truth for both sides */}
+      <button onClick={() => setShowCal(!showCal)} className="mt-2 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500 hover:text-zinc-300">
+        {showCal ? "Hide" : "Show"} booking calendar (what customers see)
+      </button>
+      {showCal && <div className="mt-2"><AvailabilityStrip serviceId={s.id} /></div>}
       {err && <p className="mt-1.5 text-[11px] font-medium text-amber-300">{err}</p>}
     </div>
   );
@@ -655,7 +663,8 @@ function ReleaseScheduler({ s, onChanged }: { s: MyService; onChanged: () => voi
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        releaseAt: openAt,
+        // empty "opens at" = open this availability RIGHT NOW (manual release)
+        releaseAt: openAt || new Date().toISOString(),
         coversUntil: covers ? `${covers}T23:59:59` : "",
         earlyAccessHours: ea.trim() === "" ? null : Number(ea),
         slots: slots.trim() === "" ? null : Number(slots),
@@ -694,7 +703,7 @@ function ReleaseScheduler({ s, onChanged }: { s: MyService; onChanged: () => voi
         <div className="mt-1 flex flex-wrap items-end gap-2">
           <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
             Opens at
-            <input type="datetime-local" value={openAt} onChange={(e) => setOpenAt(e.target.value)} className="input-dark mt-1 px-2 py-1.5 text-xs" title="The moment this release opens for booking" />
+            <input type="datetime-local" value={openAt} onChange={(e) => setOpenAt(e.target.value)} className="input-dark mt-1 px-2 py-1.5 text-xs" title="The moment this release opens for booking — leave empty to open the availability right now" />
           </label>
           <label className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
             Covers dates through
@@ -712,7 +721,9 @@ function ReleaseScheduler({ s, onChanged }: { s: MyService; onChanged: () => voi
             Per client
             <input value={perClient} onChange={(e) => setPerClient(e.target.value.replace(/[^0-9]/g, ""))} placeholder="no limit" className="input-dark mt-1 w-14 px-2 py-1.5 text-xs" title="Optional: max bookings per Preferred Client during early access" />
           </label>
-          <button disabled={busy || !openAt || !covers} onClick={schedule} className="btn-ghost px-3 py-1.5 text-xs">Schedule release</button>
+          <button disabled={busy || !covers} onClick={schedule} className="btn-ghost px-3 py-1.5 text-xs">
+            {openAt ? "Schedule release" : "Open this availability now"}
+          </button>
           <p className="w-full text-[10px] leading-relaxed text-zinc-600">
             Nothing beyond your released dates is bookable until this opens{ea.trim() ? ` — then Preferred Clients book first for ${ea}h, everyone after` : " — then it opens to everyone at once"}. Capacity always binds everyone.
           </p>
