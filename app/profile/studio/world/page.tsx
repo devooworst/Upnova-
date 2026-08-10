@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Undo2,
   Redo2,
   Monitor,
@@ -52,6 +53,8 @@ export default function MyWorldEditor() {
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [defaultOpen, setDefaultOpen] = useState(false);
   const [meta, setMeta] = useState<{ isPro: boolean; demoBypass: boolean } | null>(null);
 
   // undo/redo — snapshots of the whole studio config
@@ -148,11 +151,12 @@ export default function MyWorldEditor() {
     setBusy(false);
   };
 
-  /* Default Layout = the standard UpNova arrangement, applied to the SAVED
-     profile (not just this editor). Confirm, reset, persist immediately. */
+  /* Default Layout = the ORIGINAL UpNova profile structure (one full-width
+     column, original order and spacing — the canonical DEFAULT_WORLD),
+     applied to the SAVED profile, not just this editor. */
   const defaultLayout = async () => {
     if (!cfg) return;
-    if (!window.confirm("Restore the default UpNova profile arrangement? Your environment, theme, banner, and decorations stay — the layout resets and saves immediately.")) return;
+    setDefaultOpen(false);
     pushHistory(cfg);
     const next: StudioConfig = { ...cfg, world: { ...world, elements: JSON.parse(JSON.stringify(DEFAULT_WORLD.elements)) } };
     setCfg(next);
@@ -203,12 +207,24 @@ export default function MyWorldEditor() {
       </div>
     );
 
-  const widths = { desktop: "max-w-5xl", tablet: "max-w-3xl", mobile: "max-w-sm" } as const;
+  // large screens use the space — the edit view matches the real profile scale
+  const widths = { desktop: "max-w-5xl 2xl:max-w-6xl", tablet: "max-w-3xl", mobile: "max-w-sm" } as const;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink">
       {/* floating toolbar — minimal, per the spec */}
       <div className="sticky top-3 z-[60] mx-auto flex w-fit max-w-[96vw] items-center gap-1 rounded-full border border-line bg-card/95 px-2 py-1.5 shadow-2xl backdrop-blur">
+        <button
+          onClick={() => (dirty ? setLeaveOpen(true) : router.push("/profile"))}
+          className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-zinc-600 hover:bg-card-raised"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Profile
+        </button>
+        <span className="mx-1 h-5 w-px bg-line" />
+        <span className={`rounded-full px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] ${preview ? "bg-sky-400/15 text-sky-300" : "bg-lime-400/15 text-lime-300"}`}>
+          {preview ? "Preview mode" : "Edit mode"}
+        </span>
+        <span className="mx-1 h-5 w-px bg-line" />
         <button onClick={undo} disabled={undoStack.current.length === 0} className="icon-btn h-8 w-8 disabled:opacity-30" title="Undo" aria-label="Undo"><Undo2 className="h-4 w-4" /></button>
         <button onClick={redo} disabled={redoStack.current.length === 0} className="icon-btn h-8 w-8 disabled:opacity-30" title="Redo" aria-label="Redo"><Redo2 className="h-4 w-4" /></button>
         <span className="mx-1 h-5 w-px bg-line" />
@@ -217,13 +233,20 @@ export default function MyWorldEditor() {
         ))}
         <span className="mx-1 h-5 w-px bg-line" />
         <button onClick={() => setPreview(!preview)} className={`icon-btn h-8 w-8 ${preview ? "bg-lime-400/15 text-lime-300" : ""}`} title="Preview — exactly what visitors see" aria-label="Preview"><Eye className="h-4 w-4" /></button>
-        <button onClick={() => setDrawer(!drawer)} className={`icon-btn h-8 w-8 ${drawer ? "bg-lime-400/15 text-lime-300" : ""}`} title="Design — environment, banner, decorations" aria-label="Design panel"><Paintbrush className="h-4 w-4" /></button>
-        <button onClick={defaultLayout} disabled={busy} className="icon-btn h-8 w-8 disabled:opacity-40" title="Default Layout — restore the standard UpNova arrangement (saves)" aria-label="Default layout"><LayoutTemplate className="h-4 w-4" /></button>
+        <button
+          onClick={() => setDrawer(!drawer)}
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition ${drawer ? "bg-lime-400/15 text-lime-300" : "text-zinc-300 hover:bg-card-raised"}`}
+          title="Theme & Decorations — change backgrounds, colors, decorations and visual effects."
+          aria-label="Theme and decorations"
+        >
+          <Paintbrush className="h-3.5 w-3.5" /> Theme
+        </button>
+        <button onClick={() => setDefaultOpen(true)} disabled={busy} className="icon-btn h-8 w-8 disabled:opacity-40" title="Default Layout — restore the original UpNova profile arrangement" aria-label="Default layout"><LayoutTemplate className="h-4 w-4" /></button>
         <span className="mx-1 h-5 w-px bg-line" />
         <button onClick={save} disabled={busy || !dirty} className="rounded-full bg-lime-400 px-4 py-1.5 text-xs font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-40">
           {busy ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
-        <button onClick={() => (dirty && !window.confirm("Leave with unsaved changes?") ? null : router.push("/profile"))} className="icon-btn h-8 w-8" title="Exit to profile" aria-label="Exit">
+        <button onClick={() => (dirty ? setLeaveOpen(true) : router.push("/profile"))} className="icon-btn h-8 w-8" title="Exit to profile" aria-label="Exit">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -260,6 +283,47 @@ export default function MyWorldEditor() {
         )}
       </div>
 
+      {/* unsaved changes — Save & Leave / Leave Without Saving / Cancel */}
+      {leaveOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={() => setLeaveOpen(false)}>
+          <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Unsaved changes</p>
+            <p className="mt-1.5 text-xs text-zinc-500">Save before leaving?</p>
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={async () => { await save(); setLeaveOpen(false); router.push("/profile"); }}
+                disabled={busy}
+                className="btn-lime w-full rounded-md py-2 text-xs disabled:opacity-50"
+              >
+                Save &amp; Leave
+              </button>
+              <button onClick={() => { setLeaveOpen(false); router.push("/profile"); }} className="w-full rounded-full border border-red-500/30 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10">
+                Leave Without Saving
+              </button>
+              <button onClick={() => setLeaveOpen(false)} className="btn-ghost w-full py-2 text-xs">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* default layout confirm */}
+      {defaultOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={() => setDefaultOpen(false)}>
+          <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Restore default layout?</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+              This resets your My World arrangement to the original UpNova profile — full-width
+              sections in the original order and spacing. Your environment, theme, banner, and
+              decorations stay. Saves immediately.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setDefaultOpen(false)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
+              <button onClick={defaultLayout} disabled={busy} className="btn-lime flex-1 rounded-md py-2 text-xs disabled:opacity-50">Restore Default</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* design drawer — scene, banner, decorations (the creative layer) */}
       {drawer && !preview && (
         <aside className="fixed bottom-0 right-0 top-0 z-[55] w-80 max-w-[90vw] overflow-y-auto border-l border-line bg-card p-4 shadow-2xl">
@@ -278,7 +342,8 @@ export default function MyWorldEditor() {
             ))}
           </div>
 
-          <p className="mt-5 flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500"><ImageIcon className="h-3 w-3" /> Banner / cover</p>
+          <p className="mt-5 flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500"><ImageIcon className="h-3 w-3" /> Profile banner (header image)</p>
+          <p className="mt-0.5 text-[9px] leading-relaxed text-zinc-600">Sits on your profile card, exactly as visitors see it. The Environment above is the separate canvas background behind everything.</p>
           <div className="mt-2 overflow-hidden rounded-lg border border-line">
             {cover?.url ? (
               // eslint-disable-next-line @next/next/no-img-element

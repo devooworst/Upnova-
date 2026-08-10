@@ -59,16 +59,20 @@ export const WORLD_ELEMENT_LABELS: Record<string, string> = {
   experience: "Experience",
 };
 
+/* THE CANONICAL DEFAULT = the original UpNova profile structure:
+   one full-width column, original section order, original spacing,
+   no rotation, content-sized heights. "Default layout" restores
+   exactly this — the profile every visitor knows. */
 export const DEFAULT_WORLD: WorldConfig = {
   enabled: false,
   environment: "cosmic",
   elements: {
-    hero: { x: 2, y: 24, w: 64, h: 0, rotate: 0, layer: 10, hidden: false },
-    trust: { x: 68, y: 60, w: 30, h: 0, rotate: 1, layer: 8, hidden: false },
-    posts: { x: 2, y: 460, w: 52, h: 0, rotate: 0, layer: 7, hidden: false },
-    services: { x: 56, y: 460, w: 42, h: 0, rotate: -1, layer: 6, hidden: false },
-    reviews: { x: 2, y: 960, w: 44, h: 0, rotate: 0, layer: 5, hidden: false },
-    experience: { x: 48, y: 960, w: 50, h: 0, rotate: 0, layer: 4, hidden: false },
+    hero: { x: 0, y: 0, w: 100, h: 0, rotate: 0, layer: 10, hidden: false },
+    trust: { x: 0, y: 560, w: 100, h: 0, rotate: 0, layer: 9, hidden: false },
+    posts: { x: 0, y: 1000, w: 100, h: 0, rotate: 0, layer: 8, hidden: false },
+    services: { x: 0, y: 1560, w: 100, h: 0, rotate: 0, layer: 7, hidden: false },
+    reviews: { x: 0, y: 2040, w: 100, h: 0, rotate: 0, layer: 6, hidden: false },
+    experience: { x: 0, y: 2440, w: 100, h: 0, rotate: 0, layer: 5, hidden: false },
   },
 };
 

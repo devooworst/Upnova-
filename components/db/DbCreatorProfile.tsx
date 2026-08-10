@@ -98,7 +98,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
   const { user: me } = useSession();
   const [data, setData] = useState<PublicProfile | null>(null);
   // WYSIWYG edit interaction state (only used when `edit` is provided)
-  const editDrag = useRef<{ id: string; mode: "move" | "e" | "w" | "n" | "s" | "se" | "rot"; startX: number; startY: number; el: WorldElement; measuredH: number } | null>(null);
+  const editDrag = useRef<{ id: string; mode: string; startX: number; startY: number; el: WorldElement; measuredH: number } | null>(null);
   const editCanvasRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -551,7 +551,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     const stacked = edit?.device === "mobile"; // the REAL phone behavior
     const snap2 = (v: number) => Math.round(v / 2) * 2;
     const snap20 = (v: number) => Math.round(v / 20) * 20;
-    const startInteraction = (id: string, mode: "move" | "e" | "w" | "n" | "s" | "se" | "rot") => (e: React.PointerEvent) => {
+    const startInteraction = (id: string, mode: string) => (e: React.PointerEvent) => {
       if (!edit || stacked) return;
       e.preventDefault();
       e.stopPropagation();
@@ -581,19 +581,24 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
           w: snap2(Math.min(100, Math.max(24, d.el.w - dxPct))),
           x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
         });
-      else if (d.mode === "s") edit.onChange(d.id, { h: clampH(baseH + dy) });
-      else if (d.mode === "n")
-        edit.onChange(d.id, {
-          h: clampH(baseH - dy),
-          y: snap20(Math.min(4000, Math.max(0, d.el.y + dy))),
-        });
-      else if (d.mode === "se")
-        edit.onChange(d.id, {
-          w: snap2(Math.min(100, Math.max(24, d.el.w + dxPct))),
-          h: clampH(baseH + dy),
-        });
       else if (d.mode === "rot")
         edit.onChange(d.id, { rotate: Math.round(Math.min(8, Math.max(-8, d.el.rotate + (e.clientX - d.startX) / 14))) });
+      else {
+        // any edge/corner combination: n/s adjust height (n also moves y),
+        // e/w adjust width (w also moves x) — composable like a real design tool
+        const patch: Partial<WorldElement> = {};
+        if (d.mode.includes("e")) patch.w = snap2(Math.min(100, Math.max(24, d.el.w + dxPct)));
+        if (d.mode.includes("w")) {
+          patch.w = snap2(Math.min(100, Math.max(24, d.el.w - dxPct)));
+          patch.x = snap2(Math.min(100, Math.max(0, d.el.x + dxPct)));
+        }
+        if (d.mode.includes("s")) patch.h = clampH(baseH + dy);
+        if (d.mode.includes("n")) {
+          patch.h = clampH(baseH - dy);
+          patch.y = snap20(Math.min(4000, Math.max(0, d.el.y + dy)));
+        }
+        edit.onChange(d.id, patch);
+      }
     };
     const endInteraction = () => (editDrag.current = null);
     const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
@@ -619,12 +624,9 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
               DEMO MODE preview — only you see this world until Pro is active.
             </p>
           )}
-          {coverUrl && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-72" aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={coverUrl} alt="" className="h-full w-full object-cover opacity-80" style={{ objectPosition: `center ${coverPos}%`, maskImage: "linear-gradient(180deg, black 55%, transparent 100%)", WebkitMaskImage: "linear-gradient(180deg, black 55%, transparent 100%)" }} />
-            </div>
-          )}
+          {/* the profile banner lives ON the header card (inside the hero
+              element), exactly as visitors see it on a standard profile.
+              The canvas background is the ENVIRONMENT — a separate concept. */}
           <div className="relative p-3 sm:p-4">
             <div
               ref={editCanvasRef}
@@ -661,19 +663,25 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                     >
                       {isSel && (
                         <>
-                          <span className="absolute -top-6 left-0 z-10 whitespace-nowrap rounded bg-lime-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
+                          <span className="absolute -top-6 left-0 z-10 flex items-center gap-1.5 whitespace-nowrap rounded bg-lime-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
                             {WORLD_ELEMENT_LABELS[id]}
                             {id === "hero" ? " · identity & actions locked inside" : ""}
+                            <span className="rounded bg-zinc-950/20 px-1 font-mono font-semibold">
+                              {el.x}% · {el.y}px · w{el.w}%{el.h > 0 ? ` · h${el.h}px` : ""}{el.rotate ? ` · ${el.rotate}°` : ""}
+                            </span>
                           </span>
                           {/* rotation — grab and pull sideways */}
-                          <span onPointerDown={startInteraction(id, "rot")} className="absolute -top-8 left-1/2 z-10 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-zinc-900 bg-lime-400" title="Drag sideways to rotate" aria-label="Rotate" />
-                          {/* edges */}
-                          <span onPointerDown={startInteraction(id, "e")} className="absolute -right-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize right edge" />
-                          <span onPointerDown={startInteraction(id, "w")} className="absolute -left-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize left edge" />
-                          <span onPointerDown={startInteraction(id, "n")} className="absolute -top-1.5 left-1/2 z-10 h-3 w-7 -translate-x-1/2 cursor-ns-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize top edge" />
-                          <span onPointerDown={startInteraction(id, "s")} className="absolute -bottom-1.5 left-1/2 z-10 h-3 w-7 -translate-x-1/2 cursor-ns-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize bottom edge" />
-                          {/* corner */}
-                          <span onPointerDown={startInteraction(id, "se")} className="absolute -bottom-1.5 -right-1.5 z-10 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize width and height" />
+                          <span onPointerDown={startInteraction(id, "rot")} className="absolute -top-9 left-1/2 z-10 h-5 w-5 -translate-x-1/2 cursor-grab rounded-full border-2 border-zinc-900 bg-lime-400 shadow" title="Drag sideways to rotate" aria-label="Rotate" />
+                          {/* edges — generous hit areas, correct cursors */}
+                          <span onPointerDown={startInteraction(id, "e")} className="absolute -right-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize right edge" />
+                          <span onPointerDown={startInteraction(id, "w")} className="absolute -left-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize left edge" />
+                          <span onPointerDown={startInteraction(id, "n")} className="absolute -top-2 left-1/2 z-10 h-4 w-10 -translate-x-1/2 cursor-ns-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize top edge" />
+                          <span onPointerDown={startInteraction(id, "s")} className="absolute -bottom-2 left-1/2 z-10 h-4 w-10 -translate-x-1/2 cursor-ns-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize bottom edge" />
+                          {/* all four corners */}
+                          <span onPointerDown={startInteraction(id, "nw")} className="absolute -left-2 -top-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from top-left" />
+                          <span onPointerDown={startInteraction(id, "ne")} className="absolute -right-2 -top-2 z-10 h-4 w-4 cursor-nesw-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from top-right" />
+                          <span onPointerDown={startInteraction(id, "sw")} className="absolute -bottom-2 -left-2 z-10 h-4 w-4 cursor-nesw-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from bottom-left" />
+                          <span onPointerDown={startInteraction(id, "se")} className="absolute -bottom-2 -right-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from bottom-right" />
                         </>
                       )}
                     </div>
