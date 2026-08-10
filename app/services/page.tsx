@@ -8,6 +8,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import AvailabilityStrip from "@/components/AvailabilityStrip";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, ShoppingBag, Zap, X, Bookmark, CalendarDays, Plus } from "lucide-react";
@@ -63,6 +64,7 @@ export default function ServicesPage() {
   const [category, setCategory] = useState("All");
   const [hiring, setHiring] = useState<ServiceItem | null>(null);
   const [booking, setBooking] = useState<ServiceItem | null>(null);
+  const [bookingDate, setBookingDate] = useState<string | null>(null); // pre-picked on the service page — never re-asked
   const [saved, setSaved] = useState<Set<string>>(new Set());
 
   // category deep links: /services?category=beauty acts as the category page
@@ -89,11 +91,15 @@ export default function ServicesPage() {
     const params = new URLSearchParams(window.location.search);
     const bookId = params.get("book");
     const hireId = params.get("hire");
+    const dateParam = params.get("date"); // the date already chosen on the calendar
     if (!bookId && !hireId) return;
     const target = items.find((s) => s.id === (bookId ?? hireId));
     window.history.replaceState(null, "", "/services"); // one-shot
     if (!target || target.isMine) return;
-    if (bookId && target.fulfillment === "appointment") setBooking(target);
+    if (bookId && target.fulfillment === "appointment") {
+      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) setBookingDate(dateParam);
+      setBooking(target);
+    }
     else if (target) setHiring(target);
   }, [me, items]);
 
@@ -290,7 +296,7 @@ export default function ServicesPage() {
       </div>
 
       {hiring && <HireWizard service={hiring} onClose={() => setHiring(null)} />}
-      {booking && <BookWizard service={booking} onClose={() => setBooking(null)} />}
+      {booking && <BookWizard service={booking} initialDate={bookingDate} onClose={() => { setBooking(null); setBookingDate(null); }} />}
     </div>
   );
 }
@@ -307,7 +313,7 @@ const DEFAULT_DURATION: Record<string, number> = {
   events: 240,
 };
 
-function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () => void }) {
+function BookWizard({ service, initialDate, onClose }: { service: ServiceItem; initialDate?: string | null; onClose: () => void }) {
   const router = useRouter();
   const firstName = service.owner.displayName.split(" ")[0];
   const menu = service.config?.menu;
@@ -315,8 +321,12 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
   const [step, setStep] = useState<"options" | "slot" | "review" | "pay" | "done" | "requested">(hasMenu ? "options" : "slot");
   const [pkgId, setPkgId] = useState<string | null>(null);
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set());
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(initialDate ?? "");
   const [hour, setHour] = useState<number | null>(null);
+  // THE TIME LAYER — real slots from the availability API (the same rules
+  // the booking POST enforces): available · booked · too soon · past.
+  const [daySlots, setDaySlots] = useState<{ dayStatus: string; reason?: string; opensAt?: string; slots: { hour: number; label: string; status: string; reason?: string }[] } | null>(null);
+  const [changingDate, setChangingDate] = useState(false);
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -337,6 +347,18 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
     : SLOT_HOURS;
   const allowedDays = sched?.days && sched.days.length ? sched.days : null;
   const dayAllowed = !date || !allowedDays || allowedDays.includes(new Date(`${date}T12:00:00`).getDay());
+
+  useEffect(() => {
+    if (!date) { setDaySlots(null); return; }
+    let dead = false;
+    setDaySlots(null);
+    setHour(null);
+    fetch(`/api/services/${service.id}/availability?date=${date}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (!dead) setDaySlots(d); })
+      .catch(() => { if (!dead) setDaySlots({ dayStatus: "booking_closed", reason: "Couldn't load times — try again.", slots: [] }); });
+    return () => { dead = true; };
+  }, [date, service.id]);
 
   const fmtHour = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
   const startDate = date && hour != null ? new Date(`${date}T${String(hour).padStart(2, "0")}:00:00`) : null;
@@ -542,42 +564,78 @@ function BookWizard({ service, onClose }: { service: ServiceItem; onClose: () =>
           </div>
         )}
 
-        {/* ------------------------- 1 · slot ------------------------- */}
+        {/* ------------------------- 1 · slot -------------------------
+            Two layers, never redundant: the CALENDAR picks the date (or it
+            arrived pre-picked from the service page); the TIME GRID picks
+            the time. The chosen date persists to the end of the flow. */}
         {step === "slot" && (
           <div className="mt-4 space-y-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Select a date</p>
-              <input
-                type="date"
-                value={date}
-                min={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setDate(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50"
-              />
-            </div>
-            {date && !dayAllowed && (
-              <p className="rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-xs text-amber-300">
-                {firstName} doesn&apos;t take bookings on{" "}
-                {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long" })}s — pick another day.
-              </p>
+            {!date || changingDate ? (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Select a date</p>
+                <div className="mt-1.5">
+                  <AvailabilityStrip
+                    serviceId={service.id}
+                    selectedDate={date || null}
+                    onSelectDate={(d) => { setDate(d); setChangingDate(false); }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl border border-lime-400/30 bg-lime-400/5 px-3.5 py-2">
+                <p className="text-sm font-semibold text-zinc-100">
+                  {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                </p>
+                <button onClick={() => setChangingDate(true)} className="text-[11px] font-semibold text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline">
+                  Change date
+                </button>
+              </div>
             )}
-            {date && dayAllowed && (
+            {date && !changingDate && (
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Available times</p>
-                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  {slotHours.map((h) => (
-                    <button
-                      key={h}
-                      onClick={() => setHour(h)}
-                      className={`rounded-lg border px-2 py-1.5 font-mono text-xs tracking-[0.05em] transition ${
-                        hour === h ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
-                      }`}
-                    >
-                      {fmtHour(h)}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-1 text-[10px] text-zinc-600">Taken slots are rejected automatically at booking.</p>
+                {daySlots === null ? (
+                  <div className="mt-1.5 h-16 animate-pulse rounded-xl bg-card-raised" />
+                ) : daySlots.slots.length === 0 ? (
+                  <p className="mt-1.5 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-xs leading-relaxed text-amber-300">
+                    {daySlots.reason ?? "No times are available on this day."}
+                    {daySlots.opensAt ? ` Bookings open ${new Date(daySlots.opensAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.` : ""}{" "}
+                    Pick another date above.
+                  </p>
+                ) : (
+                  <>
+                    <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                      {daySlots.slots.map((s) => (
+                        <button
+                          key={s.hour}
+                          disabled={s.status !== "available"}
+                          onClick={() => setHour(s.hour)}
+                          title={s.reason ?? (s.status === "available" ? "Available" : undefined)}
+                          className={`rounded-lg border px-2 py-1.5 font-mono text-xs tracking-[0.05em] transition ${
+                            hour === s.hour
+                              ? "border-lime-400/50 bg-lime-400/10 text-lime-300"
+                              : s.status === "available"
+                                ? "border-line text-zinc-400 hover:border-zinc-600"
+                                : s.status === "booked"
+                                  ? "cursor-not-allowed border-rose-400/25 bg-rose-400/5 text-rose-300/60 line-through"
+                                  : "cursor-not-allowed border-line text-zinc-700"
+                          }`}
+                        >
+                          {s.label}
+                          {s.status === "booked" ? " · booked" : s.status === "too_soon" ? " · too soon" : ""}
+                        </button>
+                      ))}
+                    </div>
+                    {daySlots.slots.every((s) => s.status !== "available") && (
+                      <p className="mt-1.5 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-xs text-amber-300">
+                        Every time on this day is taken or too soon — pick another date above.
+                      </p>
+                    )}
+                    <p className="mt-1 text-[10px] text-zinc-600">
+                      Times come from {firstName}&apos;s real calendar — only bookable slots are selectable.
+                    </p>
+                  </>
+                )}
               </div>
             )}
             <input

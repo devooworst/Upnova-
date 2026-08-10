@@ -141,7 +141,24 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
     }
   };
 
+  /* PERSONA LENS — a completely separate testing environment per persona.
+     Selecting Test Customer shows ONLY customer scenarios and customer
+     steps; other personas' steps stay hidden until you switch. The lens
+     follows whoever you're currently viewing as, and can be changed here. */
+  const [lens, setLens] = useState<string | null>(null);
+  useEffect(() => {
+    if (lens) return;
+    const active = (personas ?? []).find((p) => p.active);
+    if (active) setLens(active.handle);
+    else if (personas?.length) setLens(personas[0].handle);
+  }, [personas, lens]);
+
+  const lensScenarios = (scenarios ?? []).filter((s) => lens && s.personas.includes(lens));
+  const otherCount = (scenarios ?? []).length - lensScenarios.length;
+
+  const mySteps = (steps: StepState[]) => steps.filter((s) => s.role === lens || s.role === "check");
   const firstPending = detail?.steps.find((s) => s.status === "pending" && s.role !== "check");
+  const firstPendingMine = detail?.steps.find((s) => s.status === "pending" && s.role === lens);
 
   return (
     <section className="card overflow-hidden">
@@ -183,8 +200,29 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
         {msg && <p className="rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">{msg}</p>}
 
         {/* scenarios */}
+        {/* the lens switcher — three separate environments, zero mixing */}
+        <div className="flex flex-wrap items-center gap-1.5" data-tut="qa-lens">
+          <span className="mr-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">Testing as</span>
+          {(personas ?? []).map((p) => (
+            <button
+              key={p.handle}
+              onClick={() => { setLens(p.handle); setOpen(null); }}
+              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                lens === p.handle ? "border-violet-400/60 bg-violet-400/15 text-violet-200" : "border-line text-zinc-400 hover:border-zinc-600"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+          {otherCount > 0 && (
+            <span className="ml-auto text-[10px] text-zinc-600">
+              {otherCount} scenario{otherCount === 1 ? "" : "s"} live in the other personas&apos; environments
+            </span>
+          )}
+        </div>
+
         <div className="space-y-2">
-          {(scenarios ?? []).map((s) => {
+          {lensScenarios.map((s) => {
             const isOpen = open === s.id;
             const d = isOpen && detail?.id === s.id ? detail : null;
             const sum = d ?? s;
@@ -236,7 +274,9 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                       </button>
                       {d && firstPending && (
                         <span className="ml-auto rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-                          Next: {roleLabel(firstPending.role)}
+                          {firstPendingMine && firstPendingMine.id === firstPending.id
+                            ? "Next: your move"
+                            : `Next: ${roleLabel(firstPending.role)}${firstPending.role !== lens ? " (other side)" : ""}`}
                         </span>
                       )}
                       {d && !firstPending && d.done === d.total && (
@@ -255,6 +295,20 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                       <ol className="mt-3 space-y-2">
                         {d.steps.map((st, idx) => {
                           const isNext = firstPending?.id === st.id;
+                          /* the other persona's step: shown only as a slim
+                             marker — its instructions belong to THAT
+                             persona's environment */
+                          if (st.role !== "check" && st.role !== lens) {
+                            return (
+                              <li key={st.id} className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 ${st.status === "done" ? "border-lime-400/20 text-zinc-600" : "border-line text-zinc-600"}`}>
+                                <span className="font-mono text-[9px]">{idx + 1}</span>
+                                <span className="text-[10px]">
+                                  {st.status === "done" ? "Done" : "Waiting"} on {roleLabel(st.role)}&apos;s side — switch personas to {st.status === "done" ? "review" : "play"} it
+                                </span>
+                                {st.status === "done" && <span className="ml-auto font-mono text-[9px] text-lime-400/70">verified</span>}
+                              </li>
+                            );
+                          }
                           return (
                             <li
                               key={st.id}

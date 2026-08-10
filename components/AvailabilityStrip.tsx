@@ -58,7 +58,19 @@ function explain(d: Day): string {
   }
 }
 
-export default function AvailabilityStrip({ serviceId, days = 42 }: { serviceId: string; days?: number }) {
+export default function AvailabilityStrip({
+  serviceId,
+  days = 42,
+  onSelectDate,
+  selectedDate,
+}: {
+  serviceId: string;
+  days?: number;
+  /** date-selection mode: bookable dates become pickable (step 1 of the
+      booking flow); non-bookable dates still explain themselves */
+  onSelectDate?: (date: string) => void;
+  selectedDate?: string | null;
+}) {
   const [data, setData] = useState<Day[] | null>(null);
   const [picked, setPicked] = useState<Day | null>(null);
 
@@ -82,8 +94,15 @@ export default function AvailabilityStrip({ serviceId, days = 42 }: { serviceId:
           return (
             <button
               key={d.date}
-              onClick={() => setPicked(picked?.date === d.date ? null : d)}
-              className={`relative flex h-9 flex-col items-center justify-center rounded-md border text-[9px] font-semibold leading-tight transition ${STYLE[d.status]} ${picked?.date === d.date ? "ring-1 ring-zinc-300" : ""}`}
+              onClick={() => {
+                if (onSelectDate && ["available", "limited"].includes(d.status)) {
+                  onSelectDate(d.date);
+                  setPicked(null);
+                  return;
+                }
+                setPicked(picked?.date === d.date ? null : d);
+              }}
+              className={`relative flex h-9 flex-col items-center justify-center rounded-md border text-[9px] font-semibold leading-tight transition ${STYLE[d.status]} ${picked?.date === d.date || selectedDate === d.date ? "ring-2 ring-lime-300" : ""}`}
               title={explain(d)}
               aria-label={explain(d)}
             >

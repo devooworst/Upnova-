@@ -6,6 +6,8 @@ import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
 import { readEarlyAccess, writeEarlyAccess, readRelease, writeRelease } from "@/lib/server/preferred";
 import { LEARN_SCENARIOS, LEARN_PATHS, TOUR_TO_SCENARIO } from "@/lib/learnScenarios";
+import { QA_SCENARIOS } from "@/lib/server/qaScenarios";
+import { signDemoToken } from "@/lib/server/auth";
 
 /* per-run email nonce — throwaway signups get a UNIQUE email every run so
    the production signup rate limiter (5 per email / 15 min) never trips
@@ -52,6 +54,7 @@ const PLANNED_CATEGORIES = [
   "NOTIFICATIONS",
   "ACTIVITY",
   "SUBSCRIPTIONS & MY WORLD",
+  "BOOKING FLOW & QA LAB",
   "DATABASE INTEGRITY",
 ];
 
@@ -1240,6 +1243,80 @@ export async function POST(req: NextRequest) {
     step(c, "verification gate holds in simulation (campus 403 for unverified)", campusGate.status === 403, { actual: String(campusGate.status) });
   }
 
+  /* ================= BOOKING FLOW & QA LAB ================= */
+  {
+    const c = cat("BOOKING FLOW & QA LAB");
+    const svcF = ((await api("rachel", "/api/services")).data as any).services.find((s: any) => s.owner?.handle === "lena");
+    const wkDate = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); return t.toISOString().slice(0, 10); })();
+
+    /* ---- the two-layer booking flow: date → REAL times → book ---- */
+    const slots1 = (await api("rachel", `/api/services/${svcF.id}/availability?date=${wkDate}`)).data as any;
+    const openSlot = (slots1.slots ?? []).find((s: any) => s.status === "available");
+    step(c, "customer picks a date → the REAL time layer appears (available slots from the provider's actual calendar)",
+      slots1.dayStatus && Array.isArray(slots1.slots) && !!openSlot, { route: "GET availability?date=", actual: `day=${slots1.dayStatus} slots=${slots1.slots?.length} open=${!!openSlot}` });
+
+    // ONE SOURCE OF TRUTH: a slot shown as available MUST book successfully
+    const bkSlot = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svcF.id, startsAt: `${wkDate}T${String(openSlot.hour).padStart(2, "0")}:00:00`, durationMin: 60 } });
+    step(c, "one source of truth: the slot shown as available books successfully — same date, same time, no second date screen",
+      bkSlot.status === 200, { actual: String(bkSlot.status) });
+
+    const slots2 = (await api("rachel", `/api/services/${svcF.id}/availability?date=${wkDate}`)).data as any;
+    const nowBooked = (slots2.slots ?? []).find((s: any) => s.hour === openSlot.hour);
+    step(c, "the booked time immediately shows BOOKED — it can't be selected again",
+      nowBooked?.status === "booked", { actual: JSON.stringify(nowBooked) });
+
+    const sunday = (() => { let t = new Date(Date.now() + 2 * 86400e3); while (t.getDay() !== 0) t = new Date(t.getTime() + 86400e3); return t.toISOString().slice(0, 10); })();
+    const slotsSun = (await api("rachel", `/api/services/${svcF.id}/availability?date=${sunday}`)).data as any;
+    const farDate = new Date(Date.now() + 75 * 86400e3).toISOString().slice(0, 10);
+    const slotsFar = (await api("rachel", `/api/services/${svcF.id}/availability?date=${farDate}`)).data as any;
+    step(c, "closed days offer NO times (with the reason) · outside-horizon dates offer NO times (with when they open)",
+      slotsSun.dayStatus === "booking_closed" && (slotsSun.slots ?? []).length === 0 && slotsFar.dayStatus === "outside_horizon" && (slotsFar.slots ?? []).length === 0 && !!slotsFar.opensAt, {
+      actual: `sunday=${slotsSun.dayStatus}/${slotsSun.slots?.length} far=${slotsFar.dayStatus}/${slotsFar.slots?.length}` });
+
+    // clean up the slot-proof booking
+    if ((bkSlot.data as any).id) await api("rachel", `/api/bookings/${(bkSlot.data as any).id}`, { method: "PATCH", body: { action: "cancel" } });
+
+    /* ---- QA LAB: three separated persona environments ---- */
+    const roles = new Set<string>();
+    let untagged = 0;
+    for (const sc of QA_SCENARIOS) for (const st of sc.steps) { roles.add(st.role); if (!st.role) untagged++; }
+    step(c, "every QA checkpoint is persona-tagged (testcustomer / testcreator / testbusiness / auto-check) — environments can't mix",
+      untagged === 0 && ["testcustomer", "testcreator", "testbusiness", "check"].every((r) => roles.has(r)), { actual: Array.from(roles).join(",") });
+    const byPersona = (h: string) => QA_SCENARIOS.filter((s) => s.personas.includes(h)).map((s) => s.id);
+    const cust = byPersona("testcustomer"), crea = byPersona("testcreator"), biz2 = byPersona("testbusiness");
+    step(c, "each persona sees ONLY its own scenarios: customer never gets the hiring flow, creator never gets the customer-opportunity flow",
+      !cust.includes("hiring") && !crea.includes("opportunity") && biz2.includes("hiring") && cust.includes("booking") && crea.includes("booking"), {
+      actual: JSON.stringify({ customer: cust, creator: crea, business: biz2 }) });
+
+    /* ---- the creator progress-update scenario, END TO END, via the
+       exact calls the UI makes (impersonation + panel routes) ---- */
+    const tokCreator = signDemoToken("testcreator");
+    const tokCustomer = signDemoToken("testcustomer");
+    const tokAdmin = signDemoToken("devin"); // the QA Lab operator
+    const asTok = async (tok: string, path: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + path, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      let data: any = {}; try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    };
+    const qaAct = async (bodyIn: Record<string, unknown>) => (await asTok(tokAdmin, "/api/qa/scenarios/booking", { method: "POST", body: bodyIn })).data as any;
+    const armed = await qaAct({ action: "start" });
+    step(c, "QA scenario armed by the admin operator (reset + observing)", !!armed?.startedAt, { actual: JSON.stringify({ startedAt: armed?.startedAt, error: armed?.error }).slice(0, 100) });
+    for (const s of ["profile", "message", "reply", "book", "accept", "pay"]) await qaAct({ action: "auto", step: s });
+    const qaBk = ((await asTok(tokCreator, "/api/bookings")).data.bookings ?? []).find((b: any) => b.status === "confirmed" && b.myRole === "provider");
+    const postProg = qaBk ? await asTok(tokCreator, `/api/bookings/${qaBk.id}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 60, message: "[QA] suite-verified update", etaAt: null } }) : { status: 0, data: {} };
+    step(c, "Test Creator sees the booking (provider role) and posts a progress update through the real panel route",
+      !!qaBk && postProg.status === 200 && !!(postProg.data as any).id, { actual: `booking=${!!qaBk} post=${postProg.status}` });
+    const rowInDb = qaBk ? db.select().from(tables.progressUpdates).all().find((r) => r.bookingId === qaBk.id && r.message.includes("suite-verified")) : null;
+    const custView = qaBk ? await asTok(tokCustomer, `/api/bookings/${qaBk.id}/progress`) : { status: 0, data: {} };
+    const custSees = ((custView.data as any).progress?.updates ?? []).some((u: any) => u.message?.includes("suite-verified"));
+    step(c, "the update EXISTS in the database and the Test Customer sees the very same row — state verified, not button clicks",
+      !!rowInDb && custView.status === 200 && custSees, { record: rowInDb?.id, actual: `dbRow=${!!rowInDb} customerSees=${custSees}` });
+    const scenarioNow = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    const progStep = (scenarioNow.steps ?? []).find((x: any) => x.id === "progress");
+    step(c, "the scenario checkpoint flips to DONE from the database state", progStep?.status === "done", { actual: JSON.stringify({ status: progStep?.status, actual: progStep?.actual }).slice(0, 120) });
+    await qaAct({ action: "reset" }); // leave the QA stage clean
+  }
+
   /* ================= DATABASE INTEGRITY ================= */
   {
     const c = cat("DATABASE INTEGRITY");
@@ -1253,7 +1330,7 @@ export async function POST(req: NextRequest) {
     const orphanMembers = db.select().from(tables.conversationMembers).all().filter((m) => !db.select().from(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).get()).length;
     step(c, "no orphaned conversation members", orphanMembers === 0, { actual: String(orphanMembers) });
     const dupBookings = db.select().from(tables.bookings).where(and(eq(tables.bookings.clientId, rachel.id), eq(tables.bookings.providerId, lena.id))).all().length;
-    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window + 1 drop + 2 horizon checks)", dupBookings === 8, { expected: "8", actual: String(dupBookings) });
+    step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window + 1 drop + 2 horizon + 1 slot-proof)", dupBookings === 9, { expected: "9", actual: String(dupBookings) });
   }
 
   } catch (e) {

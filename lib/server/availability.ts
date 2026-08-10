@@ -167,3 +167,93 @@ export function serviceAvailability(serviceId: string, viewerId: string | null, 
   }
   return { days };
 }
+
+/* ------------------------------------------------------------------ */
+/*  TIME-SLOT LAYER — the second half of the booking flow.             */
+/*                                                                     */
+/*  The calendar picks the DATE; this picks the TIME. Slots are        */
+/*  derived from the same rules the booking POST enforces (schedule,   */
+/*  conflicts + buffer, advance notice, same-day policy, day caps,     */
+/*  release/horizon/early-access gates) — a slot is only "available"   */
+/*  if the actual booking API would accept it. One source of truth.    */
+/* ------------------------------------------------------------------ */
+
+export interface TimeSlot {
+  hour: number;
+  label: string; // "9:00 AM"
+  status: "available" | "booked" | "too_soon" | "past";
+  reason?: string;
+}
+
+export interface DaySlots {
+  date: string;
+  /** the day-level state (same enum as the calendar) */
+  dayStatus: DayStatus;
+  reason?: string;
+  opensAt?: string;
+  publicAt?: string;
+  slots: TimeSlot[];
+}
+
+export function serviceDaySlots(serviceId: string, viewerId: string | null, dateStr: string): DaySlots | null {
+  const svc = db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
+  if (!svc || !svc.active || svc.visibility === "draft") return null;
+  const cfg = parseConfig(svc.config);
+  const sched = cfg.scheduling;
+
+  // day-level verdict comes from the SAME calendar engine
+  const target = new Date(dateStr + "T00:00:00");
+  if (isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const idx = Math.round((target.getTime() - today.getTime()) / 86400_000);
+  const cal = serviceAvailability(serviceId, viewerId, Math.min(90, Math.max(7, idx + 1)));
+  const day = cal?.days.find((d) => d.date === dateStr) ?? (idx < 0 ? { date: dateStr, status: "booking_closed" as DayStatus, note: "This date is in the past." } : undefined);
+  if (!day) return { date: dateStr, dayStatus: "not_released", reason: "This date is beyond the visible calendar.", slots: [] };
+
+  const blocked = !["available", "limited"].includes(day.status);
+  if (blocked)
+    return { date: dateStr, dayStatus: day.status, reason: day.note, opensAt: day.opensAt, publicAt: day.publicAt, slots: [] };
+
+  // per-slot: real conflicts with the provider's calendar (buffer included)
+  const durationMin = sched.durationMin || 60;
+  const bufferMs = (sched.bufferMin ?? 0) * 60_000;
+  const noticeMs = (sched.advanceNoticeHours ?? 0) * 3600_000;
+  const taken = db
+    .select()
+    .from(tables.bookings)
+    .where(eq(tables.bookings.providerId, svc.ownerId))
+    .all()
+    .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status));
+
+  const sameDayBlocked = sched.sameDayBooking === false && dateStr === new Date().toISOString().slice(0, 10);
+  const slots: TimeSlot[] = [];
+  const startH = sched.startHour ?? 9;
+  const endH = sched.endHour ?? 17;
+  for (let h = startH; h < endH; h++) {
+    const start = new Date(`${dateStr}T${String(h).padStart(2, "0")}:00:00`);
+    const end = new Date(start.getTime() + durationMin * 60_000);
+    const label = start.toLocaleTimeString("en-US", { hour: "numeric" });
+    if (start.getTime() <= Date.now()) {
+      slots.push({ hour: h, label, status: "past", reason: "This time has passed." });
+      continue;
+    }
+    if (sameDayBlocked) {
+      slots.push({ hour: h, label, status: "too_soon", reason: "Same-day booking isn't available for this service." });
+      continue;
+    }
+    if (start.getTime() - Date.now() < noticeMs) {
+      slots.push({ hour: h, label, status: "too_soon", reason: `Needs at least ${sched.advanceNoticeHours} hours advance notice.` });
+      continue;
+    }
+    const conflict = taken.some((b) => {
+      const aStart = start.getTime() - bufferMs;
+      const aEnd = end.getTime() + bufferMs;
+      const bStart = b.startsAt.getTime();
+      const bEnd = bStart + b.durationMin * 60_000;
+      return aStart < bEnd && bStart < aEnd;
+    });
+    slots.push(conflict ? { hour: h, label, status: "booked", reason: "Already booked." } : { hour: h, label, status: "available" });
+  }
+  return { date: dateStr, dayStatus: day.status, reason: day.note, slots };
+}

@@ -72,6 +72,7 @@ export default function ServicePage() {
   const [svc, setSvc] = useState<ServiceDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/services/${id}`, { cache: "no-store" })
@@ -93,7 +94,9 @@ export default function ServicePage() {
 
   const book = () => {
     if (!svc) return;
-    const resume = `/services?${svc.fulfillment === "appointment" ? "book" : "hire"}=${svc.id}`;
+    // the date picked on the calendar RIDES ALONG — never selected twice
+    const dateQ = svc.fulfillment === "appointment" && pickedDate ? `&date=${pickedDate}` : "";
+    const resume = `/services?${svc.fulfillment === "appointment" ? "book" : "hire"}=${svc.id}${dateQ}`;
     if (me === null) {
       promptJoin(svc.fulfillment === "appointment" ? "book" : "hire", resume);
       return;
@@ -246,8 +249,9 @@ export default function ServicePage() {
         {svc.fulfillment === "appointment" && !svc.deactivated && (
           <div className="mt-5 border-t border-dashed border-line pt-4">
             <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Booking availability — next 6 weeks</p>
+            <p className="mt-0.5 text-[10px] text-zinc-600">Pick a date here — you&apos;ll choose the time next, without selecting the date again.</p>
             <div className="mt-2">
-              <AvailabilityStrip serviceId={svc.id} />
+              <AvailabilityStrip serviceId={svc.id} onSelectDate={setPickedDate} selectedDate={pickedDate} />
             </div>
           </div>
         )}
@@ -268,7 +272,9 @@ export default function ServicePage() {
             <>
               <button onClick={book} className="btn-lime w-full justify-center py-2.5 text-sm">
                 {svc.fulfillment === "appointment" ? <CalendarDays className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
-                {svc.cta}
+                {svc.fulfillment === "appointment" && pickedDate
+                  ? `Book ${new Date(pickedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — pick a time`
+                  : svc.cta}
               </button>
               {me === null && (
                 <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-zinc-500">
