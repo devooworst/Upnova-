@@ -55,6 +55,7 @@ export default function MyWorldEditor() {
   const [msg, setMsg] = useState<string | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [defaultOpen, setDefaultOpen] = useState(false);
+  const [imgUrl, setImgUrl] = useState("");
   const [meta, setMeta] = useState<{ isPro: boolean; demoBypass: boolean } | null>(null);
 
   // undo/redo — snapshots of the whole studio config
@@ -118,6 +119,60 @@ export default function MyWorldEditor() {
       return { ...c, world: { ...w, elements: { ...w.elements, [id]: { ...w.elements[id], ...patch } } } };
     });
     setDirty(true);
+  };
+
+  /* ---- free image layers: add / patch / remove (history-aware) ---- */
+  const patchImage = (id: string, patch: Record<string, unknown>) => {
+    setCfg((c) => {
+      if (!c) return c;
+      if (!gestureOpen.current) {
+        pushHistory(c);
+        gestureOpen.current = true;
+        setTimeout(() => (gestureOpen.current = false), 400);
+      }
+      const w = c.world ?? DEFAULT_WORLD;
+      const imgs = { ...(w.images ?? {}) };
+      if (!imgs[id]) return c;
+      imgs[id] = { ...imgs[id], ...patch };
+      return { ...c, world: { ...w, images: imgs } };
+    });
+    setDirty(true);
+  };
+  const addImage = (src: string) => {
+    const clean = src.trim();
+    if (!clean) return;
+    mutate((c) => {
+      const w = c.world ?? DEFAULT_WORLD;
+      const imgs = { ...(w.images ?? {}) };
+      if (Object.keys(imgs).length >= 8) {
+        setMsg("Up to 8 image layers per world.");
+        return c;
+      }
+      const id = Math.random().toString(36).slice(2, 10);
+      imgs[id] = { src: clean, x: 32, y: 120, w: 28, rotate: 0, opacity: 1, layer: 25, locked: false };
+      setSelected(`img:${id}`);
+      return { ...c, world: { ...w, images: imgs } };
+    });
+    setImgUrl("");
+  };
+  const removeImage = (id: string) => {
+    mutate((c) => {
+      const w = c.world ?? DEFAULT_WORLD;
+      const imgs = { ...(w.images ?? {}) };
+      delete imgs[id];
+      return { ...c, world: { ...w, images: imgs } };
+    });
+    setSelected("hero");
+  };
+  const pickWorldImage = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 600_000) {
+      setMsg("Image too large — keep decorations under ~600 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => addImage(String(reader.result));
+    reader.readAsDataURL(file);
   };
 
   const save = async () => {
@@ -271,6 +326,8 @@ export default function MyWorldEditor() {
                   device,
                   onSelect: setSelected,
                   onChange: (id, patch) => patchEl(id, patch as Record<string, unknown>),
+                  onImageChange: (id, patch) => patchImage(id, patch as Record<string, unknown>),
+                  onImageRemove: removeImage,
                   coverUrl: cover?.touched ? cover.url : undefined,
                   coverPos: cover?.touched ? cover.pos : undefined,
                 }
@@ -331,6 +388,41 @@ export default function MyWorldEditor() {
             <h2 className="text-sm font-bold text-zinc-100">Design</h2>
             <button onClick={() => setDrawer(false)} className="icon-btn h-7 w-7" aria-label="Close design panel"><X className="h-3.5 w-3.5" /></button>
           </div>
+
+          <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Images &amp; layers</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
+            Free decorative layers — put them behind cards, between cards, or in front (select one on the
+            canvas for layer, opacity, lock, rotate, and delete controls). They never break the card layout.
+          </p>
+          <div className="mt-2 flex gap-1.5">
+            <input
+              value={imgUrl}
+              onChange={(e) => setImgUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addImage(imgUrl)}
+              placeholder="Paste an image URL…"
+              className="min-w-0 flex-1 rounded-lg border border-line bg-card-raised px-3 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+            />
+            <button onClick={() => addImage(imgUrl)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">Add</button>
+          </div>
+          <label className="btn-ghost mt-1.5 flex w-full cursor-pointer justify-center py-1.5 text-xs">
+            <ImageIcon className="h-3.5 w-3.5" /> Upload image (≤600 KB)
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => pickWorldImage(e.target.files?.[0] ?? null)} />
+          </label>
+          {Object.keys(world.images ?? {}).length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {Object.entries(world.images ?? {}).map(([iid, im]) => (
+                <li key={iid} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${selected === `img:${iid}` ? "border-sky-400/50 bg-sky-400/5" : "border-line"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={im.src} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
+                  <button onClick={() => setSelected(`img:${iid}`)} className="min-w-0 flex-1 truncate text-left text-[10px] text-zinc-300 hover:text-zinc-100">
+                    z {im.layer} · {Math.round(im.opacity * 100)}%{im.locked ? " · locked" : ""}
+                  </button>
+                  <button onClick={() => patchImage(iid, { locked: !im.locked })} className="icon-btn h-6 w-6" title={im.locked ? "Unlock" : "Lock"}><Lock className={`h-3 w-3 ${im.locked ? "text-sky-300" : "text-zinc-600"}`} /></button>
+                  <button onClick={() => removeImage(iid)} className="icon-btn h-6 w-6" title="Delete"><Trash2 className="h-3 w-3 text-zinc-500 hover:text-rose-300" /></button>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">World headline</p>
           <input

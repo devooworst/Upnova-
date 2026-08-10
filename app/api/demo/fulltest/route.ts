@@ -836,6 +836,51 @@ export async function POST(req: NextRequest) {
     const save = await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: { enabled: true, environment: "neon", elements: {} } } } });
     const visitor = await api("lena", "/api/users/rachel");
     step(c, "pro save → ANOTHER account renders the world", save.status === 200 && (visitor.data as any).studio?.world?.enabled === true);
+
+    /* ---- MY WORLD PARITY: the saved layout IS the published layout ----
+       Same renderer + same fixed design-width canvas in editor and
+       viewer, so parity is architectural; here we prove the DATA leg:
+       moved/resized cards and layered images round-trip EXACTLY. */
+    const layout = {
+      enabled: true,
+      environment: "neon",
+      elements: {
+        hero: { x: 4.2, y: 24, w: 62.5, h: 0, rotate: 2, layer: 12, hidden: false },
+        trust: { x: 55.1, y: 610, w: 40, h: 260, rotate: -3, layer: 14, hidden: false },
+        posts: { x: 0, y: 940, w: 100, h: 0, rotate: 0, layer: 8, hidden: false },
+      },
+      images: {
+        back1: { src: "/images/banner.jpg", x: 10, y: 60, w: 55, rotate: -12, opacity: 0.6, layer: -6, locked: false },
+        front1: { src: "/images/beat-cover.jpg", x: 70.5, y: 300, w: 18, rotate: 25, opacity: 0.9, layer: 25, locked: true },
+      },
+    };
+    await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: layout } } });
+    const v2 = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
+    const heroOk = v2?.elements?.hero?.x === 4.2 && v2?.elements?.hero?.w === 62.5 && v2?.elements?.hero?.rotate === 2 && v2?.elements?.hero?.layer === 12;
+    const trustOk = v2?.elements?.trust?.y === 610 && v2?.elements?.trust?.h === 260 && v2?.elements?.trust?.rotate === -3;
+    step(c, "moved/resized cards round-trip EXACTLY to the public profile (position, size, rotation, layer)", heroOk && trustOk, {
+      route: "PATCH /api/me/studio → GET /api/users/rachel",
+      expected: "hero 4.2%/62.5%/2°/z12 · trust y610/h260/-3°",
+      actual: JSON.stringify({ hero: v2?.elements?.hero, trust: v2?.elements?.trust }).slice(0, 140),
+    });
+    const b1 = v2?.images?.back1, f1 = v2?.images?.front1;
+    step(c, "image layers survive with z-order intact: one BEHIND cards (z<0), one IN FRONT — opacity, rotation, lock too",
+      b1?.layer === -6 && b1?.opacity === 0.6 && b1?.rotate === -12 && b1?.src === "/images/banner.jpg" &&
+      f1?.layer === 25 && f1?.opacity === 0.9 && f1?.rotate === 25 && f1?.locked === true, {
+      expected: "back1 z-6 op.6 rot-12 · front1 z25 op.9 rot25 locked",
+      actual: JSON.stringify({ back1: b1, front1: f1 }).slice(0, 160),
+    });
+    // refresh-stability: a SECOND independent read returns the identical layout
+    const v3 = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
+    step(c, "refresh: a second read returns the identical saved layout", JSON.stringify(v3) === JSON.stringify(v2));
+    // the sanitizer defends the canvas: hostile/out-of-range input is clamped or dropped, never trusted
+    await api("rachel", "/api/me/studio", { method: "PATCH", body: { studio: { theme: "neon", world: { ...layout, images: { evil: { src: "javascript:alert(1)", x: 10, y: 10, w: 20, rotate: 0, opacity: 1, layer: 5, locked: false }, wild: { src: "/images/banner.jpg", x: 400, y: 99999, w: 2, rotate: 720, opacity: 9, layer: 99, locked: false } } } } } });
+    const v4 = ((await api("lena", "/api/users/rachel")).data as any).studio?.world;
+    const wild = v4?.images?.wild;
+    step(c, "sanitizer: script src DROPPED; wild geometry clamped (x≤100, y≤4000, w≥4, rot≤180, op≤1, z≤30)",
+      !v4?.images?.evil && wild && wild.x === 100 && wild.y === 4000 && wild.w === 4 && wild.rotate === 180 && wild.opacity === 1 && wild.layer === 30, {
+      actual: JSON.stringify({ evil: v4?.images?.evil ?? null, wild }).slice(0, 140),
+    });
     await api("rachel", "/api/me/plan", { method: "PATCH", body: { plan: "free" } });
     const hidden = await api("lena", "/api/users/rachel");
     step(c, "downgrade hides but preserves (status ≠ deletion)", (hidden.data as any).studio === null);

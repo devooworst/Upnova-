@@ -7,7 +7,7 @@
 /* ------------------------------------------------------------------ */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, WORLD_ELEMENT_LABELS, BANNERS, type StudioConfig, type WorldElement } from "@/lib/profileStudio";
+import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, WORLD_ELEMENT_LABELS, BANNERS, WORLD_DESIGN_WIDTH, WORLD_STACK_BELOW, type StudioConfig, type WorldElement, type WorldImage } from "@/lib/profileStudio";
 import { Star as StarDeco, Heart, Leaf, Sparkles as SparklesIcon, Music2, Zap as ZapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -87,6 +87,9 @@ export interface WorldEditProps {
   device: "desktop" | "tablet" | "mobile";
   onSelect: (id: string) => void;
   onChange: (id: string, patch: Partial<WorldElement>) => void;
+  /** free image layers — same gesture system, separate collection */
+  onImageChange?: (id: string, patch: Partial<WorldImage>) => void;
+  onImageRemove?: (id: string) => void;
   /** unsaved banner/cover being edited in the Studio — same fields the
       profile PATCH persists; undefined = use the saved profile cover */
   coverUrl?: string | null;
@@ -103,6 +106,24 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     others: { l: number; r: number; cx: number; t: number; b: number; cy: number }[];
   } | null>(null);
   const editCanvasRef = useRef<HTMLDivElement>(null);
+  /* ---- ONE LAYOUT ENGINE: the world canvas is laid out at exactly
+     WORLD_DESIGN_WIDTH design px and uniformly scaled to the measured
+     container — in the editor AND on the published profile. Identical
+     text wrapping, identical heights, identical positions, every
+     viewport. The scale is measured live, never hard-coded. ---- */
+  const [availW, setAvailW] = useState<number | null>(null);
+  const worldScaleRef = useRef(1);
+  const measureRO = useRef<ResizeObserver | null>(null);
+  const measureNode = useCallback((node: HTMLDivElement | null) => {
+    measureRO.current?.disconnect();
+    if (node) {
+      const apply = () => setAvailW(node.clientWidth || null);
+      const ro = new ResizeObserver(apply);
+      ro.observe(node);
+      measureRO.current = ro;
+      apply();
+    }
+  }, []);
   // temporary smart-alignment guides — exist only while dragging
   const [dragGuides, setDragGuides] = useState<{ v: number[]; h: number[]; equal: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -553,20 +574,36 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
      inside it stays standard UpNova. */
   const world = studio?.world;
   if (world?.enabled) {
-    const stacked = edit?.device === "mobile"; // the REAL phone behavior
-    const snap2 = (v: number) => Math.round(v / 2) * 2;
-    const snap20 = (v: number) => Math.round(v / 20) * 20;
+    const DESIGN_W = WORLD_DESIGN_WIDTH;
+    // stacked = the clean mobile flow. Editor's phone preview and REAL
+    // narrow viewports behave identically (same rule, same threshold).
+    const stacked = edit ? edit.device === "mobile" : availW !== null && availW < WORLD_STACK_BELOW;
+    const scale = Math.min(1.25, Math.max(0.2, (availW ?? DESIGN_W) / DESIGN_W));
+    worldScaleRef.current = scale;
+    const images: Record<string, WorldImage> = world.images ?? {};
+    const imgOf = (key: string) => images[key.slice(4)];
+    const isImgKey = (key: string) => key.startsWith("img:");
+    const routePatch = (key: string, patch: Record<string, number>) => {
+      if (!edit) return;
+      if (isImgKey(key)) edit.onImageChange?.(key.slice(4), patch);
+      else edit.onChange(key, patch);
+    };
     const startInteraction = (id: string, mode: string) => (e: React.PointerEvent) => {
       if (!edit || stacked) return;
       e.preventDefault();
       e.stopPropagation();
       edit.onSelect(id);
-      const el = world.elements[id];
+      const img = isImgKey(id) ? imgOf(id) : null;
+      if (img?.locked && mode !== "select") return; // locked layers never drag
+      const el: WorldElement = img
+        ? { x: img.x, y: img.y, w: img.w, h: 0, rotate: img.rotate, layer: img.layer, hidden: false }
+        : world.elements[id];
+      if (!el) return;
       const host = (e.currentTarget as HTMLElement).closest("[data-world-el]") as HTMLElement | null;
       const canvas = editCanvasRef.current;
       const others: { l: number; r: number; cx: number; t: number; b: number; cy: number }[] = [];
       if (canvas) {
-        const cw = canvas.clientWidth || 1;
+        const cw = canvas.clientWidth || 1; // offset metrics are DESIGN units (transform-immune)
         canvas.querySelectorAll<HTMLElement>("[data-world-el]").forEach((n) => {
           if (n.dataset.worldEl === id) return;
           const l = (n.offsetLeft / cw) * 100;
@@ -581,10 +618,14 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       const d = editDrag.current;
       const rect = editCanvasRef.current?.getBoundingClientRect();
       if (!d || !rect || !edit) return;
+      const isImg = isImgKey(d.id);
+      // rect.width is the SCALED on-screen width → % math stays exact;
+      // vertical motion converts screen px → design px via the live scale
       const dxPct = ((e.clientX - d.startX) / rect.width) * 100;
-      const dy = e.clientY - d.startY;
+      const dy = (e.clientY - d.startY) / worldScaleRef.current;
       const baseH = d.el.h > 0 ? d.el.h : d.measuredH;
       const clampH = (v: number) => Math.round(Math.min(1600, Math.max(0, v)));
+      const minW = isImg ? 4 : 24;
       if (d.mode === "move") {
         /* FREEFORM canvas + smart assistance: positions are free (no grid
            quantization). When an edge/center comes close to another
@@ -600,7 +641,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         let equal = false;
         if (!e.altKey) {
           const TX = 0.9; // % — small threshold: helpful, never sticky
-          const TY = 8; // px
+          const TY = 8; // design px
           const vCands = [0, 50, 100, ...d.others.flatMap((o) => [o.l, o.r, o.cx])];
           const myV: [number, (c: number) => number][] = [
             [x, (c) => c],
@@ -633,49 +674,99 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
           }
         }
         setDragGuides(v.length || hg.length || equal ? { v, h: hg, equal } : null);
-        edit.onChange(d.id, { x: Math.round(x * 10) / 10, y: Math.round(y) });
+        routePatch(d.id, { x: Math.round(x * 10) / 10, y: Math.round(y) });
       }
       else if (d.mode === "e")
-        edit.onChange(d.id, { w: Math.round(Math.min(100, Math.max(24, d.el.w + dxPct)) * 10) / 10 });
+        routePatch(d.id, { w: Math.round(Math.min(100, Math.max(minW, d.el.w + dxPct)) * 10) / 10 });
       else if (d.mode === "w")
-        edit.onChange(d.id, {
-          w: Math.round(Math.min(100, Math.max(24, d.el.w - dxPct)) * 10) / 10,
+        routePatch(d.id, {
+          w: Math.round(Math.min(100, Math.max(minW, d.el.w - dxPct)) * 10) / 10,
           x: Math.round(Math.min(100, Math.max(0, d.el.x + dxPct)) * 10) / 10,
         });
-      else if (d.mode === "rot")
-        edit.onChange(d.id, { rotate: Math.round(Math.min(8, Math.max(-8, d.el.rotate + (e.clientX - d.startX) / 14))) });
+      else if (d.mode === "rot") {
+        // cards stay subtle (±8°); image decorations rotate freely (±180°)
+        const range = isImg ? 180 : 8;
+        const speed = isImg ? 2 : 14;
+        routePatch(d.id, { rotate: Math.round(Math.min(range, Math.max(-range, d.el.rotate + (e.clientX - d.startX) / speed))) });
+      }
       else {
         // any edge/corner combination: n/s adjust height (n also moves y),
         // e/w adjust width (w also moves x) — composable like a real design tool
-        const patch: Partial<WorldElement> = {};
+        const patch: Record<string, number> = {};
         const fine = (v: number) => Math.round(v * 10) / 10;
-        if (d.mode.includes("e")) patch.w = fine(Math.min(100, Math.max(24, d.el.w + dxPct)));
+        if (d.mode.includes("e")) patch.w = fine(Math.min(100, Math.max(minW, d.el.w + dxPct)));
         if (d.mode.includes("w")) {
-          patch.w = fine(Math.min(100, Math.max(24, d.el.w - dxPct)));
+          patch.w = fine(Math.min(100, Math.max(minW, d.el.w - dxPct)));
           patch.x = fine(Math.min(100, Math.max(0, d.el.x + dxPct)));
         }
-        if (d.mode.includes("s")) patch.h = clampH(baseH + dy);
-        if (d.mode.includes("n")) {
+        if (!isImg && d.mode.includes("s")) patch.h = clampH(baseH + dy);
+        if (!isImg && d.mode.includes("n")) {
           patch.h = clampH(baseH - dy);
           patch.y = Math.round(Math.min(4000, Math.max(0, d.el.y + dy)));
         }
-        edit.onChange(d.id, patch);
+        if (isImg && d.mode.includes("n")) patch.y = Math.round(Math.min(4000, Math.max(0, d.el.y + dy)));
+        routePatch(d.id, patch);
       }
     };
     const endInteraction = () => {
       editDrag.current = null;
       setDragGuides(null); // guides never linger
     };
+
     const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
     const els = WORLD_ELEMENT_IDS
       .map((id) => ({ id, el: world.elements[id] }))
       .filter((x) => x.el && (!x.el.hidden || x.id === "hero"))
       .sort((a, b) => a.el.y - b.el.y);
-    const canvasH = Math.max(900, Math.max(...els.map((x) => x.el.y)) + 640);
+    const imgEntries = Object.entries(images);
+    const canvasH = Math.max(
+      900,
+      Math.max(...els.map((x) => x.el.y)) + 640,
+      ...imgEntries.map(([, im]) => im.y + 360)
+    );
     const worldTitle = (world.title ?? "").trim() || `${user.displayName}'s world`;
     const showTitle = world.showTitle !== false;
+
+    /* selected-layer controls — clear front/back relationship management */
+    const layerControls = (key: string) => {
+      if (!edit) return null;
+      const img = isImgKey(key) ? imgOf(key) : null;
+      const cur = img ? img.layer : world.elements[key]?.layer ?? 10;
+      const [lo, hi] = img ? [-10, 30] : [0, 20];
+      const setLayer = (v: number) => {
+        const nv = Math.min(hi, Math.max(lo, v));
+        if (img) edit.onImageChange?.(key.slice(4), { layer: nv });
+        else edit.onChange(key, { layer: nv });
+      };
+      const stop = (e: React.PointerEvent | React.MouseEvent) => { e.stopPropagation(); };
+      const btn = "rounded bg-zinc-950/85 px-1.5 py-0.5 font-mono text-[9px] font-bold text-lime-300 hover:bg-zinc-950";
+      return (
+        <span onPointerDown={stop} onClick={stop} className="absolute -top-[3.4rem] left-0 z-20 flex items-center gap-1 rounded-lg border border-lime-400/40 bg-zinc-900/95 px-1.5 py-1 shadow-xl">
+          <button className={btn} title="Send to back" onClick={() => setLayer(lo)}>⟪</button>
+          <button className={btn} title="Send backward" onClick={() => setLayer(cur - 1)}>−</button>
+          <span className="font-mono text-[9px] text-zinc-400">z {cur}</span>
+          <button className={btn} title="Bring forward" onClick={() => setLayer(cur + 1)}>+</button>
+          <button className={btn} title="Bring to front" onClick={() => setLayer(hi)}>⟫</button>
+          {img && (
+            <>
+              <span className="mx-0.5 h-4 w-px bg-zinc-700" />
+              <input
+                type="range" min={5} max={100} value={Math.round(img.opacity * 100)}
+                onChange={(e) => edit.onImageChange?.(key.slice(4), { opacity: Number(e.target.value) / 100 })}
+                className="h-1 w-14 accent-lime-400" title="Opacity"
+              />
+              <button className={btn} title={img.locked ? "Unlock" : "Lock (prevents accidental drags)"} onClick={() => edit.onImageChange?.(key.slice(4), { locked: !img.locked })}>
+                {img.locked ? "🔒" : "🔓"}
+              </button>
+              <button className="rounded bg-rose-500/90 px-1.5 py-0.5 font-mono text-[9px] font-bold text-zinc-50 hover:bg-rose-500" title="Delete image" onClick={() => edit.onImageRemove?.(key.slice(4))}>✕</button>
+            </>
+          )}
+        </span>
+      );
+    };
+
     return (
-      <div className="mx-auto max-w-5xl">
+      <div className={edit ? "" : "mx-auto max-w-5xl"}>
         <div className="relative overflow-hidden rounded-2xl border border-line" style={{ backgroundImage: env.css }}>
           {env.overlay !== "none" && (
             <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: env.overlay }} aria-hidden />
@@ -690,92 +781,160 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
               element), exactly as visitors see it on a standard profile.
               The canvas background is the ENVIRONMENT — a separate concept. */}
           <div className="relative p-3 sm:p-4">
-            <div
-              ref={editCanvasRef}
-              onPointerMove={edit && !stacked ? onCanvasMove : undefined}
-              onPointerUp={edit && !stacked ? endInteraction : undefined}
-              className={stacked ? "relative" : "relative sm:h-[var(--wh)]"}
-              style={stacked ? undefined : ({ "--wh": `${canvasH}px`, touchAction: edit ? "none" : undefined } as React.CSSProperties)}
-            >
-              {/* world headline — an overlay, not a flow block: the whole
-                  canvas (including this top area) is placeable space */}
-              {showTitle && (
-                <div className="pointer-events-none absolute inset-x-1 top-0 z-0 flex items-center justify-between px-3 pt-1" aria-hidden={!worldTitle}>
-                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-zinc-400/90">{worldTitle}</p>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on UpNova</p>
-                </div>
-              )}
-              {/* SMART GUIDES — rose lines while dragging, gone on release */}
-              {edit && !stacked && dragGuides && (
-                <>
-                  {dragGuides.v.map((gv, i) => (
-                    <span key={`v${i}`} className="pointer-events-none absolute bottom-0 top-0 z-40 w-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ left: `${gv}%` }} aria-hidden />
-                  ))}
-                  {dragGuides.h.map((gh, i) => (
-                    <span key={`h${i}`} className="pointer-events-none absolute inset-x-0 z-40 h-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ top: gh }} aria-hidden />
-                  ))}
-                  {dragGuides.equal && (
-                    <span className="pointer-events-none absolute left-1/2 top-2 z-40 -translate-x-1/2 rounded-full bg-rose-400 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-950 shadow">
-                      Equal spacing
-                    </span>
-                  )}
-                </>
-              )}
-              {els.map(({ id, el }) => {
-                const isSel = edit && edit.selected === id;
-                return (
-                <div
-                  key={id}
-                  data-world-el={id}
-                  className={
-                    stacked
-                      ? "relative mb-4"
-                      : "relative mb-4 sm:absolute sm:mb-0 sm:left-[var(--wx)] sm:top-[var(--wy)] sm:w-[var(--ww)] sm:z-[var(--wz)] sm:rotate-[var(--wr)]"
-                  }
-                  style={stacked ? undefined : ({ "--wx": `${el.x}%`, "--wy": `${el.y}px`, "--ww": `${el.w}%`, "--wz": String(el.layer), "--wr": `${el.rotate}deg`, minHeight: el.h > 0 ? el.h : undefined } as React.CSSProperties)}
-                >
-                  {/* in edit mode the real content shows but doesn't swallow clicks */}
-                  <div className={edit && !stacked ? "pointer-events-none select-none" : undefined}>
+            {stacked ? (
+              /* ---- MOBILE / NARROW: the clean stacked flow (readable
+                 always beats miniature). Same rule in editor phone
+                 preview and on real phones. ---- */
+              <div className="relative">
+                {els.map(({ id }) => (
+                  <div key={id} className="relative mb-4">
                     {id === "hero" ? headerBlock : sectionBlocks[id] ?? null}
                   </div>
-                  {edit && !stacked && (
-                    <div
-                      onPointerDown={startInteraction(id, "move")}
-                      className={`absolute -inset-0.5 cursor-grab rounded-xl transition active:cursor-grabbing ${
-                        isSel ? "ring-2 ring-lime-400" : "ring-1 ring-transparent hover:ring-lime-400/40"
-                      }`}
-                      role="button"
-                      aria-label={`Select ${WORLD_ELEMENT_LABELS[id]}`}
-                    >
-                      {isSel && (
-                        <>
-                          <span className="absolute -top-6 left-0 z-10 flex items-center gap-1.5 whitespace-nowrap rounded bg-lime-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
-                            {WORLD_ELEMENT_LABELS[id]}
-                            {id === "hero" ? " · identity & actions locked inside" : ""}
-                            <span className="rounded bg-zinc-950/20 px-1 font-mono font-semibold">
-                              {el.x}% · {el.y}px · w{el.w}%{el.h > 0 ? ` · h${el.h}px` : ""}{el.rotate ? ` · ${el.rotate}°` : ""}
-                            </span>
-                          </span>
-                          {/* rotation — grab and pull sideways */}
-                          <span onPointerDown={startInteraction(id, "rot")} className="absolute -top-9 left-1/2 z-10 h-5 w-5 -translate-x-1/2 cursor-grab rounded-full border-2 border-zinc-900 bg-lime-400 shadow" title="Drag sideways to rotate" aria-label="Rotate" />
-                          {/* edges — generous hit areas, correct cursors */}
-                          <span onPointerDown={startInteraction(id, "e")} className="absolute -right-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize right edge" />
-                          <span onPointerDown={startInteraction(id, "w")} className="absolute -left-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize left edge" />
-                          <span onPointerDown={startInteraction(id, "n")} className="absolute -top-2 left-1/2 z-10 h-4 w-10 -translate-x-1/2 cursor-ns-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize top edge" />
-                          <span onPointerDown={startInteraction(id, "s")} className="absolute -bottom-2 left-1/2 z-10 h-4 w-10 -translate-x-1/2 cursor-ns-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize bottom edge" />
-                          {/* all four corners */}
-                          <span onPointerDown={startInteraction(id, "nw")} className="absolute -left-2 -top-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from top-left" />
-                          <span onPointerDown={startInteraction(id, "ne")} className="absolute -right-2 -top-2 z-10 h-4 w-4 cursor-nesw-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from top-right" />
-                          <span onPointerDown={startInteraction(id, "sw")} className="absolute -bottom-2 -left-2 z-10 h-4 w-4 cursor-nesw-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from bottom-left" />
-                          <span onPointerDown={startInteraction(id, "se")} className="absolute -bottom-2 -right-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from bottom-right" />
-                        </>
-                      )}
+                ))}
+              </div>
+            ) : (
+              /* ---- SCALED DESIGN CANVAS: laid out at DESIGN_W, scaled to
+                 the real container. What you saved is what renders. ---- */
+              <div ref={measureNode} className="relative w-full" style={{ height: canvasH * scale }}>
+                <div
+                  ref={editCanvasRef}
+                  onPointerMove={edit ? onCanvasMove : undefined}
+                  onPointerUp={edit ? endInteraction : undefined}
+                  className="relative"
+                  style={{ width: DESIGN_W, height: canvasH, transform: `scale(${scale})`, transformOrigin: "top left", touchAction: edit ? "none" : undefined }}
+                >
+                  {/* world headline — an overlay, not a flow block */}
+                  {showTitle && (
+                    <div className="pointer-events-none absolute inset-x-1 top-0 z-[1] flex items-center justify-between px-3 pt-1" aria-hidden={!worldTitle}>
+                      <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-zinc-400/90">{worldTitle}</p>
+                      <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on UpNova</p>
                     </div>
                   )}
+                  {/* SMART GUIDES — rose lines while dragging, gone on release */}
+                  {edit && dragGuides && (
+                    <>
+                      {dragGuides.v.map((gv, i) => (
+                        <span key={`v${i}`} className="pointer-events-none absolute bottom-0 top-0 z-40 w-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ left: `${gv}%` }} aria-hidden />
+                      ))}
+                      {dragGuides.h.map((gh, i) => (
+                        <span key={`h${i}`} className="pointer-events-none absolute inset-x-0 z-40 h-px bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" style={{ top: gh }} aria-hidden />
+                      ))}
+                      {dragGuides.equal && (
+                        <span className="pointer-events-none absolute left-1/2 top-2 z-40 -translate-x-1/2 rounded-full bg-rose-400 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-950 shadow">
+                          Equal spacing
+                        </span>
+                      )}
+                    </>
+                  )}
+
+                  {/* ---- FREE IMAGE LAYERS — visual layers, never in the
+                       card flow: behind cards (negative z), between, or in
+                       front. The saved layer survives round-trips. ---- */}
+                  {imgEntries.map(([iid, im]) => {
+                    const key = `img:${iid}`;
+                    const isSel = edit && edit.selected === key;
+                    return (
+                      <div
+                        key={key}
+                        data-world-el={key}
+                        className="absolute"
+                        style={{ left: `${im.x}%`, top: im.y, width: `${im.w}%`, zIndex: im.layer, transform: im.rotate ? `rotate(${im.rotate}deg)` : undefined }}
+                      >
+                        <img
+                          src={im.src}
+                          alt=""
+                          draggable={false}
+                          className={`h-auto w-full select-none ${edit ? "" : "pointer-events-none"}`}
+                          style={{ opacity: im.opacity }}
+                        />
+                        {edit && (
+                          <div
+                            onPointerDown={startInteraction(key, "move")}
+                            className={`absolute -inset-0.5 rounded-lg transition ${im.locked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"} ${
+                              isSel ? "ring-2 ring-sky-400" : "ring-1 ring-transparent hover:ring-sky-400/40"
+                            }`}
+                            role="button"
+                            aria-label="Select image layer"
+                          >
+                            {isSel && (
+                              <>
+                                {layerControls(key)}
+                                <span className="absolute -top-6 left-0 z-10 flex items-center gap-1.5 whitespace-nowrap rounded bg-sky-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
+                                  Image layer{im.locked ? " · locked" : ""}
+                                  <span className="rounded bg-zinc-950/20 px-1 font-mono font-semibold">
+                                    {im.x}% · {im.y}px · w{im.w}%{im.rotate ? ` · ${im.rotate}°` : ""} · {Math.round(im.opacity * 100)}%
+                                  </span>
+                                </span>
+                                {!im.locked && (
+                                  <>
+                                    <span onPointerDown={startInteraction(key, "rot")} className="absolute -top-9 left-1/2 z-10 h-5 w-5 -translate-x-1/2 cursor-grab rounded-full border-2 border-zinc-900 bg-sky-400 shadow" title="Drag sideways to rotate" aria-label="Rotate image" />
+                                    <span onPointerDown={startInteraction(key, "e")} className="absolute -right-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-sky-400 shadow" aria-label="Resize right" />
+                                    <span onPointerDown={startInteraction(key, "w")} className="absolute -left-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-sky-400 shadow" aria-label="Resize left" />
+                                    <span onPointerDown={startInteraction(key, "se")} className="absolute -bottom-2 -right-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-sky-400 shadow" aria-label="Resize corner" />
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {els.map(({ id, el }) => {
+                    const isSel = edit && edit.selected === id;
+                    return (
+                    <div
+                      key={id}
+                      data-world-el={id}
+                      className="absolute"
+                      style={{ left: `${el.x}%`, top: el.y, width: `${el.w}%`, zIndex: el.layer, transform: el.rotate ? `rotate(${el.rotate}deg)` : undefined, minHeight: el.h > 0 ? el.h : undefined }}
+                    >
+                      {/* in edit mode the real content shows but doesn't swallow clicks */}
+                      <div className={edit ? "pointer-events-none select-none" : undefined}>
+                        {id === "hero" ? headerBlock : sectionBlocks[id] ?? null}
+                      </div>
+                      {edit && (
+                        <div
+                          onPointerDown={startInteraction(id, "move")}
+                          className={`absolute -inset-0.5 cursor-grab rounded-xl transition active:cursor-grabbing ${
+                            isSel ? "ring-2 ring-lime-400" : "ring-1 ring-transparent hover:ring-lime-400/40"
+                          }`}
+                          role="button"
+                          aria-label={`Select ${WORLD_ELEMENT_LABELS[id]}`}
+                        >
+                          {isSel && (
+                            <>
+                              {layerControls(id)}
+                              <span className="absolute -top-6 left-0 z-10 flex items-center gap-1.5 whitespace-nowrap rounded bg-lime-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
+                                {WORLD_ELEMENT_LABELS[id]}
+                                {id === "hero" ? " · identity & actions locked inside" : ""}
+                                <span className="rounded bg-zinc-950/20 px-1 font-mono font-semibold">
+                                  {el.x}% · {el.y}px · w{el.w}%{el.h > 0 ? ` · h${el.h}px` : ""}{el.rotate ? ` · ${el.rotate}°` : ""}
+                                </span>
+                              </span>
+                              {/* rotation — grab and pull sideways */}
+                              <span onPointerDown={startInteraction(id, "rot")} className="absolute -top-9 left-1/2 z-10 h-5 w-5 -translate-x-1/2 cursor-grab rounded-full border-2 border-zinc-900 bg-lime-400 shadow" title="Drag sideways to rotate" aria-label="Rotate" />
+                              {/* edges — generous hit areas, correct cursors */}
+                              <span onPointerDown={startInteraction(id, "e")} className="absolute -right-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize right edge" />
+                              <span onPointerDown={startInteraction(id, "w")} className="absolute -left-2 top-1/2 z-10 h-10 w-4 -translate-y-1/2 cursor-ew-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize left edge" />
+                              <span onPointerDown={startInteraction(id, "n")} className="absolute -top-2 left-1/2 z-10 h-4 w-10 -translate-x-1/2 cursor-ns-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize top edge" />
+                              <span onPointerDown={startInteraction(id, "s")} className="absolute -bottom-2 left-1/2 z-10 h-4 w-10 -translate-x-1/2 cursor-ns-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize bottom edge" />
+                              {/* all four corners */}
+                              <span onPointerDown={startInteraction(id, "nw")} className="absolute -left-2 -top-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from top-left" />
+                              <span onPointerDown={startInteraction(id, "ne")} className="absolute -right-2 -top-2 z-10 h-4 w-4 cursor-nesw-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from top-right" />
+                              <span onPointerDown={startInteraction(id, "sw")} className="absolute -bottom-2 -left-2 z-10 h-4 w-4 cursor-nesw-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from bottom-left" />
+                              <span onPointerDown={startInteraction(id, "se")} className="absolute -bottom-2 -right-2 z-10 h-4 w-4 cursor-nwse-resize rounded border border-zinc-900 bg-lime-400 shadow" aria-label="Resize from bottom-right" />
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}
                 </div>
-                );
-              })}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

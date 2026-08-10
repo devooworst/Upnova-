@@ -13,7 +13,7 @@
 
 export interface WorldElement {
   x: number; // % of canvas width (0–100)
-  y: number; // px from canvas top (0–4000)
+  y: number; // px from canvas top (0–4000) — DESIGN pixels (see WORLD_DESIGN_WIDTH)
   w: number; // % width (24–100)
   /** min-height in px (0 = size to content). Content can never be clipped:
       cards grow with their real content, this only adds room. */
@@ -23,10 +23,41 @@ export interface WorldElement {
   hidden: boolean;
 }
 
+/* ------------------------------------------------------------------ */
+/* THE PARITY RULE — one layout engine for editor AND viewer.          */
+/* Every world canvas is laid out at exactly WORLD_DESIGN_WIDTH design */
+/* pixels, then uniformly SCALED to whatever container it renders in.  */
+/* Text wraps identically, card heights are identical, positions are   */
+/* identical — the published profile is pixel-for-pixel the editor,    */
+/* just zoomed. Never hard-coded to any screenshot: the scale factor   */
+/* is measured live from the real container.                           */
+/* ------------------------------------------------------------------ */
+export const WORLD_DESIGN_WIDTH = 960;
+/** below this real width the canvas falls back to the clean stacked
+    mobile layout (readable > miniature) — editor previews match it */
+export const WORLD_STACK_BELOW = 560;
+
+/** Free image/decoration layers — a lightweight design canvas. Images
+    are VISUAL LAYERS: they never join the card flow, so they can sit
+    behind cards (negative layer), between them, or in front — and can
+    never break the layout. */
+export interface WorldImage {
+  src: string; // https URL or site-relative path — validated, never scripts
+  x: number; // % of canvas width
+  y: number; // design px from top
+  w: number; // % width (4–100)
+  rotate: number; // -180..180 — decorations rotate freely
+  opacity: number; // 0.05–1
+  layer: number; // z-order -10..30 (cards live at 0..20 → behind/between/front)
+  locked: boolean; // safe from accidental drags; still selectable
+}
+
 export interface WorldConfig {
   enabled: boolean;
   environment: string; // ENVIRONMENTS id — the full-bleed backdrop scene
   elements: Record<string, WorldElement>; // keyed by APPROVED element ids
+  /** free decorative image layers, keyed by generated ids (max 8) */
+  images?: Record<string, WorldImage>;
   /** the world headline — custom text ("welcome to my studio…") or the
       default "{name}'s world"; hideable entirely. Plain text only. */
   title?: string;
@@ -160,11 +191,43 @@ export function sanitizeWorld(input: unknown): WorldConfig {
     enabled: !!o.enabled,
     environment: typeof o.environment === "string" && o.environment in ENVIRONMENTS ? o.environment : "cosmic",
     elements,
+    images: sanitizeWorldImages(o.images),
     // plain text only — control chars stripped, length capped; React
     // escaping keeps it inert everywhere it renders
     title: String(o.title ?? "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80),
     showTitle: o.showTitle !== false,
   };
+}
+
+/** image layers: validated sources only (https or site-relative — never
+    scripts/data URIs beyond images), clamped geometry, capped count.
+    The saved layer/z survives round-trips exactly. */
+function sanitizeWorldImages(input: unknown): Record<string, WorldImage> {
+  const out: Record<string, WorldImage> = {};
+  if (typeof input !== "object" || input === null) return out;
+  const entries = Object.entries(input as Record<string, unknown>).slice(0, 8);
+  for (const [rawId, rawVal] of entries) {
+    const id = rawId.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32);
+    if (!id || typeof rawVal !== "object" || rawVal === null) continue;
+    const r = rawVal as Record<string, unknown>;
+    const rawSrc = String(r.src ?? "").trim();
+    // data-URI images (uploaded decorations) get a bigger budget; URLs stay short
+    const isDataImg = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(rawSrc);
+    const src = rawSrc.slice(0, isDataImg ? 900_000 : 500);
+    const okSrc = isDataImg || /^https?:\/\/[^\s"'<>]+$/i.test(src) || /^\/[a-zA-Z0-9/_.%-]+$/.test(src);
+    if (!okSrc) continue;
+    out[id] = {
+      src,
+      x: clamp(r.x, 0, 100, 30),
+      y: clamp(r.y, 0, 4000, 80),
+      w: clamp(r.w, 4, 100, 28),
+      rotate: clamp(r.rotate, -180, 180, 0),
+      opacity: Math.max(0.05, Math.min(1, Number(r.opacity) || 1)),
+      layer: clamp(r.layer, -10, 30, 25),
+      locked: !!r.locked,
+    };
+  }
+  return out;
 }
 
 export const SECTION_IDS = ["trust", "posts", "services", "reviews", "experience"] as const;
