@@ -48,6 +48,10 @@ export function publicUser(
     businessVerified: !!user.businessVerified,
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
+    // the banner/cover is public profile imagery, same as the avatar —
+    // one source for the profile page, Studio canvas, and visitors
+    coverUrl: profile.coverUrl,
+    coverPos: profile.coverPos,
     verified: profile.verified,
     primaryRole: profile.primaryRole,
     additionalRoles: parse(profile.additionalRoles),

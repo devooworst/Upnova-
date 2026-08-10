@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Palette, Sparkles, Check, RotateCcw, Eye, ArrowUp, ArrowDown, Lock, FlaskConical } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
-import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff, LayoutTemplate, Move, Lock as LockIcon } from "lucide-react";
+import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff, LayoutTemplate, Move, Lock as LockIcon, Image as ImageIcon, Trash2 } from "lucide-react";
 import DbCreatorProfile from "@/components/db/DbCreatorProfile";
 import {
   BANNERS,
@@ -86,6 +86,31 @@ export default function ProfileStudioPage() {
   };
   const [selected, setSelected] = useState<string>("hero");
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  /* ---- banner/cover: the SAME profiles.coverUrl the profile renders.
+     Loaded from the same public payload; saved through the same
+     /api/me/profile PATCH Edit Profile uses. No second banner system. ---- */
+  const [cover, setCover] = useState<{ url: string | null; pos: number; touched: boolean } | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    fetch(`/api/users/${user.handle}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setCover({ url: d.user?.coverUrl ?? null, pos: d.user?.coverPos ?? 50, touched: false }))
+      .catch(() => setCover({ url: null, pos: 50, touched: false }));
+  }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pickCover = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 1_100_000) {
+      setMsg({ kind: "err", text: "Banner image is too large — keep it under ~1 MB." });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCover((c) => ({ url: String(reader.result), pos: c?.pos ?? 50, touched: true }));
+      setDirty(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const resetLayout = () => {
     setWorld({ elements: { ...DEFAULT_WORLD.elements } });
     setMsg({ kind: "ok", text: "Layout back to the default arrangement — environment and styling kept. Save to persist." });
@@ -95,6 +120,21 @@ export default function ProfileStudioPage() {
     setBusy(true);
     setMsg(null);
     try {
+      // banner/cover first — same endpoint Edit Profile uses (profiles table)
+      if (cover?.touched) {
+        const cres = await fetch("/api/me/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ coverUrl: cover.url, coverPos: cover.pos }),
+        });
+        if (!cres.ok) {
+          const cd = await cres.json().catch(() => ({} as { error?: string }));
+          setMsg({ kind: "err", text: (cd as { error?: string }).error || "Banner save failed — nothing else was changed." });
+          setBusy(false);
+          return;
+        }
+        setCover((c) => (c ? { ...c, touched: false } : c));
+      }
       const res = await fetch("/api/me/studio", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -291,6 +331,52 @@ export default function ProfileStudioPage() {
             </div>
           </section>
 
+          {/* THE banner/cover — the real profile image behind your world */}
+          <section className="card p-5">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+              <ImageIcon className="h-4 w-4 text-lime-400" /> Profile banner / cover
+            </h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              The real cover image on your profile — the same one Edit Profile manages. In My World
+              it becomes the top of your environment; on the standard profile it sits across the
+              header. Saved with everything else when you press Save.
+            </p>
+            <div className="mt-3 flex flex-wrap items-start gap-4">
+              <div className="w-full max-w-xs overflow-hidden rounded-lg border border-line">
+                {cover?.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cover.url} alt="Current banner" className="h-24 w-full object-cover" style={{ objectPosition: `center ${cover.pos}%` }} />
+                ) : (
+                  <div className="flex h-24 w-full items-center justify-center bg-card-raised text-[11px] text-zinc-600">No banner yet</div>
+                )}
+              </div>
+              <div className="min-w-[12rem] flex-1 space-y-3">
+                <label className="btn-ghost inline-flex cursor-pointer px-4 py-2 text-xs">
+                  <ImageIcon className="h-3.5 w-3.5" /> {cover?.url ? "Replace banner" : "Upload banner"}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => pickCover(e.target.files?.[0] ?? null)} />
+                </label>
+                {cover?.url && (
+                  <>
+                    <label className="block text-[10px] text-zinc-500">
+                      Vertical position — {cover.pos}%
+                      <input
+                        type="range" min={0} max={100} value={cover.pos}
+                        onChange={(e) => { setCover((c) => (c ? { ...c, pos: Number(e.target.value), touched: true } : c)); setDirty(true); }}
+                        className="mt-1 w-full accent-lime-400"
+                      />
+                    </label>
+                    <button
+                      onClick={() => { setCover((c) => (c ? { url: null, pos: 50, touched: true } : c)); setDirty(true); }}
+                      className="flex items-center gap-1.5 rounded-full border border-red-500/30 px-3 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="h-3 w-3" /> Remove banner
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* banner + decorations — the "decorate your room" layer */}
           <section className="card grid gap-5 p-5 sm:grid-cols-2">
             <div>
@@ -407,6 +493,8 @@ export default function ProfileStudioPage() {
                         device,
                         onSelect: setSelected,
                         onChange: (id, patch) => patchEl(id, patch),
+                        coverUrl: cover?.touched ? cover.url : undefined,
+                        coverPos: cover?.touched ? cover.pos : undefined,
                       }}
                     />
                   )}

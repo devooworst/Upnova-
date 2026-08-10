@@ -26,6 +26,8 @@ interface PublicProfile {
     handle: string;
     displayName: string;
     avatarUrl: string | null;
+    coverUrl?: string | null;
+    coverPos?: number;
     verified: boolean;
     roleLine: string;
     bio: string;
@@ -84,6 +86,10 @@ export interface WorldEditProps {
   device: "desktop" | "tablet" | "mobile";
   onSelect: (id: string) => void;
   onChange: (id: string, patch: Partial<WorldElement>) => void;
+  /** unsaved banner/cover being edited in the Studio — same fields the
+      profile PATCH persists; undefined = use the saved profile cover */
+  coverUrl?: string | null;
+  coverPos?: number;
 }
 
 export default function DbCreatorProfile({ handle, edit }: { handle: string; edit?: WorldEditProps }) {
@@ -162,6 +168,20 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
   const headingFont = FONTS[studio?.font ?? "standard"] ?? FONTS.standard;
   const effect = EFFECTS[studio?.effect ?? "none"] ?? EFFECTS.none;
   const banner = BANNERS[studio?.banner ?? "none"] ?? BANNERS.none;
+  const coverUrl = edit && edit.coverUrl !== undefined ? edit.coverUrl : user.coverUrl ?? null;
+  const coverPos = edit && edit.coverPos !== undefined ? edit.coverPos : user.coverPos ?? 50;
+  /* the banner/cover — REAL profile data (profiles.coverUrl), the same
+     image Edit Profile manages; rendered identically for owner, Studio
+     canvas, and visitors */
+  const coverBlock = coverUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={coverUrl}
+      alt=""
+      className="h-36 w-full object-cover sm:h-44"
+      style={{ objectPosition: `center ${coverPos}%` }}
+    />
+  ) : null;
   const DECO_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
     stars: StarDeco, hearts: Heart, vines: Leaf, sparkles: SparklesIcon, notes: Music2, bolts: ZapIcon,
   };
@@ -177,9 +197,11 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
 
   const headerBlock = (
     <>
-      <header className={`card relative overflow-hidden p-5 sm:p-6 ${theme.card} ${theme.headerRing} ${effect.cls}`}>
-        {banner.css && <span className="absolute inset-x-0 top-0 h-2.5" style={{ backgroundImage: banner.css }} aria-hidden />}
+      <header className={`card relative overflow-hidden ${theme.card} ${theme.headerRing} ${effect.cls}`}>
+        {coverBlock}
+        {banner.css && <span className={`absolute inset-x-0 top-0 h-2.5 ${coverBlock ? "z-10" : ""}`} style={{ backgroundImage: banner.css }} aria-hidden />}
         {decoStrip}
+        <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <span className={`inline-flex ${frame.cls}`}>
@@ -312,6 +334,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
             ))}
           </div>
         )}
+        </div>
       </header>
     </>
   );
@@ -548,6 +571,12 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
             <p className="relative mx-4 mt-2 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[10px] text-amber-300">
               DEMO MODE preview — only you see this world until Pro is active.
             </p>
+          )}
+          {coverUrl && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-72" aria-hidden>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={coverUrl} alt="" className="h-full w-full object-cover opacity-80" style={{ objectPosition: `center ${coverPos}%`, maskImage: "linear-gradient(180deg, black 55%, transparent 100%)", WebkitMaskImage: "linear-gradient(180deg, black 55%, transparent 100%)" }} />
+            </div>
           )}
           <div className="relative p-3 sm:p-4">
             <div
