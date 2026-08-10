@@ -153,8 +153,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
         .run();
       set({ status: "completed" });
-      sys(`${b.title} completed — payout of $${b.price} released to ${actorName}.`);
-      notify({ userId: other, actorId: user.id, type: "payment", title: `${b.title} completed — $${b.price} released`, body: "", href: "/calendar", category: "payments" });
+      sys(`${b.title} completed — the secured $${b.price + b.travelFee} was released to ${actorName} (the provider).`);
+      notify({ userId: other, actorId: user.id, type: "payment", title: `${b.title} completed — your secured $${b.price + b.travelFee} was released to the provider`, body: "", href: "/calendar", category: "payments" });
     } else {
       throw new ApiError(400, "Unknown action");
     }

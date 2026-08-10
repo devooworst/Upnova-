@@ -568,9 +568,20 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
             </div>
           )}
           {b.status === "confirmed" && b.myRole === "provider" && (
-            <button disabled={busy} onClick={() => act("complete")} className="btn-lime w-full justify-center py-2 text-xs">
-              Mark completed — releases ${b.price}
-            </button>
+            <div>
+              <button
+                disabled={busy}
+                onClick={() => act("complete")}
+                className="btn-lime w-full justify-center py-2 text-xs"
+                title={`The customer's payment is secured. When you mark the service completed, the secured $${b.price + (b.travelFee ?? 0)} is released to you.`}
+              >
+                Mark completed — release ${b.price + (b.travelFee ?? 0)} to me
+              </button>
+              <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
+                The customer&apos;s payment is secured. When you mark the service completed, the secured
+                ${b.price + (b.travelFee ?? 0)} is released <span className="font-semibold text-zinc-400">to you</span>.
+              </p>
+            </div>
           )}
 
           {["accepted", "confirmed"].includes(b.status) && (
