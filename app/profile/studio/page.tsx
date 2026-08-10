@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Palette, Sparkles, Check, RotateCcw, Eye, ArrowUp, ArrowDown, Lock, FlaskConical } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
-import { useRef } from "react";
-import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff } from "lucide-react";
+import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff, LayoutTemplate, Move, Lock as LockIcon } from "lucide-react";
+import DbCreatorProfile from "@/components/db/DbCreatorProfile";
 import {
   BANNERS,
   DECORATIONS,
@@ -86,28 +86,10 @@ export default function ProfileStudioPage() {
   };
   const [selected, setSelected] = useState<string>("hero");
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
-  const onElPointerDown = (id: string) => (e: React.PointerEvent) => {
-    setSelected(id);
-    const canvas = canvasRef.current;
-    if (!canvas || device === "mobile") return;
-    const rect = canvas.getBoundingClientRect();
-    const el = world.elements[id];
-    dragRef.current = { id, dx: e.clientX - rect.left - (el.x / 100) * rect.width, dy: e.clientY - rect.top - el.y * 0.28 };
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  const resetLayout = () => {
+    setWorld({ elements: { ...DEFAULT_WORLD.elements } });
+    setMsg({ kind: "ok", text: "Layout back to the default arrangement — environment and styling kept. Save to persist." });
   };
-  const onCanvasPointerMove = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    const canvas = canvasRef.current;
-    if (!d || !canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    // snap: 2% grid horizontally, 20px vertically (canvas shows at 0.28 scale)
-    const x = Math.round(Math.min(100, Math.max(0, ((e.clientX - rect.left - d.dx) / rect.width) * 100)) / 2) * 2;
-    const y = Math.round(Math.min(4000, Math.max(0, (e.clientY - rect.top - d.dy) / 0.28)) / 20) * 20;
-    patchEl(d.id, { x, y });
-  };
-  const onCanvasPointerUp = () => (dragRef.current = null);
 
   const save = async () => {
     setBusy(true);
@@ -404,41 +386,50 @@ export default function ProfileStudioPage() {
                   <span className="ml-auto font-mono text-[9px] text-zinc-600">drag to move · 2% / 20px snap</span>
                 </div>
 
-                {/* the canvas — drag to place; mobile shows the real stacked order */}
-                <div className={`mx-auto mt-2 ${device === "tablet" ? "max-w-md" : device === "mobile" ? "max-w-[240px]" : ""}`}>
-                  <div
-                    ref={canvasRef}
-                    onPointerMove={onCanvasPointerMove}
-                    onPointerUp={onCanvasPointerUp}
-                    className="relative overflow-hidden rounded-xl border border-line"
-                    style={{ backgroundImage: ENVIRONMENTS[world.environment].css, height: device === "mobile" ? "auto" : 420, touchAction: "none" }}
-                  >
-                    {device === "mobile" ? (
-                      <div className="space-y-2 p-3">
-                        <p className="text-center font-mono text-[8px] uppercase tracking-wide text-zinc-500">phones always stack top-to-bottom</p>
-                        {WORLD_ELEMENT_IDS.filter((id) => !world.elements[id].hidden || id === "hero")
-                          .sort((a, b) => world.elements[a].y - world.elements[b].y)
-                          .map((id) => (
-                            <div key={id} className="rounded border border-line bg-card/90 px-2 py-1.5 text-[9px] font-semibold text-zinc-300">{WORLD_ELEMENT_LABELS[id]}</div>
-                          ))}
-                      </div>
-                    ) : (
-                      WORLD_ELEMENT_IDS.map((id) => {
-                        const el = world.elements[id];
-                        if (el.hidden && id !== "hero") return null;
-                        return (
-                          <div
-                            key={id}
-                            onPointerDown={onElPointerDown(id)}
-                            className={`absolute cursor-grab select-none rounded-lg border px-2 py-1.5 text-[9px] font-bold active:cursor-grabbing ${selected === id ? "border-lime-400 bg-lime-400/15 text-lime-200" : "border-zinc-500/60 bg-card/85 text-zinc-300"}`}
-                            style={{ left: `${el.x}%`, top: el.y * 0.28, width: `${el.w}%`, zIndex: el.layer, transform: `rotate(${el.rotate}deg)`, minHeight: 34 }}
-                          >
-                            {WORLD_ELEMENT_LABELS[id]}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                {/* WYSIWYG canvas — the REAL profile, editable in place:
+                    click → outline + handles, drag to move, pull an edge to
+                    resize. Same renderer visitors get; never a mock. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500"><LockIcon className="h-2.5 w-2.5" /> identity · actions · trust: locked inside</span>
+                  <span className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-400"><Move className="h-2.5 w-2.5" /> sections: move · resize · rotate · layer</span>
+                  <span className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-lime-300"><Sparkles className="h-2.5 w-2.5" /> scene · theme · decorations: fully creative</span>
+                  <button onClick={resetLayout} className="ml-auto flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold text-zinc-300 hover:border-zinc-600">
+                    <LayoutTemplate className="h-3 w-3" /> Default layout
+                  </button>
+                </div>
+                <div className={`mx-auto mt-2 max-h-[70vh] overflow-y-auto rounded-xl border border-line ${device === "tablet" ? "max-w-3xl" : device === "mobile" ? "max-w-sm" : ""}`}>
+                  {user && (
+                    <DbCreatorProfile
+                      handle={user.handle}
+                      edit={{
+                        studio: { ...cfg, world: { ...world, enabled: true } },
+                        selected,
+                        device,
+                        onSelect: setSelected,
+                        onChange: (id, patch) => patchEl(id, patch),
+                      }}
+                    />
+                  )}
+                </div>
+                {device === "mobile" && (
+                  <p className="mt-1.5 text-center font-mono text-[9px] uppercase tracking-wide text-zinc-600">
+                    exactly what phone visitors get — worlds always stack cleanly on small screens
+                  </p>
+                )}
+
+                {/* element picker — select anything, including hidden ones */}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {WORLD_ELEMENT_IDS.map((id) => (
+                    <button
+                      key={id}
+                      onClick={() => setSelected(id)}
+                      className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
+                        selected === id ? "border-lime-400/60 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
+                      } ${world.elements[id].hidden && id !== "hero" ? "opacity-50" : ""}`}
+                    >
+                      {WORLD_ELEMENT_LABELS[id]}{world.elements[id].hidden && id !== "hero" ? " (hidden)" : ""}
+                    </button>
+                  ))}
                 </div>
 
                 {/* inspector for the selected element */}

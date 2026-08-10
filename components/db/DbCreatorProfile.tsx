@@ -6,8 +6,8 @@
 /*  come from the owner's real record.                                 */
 /* ------------------------------------------------------------------ */
 
-import React, { useCallback, useEffect, useState } from "react";
-import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, BANNERS } from "@/lib/profileStudio";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { THEMES, FRAMES, ACCENTS, FONTS, EFFECTS, SECTION_IDS, ENVIRONMENTS, WORLD_ELEMENT_IDS, WORLD_ELEMENT_LABELS, BANNERS, type StudioConfig, type WorldElement } from "@/lib/profileStudio";
 import { Star as StarDeco, Heart, Leaf, Sparkles as SparklesIcon, Music2, Zap as ZapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -74,10 +74,25 @@ interface PublicProfile {
   reviews?: { rating: number; body: string; createdAt: string }[];
 }
 
-export default function DbCreatorProfile({ handle }: { handle: string }) {
+/** WYSIWYG edit mode (Profile Studio): when `edit` is provided, this SAME
+    renderer becomes the canvas — real components, real data — with
+    selection outlines, drag-to-move, and resize handles layered on top.
+    The editor never has a second representation that could drift. */
+export interface WorldEditProps {
+  studio: StudioConfig;
+  selected: string;
+  device: "desktop" | "tablet" | "mobile";
+  onSelect: (id: string) => void;
+  onChange: (id: string, patch: Partial<WorldElement>) => void;
+}
+
+export default function DbCreatorProfile({ handle, edit }: { handle: string; edit?: WorldEditProps }) {
   const router = useRouter();
   const { user: me } = useSession();
   const [data, setData] = useState<PublicProfile | null>(null);
+  // WYSIWYG edit interaction state (only used when `edit` is provided)
+  const editDrag = useRef<{ id: string; mode: "move" | "e" | "w"; startX: number; startY: number; el: WorldElement } | null>(null);
+  const editCanvasRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -140,7 +155,7 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
     else if (res.status === 401) promptJoin("message");
   };
 
-  const studio = data.studio ?? null;
+  const studio = edit ? edit.studio : (data.studio ?? null);
   const theme = THEMES[studio?.theme ?? "none"] ?? THEMES.none;
   const frame = FRAMES[studio?.frame ?? "none"] ?? FRAMES.none;
   const accent = ACCENTS[studio?.accent ?? "none"] ?? ACCENTS.none;
@@ -479,6 +494,38 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
      inside it stays standard UpNova. */
   const world = studio?.world;
   if (world?.enabled) {
+    const stacked = edit?.device === "mobile"; // the REAL phone behavior
+    const snap2 = (v: number) => Math.round(v / 2) * 2;
+    const snap20 = (v: number) => Math.round(v / 20) * 20;
+    const startInteraction = (id: string, mode: "move" | "e" | "w") => (e: React.PointerEvent) => {
+      if (!edit || stacked) return;
+      e.preventDefault();
+      e.stopPropagation();
+      edit.onSelect(id);
+      const el = world.elements[id];
+      editDrag.current = { id, mode, startX: e.clientX, startY: e.clientY, el: { ...el } };
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    };
+    const onCanvasMove = (e: React.PointerEvent) => {
+      const d = editDrag.current;
+      const rect = editCanvasRef.current?.getBoundingClientRect();
+      if (!d || !rect || !edit) return;
+      const dxPct = ((e.clientX - d.startX) / rect.width) * 100;
+      const dy = e.clientY - d.startY;
+      if (d.mode === "move")
+        edit.onChange(d.id, {
+          x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
+          y: snap20(Math.min(4000, Math.max(0, d.el.y + dy))),
+        });
+      else if (d.mode === "e")
+        edit.onChange(d.id, { w: snap2(Math.min(100, Math.max(24, d.el.w + dxPct))) });
+      else
+        edit.onChange(d.id, {
+          w: snap2(Math.min(100, Math.max(24, d.el.w - dxPct))),
+          x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
+        });
+    };
+    const endInteraction = () => (editDrag.current = null);
     const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
     const els = WORLD_ELEMENT_IDS
       .map((id) => ({ id, el: world.elements[id] }))
@@ -503,16 +550,54 @@ export default function DbCreatorProfile({ handle }: { handle: string }) {
             </p>
           )}
           <div className="relative p-3 sm:p-4">
-            <div className="relative sm:h-[var(--wh)]" style={{ "--wh": `${canvasH}px` } as React.CSSProperties}>
-              {els.map(({ id, el }) => (
+            <div
+              ref={editCanvasRef}
+              onPointerMove={edit && !stacked ? onCanvasMove : undefined}
+              onPointerUp={edit && !stacked ? endInteraction : undefined}
+              className={stacked ? "relative" : "relative sm:h-[var(--wh)]"}
+              style={stacked ? undefined : ({ "--wh": `${canvasH}px`, touchAction: edit ? "none" : undefined } as React.CSSProperties)}
+            >
+              {els.map(({ id, el }) => {
+                const isSel = edit && edit.selected === id;
+                return (
                 <div
                   key={id}
-                  className="relative mb-4 sm:absolute sm:mb-0 sm:left-[var(--wx)] sm:top-[var(--wy)] sm:w-[var(--ww)] sm:z-[var(--wz)] sm:rotate-[var(--wr)]"
-                  style={{ "--wx": `${el.x}%`, "--wy": `${el.y}px`, "--ww": `${el.w}%`, "--wz": String(el.layer), "--wr": `${el.rotate}deg` } as React.CSSProperties}
+                  className={
+                    stacked
+                      ? "relative mb-4"
+                      : "relative mb-4 sm:absolute sm:mb-0 sm:left-[var(--wx)] sm:top-[var(--wy)] sm:w-[var(--ww)] sm:z-[var(--wz)] sm:rotate-[var(--wr)]"
+                  }
+                  style={stacked ? undefined : ({ "--wx": `${el.x}%`, "--wy": `${el.y}px`, "--ww": `${el.w}%`, "--wz": String(el.layer), "--wr": `${el.rotate}deg` } as React.CSSProperties)}
                 >
-                  {id === "hero" ? headerBlock : sectionBlocks[id] ?? null}
+                  {/* in edit mode the real content shows but doesn't swallow clicks */}
+                  <div className={edit && !stacked ? "pointer-events-none select-none" : undefined}>
+                    {id === "hero" ? headerBlock : sectionBlocks[id] ?? null}
+                  </div>
+                  {edit && !stacked && (
+                    <div
+                      onPointerDown={startInteraction(id, "move")}
+                      className={`absolute -inset-0.5 cursor-grab rounded-xl transition active:cursor-grabbing ${
+                        isSel ? "ring-2 ring-lime-400" : "ring-1 ring-transparent hover:ring-lime-400/40"
+                      }`}
+                      role="button"
+                      aria-label={`Select ${WORLD_ELEMENT_LABELS[id]}`}
+                    >
+                      {isSel && (
+                        <>
+                          <span className="absolute -top-6 left-0 z-10 whitespace-nowrap rounded bg-lime-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
+                            {WORLD_ELEMENT_LABELS[id]}
+                            {id === "hero" ? " · identity & actions locked inside" : ""}
+                          </span>
+                          <span onPointerDown={startInteraction(id, "e")} className="absolute -right-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize from the right edge" />
+                          <span onPointerDown={startInteraction(id, "w")} className="absolute -left-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize from the left edge" />
+                          <span onPointerDown={startInteraction(id, "e")} className="absolute -bottom-1.5 -right-1.5 z-10 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize from the corner" />
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
