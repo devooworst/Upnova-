@@ -166,6 +166,27 @@ export async function POST(req: NextRequest) {
     const dead = await api("rachel2", "/api/auth/me");
     const alive = await api("rachel", "/api/auth/me");
     step(c, "logout revokes the presented session; the other survives", !(dead.data as any).user && !!(alive.data as any).user, { route: "POST /api/auth/logout", expected: "revoked token → user:null; sibling token → user", actual: `dead=${!!(dead.data as any).user} alive=${!!(alive.data as any).user}` });
+    // TWO DEVELOPMENT/ADMIN ACCOUNTS — completely separate users: own
+    // ids, own credentials, own sessions; both admins, both REAL
+    // (simulated=false → automation can never message or act as them).
+    const devinRow = db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get();
+    const jaylinRow = db.select().from(tables.users).where(eq(tables.users.handle, "jaylin")).get();
+    const jl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "jaylin@upnova.dev", password: "upnova123" } });
+    tok.jaylin = (jl.data as { sessionToken?: string }).sessionToken ?? "";
+    const jme = (await api("jaylin", "/api/auth/me")).data as any;
+    step(
+      c,
+      "dev admins devin + jaylin: two SEPARATE records, own credentials, both admin, both REAL",
+      !!devinRow && !!jaylinRow && devinRow.id !== jaylinRow.id &&
+        devinRow.role === "admin" && jaylinRow.role === "admin" &&
+        !devinRow.simulated && !jaylinRow.simulated &&
+        jme.user?.handle === "jaylin" && jme.user?.role === "admin",
+      {
+        route: "POST /api/auth/login (jaylin@upnova.dev)",
+        expected: "distinct ids · role=admin ×2 · simulated=false ×2 · session identifies jaylin",
+        actual: `ids ${devinRow?.id?.slice(0, 6)}…≠${jaylinRow?.id?.slice(0, 6)}… roles=${devinRow?.role}/${jaylinRow?.role} simulated=${!!devinRow?.simulated}/${!!jaylinRow?.simulated} me=${jme.user?.handle}`,
+      }
+    );
     const anon = await api(null, "/api/me/notifications");
     step(c, "protected route rejects no/invalid credentials", anon.status === 401, { route: "GET /api/me/notifications", actual: String(anon.status) });
     // THE FRIEND'S-COMPUTER TEST: a request with NO credentials of any

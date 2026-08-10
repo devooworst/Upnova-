@@ -144,6 +144,19 @@ function seed() {
       verified: true, trust: "identity", admin: true,
     },
     {
+      // SECOND development/admin account — a COMPLETELY SEPARATE user:
+      // own id, own credentials, own profile, own sessions, own inbox.
+      // admin:true → role admin + simulated:false (REAL account: the
+      // platform never auto-messages or acts as Jaylin, same as Devin).
+      handle: "jaylin", name: "Jaylin", role: "Development Admin",
+      bio: "UpNova development and platform administration.",
+      avatar: null, city: "Baltimore", state: "MD", county: "Baltimore City",
+      lat: 39.2904, lng: -76.6122,
+      skills: ["Platform Development", "QA"],
+      interests: ["Technology", "Music"],
+      verified: true, trust: "identity", admin: true,
+    },
+    {
       handle: "ava", name: "Ava Chen", role: "Photographer",
       bio: "Golden hour chaser. Events, portraits, and brand shoots across Baltimore.",
       avatar: "/images/ava.jpg", city: "Baltimore", state: "MD", county: "Baltimore City",
