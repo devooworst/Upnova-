@@ -97,7 +97,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
   const { user: me } = useSession();
   const [data, setData] = useState<PublicProfile | null>(null);
   // WYSIWYG edit interaction state (only used when `edit` is provided)
-  const editDrag = useRef<{ id: string; mode: "move" | "e" | "w"; startX: number; startY: number; el: WorldElement } | null>(null);
+  const editDrag = useRef<{ id: string; mode: "move" | "e" | "w" | "n" | "s" | "se" | "rot"; startX: number; startY: number; el: WorldElement; measuredH: number } | null>(null);
   const editCanvasRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -520,13 +520,14 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     const stacked = edit?.device === "mobile"; // the REAL phone behavior
     const snap2 = (v: number) => Math.round(v / 2) * 2;
     const snap20 = (v: number) => Math.round(v / 20) * 20;
-    const startInteraction = (id: string, mode: "move" | "e" | "w") => (e: React.PointerEvent) => {
+    const startInteraction = (id: string, mode: "move" | "e" | "w" | "n" | "s" | "se" | "rot") => (e: React.PointerEvent) => {
       if (!edit || stacked) return;
       e.preventDefault();
       e.stopPropagation();
       edit.onSelect(id);
       const el = world.elements[id];
-      editDrag.current = { id, mode, startX: e.clientX, startY: e.clientY, el: { ...el } };
+      const host = (e.currentTarget as HTMLElement).closest("[data-world-el]") as HTMLElement | null;
+      editDrag.current = { id, mode, startX: e.clientX, startY: e.clientY, el: { ...el }, measuredH: host?.offsetHeight ?? 200 };
       (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     };
     const onCanvasMove = (e: React.PointerEvent) => {
@@ -535,6 +536,8 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       if (!d || !rect || !edit) return;
       const dxPct = ((e.clientX - d.startX) / rect.width) * 100;
       const dy = e.clientY - d.startY;
+      const baseH = d.el.h > 0 ? d.el.h : d.measuredH;
+      const clampH = (v: number) => snap20(Math.min(1600, Math.max(0, v)));
       if (d.mode === "move")
         edit.onChange(d.id, {
           x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
@@ -542,11 +545,24 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         });
       else if (d.mode === "e")
         edit.onChange(d.id, { w: snap2(Math.min(100, Math.max(24, d.el.w + dxPct))) });
-      else
+      else if (d.mode === "w")
         edit.onChange(d.id, {
           w: snap2(Math.min(100, Math.max(24, d.el.w - dxPct))),
           x: snap2(Math.min(100, Math.max(0, d.el.x + dxPct))),
         });
+      else if (d.mode === "s") edit.onChange(d.id, { h: clampH(baseH + dy) });
+      else if (d.mode === "n")
+        edit.onChange(d.id, {
+          h: clampH(baseH - dy),
+          y: snap20(Math.min(4000, Math.max(0, d.el.y + dy))),
+        });
+      else if (d.mode === "se")
+        edit.onChange(d.id, {
+          w: snap2(Math.min(100, Math.max(24, d.el.w + dxPct))),
+          h: clampH(baseH + dy),
+        });
+      else if (d.mode === "rot")
+        edit.onChange(d.id, { rotate: Math.round(Math.min(8, Math.max(-8, d.el.rotate + (e.clientX - d.startX) / 14))) });
     };
     const endInteraction = () => (editDrag.current = null);
     const env = ENVIRONMENTS[world.environment] ?? ENVIRONMENTS.cosmic;
@@ -591,12 +607,13 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                 return (
                 <div
                   key={id}
+                  data-world-el={id}
                   className={
                     stacked
                       ? "relative mb-4"
                       : "relative mb-4 sm:absolute sm:mb-0 sm:left-[var(--wx)] sm:top-[var(--wy)] sm:w-[var(--ww)] sm:z-[var(--wz)] sm:rotate-[var(--wr)]"
                   }
-                  style={stacked ? undefined : ({ "--wx": `${el.x}%`, "--wy": `${el.y}px`, "--ww": `${el.w}%`, "--wz": String(el.layer), "--wr": `${el.rotate}deg` } as React.CSSProperties)}
+                  style={stacked ? undefined : ({ "--wx": `${el.x}%`, "--wy": `${el.y}px`, "--ww": `${el.w}%`, "--wz": String(el.layer), "--wr": `${el.rotate}deg`, minHeight: el.h > 0 ? el.h : undefined } as React.CSSProperties)}
                 >
                   {/* in edit mode the real content shows but doesn't swallow clicks */}
                   <div className={edit && !stacked ? "pointer-events-none select-none" : undefined}>
@@ -617,9 +634,15 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                             {WORLD_ELEMENT_LABELS[id]}
                             {id === "hero" ? " · identity & actions locked inside" : ""}
                           </span>
-                          <span onPointerDown={startInteraction(id, "e")} className="absolute -right-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize from the right edge" />
-                          <span onPointerDown={startInteraction(id, "w")} className="absolute -left-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize from the left edge" />
-                          <span onPointerDown={startInteraction(id, "e")} className="absolute -bottom-1.5 -right-1.5 z-10 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize from the corner" />
+                          {/* rotation — grab and pull sideways */}
+                          <span onPointerDown={startInteraction(id, "rot")} className="absolute -top-8 left-1/2 z-10 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-zinc-900 bg-lime-400" title="Drag sideways to rotate" aria-label="Rotate" />
+                          {/* edges */}
+                          <span onPointerDown={startInteraction(id, "e")} className="absolute -right-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize right edge" />
+                          <span onPointerDown={startInteraction(id, "w")} className="absolute -left-1.5 top-1/2 z-10 h-7 w-3 -translate-y-1/2 cursor-ew-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize left edge" />
+                          <span onPointerDown={startInteraction(id, "n")} className="absolute -top-1.5 left-1/2 z-10 h-3 w-7 -translate-x-1/2 cursor-ns-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize top edge" />
+                          <span onPointerDown={startInteraction(id, "s")} className="absolute -bottom-1.5 left-1/2 z-10 h-3 w-7 -translate-x-1/2 cursor-ns-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize bottom edge" />
+                          {/* corner */}
+                          <span onPointerDown={startInteraction(id, "se")} className="absolute -bottom-1.5 -right-1.5 z-10 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-zinc-900 bg-lime-400" aria-label="Resize width and height" />
                         </>
                       )}
                     </div>

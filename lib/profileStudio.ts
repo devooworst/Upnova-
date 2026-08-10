@@ -15,6 +15,9 @@ export interface WorldElement {
   x: number; // % of canvas width (0–100)
   y: number; // px from canvas top (0–4000)
   w: number; // % width (24–100)
+  /** min-height in px (0 = size to content). Content can never be clipped:
+      cards grow with their real content, this only adds room. */
+  h: number;
   rotate: number; // degrees, clamped ±8 — personality, never chaos
   layer: number; // z-order 0–20
   hidden: boolean;
@@ -60,12 +63,12 @@ export const DEFAULT_WORLD: WorldConfig = {
   enabled: false,
   environment: "cosmic",
   elements: {
-    hero: { x: 2, y: 24, w: 64, rotate: 0, layer: 10, hidden: false },
-    trust: { x: 68, y: 60, w: 30, rotate: 1, layer: 8, hidden: false },
-    posts: { x: 2, y: 460, w: 52, rotate: 0, layer: 7, hidden: false },
-    services: { x: 56, y: 460, w: 42, rotate: -1, layer: 6, hidden: false },
-    reviews: { x: 2, y: 960, w: 44, rotate: 0, layer: 5, hidden: false },
-    experience: { x: 48, y: 960, w: 50, rotate: 0, layer: 4, hidden: false },
+    hero: { x: 2, y: 24, w: 64, h: 0, rotate: 0, layer: 10, hidden: false },
+    trust: { x: 68, y: 60, w: 30, h: 0, rotate: 1, layer: 8, hidden: false },
+    posts: { x: 2, y: 460, w: 52, h: 0, rotate: 0, layer: 7, hidden: false },
+    services: { x: 56, y: 460, w: 42, h: 0, rotate: -1, layer: 6, hidden: false },
+    reviews: { x: 2, y: 960, w: 44, h: 0, rotate: 0, layer: 5, hidden: false },
+    experience: { x: 48, y: 960, w: 50, h: 0, rotate: 0, layer: 4, hidden: false },
   },
 };
 
@@ -139,6 +142,7 @@ export function sanitizeWorld(input: unknown): WorldConfig {
       x: clamp(raw.x, 0, 100, dflt.x),
       y: clamp(raw.y, 0, 4000, dflt.y),
       w: clamp(raw.w, 24, 100, dflt.w),
+      h: clamp(raw.h, 0, 1600, 0),
       rotate: clamp(raw.rotate, -8, 8, 0),
       layer: clamp(raw.layer, 0, 20, dflt.layer),
       hidden: id === "hero" ? false : !!raw.hidden, // the hero can NEVER be hidden

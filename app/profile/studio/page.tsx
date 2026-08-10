@@ -442,115 +442,20 @@ export default function ProfileStudioPage() {
             </div>
 
             {world.enabled && canWorld && (
-              <>
-                {/* environment scenes */}
-                <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Environment</p>
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {Object.entries(ENVIRONMENTS).map(([id, env]) => (
-                    <button
-                      key={id}
-                      onClick={() => setWorld({ environment: id })}
-                      className={`overflow-hidden rounded-lg border text-left transition ${world.environment === id ? "border-lime-400/60" : "border-line hover:border-zinc-600"}`}
-                    >
-                      <span className="block h-12 w-full" style={{ backgroundImage: env.css }} />
-                      <span className="block px-2 py-1.5">
-                        <span className="block text-[11px] font-semibold text-zinc-100">{env.label}</span>
-                        <span className="block truncate text-[9px] text-zinc-500">{env.desc}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* device preview switch */}
-                <div className="mt-4 flex items-center gap-1.5">
-                  <p className="mr-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Canvas</p>
-                  {([["desktop", Monitor], ["tablet", Tablet], ["mobile", Smartphone]] as const).map(([d, Icon]) => (
-                    <button key={d} onClick={() => setDevice(d)} className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize transition ${device === d ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400"}`}>
-                      <Icon className="h-3 w-3" /> {d}
-                    </button>
-                  ))}
-                  <span className="ml-auto font-mono text-[9px] text-zinc-600">drag to move · 2% / 20px snap</span>
-                </div>
-
-                {/* WYSIWYG canvas — the REAL profile, editable in place:
-                    click → outline + handles, drag to move, pull an edge to
-                    resize. Same renderer visitors get; never a mock. */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500"><LockIcon className="h-2.5 w-2.5" /> identity · actions · trust: locked inside</span>
-                  <span className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-400"><Move className="h-2.5 w-2.5" /> sections: move · resize · rotate · layer</span>
-                  <span className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-lime-300"><Sparkles className="h-2.5 w-2.5" /> scene · theme · decorations: fully creative</span>
-                  <button onClick={resetLayout} className="ml-auto flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold text-zinc-300 hover:border-zinc-600">
-                    <LayoutTemplate className="h-3 w-3" /> Default layout
-                  </button>
-                </div>
-                <div className={`mx-auto mt-2 max-h-[70vh] overflow-y-auto rounded-xl border border-line ${device === "tablet" ? "max-w-3xl" : device === "mobile" ? "max-w-sm" : ""}`}>
-                  {user && (
-                    <DbCreatorProfile
-                      handle={user.handle}
-                      edit={{
-                        studio: { ...cfg, world: { ...world, enabled: true } },
-                        selected,
-                        device,
-                        onSelect: setSelected,
-                        onChange: (id, patch) => patchEl(id, patch),
-                        coverUrl: cover?.touched ? cover.url : undefined,
-                        coverPos: cover?.touched ? cover.pos : undefined,
-                      }}
-                    />
-                  )}
-                </div>
-                {device === "mobile" && (
-                  <p className="mt-1.5 text-center font-mono text-[9px] uppercase tracking-wide text-zinc-600">
-                    exactly what phone visitors get — worlds always stack cleanly on small screens
-                  </p>
-                )}
-
-                {/* element picker — select anything, including hidden ones */}
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {WORLD_ELEMENT_IDS.map((id) => (
-                    <button
-                      key={id}
-                      onClick={() => setSelected(id)}
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
-                        selected === id ? "border-lime-400/60 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"
-                      } ${world.elements[id].hidden && id !== "hero" ? "opacity-50" : ""}`}
-                    >
-                      {WORLD_ELEMENT_LABELS[id]}{world.elements[id].hidden && id !== "hero" ? " (hidden)" : ""}
-                    </button>
-                  ))}
-                </div>
-
-                {/* inspector for the selected element */}
-                <div className="mt-3 rounded-lg border border-line bg-card-raised p-3">
-                  <p className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                    <Layers className="h-3.5 w-3.5 text-zinc-500" /> {WORLD_ELEMENT_LABELS[selected]}
-                    {selected === "hero" && <span className="font-mono text-[8px] uppercase text-zinc-600">always visible · functions locked</span>}
-                  </p>
-                  <div className="mt-2 grid gap-3 sm:grid-cols-3">
-                    <label className="text-[10px] text-zinc-500">
-                      Width — {world.elements[selected].w}%
-                      <input type="range" min={24} max={100} value={world.elements[selected].w} onChange={(e) => patchEl(selected, { w: Number(e.target.value) })} className="mt-1 w-full accent-lime-400" />
-                    </label>
-                    <label className="text-[10px] text-zinc-500">
-                      Rotate — {world.elements[selected].rotate}°
-                      <input type="range" min={-8} max={8} value={world.elements[selected].rotate} onChange={(e) => patchEl(selected, { rotate: Number(e.target.value) })} className="mt-1 w-full accent-lime-400" />
-                    </label>
-                    <div className="flex items-end gap-2">
-                      <button onClick={() => patchEl(selected, { layer: Math.min(20, world.elements[selected].layer + 1) })} className="btn-ghost px-2.5 py-1 text-[10px]">Layer +</button>
-                      <button onClick={() => patchEl(selected, { layer: Math.max(0, world.elements[selected].layer - 1) })} className="btn-ghost px-2.5 py-1 text-[10px]">Layer −</button>
-                      {selected !== "hero" && (
-                        <button onClick={() => patchEl(selected, { hidden: !world.elements[selected].hidden })} className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${world.elements[selected].hidden ? "border-amber-400/40 text-amber-300" : "border-line text-zinc-400"}`}>
-                          <EyeOff className="h-3 w-3" /> {world.elements[selected].hidden ? "Hidden" : "Hide"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
-                  Approved elements only — messaging, booking, payments, verification, reporting,
-                  and your identity badges live inside the profile card and can&apos;t be altered or hidden.
+              <div className="mt-4 rounded-xl border border-lime-400/25 bg-lime-400/5 p-4">
+                <p className="text-xs leading-relaxed text-zinc-400">
+                  <span className="font-semibold text-lime-300">Your world is edited full-screen, on the real thing.</span>{" "}
+                  The editor opens your actual profile — same components, same banner, same data
+                  visitors see — and you grab, drag, and resize the cards directly. No abstract
+                  canvas.
                 </p>
-              </>
+                <Link
+                  href="/profile/studio/world"
+                  className="btn-lime mt-3 inline-flex rounded-md px-5 py-2 text-xs"
+                >
+                  Open My World editor — full screen →
+                </Link>
+              </div>
             )}
           </section>
 
