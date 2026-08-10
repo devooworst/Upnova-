@@ -176,6 +176,32 @@ export async function POST(req: NextRequest) {
     step(c, "open lena's profile: identity + services visible", prof.status === 200 && (prof.data as any).user?.handle === "lena" && services.length > 0, { route: "GET /api/users/lena", record: `services=${services.length}` });
     const bp = await api("rachel", "/api/users/harboroak");
     step(c, "business profile is a business destination (business block present)", !!(bp.data as any).business, { route: "GET /api/users/harboroak" });
+
+    /* ---- GLOBAL SEARCH: real accounts, from ANOTHER account, ranked ---- */
+    const s1 = (await api("rachel", "/api/search?q=devin")).data as any;
+    step(c, "SEARCH exact username from another account → @devin ranks FIRST", s1.people?.[0]?.handle === "devin" && !!s1.people?.[0]?.displayName, {
+      route: "GET /api/search?q=devin", expected: "people[0]=@devin", actual: `people[0]=@${s1.people?.[0]?.handle} of ${s1.people?.length}`,
+    });
+    const s2 = (await api("rachel", "/api/search?q=dev")).data as any;
+    step(c, "SEARCH partial username → @devin still found", (s2.people ?? []).some((p: any) => p.handle === "devin"), { actual: (s2.people ?? []).map((p: any) => "@" + p.handle).join(", ") });
+    const lenaName = String(((await api("rachel", "/api/users/lena")).data as any).user?.displayName ?? "");
+    const lastName = lenaName.split(" ").pop() ?? "";
+    const s3 = (await api("rachel", `/api/search?q=${encodeURIComponent(lastName.toLowerCase())}`)).data as any;
+    step(c, `SEARCH by display name ("${lastName}") → @lena found`, (s3.people ?? []).some((p: any) => p.handle === "lena"), { actual: (s3.people ?? []).map((p: any) => "@" + p.handle).join(", ") });
+    const s4 = (await api("rachel", "/api/search?q=zzzznotauser")).data as any;
+    step(c, "SEARCH nonexistent account → honest empty PEOPLE (200, never an error)", Array.isArray(s4.people) && s4.people.length === 0, { actual: `people=${s4.people?.length}` });
+    // a brand-new account is searchable the moment it exists
+    const nu = await api(null, "/api/auth/signup", { method: "POST", body: { email: "tonbsearch@upnova.dev", password: "Tour-walkthrough-99", handle: "tonbsearch", displayName: "Searchme Fresh" } });
+    const s5 = (await api("rachel", "/api/search?q=tonbsearch")).data as any;
+    const s6 = (await api("rachel", "/api/search?q=searchme")).data as any;
+    step(c, "NEW account is searchable immediately — by handle AND display name", nu.status === 200 && (s5.people ?? []).some((p: any) => p.handle === "tonbsearch") && (s6.people ?? []).some((p: any) => p.handle === "tonbsearch"), {
+      expected: "found via 'tonbsearch' and 'searchme'", actual: `handle=${(s5.people ?? []).length} name=${(s6.people ?? []).length}`,
+    });
+    const s7 = (await api("rachel", "/api/search?q=photographer&full=1")).data as any;
+    const s8 = (await api("rachel", "/api/search?q=brand%20identity")).data as any;
+    step(c, "cross-section search still works: opportunities + services return real matches", (s7.opportunities ?? []).length >= 1 && (s8.services ?? []).some((x: any) => /brand identity/i.test(x.title)), {
+      actual: `opps=${s7.opportunities?.length} services="${(s8.services ?? []).map((x: any) => x.title).join(",")}"`,
+    });
   }
 
   /* ================= MESSAGING (A → B → A) ================= */

@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getTheme, setTheme } from "@/lib/theme";
 import DbNotificationBell from "./db/DbNotificationBell";
+import GlobalSearch from "./GlobalSearch";
 import Avatar from "./Avatar";
 import { promptJoin } from "./GuestGate";
 import { useSession, logout } from "@/lib/session";
@@ -72,18 +73,8 @@ export default function Navbar() {
         {/* DEMO MODE / SIMULATION MODE master switch — outside the logo link */}
         <DemoModeSwitch />
 
-        {/* Desktop search */}
-        <div className="relative mx-auto hidden w-full max-w-xl md:block">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="search"
-            placeholder="Search creators, opportunities, communities…"
-            className="w-full rounded-full border border-line bg-card px-10 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/40 focus:ring-2 focus:ring-lime-400/15"
-          />
-          <kbd className="pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2 rounded border border-line bg-card-raised px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 lg:block">
-            ⌘K
-          </kbd>
-        </div>
+        {/* Desktop search — live people/global search (components/GlobalSearch) */}
+        <GlobalSearch variant="desktop" />
 
         {/* Right actions */}
         <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:gap-1.5">
@@ -241,16 +232,9 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Mobile search */}
+      {/* Mobile search — same live search */}
       <div className="px-3 pb-3 md:hidden">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="search"
-            placeholder="Search creators, opportunities, communities…"
-            className="w-full rounded-full border border-line bg-card py-2.5 pl-10 pr-4 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/40"
-          />
-        </div>
+        <GlobalSearch variant="mobile" />
       </div>
     </header>
   );
