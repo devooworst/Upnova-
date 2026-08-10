@@ -68,8 +68,14 @@ export default function Home() {
   };
 
   return (
-    <div className="flex gap-6">
-      <div className="mx-auto w-full min-w-0 max-w-[640px] flex-1 space-y-4 xl:mx-0">
+    /* ONE centered content group — feed + right rail move together.
+       The group centers inside whatever width the (collapsible) left
+       sidebar leaves available, so closing the hamburger re-centers Home
+       automatically: no fixed left offset, no dead zone on the right.
+       Wide screens get slightly more room (2xl) instead of empty space;
+       below xl the rail drops away and the feed centers alone. */
+    <div className="mx-auto flex w-full max-w-[984px] justify-center gap-6 2xl:max-w-[1040px]">
+      <div className="w-full min-w-0 max-w-[640px] flex-1 space-y-4 2xl:max-w-[688px]">
         {/* masthead — Home, always */}
         <header className="pt-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
