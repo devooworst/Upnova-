@@ -58,6 +58,13 @@ export default function QaPersonaBar() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [nextTask, setNextTask] = useState<NextTask | null>(null);
+  /* COLLAPSED BY DEFAULT — the Test Session lives in a tiny corner pill
+     until explicitly opened, and folds back the moment you interact
+     with the page, so it can never block a submit button, a form
+     field, or any control a test needs. Pure presentation: checkpoint
+     logic, progression, and verification are untouched. */
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   /* CLOSED unless the user explicitly opens it — never auto-opens */
   const [briefOpen, setBriefOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -71,6 +78,18 @@ export default function QaPersonaBar() {
     setGuideTask(null);
     try { sessionStorage.removeItem(GUIDE_KEY); } catch {}
   };
+
+  // THE PANEL GETS OUT OF THE WAY: any interaction with the real page
+  // (a click outside the panel) folds it back to the corner pill —
+  // it can never sit on top of the control you're about to press.
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onDown = (e: Event) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setPanelOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [panelOpen]);
 
   useEffect(() => {
     if (!user || !isQaHandle(user.handle)) return;
@@ -176,14 +195,51 @@ export default function QaPersonaBar() {
       {guideSteps && nextTask && (
         <QaGuide taskLabel={`${nextTask.scenario} · Test ${nextTask.idx} of ${nextTask.total}`} steps={guideSteps} onExit={stopGuide} />
       )}
-      <div className="fixed bottom-3 left-1/2 z-[90] w-[calc(100vw-1.5rem)] max-w-xl -translate-x-1/2">
-        <div className="rounded-2xl border border-amber-400/40 bg-[#141217]/95 px-3 py-2 shadow-2xl backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
-              <FlaskConical className="h-3.5 w-3.5" />
-              Test session · {QA_LABEL[user.handle] ?? user.handle}
-            </p>
-            <div className="flex flex-wrap items-center gap-1">
+      {!panelOpen ? (
+        /* ---- COLLAPSED (default): a tiny corner pill — the whole page
+             stays usable. Status at a glance, one click to open. ---- */
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="fixed bottom-3 right-3 z-[90] flex items-center gap-2 rounded-full border border-amber-400/50 bg-[#141217]/95 px-3 py-1.5 shadow-2xl backdrop-blur transition hover:border-amber-300/70"
+          title="Open the Test Session panel"
+        >
+          <FlaskConical className="h-3.5 w-3.5 text-amber-300" />
+          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-amber-300">
+            {(QA_LABEL[user.handle] ?? user.handle).replace("TEST ", "")}
+          </span>
+          {justDone ? (
+            <span className="rounded-full border border-lime-400/60 bg-lime-400/15 px-1.5 py-px font-mono text-[8px] font-bold uppercase tracking-[0.1em] text-lime-300">
+              <Check className="mr-0.5 inline h-2.5 w-2.5 align-[-1px]" /> Task done
+            </span>
+          ) : nextTask ? (
+            <span className={`font-mono text-[9px] font-bold tracking-[0.08em] ${nextTask.blocked ? "text-rose-300" : "text-zinc-400"}`}>
+              {nextTask.blocked ? "state needs restore" : `Task ${nextTask.idx}/${nextTask.total}`}
+            </span>
+          ) : (
+            <span className="font-mono text-[9px] text-zinc-500">no scenario armed</span>
+          )}
+          <span className="rounded-full border border-line px-2 py-px text-[9px] font-bold text-zinc-300">Open</span>
+        </button>
+      ) : (
+        /* ---- EXPANDED: a corner panel (bottom sheet on small screens),
+             scrollable, with an explicit Minimize — and it auto-folds on
+             any page interaction so it never blocks a control. ---- */
+        <div ref={panelRef} className="fixed bottom-2 right-2 z-[90] w-[calc(100vw-1rem)] sm:bottom-3 sm:right-3 sm:w-[min(30rem,calc(100vw-1.5rem))]">
+          <div className="max-h-[70vh] overflow-y-auto rounded-2xl border border-amber-400/40 bg-[#141217]/95 px-3 py-2 shadow-2xl backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                <FlaskConical className="h-3.5 w-3.5" />
+                Test session · {QA_LABEL[user.handle] ?? user.handle}
+              </p>
+              <button
+                onClick={() => setPanelOpen(false)}
+                className="rounded-full border border-line px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                title="Minimize to the corner pill — your place in the scenario is kept"
+              >
+                Minimize
+              </button>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
               {QA_HANDLES.map((h) => (
                 <button
                   key={h}
@@ -218,7 +274,6 @@ export default function QaPersonaBar() {
                 Exit{ret ? ` → @${ret.handle}` : ""}
               </button>
             </div>
-          </div>
 
           {/* ---- NEED HELP? — the confusion exit ramp ---- */}
           {nextTask && helpOpen && !justDone && (
@@ -414,8 +469,9 @@ export default function QaPersonaBar() {
             </div>
           )}
           {err && <p className="mt-1 text-[10px] font-medium text-rose-300">{err}</p>}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
