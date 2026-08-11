@@ -226,7 +226,19 @@ export type QaStepSnapshot = {
 };
 export type QaRuns = Record<
   string,
-  { startedAt: string; completedAt?: string; snapshot?: QaStepSnapshot[] }
+  {
+    startedAt: string;
+    completedAt?: string;
+    snapshot?: QaStepSnapshot[];
+    /** STRICT PROGRESSION — the ordered list of tasks that VERIFIED,
+        exactly aligned with the scenario definition's step order.
+        passed.length IS the cursor: tasks below it are done (their
+        verified snapshot is kept forever), the task AT it is the one
+        and only current task, tasks above it are LOCKED. The current
+        task can only be derived from here — never from whichever
+        database checkpoint happens to be true. */
+    passed?: QaStepSnapshot[];
+  }
 >;
 
 export function readRuns(): QaRuns {

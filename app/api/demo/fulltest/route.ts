@@ -10,6 +10,7 @@ import { runJobsTick } from "@/lib/server/jobs";
 import fs from "fs";
 import path from "path";
 import { QA_SCENARIOS } from "@/lib/server/qaScenarios";
+import { qaIds } from "@/lib/server/qa";
 import { signDemoToken } from "@/lib/server/auth";
 
 /* per-run email nonce — throwaway signups get a UNIQUE email every run so
@@ -58,6 +59,7 @@ const PLANNED_CATEGORIES = [
   "ACTIVITY",
   "SUBSCRIPTIONS & MY WORLD",
   "BOOKING FLOW & QA LAB",
+  "QA STRICT PROGRESSION",
   "DATABASE INTEGRITY",
 ];
 
@@ -1520,6 +1522,86 @@ export async function POST(req: NextRequest) {
     const afterReset = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
     step(c, "PROGRESSION · explicitly replaying a stage resets it (0/14) — the user's choice, never a side effect",
       afterReset.done === 0 && !afterReset.completed, { actual: `${afterReset.done}/${afterReset.total}` });
+  }
+
+  /* ================= QA STRICT PROGRESSION ================= */
+  /* The Test Center is a sequential mission system: tasks unlock
+     1 → 2 → 3 …, the current task is explicit PERSISTED state (never
+     inferred from whichever database checkpoint happens to be true),
+     stale records can't jump a run forward, and only an explicit reset
+     of THAT scenario returns it — always — to Test 1. */
+  {
+    const c = cat("QA STRICT PROGRESSION");
+    const tokAdmin2 = signDemoToken("devin");
+    const tokCust2 = signDemoToken("testcustomer");
+    const tokCrea2 = signDemoToken("testcreator");
+    const asT = async (tok: string, path: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + path, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      let data: any = {}; try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    };
+    const getB = async (tok = tokAdmin2) => (await asT(tok, "/api/qa/scenarios/booking")).data as any;
+
+    // deterministic ordering: the API's task order IS the definition's
+    const defIds = QA_SCENARIOS.find((s) => s.id === "booking")!.steps.map((s) => s.id);
+    const f = (await asT(tokAdmin2, "/api/qa/scenarios/booking", { method: "POST", body: { action: "reset" } })).data as any;
+    step(c, "task order comes from the scenario DEFINITION — never insertion order, timestamps, or completion state",
+      JSON.stringify((f.steps ?? []).map((x: any) => x.id)) === JSON.stringify(defIds), { actual: (f.steps ?? []).map((x: any) => x.id).join(",").slice(0, 120) });
+
+    step(c, "fresh/reset scenario ALWAYS starts at Test 1: 0 done, exactly ONE pending step (Test 1), everything after LOCKED",
+      f.done === 0 && f.current === 0 && f.steps?.[0]?.status === "pending" && (f.steps ?? []).filter((x: any) => x.status === "pending").length === 1 && (f.steps ?? []).slice(1).every((x: any) => x.status === "locked"),
+      { actual: `done=${f.done} current=${f.current} statuses=${(f.steps ?? []).map((x: any) => x.status[0]).join("")}` });
+
+    // even automation can't skip: Test 5 ("book") refused while Test 1 is current
+    const skip = await asT(tokAdmin2, "/api/qa/scenarios/booking", { method: "POST", body: { action: "auto", step: "book" } });
+    step(c, "NO SKIPPING: auto-running a later task is refused (409, locked) while an earlier task is current",
+      skip.status === 409 && /locked/i.test(String((skip.data as any).error)), { actual: `${skip.status} ${(skip.data as any).error ?? ""}`.slice(0, 100) });
+
+    // a stale-but-true LATER checkpoint must not fast-forward the run:
+    // create a REAL booking (Test 5's database condition) while Test 1 is current
+    const ids = qaIds();
+    const staleDay = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); t.setHours(10, 0, 0, 0); return t; })();
+    const staleBk = await asT(tokCust2, "/api/bookings", { method: "POST", body: { serviceId: ids.serviceId, startsAt: staleDay.toISOString(), durationMin: 60 } });
+    const afterStale = await getB();
+    step(c, "A STALE DATABASE CHECKPOINT CANNOT JUMP THE SCENARIO FORWARD: a real booking exists (Test 5's condition) yet the current task is STILL Test 1 and Test 5 stays LOCKED — the 'reset lands on Test 4' bug cannot recur",
+      staleBk.status === 200 && afterStale.current === 0 && afterStale.done === 0 && afterStale.steps.find((x: any) => x.id === "book")?.status === "locked",
+      { actual: `bk=${staleBk.status} current=${afterStale.current} done=${afterStale.done} book=${afterStale.steps.find((x: any) => x.id === "book")?.status}` });
+
+    // pass Test 1 → Test 2 unlocks; the advance is exactly one task
+    await asT(tokAdmin2, "/api/qa/scenarios/booking", { method: "POST", body: { action: "auto", step: "profile" } });
+    const s1 = await getB();
+    step(c, "Test 1 passes → it STAYS done and Test 2 becomes the one current task — the advance is exactly one step, never a jump",
+      s1.done === 1 && s1.current === 1 && s1.steps[0].status === "done" && s1.steps[1].status === "pending" && s1.steps.filter((x: any) => x.status === "pending").length === 1,
+      { actual: `done=${s1.done} current=${s1.current}` });
+
+    // refresh + collapse/expand + navigation are just fresh reads → the score never wobbles
+    await asT(tokAdmin2, "/api/qa/state");
+    const s2 = await getB();
+    const s3 = await getB();
+    step(c, "completed tasks survive refresh, collapse/expand, and navigation: repeated fresh reads all report 1 done / current Test 2",
+      s2.done === 1 && s3.done === 1 && s2.steps[0].status === "done" && s3.current === 1, { actual: `reads=${s2.done},${s3.done} current=${s3.current}` });
+
+    // switching personas never corrupts progression — one persisted state, every viewer
+    const asCust = await getB(tokCust2);
+    const asCrea = await getB(tokCrea2);
+    step(c, "switching personas does not corrupt progression: customer and creator views read the SAME persisted state (1 done, current Test 2)",
+      asCust.done === 1 && asCrea.done === 1 && asCust.current === 1 && asCrea.current === 1, { actual: `cust=${asCust.done}/${asCust.current} crea=${asCrea.done}/${asCrea.current}` });
+
+    // scenario independence: arming/resetting ANOTHER scenario leaves this one's passed tasks intact
+    await asT(tokAdmin2, "/api/qa/scenarios/project", { method: "POST", body: { action: "start" } });
+    const proj1 = (await asT(tokAdmin2, "/api/qa/scenarios/project")).data as any;
+    const bAfterArm = await getB();
+    await asT(tokAdmin2, "/api/qa/scenarios/project", { method: "POST", body: { action: "reset" } });
+    const bAfterOtherReset = await getB();
+    step(c, "resetting one scenario NEVER resets another: project arms+resets at its own Test 1 while booking keeps its passed Test 1 and current Test 2",
+      proj1.current === 0 && proj1.done === 0 && bAfterArm.done === 1 && bAfterArm.steps[0].status === "done" && bAfterOtherReset.done === 1 && bAfterOtherReset.current === 1,
+      { actual: `project=${proj1.done}/c${proj1.current} · booking after arm=${bAfterArm.done} after other-reset=${bAfterOtherReset.done}` });
+
+    // explicit reset of THIS scenario → back to Test 1 of N, no stale task number
+    const resetB = (await asT(tokAdmin2, "/api/qa/scenarios/booking", { method: "POST", body: { action: "reset" } })).data as any;
+    step(c, "explicit reset returns THIS scenario to TEST 1 OF N — 0 done, Test 1 pending, all later tasks locked; no stale current-task state survives",
+      resetB.done === 0 && resetB.current === 0 && resetB.steps[0].status === "pending" && resetB.steps.slice(1).every((x: any) => x.status === "locked"),
+      { actual: `done=${resetB.done} current=${resetB.current}` });
   }
 
   /* ================= DATABASE INTEGRITY ================= */

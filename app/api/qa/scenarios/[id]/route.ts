@@ -19,6 +19,7 @@ function scenarioState(id: string) {
     startedAt: prog.startedAt,
     completed: prog.completed,
     completedAt: prog.completedAt,
+    current: prog.current,
     done: prog.done,
     total: prog.total,
     steps: prog.steps,
@@ -64,12 +65,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (action === "start" || action === "reset") {
     const removed = resetQaData();
     const runs = readRuns();
-    // PROGRESSION RULE: completed scenarios keep their verified snapshot —
-    // moving to the next stage never erases an achievement. Incomplete
-    // runs restart (their shared QA data was just wiped), and explicitly
-    // arming THIS scenario always starts it fresh (replay clears its
-    // snapshot — choosing to redo is the ONLY way an achievement resets).
-    for (const k of Object.keys(runs)) if (!runs[k].completedAt || k === scenario.id) delete runs[k];
+    // STRICT PROGRESSION RULES:
+    // · Resetting/starting THIS scenario always begins at Task 1 — its
+    //   run entry (cursor, passed snapshots, completion) is replaced
+    //   wholesale, so no stale current-task state can survive.
+    // · OTHER scenarios are never touched: completed ones keep their
+    //   verified snapshots, in-flight ones keep the exact prefix of
+    //   tasks they already passed (each pass was snapshotted when it
+    //   verified). Resetting the booking scenario cannot reset the
+    //   project scenario, and vice versa.
     runs[scenario.id] = { startedAt: new Date().toISOString() };
     writeRuns(runs);
     return Response.json({ ...scenarioState(scenario.id), resetRecords: removed });
@@ -82,6 +86,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!step) return Response.json({ error: "Unknown step" }, { status: 404 });
     if (!step.perform)
       return Response.json({ error: "This checkpoint is a verification — it flips when the real action lands" }, { status: 409 });
+
+    // SEQUENTIAL UNLOCK — even automation cannot skip ahead. Only the
+    // one current task may be performed; locked tasks stay locked until
+    // every earlier task has actually passed.
+    const prog = scenarioProgress(scenario, runs);
+    const idx = scenario.steps.findIndex((s) => s.id === step.id);
+    const state = prog.steps[idx]?.status;
+    if (state === "done") return Response.json(scenarioState(scenario.id)); // already verified — idempotent
+    if (state === "locked")
+      return Response.json(
+        { error: `Test ${idx + 1} is locked — test ${(prog.current ?? 0) + 1} must pass first. Tasks unlock strictly in order.` },
+        { status: 409 }
+      );
 
     // authenticated persona calls against the REAL public routes
     const api: QaApi = async (handle, path, init) => {

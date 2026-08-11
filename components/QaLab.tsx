@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Circle,
   ExternalLink,
+  Lock,
   Play,
   RefreshCw,
   RotateCcw,
@@ -62,7 +63,7 @@ interface StepState {
   expected: string;
   href: string;
   canAuto: boolean;
-  status: "done" | "pending";
+  status: "done" | "pending" | "locked";
   actual: string;
   record: string | null;
 }
@@ -110,6 +111,8 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
   const [detail, setDetail] = useState<ScenarioDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  /* "Reset scenario" is destructive to QA progress — it always asks first */
+  const [confirmReset, setConfirmReset] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadState = useCallback(async () => {
@@ -199,8 +202,11 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
   const otherCount = (scenarios ?? []).length - lensScenarios.length;
 
   const mySteps = (steps: StepState[]) => steps.filter((s) => s.role === lens || s.role === "check");
-  const firstPending = detail?.steps.find((s) => s.status === "pending" && s.role !== "check");
-  const firstPendingMine = detail?.steps.find((s) => s.status === "pending" && s.role === lens);
+  /* STRICT ORDER: the server marks exactly ONE step "pending" — the
+     current task. Everything before it is done, everything after is
+     LOCKED. Never derived from "whichever checkpoint happens to pass". */
+  const firstPending = detail?.steps.find((s) => s.status === "pending");
+  const firstPendingMine = firstPending && firstPending.role === lens ? firstPending : undefined;
 
   /** the curriculum decides where you go next — never hunt for it:
       the next unfinished scenario in this persona's track */
@@ -369,16 +375,19 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                     <div className="mt-2.5 flex flex-wrap items-center gap-2">
                       <button
                         disabled={busy === `arm:${s.id}`}
-                        onClick={() => act(s.id, { action: sum.startedAt ? "reset" : "start" }, `arm:${s.id}`)}
+                        onClick={() => {
+                          if (!sum.startedAt) act(s.id, { action: "start" }, `arm:${s.id}`);
+                          else setConfirmReset(confirmReset === s.id ? null : s.id);
+                        }}
                         className={`${sum.startedAt ? "btn-ghost" : "btn-lime"} px-4 py-1.5 text-xs`}
                       >
                         {sum.completed ? (
                           <>
-                            <RotateCcw className="h-3.5 w-3.5" /> Replay stage (resets ITS records — other completed stages keep their progress)
+                            <RotateCcw className="h-3.5 w-3.5" /> Replay stage (resets ITS records — other stages keep their progress)
                           </>
                         ) : sum.startedAt ? (
                           <>
-                            <RotateCcw className="h-3.5 w-3.5" /> Reset scenario (wipes QA test records)
+                            <RotateCcw className="h-3.5 w-3.5" /> Reset scenario…
                           </>
                         ) : (
                           <>
@@ -402,6 +411,34 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                         </span>
                       )}
                     </div>
+
+                    {/* ---- RESET CONFIRMATION: destructive, so it always asks ---- */}
+                    {confirmReset === s.id && (
+                      <div className="mt-3 rounded-xl border border-rose-400/40 bg-rose-400/5 p-4">
+                        <p className="text-sm font-bold text-rose-300">Reset this scenario?</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+                          This erases the QA test records behind it and returns the scenario to{" "}
+                          <span className="font-semibold text-zinc-200">Test 1 of {sum.total}</span>. All {sum.done} passed
+                          check{sum.done === 1 ? "" : "s"} in THIS scenario reset to 0/{sum.total}. Other scenarios keep
+                          their progress. Only this explicit reset does this — normal navigation never resets anything.
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button onClick={() => setConfirmReset(null)} className="btn-ghost px-4 py-1.5 text-xs">
+                            Cancel
+                          </button>
+                          <button
+                            disabled={busy === `arm:${s.id}`}
+                            onClick={async () => {
+                              setConfirmReset(null);
+                              await act(s.id, { action: "reset" }, `arm:${s.id}`);
+                            }}
+                            className="rounded-lg border border-rose-400/50 bg-rose-400/10 px-4 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-400/20"
+                          >
+                            <RotateCcw className="mr-1 inline h-3.5 w-3.5 align-[-2px]" /> Reset scenario
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* ---- GUIDED FLOW: complete → confirm → continue.
                          The card always knows the one right next action —
@@ -515,11 +552,24 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                           </div>
                         );
                       }
+                      if (firstPending && firstPending.role === "check") {
+                        return (
+                          <div className="mt-3 rounded-xl border border-line bg-card-raised p-4">
+                            <p className="text-xs font-bold text-zinc-200">
+                              Test {overallIdx + 1} of {d.total} is an automatic cross-check: {firstPending.title}
+                            </p>
+                            <p className="mt-1 font-mono text-[10px] leading-relaxed text-amber-300">actual: {firstPending.actual}</p>
+                            <p className="mt-1 text-[10px] text-zinc-500">
+                              It verifies itself against the database — no action needed. If it stays stuck, that is a real bug report.
+                            </p>
+                          </div>
+                        );
+                      }
                       if (firstPending) {
                         return (
                           <div className="mt-3 rounded-xl border border-violet-400/30 bg-violet-400/5 p-4">
                             <p className="flex items-center gap-2 text-xs font-bold text-violet-200">
-                              <Check className="h-3.5 w-3.5 text-lime-400" /> Your side is done ({myDone}/{my.length}) — test {overallIdx + 1} of {d.total} happens on {roleLabel(firstPending.role)}&apos;s side
+                              <Check className="h-3.5 w-3.5 text-lime-400" /> Test {overallIdx + 1} of {d.total} is {roleLabel(firstPending.role)}&apos;s move — your checks so far: {myDone}/{my.length}
                             </p>
                             <button
                               disabled={busy === `switch:${firstPending.role}`}
@@ -550,10 +600,32 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                             return (
                               <li key={st.id} className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 ${st.status === "done" ? "border-lime-400/20 text-zinc-600" : "border-line text-zinc-600"}`}>
                                 <span className="font-mono text-[9px]">{idx + 1}</span>
-                                <span className="text-[10px]">
-                                  {st.status === "done" ? "Done" : "Waiting"} on {roleLabel(st.role)}&apos;s side — switch personas to {st.status === "done" ? "review" : "play"} it
-                                </span>
+                                {st.status === "locked" ? (
+                                  <span className="flex items-center gap-1 text-[10px]"><Lock className="h-2.5 w-2.5" /> Locked ({roleLabel(st.role)}&apos;s side) — unlocks when test {idx} passes</span>
+                                ) : (
+                                  <span className="text-[10px]">
+                                    {st.status === "done" ? "Done" : "Waiting"} on {roleLabel(st.role)}&apos;s side — switch personas to {st.status === "done" ? "review" : "play"} it
+                                  </span>
+                                )}
                                 {st.status === "done" && <span className="ml-auto font-mono text-[9px] text-lime-400/70">verified</span>}
+                              </li>
+                            );
+                          }
+                          /* LOCKED: the strict unlock system — this task
+                             cannot be seen in detail, acted on, or auto-run
+                             until every earlier task has actually passed */
+                          if (st.status === "locked") {
+                            return (
+                              <li key={st.id} className="rounded-xl border border-line bg-card-raised/50 p-3 opacity-60">
+                                <p className="flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-500">
+                                  <span className="font-mono text-[9px] text-zinc-600">{idx + 1}.</span>
+                                  <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
+                                  {st.title}
+                                  <span className={`rounded-full border px-1.5 py-px font-mono text-[8px] font-bold uppercase tracking-wide ${ROLE_STYLE[st.role]} opacity-60`}>
+                                    {roleLabel(st.role)}
+                                  </span>
+                                  <span className="ml-auto font-mono text-[9px] uppercase tracking-wide text-zinc-600">locked — passes in order</span>
+                                </p>
                               </li>
                             );
                           }
@@ -605,7 +677,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                                     )}
                                   </p>
                                 </div>
-                                {st.status !== "done" && st.role !== "check" && (
+                                {st.status === "pending" && st.role !== "check" && (
                                   <div className="flex shrink-0 flex-col gap-1">
                                     <button
                                       disabled={busy === `switch:${st.role}`}

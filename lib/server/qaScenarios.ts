@@ -18,7 +18,7 @@
 
 import { and, eq, gt } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { qaIds } from "./qa";
+import { qaIds, readRuns, writeRuns, type QaRuns, type QaStepSnapshot } from "./qa";
 
 export type QaApi = (
   handle: string,
@@ -1358,23 +1358,44 @@ export function buildContext(startedAt: Date): QaContext {
 
 /** evaluate a scenario against the REAL database */
 /* ------------------------------------------------------------------ */
-/*  PROGRESSION — completed stages STAY completed.                     */
+/*  STRICT SEQUENTIAL PROGRESSION — a mission system, not a scan.      */
 /*                                                                     */
-/*  Live checkpoints verify the real database; the moment every        */
-/*  checkpoint of an armed scenario passes, that run is snapshotted    */
-/*  into the run state (db/.qa-runs.json). From then on the scenario   */
-/*  reports 14/14 COMPLETE — collapsed, refreshed, after moving to     */
-/*  the next scenario, after logout, after redeploy — until the user   */
-/*  explicitly resets it to replay. Nothing is ever marked passed      */
-/*  artificially: the snapshot is only ever captured from a fully      */
-/*  verified live evaluation.                                          */
+/*  · Task order comes from the scenario DEFINITION, nothing else.     */
+/*  · The run state (db/.qa-runs.json) holds `passed`: the ordered     */
+/*    prefix of tasks that actually VERIFIED against the real          */
+/*    database. passed.length is the cursor.                           */
+/*  · Only the task AT the cursor is evaluated live. When it passes,   */
+/*    its verified snapshot is appended and the next task unlocks —    */
+/*    auto-checks cascade in the same pass. Tasks past the cursor are  */
+/*    LOCKED: a stale database record can never jump the scenario      */
+/*    forward, and "current task" can never be task 4 on a fresh run.  */
+/*  · Passed tasks keep their snapshot forever — collapsed,            */
+/*    refreshed, after switching personas, after moving on, after a    */
+/*    redeploy — until the user explicitly resets THIS scenario.       */
+/*  · Nothing is ever marked passed artificially: a snapshot is only   */
+/*    captured from a live verification against the real records.     */
 /* ------------------------------------------------------------------ */
-export function scenarioProgress(scenario: QaScenario, runs: import("./qa").QaRuns) {
+
+export type QaStepState = {
+  id: string;
+  role: string;
+  title: string;
+  instruction: string;
+  expected: string;
+  href: string;
+  canAuto: boolean;
+  status: "done" | "pending" | "locked";
+  actual: string;
+  record: string | null;
+};
+
+export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
   const run = runs[scenario.id];
-  // completed → the verified snapshot is the record of achievement
+
+  // completed → the verified snapshot is the permanent record of achievement
   if (run?.completedAt && run.snapshot?.length) {
     const byId = new Map(run.snapshot.map((s) => [s.id, s]));
-    const steps = scenario.steps.map((s) => {
+    const steps: QaStepState[] = scenario.steps.map((s) => {
       const snap = byId.get(s.id);
       return {
         id: s.id,
@@ -1389,26 +1410,114 @@ export function scenarioProgress(scenario: QaScenario, runs: import("./qa").QaRu
         record: snap?.record ?? null,
       };
     });
-    return { steps, done: steps.length, total: steps.length, startedAt: run.startedAt, completed: true, completedAt: run.completedAt };
+    return { steps, done: steps.length, total: steps.length, startedAt: run.startedAt, completed: true, completedAt: run.completedAt, current: null as number | null };
   }
-  const startedAt = run ? new Date(run.startedAt) : null;
-  const steps = evaluateScenario(scenario, startedAt);
-  const done = steps.filter((x) => x.status === "done").length;
-  // every checkpoint verified → capture the achievement permanently
-  if (run && steps.length > 0 && done === steps.length) {
-    const { readRuns, writeRuns } = require("./qa") as typeof import("./qa");
+
+  // not started → task 1 is up next, everything after is locked
+  if (!run) {
+    const steps: QaStepState[] = scenario.steps.map((s, i) => ({
+      id: s.id,
+      role: s.role,
+      title: s.title,
+      instruction: s.instruction,
+      expected: s.expected,
+      href: "#",
+      canAuto: false,
+      status: i === 0 ? ("pending" as const) : ("locked" as const),
+      actual: i === 0 ? "scenario not started" : "locked — earlier tests must pass first",
+      record: null,
+    }));
+    return { steps, done: 0, total: steps.length, startedAt: null, completed: false, completedAt: null, current: 0 as number | null };
+  }
+
+  const ctx = buildContext(new Date(run.startedAt));
+
+  // validate the persisted prefix against the DEFINITION order — if the
+  // scenario definition changed between deploys, truncate at the mismatch
+  let passed: QaStepSnapshot[] = (run.passed ?? []).slice();
+  let valid = 0;
+  while (valid < passed.length && valid < scenario.steps.length && passed[valid].id === scenario.steps[valid].id) valid++;
+  passed = passed.slice(0, valid);
+
+  // advance: verify ONLY the current task; each pass appends its verified
+  // snapshot and unlocks the next (auto-checks cascade in the same sweep)
+  let pendingVerdict: QaVerdict | null = null;
+  while (passed.length < scenario.steps.length) {
+    const s = scenario.steps[passed.length];
+    let v: QaVerdict;
+    try {
+      v = s.verify(ctx);
+    } catch {
+      v = { done: false, actual: "verification error — retry" };
+    }
+    if (!v.done) {
+      pendingVerdict = v;
+      break;
+    }
+    passed.push({
+      id: s.id,
+      role: s.role,
+      title: s.title,
+      instruction: s.instruction,
+      expected: s.expected,
+      actual: v.actual,
+      record: ("record" in v ? v.record : undefined) ?? null,
+    });
+  }
+
+  const complete = passed.length === scenario.steps.length;
+
+  // persist any advancement (fresh read so concurrent writes aren't clobbered)
+  let completedAt: string | null = null;
+  if (passed.length !== (run.passed?.length ?? 0) || complete) {
     const fresh = readRuns();
-    if (fresh[scenario.id] && !fresh[scenario.id].completedAt) {
-      fresh[scenario.id] = {
-        ...fresh[scenario.id],
-        completedAt: new Date().toISOString(),
-        snapshot: steps.map((s) => ({ id: s.id, role: s.role, title: s.title, instruction: s.instruction, expected: s.expected, actual: s.actual, record: s.record })),
-      };
+    if (fresh[scenario.id]) {
+      fresh[scenario.id] = { ...fresh[scenario.id], passed };
+      if (complete && !fresh[scenario.id].completedAt) {
+        fresh[scenario.id].completedAt = new Date().toISOString();
+        fresh[scenario.id].snapshot = passed;
+      }
+      completedAt = fresh[scenario.id].completedAt ?? null;
       writeRuns(fresh);
     }
-    return { steps, done, total: steps.length, startedAt: run.startedAt, completed: true, completedAt: new Date().toISOString() };
   }
-  return { steps, done, total: steps.length, startedAt: run?.startedAt ?? null, completed: false, completedAt: null };
+
+  const cursor = passed.length;
+  const steps: QaStepState[] = scenario.steps.map((s, i) => {
+    const base = { id: s.id, role: s.role, title: s.title, instruction: s.instruction, expected: s.expected };
+    if (i < cursor) {
+      const snap = passed[i];
+      return { ...base, href: safeHref(s, ctx), canAuto: false, status: "done" as const, actual: snap.actual, record: snap.record };
+    }
+    if (i === cursor)
+      return {
+        ...base,
+        href: safeHref(s, ctx),
+        canAuto: !!s.perform,
+        status: "pending" as const,
+        actual: pendingVerdict?.actual ?? "…",
+        record: (pendingVerdict && "record" in pendingVerdict ? pendingVerdict.record : undefined) ?? null,
+      };
+    return { ...base, href: "#", canAuto: false, status: "locked" as const, actual: `locked — unlocks when test ${cursor + 1} passes`, record: null };
+  });
+
+  return {
+    steps,
+    done: complete ? steps.length : cursor,
+    total: steps.length,
+    startedAt: run.startedAt,
+    completed: complete,
+    completedAt: complete ? (completedAt ?? new Date().toISOString()) : null,
+    current: complete ? null : cursor,
+  };
+}
+
+function safeHref(s: QaStep, ctx: QaContext): string {
+  try {
+    return s.href(ctx);
+  } catch {
+    return "#";
+  }
 }
 
 export function evaluateScenario(scenario: QaScenario, startedAt: Date | null) {
