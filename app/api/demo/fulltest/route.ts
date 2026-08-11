@@ -6,6 +6,9 @@ import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
 import { readEarlyAccess, writeEarlyAccess, readRelease, writeRelease } from "@/lib/server/preferred";
 import { LEARN_SCENARIOS, LEARN_PATHS, TOUR_TO_SCENARIO } from "@/lib/learnScenarios";
+import { runJobsTick } from "@/lib/server/jobs";
+import fs from "fs";
+import path from "path";
 import { QA_SCENARIOS } from "@/lib/server/qaScenarios";
 import { signDemoToken } from "@/lib/server/auth";
 
@@ -339,6 +342,28 @@ export async function POST(req: NextRequest) {
     step(c, "cross-section search still works: opportunities + services return real matches", (s7.opportunities ?? []).length >= 1 && (s8.services ?? []).some((x: any) => /brand identity/i.test(x.title)), {
       actual: `opps=${s7.opportunities?.length} services="${(s8.services ?? []).map((x: any) => x.title).join(",")}"`,
     });
+
+    /* ---- IMAGE STORAGE: uploads live on DISK, the DB stores a path ---- */
+    {
+      const px = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+      const post = await api("rachel", "/api/posts", { method: "POST", body: { body: "[TEST] image storage check", imageUrl: px } });
+      const postId = String((post.data as any).id ?? "");
+      const row = postId ? db.select().from(tables.posts).all().find((x) => x.id === postId) : null;
+      const onDisk = row?.imageUrl?.startsWith("/uploads/") ? fs.existsSync(path.join(process.cwd(), "public", row.imageUrl)) : false;
+      step(c, "uploaded post image is written to DISK — the database stores only the small /uploads path (no base64 bloat)",
+        !!row && !!row.imageUrl && row.imageUrl.startsWith("/uploads/") && !row.imageUrl.startsWith("data:") && onDisk, {
+        actual: `stored=${row?.imageUrl?.slice(0, 40)} onDisk=${onDisk}` });
+      const prevAvatar = db.select().from(tables.profiles).all().find((x) => x.userId === rachel.id)?.avatarUrl ?? null;
+      await api("rachel", "/api/me/profile", { method: "PATCH", body: { avatarUrl: px } });
+      const avatarNow = db.select().from(tables.profiles).all().find((x) => x.userId === rachel.id)?.avatarUrl ?? "";
+      step(c, "avatar upload takes the same disk path — full backward compatibility for existing URL/path values",
+        avatarNow.startsWith("/uploads/") && fs.existsSync(path.join(process.cwd(), "public", avatarNow)), { actual: avatarNow.slice(0, 40) });
+      // stage clean: remove the test post + restore rachel's avatar
+      if (row?.imageUrl) { try { fs.unlinkSync(path.join(process.cwd(), "public", row.imageUrl)); } catch {} }
+      if (postId) db.delete(tables.posts).where(eq(tables.posts.id, postId)).run();
+      if (avatarNow.startsWith("/uploads/")) { try { fs.unlinkSync(path.join(process.cwd(), "public", avatarNow)); } catch {} }
+      db.update(tables.profiles).set({ avatarUrl: prevAvatar }).where(eq(tables.profiles.userId, rachel.id)).run();
+    }
   }
 
   /* ================= MESSAGING (A → B → A) ================= */
@@ -1136,6 +1161,69 @@ export async function POST(req: NextRequest) {
     const rns = ((await api("rachel", "/api/notifications")).data as any).notifications ?? [];
     const dupes = rns.length - new Set(rns.map((n: any) => `${n.type}|${n.title}|${n.href}|${n.createdAt}`)).size;
     step(c, "no duplicated notifications", dupes === 0, { actual: `${dupes} duplicates` });
+
+    /* ===== BACKGROUND JOBS — the platform heartbeat =====
+       Reminders, review nudges, the rebooking loop, and release-open
+       alerts fire from a scheduler tick — verified against real rows,
+       idempotent by construction (ticking twice never double-sends). */
+    {
+      const notifRows = (userId: string, type: string, hrefLike: string) =>
+        db.select().from(tables.notifications).all().filter((n) => n.userId === userId && n.type === type && n.href.includes(hrefLike));
+      const tonbbU = db.select().from(tables.users).all().find((u) => u.handle === "tonbb")!;
+      const svcJ = ((await api("rachel", "/api/services")).data as any).services.find((s: any) => s.owner?.handle === "lena");
+
+      // 1 · appointment reminder: booking ~20h out (moved there directly — the
+      //     job cares about WHEN, the booking flow was proven elsewhere)
+      const wkJ = (() => { let d = new Date(Date.now() + 3 * 86400e3); while (d.getDay() === 0 || d.getDay() === 6) d = new Date(d.getTime() + 86400e3); d.setHours(11, 0, 0, 0); return d; })();
+      const bkJ = await api("tonbb", "/api/bookings", { method: "POST", body: { serviceId: svcJ.id, startsAt: wkJ.toISOString(), durationMin: 60 } });
+      const bkJId = String((bkJ.data as any).id ?? "");
+      await api("lena", `/api/bookings/${bkJId}`, { method: "PATCH", body: { action: "accept" } });
+      db.update(tables.bookings).set({ startsAt: new Date(Date.now() + 20 * 3600e3) }).where(eq(tables.bookings.id, bkJId)).run();
+      let tick = runJobsTick();
+      step(c, "JOBS · 24h appointment reminder reaches BOTH sides (client and provider), from the real booking row",
+        notifRows(tonbbU.id, "booking_reminder", bkJId).length === 1 && notifRows(lena.id, "booking_reminder", bkJId).length === 1, {
+        actual: `client=${notifRows(tonbbU.id, "booking_reminder", bkJId).length} provider=${notifRows(lena.id, "booking_reminder", bkJId).length} tickReminders=${tick.reminders}` });
+
+      // 2 · rebooking nudge: same pair, last completed ~25 days ago, nothing upcoming
+      db.update(tables.bookings).set({ status: "completed", startsAt: new Date(Date.now() - 25 * 86400e3) }).where(eq(tables.bookings.id, bkJId)).run();
+      tick = runJobsTick();
+      const rebook = notifRows(tonbbU.id, "rebook_nudge", `rebook=${bkJId}`);
+      step(c, "JOBS · the REBOOKING loop: ~3 weeks after a completed booking with nothing upcoming, the client gets a personal nudge",
+        rebook.length === 1 && /rebook/i.test(rebook[0]?.title ?? ""), { actual: `sent=${rebook.length} title=${rebook[0]?.title?.slice(0, 50)}` });
+
+      // 3 · review nudge: a completed-but-unreviewed project
+      const projJ = db.select().from(tables.projects).all().find((pr) => pr.clientId === rachel.id && pr.state === "reviewed");
+      if (projJ) db.update(tables.projects).set({ state: "completed", updatedAt: new Date() }).where(eq(tables.projects.id, projJ.id)).run();
+      tick = runJobsTick();
+      const revN = projJ ? notifRows(rachel.id, "review_nudge", projJ.id) : [];
+      step(c, "JOBS · completed work without a review earns ONE gentle review ask (never repeated)",
+        !!projJ && revN.length === 1, { actual: `sent=${revN.length}` });
+      if (projJ) db.update(tables.projects).set({ state: "reviewed" }).where(eq(tables.projects.id, projJ.id)).run();
+
+      // 4 · release-open alert: scheduled release opened 10 minutes ago
+      await api("lena", "/api/preferred-clients", { method: "POST", body: { clientId: rachel.id, benefits: [{ key: "priority_booking" }] } });
+      await api("lena", `/api/services/${svcJ.id}/release`, { method: "POST", body: { releaseAt: new Date(Date.now() - 10 * 60e3).toISOString(), coversUntil: new Date(Date.now() + 30 * 86400e3).toISOString(), earlyAccessHours: 24 } });
+      tick = runJobsTick();
+      const relN = notifRows(rachel.id, "release_open", svcJ.id).filter((n) => /OPEN/i.test(n.title));
+      step(c, "JOBS · the MOMENT a scheduled release opens, Preferred Clients get 'early access is OPEN — you book first'",
+        relN.length === 1, { actual: `sent=${relN.length} releaseAlerts=${tick.releaseAlerts}` });
+
+      // 5 · idempotency: a second tick sends NOTHING new for any of the above
+      const tick2 = runJobsTick();
+      step(c, "JOBS · idempotent by construction: a second tick re-sends none of it (restart-safe, duplicate-proof)",
+        notifRows(tonbbU.id, "booking_reminder", bkJId).length === 1 && rebook.length === 1 && relN.length === 1 && tick2.releaseAlerts === 0 && tick2.rebookNudges === 0, {
+        actual: JSON.stringify(tick2) });
+
+      // 6 · authz: the manual tick endpoint is admin-only
+      const tickDenied = await api("rachel", "/api/demo/jobs", { method: "POST", body: {} });
+      step(c, "JOBS · the manual tick endpoint refuses non-admins (403)", tickDenied.status === 403, { actual: String(tickDenied.status) });
+
+      // stage clean: cancel the release + preferred rel; booking row stays (tonbb cleanup wipes it)
+      await api("lena", `/api/services/${svcJ.id}/release`, { method: "DELETE" });
+      await api("lena", `/api/services/${svcJ.id}`, { method: "PATCH", body: { scheduling: { releaseMode: "rolling", horizonDays: 60 } } });
+      const relJ = ((await api("lena", "/api/clients")).data as any).clients?.find((x: any) => x.handle === "rachel")?.preferred?.id;
+      if (relJ) await api("lena", `/api/preferred-clients/${relJ}`, { method: "DELETE" });
+    }
   }
 
   /* ================= ACTIVITY (both sides) ================= */

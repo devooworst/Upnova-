@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { storeImage } from "@/lib/server/blobs";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
@@ -21,8 +22,9 @@ export async function PATCH(req: NextRequest) {
       .set({
         displayName: str(body.displayName, 50) || p.displayName,
         bio: str(body.bio, 300),
-        avatarUrl: body.avatarUrl === null ? null : str(body.avatarUrl, 500_000) || p.avatarUrl,
-        coverUrl: body.coverUrl === null ? null : str(body.coverUrl, 1_500_000) || p.coverUrl,
+        // uploaded images are persisted to disk; the DB keeps only the path
+        avatarUrl: body.avatarUrl === null ? null : storeImage(str(body.avatarUrl, 500_000), "avatar") || p.avatarUrl,
+        coverUrl: body.coverUrl === null ? null : storeImage(str(body.coverUrl, 1_500_000), "cover", 1_600_000) || p.coverUrl,
         coverPos: Number.isFinite(body.coverPos) ? Math.min(100, Math.max(0, Math.round(body.coverPos))) : p.coverPos,
         locationVisibility: ["city", "county", "state", "country", "hidden"].includes(body.locationVisibility)
           ? body.locationVisibility

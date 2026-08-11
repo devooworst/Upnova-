@@ -20,7 +20,15 @@ const nextConfig = {
     return [
       {
         source: "/:path*",
-        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+        headers: [
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+          // security hardening — additive, never behavior-changing.
+          // (No frame-blocking headers: the app legitimately runs embedded.)
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=()" },
+          { key: "X-DNS-Prefetch-Control", value: "off" },
+        ],
       },
     ];
   },

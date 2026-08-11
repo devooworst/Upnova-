@@ -4,6 +4,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { unrestrictedTester } from "@/lib/server/campus";
 import { sanitizeStudio, parseStudio, collegeRestrict, DEFAULT_STUDIO } from "@/lib/profileStudio";
+import { storeImage } from "@/lib/server/blobs";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,26 @@ export async function PATCH(req: NextRequest) {
           ? incoming.world
           : saved?.world,
     };
+    // My World decorative images: uploaded data-URIs are written to disk
+    // and replaced with their /uploads path BEFORE sanitizing — the DB
+    // stores a ~30-char path instead of up to 900KB of base64 per image.
+    const externalizeImages = (o: unknown) => {
+      if (typeof o !== "object" || o === null) return;
+      const rec = o as Record<string, unknown>;
+      const imgs = rec.images;
+      if (typeof imgs === "object" && imgs !== null)
+        for (const key of Object.keys(imgs as Record<string, unknown>)) {
+          const im = (imgs as Record<string, Record<string, unknown>>)[key];
+          if (im && typeof im.src === "string" && im.src.startsWith("data:image/"))
+            im.src = storeImage(im.src, "world", 950_000) ?? "";
+        }
+    };
+    const worldAny = (merged as Record<string, unknown>).world;
+    if (typeof worldAny === "object" && worldAny !== null) {
+      externalizeImages(worldAny);
+      externalizeImages((worldAny as Record<string, unknown>).tablet);
+      externalizeImages((worldAny as Record<string, unknown>).phone);
+    }
     let clean = sanitizeStudio(merged);
     // College+ = decorate the room (student themes, frames, accents,
     // banners, decorations); Pro = design the house (all themes, layout,

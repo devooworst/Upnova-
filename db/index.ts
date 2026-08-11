@@ -200,4 +200,14 @@ function create() {
 }
 
 export const db = globalForDb.__mavynDb ?? (globalForDb.__mavynDb = create());
+
+// the platform heartbeat: reminders, review + rebooking nudges, and
+// release-open alerts. Lazy-required to avoid a circular import; the
+// interval is unref'd so nothing hangs at exit.
+if (process.env.NEXT_PHASE !== "phase-production-build") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require("@/lib/server/jobs").startJobScheduler();
+  } catch { /* jobs are best-effort — the app never fails because of them */ }
+}
 export * as tables from "./schema";

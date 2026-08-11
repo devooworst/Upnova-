@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { rateLimit } from "@/lib/server/ratelimit";
 import { canMessage } from "@/lib/server/authz";
 import { blockedEitherWay } from "@/lib/server/communities";
 import { publicUser } from "@/lib/server/serialize";
@@ -92,6 +93,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
+    // anti-spam: 30 new-conversation attempts per 15 min per account
+    const rl = rateLimit(`conv:${user.id}`, 30, 15 * 60_000);
+    if (!rl.ok) throw new ApiError(429, `Slow down — try again in ${Math.ceil(rl.retryAfterSec / 60)} min`);
     const handle = String(body.toHandle || "").trim().toLowerCase();
     if (!handle) throw new ApiError(400, "toHandle is required");
 

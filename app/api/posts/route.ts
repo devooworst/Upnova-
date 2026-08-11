@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { rateLimit } from "@/lib/server/ratelimit";
+import { storeImage } from "@/lib/server/blobs";
 import { validateWorkLink } from "@/lib/server/trust";
 import { seedClientConfirmsWork } from "@/lib/server/demo";
 import { notify } from "@/lib/server/notify";
@@ -13,6 +15,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
+    // anti-spam: 20 posts per 15 min per account
+    const rlp = rateLimit(`post:${user.id}`, 20, 15 * 60_000);
+    if (!rlp.ok) throw new ApiError(429, `Slow down — try again in ${Math.ceil(rlp.retryAfterSec / 60)} min`);
     const text = String(body.body || "").trim();
     if (!text) throw new ApiError(400, "Post body is required");
     if (text.length > 2000) throw new ApiError(400, "Post is too long");
@@ -35,9 +40,10 @@ export async function POST(req: NextRequest) {
     );
 
     const id = randomBytes(12).toString("hex");
+    // images live on disk (public/uploads) — the DB stores only the path
     const imageUrl =
       typeof body.imageUrl === "string" && body.imageUrl.startsWith("data:image/") && body.imageUrl.length < 900_000
-        ? body.imageUrl
+        ? storeImage(body.imageUrl, "post")
         : null;
     db.insert(tables.posts)
       .values({
