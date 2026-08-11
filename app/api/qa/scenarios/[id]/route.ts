@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser, guarded, ApiError, isDemoMode, signDemoToken } from "@/lib/server/auth";
+import { requireQaOperator, guarded, ApiError, isDemoMode, signDemoToken } from "@/lib/server/auth";
 import { ensureQaPersonas, resetQaData, readRuns, writeRuns } from "@/lib/server/qa";
 import { getScenario, scenarioProgress, buildContext, type QaApi } from "@/lib/server/qaScenarios";
 
@@ -30,7 +30,7 @@ function scenarioState(id: string) {
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    requireUser();
+    requireQaOperator();
     ensureQaPersonas();
     return scenarioState(params.id);
   });
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const gate = await guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    requireUser();
+    requireQaOperator();
     ensureQaPersonas();
     return { ok: true };
   });
@@ -77,6 +77,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     runs[scenario.id] = { startedAt: new Date().toISOString() };
     writeRuns(runs);
     return Response.json({ ...scenarioState(scenario.id), resetRecords: removed });
+  }
+
+  if (action === "repair") {
+    // RESTORE REQUIRED STATE — exploration is allowed and can never be
+    // falsely credited, but it may consume the state the current task
+    // needs (e.g. submitting early removes Request-extension). This
+    // rewinds ONLY the QA records to the task's exact starting state.
+    // It never marks anything passed: verification still comes solely
+    // from real records created after the task is active.
+    const runs = readRuns();
+    const run = runs[scenario.id];
+    if (!run) return Response.json({ error: "Start the scenario first" }, { status: 409 });
+    const prog = scenarioProgress(scenario, runs);
+    if (prog.completed || prog.current == null) return Response.json({ error: "Nothing to repair — the scenario is complete" }, { status: 409 });
+    const step = scenario.steps[prog.current];
+    const ctx = buildContext(new Date(run.startedAt), new Date(runs[scenario.id]?.activated?.[step.id] ?? run.startedAt));
+    const readiness = step.ready?.(ctx);
+    if (!readiness || readiness.ok) return Response.json({ ...scenarioState(scenario.id), repaired: "state already correct" });
+    if (!step.repair) return Response.json({ error: `No automatic repair for this task — reset the scenario to start over. (${readiness.why})` }, { status: 409 });
+    const did = step.repair(ctx);
+    return Response.json({ ...scenarioState(scenario.id), repaired: did });
   }
 
   if (action === "auto") {

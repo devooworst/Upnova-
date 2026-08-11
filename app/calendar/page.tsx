@@ -556,9 +556,14 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
             <p className="text-xs text-zinc-500">Waiting for {b.with.displayName} to accept your request.</p>
           )}
           {b.status === "accepted" && b.myRole === "client" && (
-            <button disabled={busy} onClick={() => act("pay")} data-guide="booking-pay" className="btn-lime w-full justify-center py-2 text-sm">
-              Pay ${((b.price + (b.travelFee ?? 0)) * 1.05).toFixed(2)} — secures the booking
-            </button>
+            <div>
+              <button disabled={busy} onClick={() => act("pay")} data-guide="booking-pay" className="btn-lime w-full justify-center py-2 text-sm">
+                Pay ${((b.price + (b.travelFee ?? 0)) * 1.05).toFixed(2)} — secures the booking
+              </button>
+              <p className="mt-1.5 text-center font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                Test payment — no real money
+              </p>
+            </div>
           )}
           {b.status === "accepted" && b.myRole === "provider" && (
             <p className="text-xs text-zinc-500">Accepted — waiting for the client&apos;s payment.</p>

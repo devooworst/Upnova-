@@ -62,6 +62,8 @@ const PLANNED_CATEGORIES = [
   "SUBSCRIPTIONS & MY WORLD",
   "BOOKING FLOW & QA LAB",
   "QA STRICT PROGRESSION",
+  "QA STATE REPAIR",
+  "QA ACCESS CONTROL",
   "QA SCENARIO WALKTHROUGHS",
   "DATABASE INTEGRITY",
 ];
@@ -69,7 +71,8 @@ const PLANNED_CATEGORIES = [
 export async function POST(req: NextRequest) {
   const gate = await guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    requireUser(); // any signed-in tester may run it
+    const runner = requireUser();
+    if (runner.role !== "admin") throw new ApiError(403, "The full system test is an admin operator tool");
     return { ok: true };
   });
   if (gate.status !== 200) return gate;
@@ -1671,6 +1674,89 @@ export async function POST(req: NextRequest) {
     const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
     step(c, "GUIDANCE · every guide advance-condition is a real page prefix or a real anchor — the guide can always tell where the user is",
       badUntil.length === 0, { actual: badUntil.length ? JSON.stringify(badUntil[0]) : "all reach-conditions well-formed" });
+  }
+
+  /* ================= QA STATE REPAIR ================= */
+  /* Exploration is ALLOWED (that's how bugs are found) and can never be
+     falsely credited — but it can consume the state the current task
+     needs. The Test Center must then (a) say exactly why the task is
+     blocked instead of giving an impossible instruction, and (b) offer
+     a one-click restore that rewinds ONLY the QA records — crediting
+     nothing. This reproduces the real "Test 7 with no Request-extension
+     button" incident end to end. */
+  {
+    const c = cat("QA STATE REPAIR");
+    const tokA3 = signDemoToken("devin");
+    const tokCrea3 = signDemoToken("testcreator");
+    const as3 = async (tok: string, pth: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      let data: any = {}; try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    };
+    // walk the project scenario to Test 7 (extension)
+    await as3(tokA3, "/api/qa/scenarios/project", { method: "POST", body: { action: "reset" } });
+    for (const st of ["draft", "offer", "start", "progress", "eta"]) await as3(tokA3, "/api/qa/scenarios/project", { method: "POST", body: { action: "auto", step: st } });
+    let pr = (await as3(tokA3, "/api/qa/scenarios/project")).data as any;
+    const extIdx = pr.steps.findIndex((x: any) => x.id === "extension");
+    step(c, "setup: project scenario walked to the extension task (Test " + (extIdx + 1) + ")", pr.current === extIdx, { actual: `current=${pr.current}` });
+
+    // EXPLORE AHEAD: the creator legitimately submits the work early (a
+    // Test-9 action) — the product allows it; the extension button dies
+    const projRow = db.select().from(tables.projects).all().filter((x) => x.title === "[QA] Test project").sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).pop();
+    const early = await as3(tokCrea3, `/api/projects/${projRow!.id}`, { method: "PATCH", body: { action: "submit" } });
+    pr = (await as3(tokA3, "/api/qa/scenarios/project")).data as any;
+    const extStep = pr.steps[extIdx];
+    step(c, "exploring ahead breaks the required state — the Test Center SAYS so (blocked reason on the current task) instead of instructing an impossible click, and Test 9 was NOT credited",
+      early.status === 200 && pr.current === extIdx && !!extStep.blocked && extStep.repairable === true && pr.steps.find((x: any) => x.id === "submit")?.status === "locked",
+      { actual: `submit=${early.status} current=${pr.current} blocked="${String(extStep.blocked).slice(0, 70)}" repairable=${extStep.repairable}` });
+
+    // one-click restore: rewinds ONLY the QA records, credits nothing
+    const rep = await as3(tokA3, "/api/qa/scenarios/project", { method: "POST", body: { action: "repair" } });
+    const after = rep.data as any;
+    const projAfter = db.select().from(tables.projects).where(eq(tables.projects.id, projRow!.id)).get();
+    step(c, "RESTORE REQUIRED STATE: the project rewinds to IN PROGRESS, the block clears, nothing is marked passed, and the cursor stays on the same test",
+      rep.status === 200 && projAfter?.state === "in_progress" && after.current === extIdx && !after.steps[extIdx].blocked && after.done === extIdx,
+      { actual: `state=${projAfter?.state} current=${after.current} done=${after.done} blocked=${after.steps[extIdx].blocked ?? "none"}` });
+
+    // and the task is now genuinely completable
+    await as3(tokA3, "/api/qa/scenarios/project", { method: "POST", body: { action: "auto", step: "extension" } });
+    const done = (await as3(tokA3, "/api/qa/scenarios/project")).data as any;
+    step(c, "after the repair the extension task completes for real (Request extension works again) and exactly the next task unlocks",
+      done.steps[extIdx].status === "done" && done.current === extIdx + 1, { actual: `extension=${done.steps[extIdx].status} current=${done.current}` });
+    await as3(tokA3, "/api/qa/scenarios/project", { method: "POST", body: { action: "reset" } });
+  }
+
+  /* ================= QA ACCESS CONTROL ================= */
+  /* Test Center / demo tooling is restricted SERVER-SIDE to authorized
+     development accounts: dev admins + the three QA personas. A normal
+     account (even a demo/seed one) gets 403 from every protected route
+     no matter how it arrives — direct API call, URL, cookies, storage. */
+  {
+    const c = cat("QA ACCESS CONTROL");
+    const tokNormal = signDemoToken("rachel"); // a normal (non-admin) account
+    const tokPersona = signDemoToken("testcustomer");
+    const hit = async (tok: string | null, pth: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      return res.status;
+    };
+    const s1 = await hit(tokNormal, "/api/qa/state");
+    const s2 = await hit(tokNormal, "/api/qa/scenarios/booking");
+    const s3 = await hit(tokNormal, "/api/qa/scenarios/booking", { method: "POST", body: { action: "start" } });
+    step(c, "a normal signed-in account CANNOT read or arm QA scenarios by calling the APIs directly — 403 on state, detail, and actions",
+      s1 === 403 && s2 === 403 && s3 === 403, { actual: `${s1}/${s2}/${s3}` });
+    const s4 = await hit(tokNormal, "/api/qa/impersonate", { method: "POST", body: { handle: "testcustomer" } });
+    step(c, "a normal account cannot impersonate a QA persona — persona switching is dev-only (403)", s4 === 403, { actual: String(s4) });
+    const s5 = await hit(tokNormal, "/api/demo/fulltest", { method: "POST" });
+    const s6 = await hit(tokNormal, "/api/demo/reset", { method: "POST", body: { kind: "booking" } });
+    const s7 = await hit(tokNormal, "/api/demo/clock", { method: "POST", body: { advanceMs: 1000 } });
+    const s8 = await hit(tokNormal, "/api/demo/account-state", { method: "POST", body: { state: "alumni" } });
+    step(c, "demo operator tools (full test, data reset, demo clock, account-state switcher) all refuse a normal account server-side",
+      s5 === 403 && s6 === 403 && s7 === 403 && s8 === 403, { actual: `${s5}/${s6}/${s7}/${s8}` });
+    const g1 = await hit(null, "/api/qa/state");
+    const g2 = await hit(null, "/api/qa/impersonate", { method: "POST", body: { handle: "testcustomer" } });
+    step(c, "guests (no auth at all) get 401 — no test data or controls leak", g1 === 401 && g2 === 401, { actual: `${g1}/${g2}` });
+    const p1 = await hit(tokPersona, "/api/qa/state");
+    step(c, "the QA personas themselves stay authorized (they ARE the dev tooling): testcustomer reads QA state fine", p1 === 200, { actual: String(p1) });
   }
 
   /* ================= QA SCENARIO WALKTHROUGHS ================= */

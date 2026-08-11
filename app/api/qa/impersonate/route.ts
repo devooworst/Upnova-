@@ -40,12 +40,21 @@ export async function POST(req: NextRequest) {
     const me = requireUser();
     ensureQaPersonas();
 
+    // SERVER-SIDE AUTHORIZATION — persona switching is a development
+    // tool. Entering a QA persona: dev admins + QA personas only.
+    // Exiting via returnToken: only a QA persona can be "inside" one.
+    const meIsQa = isQaHandle(me.handle);
+    const meAuthorized = me.role === "admin" || meIsQa;
+
     let targetHandle: string;
     if (body.returnToken) {
+      if (!meIsQa) throw new ApiError(403, "Nothing to exit — you are not in a test persona");
       const h = verifyDemoToken(String(body.returnToken));
       if (!h) throw new ApiError(403, "Invalid return token");
       targetHandle = h;
     } else {
+      if (!meAuthorized)
+        throw new ApiError(403, "Test personas are restricted to authorized development accounts");
       targetHandle = String(body.handle ?? "").trim().toLowerCase();
       if (!isQaHandle(targetHandle))
         throw new ApiError(403, "Only the QA test personas can be impersonated");

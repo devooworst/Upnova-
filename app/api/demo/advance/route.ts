@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
+import { requireUser, guarded, ApiError, isDemoMode , requireQaOperator } from "@/lib/server/auth";
 import { forceAdvanceBooking, forceAdvanceOrder, forceAdvanceApplication } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   return guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireUser();
+    const user = requireQaOperator();
     const kind = String(body.kind || "");
     const id = String(body.id || "");
     if (!id) throw new ApiError(400, "id is required");

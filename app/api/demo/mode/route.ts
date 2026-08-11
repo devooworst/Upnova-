@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
+import { requireUser, guarded, ApiError, isDemoMode , requireQaOperator } from "@/lib/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   return guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireUser();
+    const user = requireQaOperator();
     const mode = String(body.mode || "");
     if (mode !== "demo" && mode !== "simulation")
       throw new ApiError(400, 'mode must be "demo" or "simulation"');

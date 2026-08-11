@@ -59,6 +59,16 @@ export interface QaStep {
   verify: (ctx: QaContext) => QaVerdict;
   /** optional: perform the action through the real HTTP routes as the persona */
   perform?: (ctx: QaContext, api: QaApi) => Promise<void>;
+  /** REQUIRED STARTING STATE — exploration is allowed (the tester may
+      click anything, that's how bugs are found), but if it consumed the
+      state this task needs (e.g. submitting early removes the Request-
+      extension action), the Test Center must SAY so and offer a repair,
+      never present an impossible instruction. */
+  ready?: (ctx: QaContext) => { ok: boolean; why: string };
+  /** restores the exact required starting state (test-environment state
+      surgery — a fixture reset, NEVER a faked checkpoint: verification
+      still only ever comes from real records). Returns what it did. */
+  repair?: (ctx: QaContext) => string;
 }
 
 export interface QaScenario {
@@ -158,6 +168,65 @@ const payFor = (key: "bookingId" | "projectId", id: string) =>
   db.select().from(tables.payments).all().find((p) => p[key] === id);
 
 const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "none");
+
+/* ------------------- required-state helpers (fixtures) ------------------- */
+/* Exploration never falsely completes future tasks (activation gating),
+   but it CAN consume the state a task needs — e.g. submitting the work
+   early removes the Request-extension action. These helpers detect that
+   and rewind ONLY the QA records to the exact required starting state. */
+
+const PROJECT_LABEL: Record<string, string> = {
+  draft: "Draft", offer_sent: "Offer sent", accepted: "Accepted", in_progress: "In progress",
+  extension_requested: "Extension requested", submitted: "Delivered — awaiting review",
+  approved: "Approved", completed: "Completed", reviewed: "Reviewed",
+};
+
+function projectReady(getP: (ctx: QaContext) => typeof tables.projects.$inferSelect | undefined, allowed: string[], needLabel: string) {
+  return (ctx: QaContext) => {
+    const p = getP(ctx);
+    if (!p) return { ok: true, why: "" }; // no project yet — the verify explains that
+    if (allowed.includes(p.state)) return { ok: true, why: "" };
+    return {
+      ok: false,
+      why: `the project is "${PROJECT_LABEL[p.state] ?? p.state}", but this test needs it ${needLabel} — the required action doesn't exist in the current state (you likely explored ahead; that's fine, nothing was falsely credited)`,
+    };
+  };
+}
+
+function projectRepair(getP: (ctx: QaContext) => typeof tables.projects.$inferSelect | undefined) {
+  return (ctx: QaContext) => {
+    const p = getP(ctx);
+    if (!p) return "no project to repair";
+    // rewind the QA project to IN PROGRESS: state back, secured (not
+    // released) TEST payment, stale pending extensions cleared
+    db.update(tables.projects).set({ state: "in_progress" }).where(eq(tables.projects.id, p.id)).run();
+    const pay = db.select().from(tables.payments).all().find((x) => x.projectId === p.id);
+    if (pay && pay.status === "released") db.update(tables.payments).set({ status: "held" }).where(eq(tables.payments.id, pay.id)).run();
+    for (const e of db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all())
+      if (e.status === "pending" && !inTask(e.createdAt, ctx)) db.delete(tables.extensionRequests).where(eq(tables.extensionRequests.id, e.id)).run();
+    return `project "${p.title}" rewound to IN PROGRESS (TEST payment secured, stale pending extensions cleared)`;
+  };
+}
+
+function bookingReady(getB: (ctx: QaContext) => typeof tables.bookings.$inferSelect | undefined, allowed: string[], needLabel: string) {
+  return (ctx: QaContext) => {
+    const b = getB(ctx);
+    if (!b) return { ok: true, why: "" };
+    if (allowed.includes(b.status)) return { ok: true, why: "" };
+    return { ok: false, why: `the booking is "${b.status}", but this test needs it ${needLabel} — the required action doesn't exist in the current state` };
+  };
+}
+
+function bookingRepair(getB: (ctx: QaContext) => typeof tables.bookings.$inferSelect | undefined, to: "pending" | "accepted" | "confirmed" = "confirmed") {
+  return (ctx: QaContext) => {
+    const b = getB(ctx);
+    if (!b) return "no booking to repair";
+    db.update(tables.bookings).set({ status: to }).where(eq(tables.bookings.id, b.id)).run();
+    const pay = db.select().from(tables.payments).all().find((x) => x.bookingId === b.id);
+    if (pay && pay.status === "released" && to === "confirmed") db.update(tables.payments).set({ status: "held" }).where(eq(tables.payments.id, pay.id)).run();
+    return `booking rewound to ${to.toUpperCase()}${to === "confirmed" ? " (TEST payment secured)" : ""}`;
+  };
+}
 
 /** next weekday at a given hour — keeps auto-performed bookings clear of
     real scheduling rules (no-Sunday etc.) so the step tests what it says */
@@ -282,6 +351,8 @@ const bookingScenario: QaScenario = {
       instruction: "Switch to TEST CREATOR → Bookings → find the pending request → click Accept.",
       expected: "Booking status pending → accepted, and Test Customer notified.",
       href: () => "/calendar",
+      ready: bookingReady(qaBooking, ["pending", "accepted", "confirmed", "completed"], "a live request (not cancelled)"),
+      repair: bookingRepair(qaBooking, "pending"),
       verify: (ctx) => {
         const b = qaBooking(ctx);
         if (!b) return { done: false, actual: "no booking yet — finish the previous step" };
@@ -300,6 +371,8 @@ const bookingScenario: QaScenario = {
       instruction: "As TEST CUSTOMER → Bookings → open the accepted booking → click Pay (clearly labeled TEST — no real money exists here).",
       expected: "Booking confirmed + a payment row in HELD state (secured, releases on completion).",
       href: () => "/calendar",
+      ready: bookingReady(qaBooking, ["accepted", "confirmed", "completed"], "ACCEPTED so the Pay button exists"),
+      repair: bookingRepair(qaBooking, "accepted"),
       verify: (ctx) => {
         const b = qaBooking(ctx);
         if (!b) return { done: false, actual: "no booking yet" };
@@ -348,6 +421,8 @@ const bookingScenario: QaScenario = {
       instruction: "As TEST CREATOR → Bookings → open the booking's progress panel → pick a status and % → write a short note → click Post update.",
       expected: "A real progress_updates row on this booking, authored by Test Creator while this test was active.",
       href: () => "/calendar",
+      ready: bookingReady(qaBooking, ["accepted", "confirmed"], "ACCEPTED or CONFIRMED — progress posting closes once it's completed"),
+      repair: bookingRepair(qaBooking, "confirmed"),
       verify: (ctx) => {
         const b = qaBooking(ctx);
         if (!b) return { done: false, actual: "no booking yet" };
@@ -388,6 +463,8 @@ const bookingScenario: QaScenario = {
       instruction: "As TEST CREATOR → Bookings → open the booking → click \"Mark completed — release $ to me\".",
       expected: "Booking completed + the held TEST payment flips to RELEASED.",
       href: () => "/calendar",
+      ready: bookingReady(qaBooking, ["confirmed", "completed"], "CONFIRMED (paid) so Mark-completed exists"),
+      repair: bookingRepair(qaBooking, "confirmed"),
       verify: (ctx) => {
         const b = qaBooking(ctx);
         if (!b) return { done: false, actual: "no booking yet" };
@@ -505,6 +582,8 @@ const projectScenario: QaScenario = {
         const p = qaProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: projectReady(qaProject, ["in_progress", "extension_requested", "submitted", "approved"], "IN PROGRESS (progress posting closes once it's completed)"),
+      repair: projectRepair(qaProject),
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -531,6 +610,8 @@ const projectScenario: QaScenario = {
         const p = qaProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: projectReady(qaProject, ["in_progress", "extension_requested", "submitted", "approved"], "IN PROGRESS (ETA updates close once it's completed)"),
+      repair: projectRepair(qaProject),
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -566,6 +647,17 @@ const projectScenario: QaScenario = {
         const p = qaProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: (ctx) => {
+        const base = projectReady(qaProject, ["in_progress"], "IN PROGRESS — the Request-extension button only exists there")(ctx);
+        if (!base.ok) return base;
+        const p = qaProject(ctx);
+        const stale = p
+          ? db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all().find((e) => e.status === "pending" && !inTask(e.createdAt, ctx))
+          : undefined;
+        if (stale) return { ok: false, why: "a pending extension from before this test became active is blocking a new request" };
+        return { ok: true, why: "" };
+      },
+      repair: projectRepair(qaProject),
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -612,6 +704,8 @@ const projectScenario: QaScenario = {
         const p = qaProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: projectReady(qaProject, ["in_progress", "extension_requested", "submitted", "approved", "completed", "reviewed"], "IN PROGRESS so Submit-work exists"),
+      repair: projectRepair(qaProject),
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -1040,6 +1134,8 @@ const hiringScenario: QaScenario = {
         const p = qaBizProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: projectReady(qaBizProject, ["in_progress", "extension_requested", "submitted", "approved"], "IN PROGRESS (progress posting closes once it's completed)"),
+      repair: projectRepair(qaBizProject),
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -1067,6 +1163,17 @@ const hiringScenario: QaScenario = {
         const p = qaBizProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: (ctx) => {
+        const base = projectReady(qaBizProject, ["in_progress"], "IN PROGRESS — the Request-extension button only exists there")(ctx);
+        if (!base.ok) return base;
+        const p = qaBizProject(ctx);
+        const stale = p
+          ? db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all().find((e) => e.status === "pending" && !inTask(e.createdAt, ctx))
+          : undefined;
+        if (stale) return { ok: false, why: "a pending extension from before this test became active is blocking a new request" };
+        return { ok: true, why: "" };
+      },
+      repair: projectRepair(qaBizProject),
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -1114,6 +1221,8 @@ const hiringScenario: QaScenario = {
         const p = qaBizProject(ctx);
         return p ? `/projects/${p.id}` : "/calendar";
       },
+      ready: projectReady(qaBizProject, ["in_progress", "extension_requested", "submitted", "approved", "completed", "reviewed"], "IN PROGRESS so Submit-work exists"),
+      repair: projectRepair(qaBizProject),
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -1446,6 +1555,12 @@ export type QaStepState = {
   status: "done" | "pending" | "locked";
   actual: string;
   record: string | null;
+  /** the current task's required starting state is missing (exploration
+      consumed it) — the reason, in plain language. Never an impossible
+      instruction without saying so. */
+  blocked?: string | null;
+  /** a one-click state restore exists for this blockage */
+  repairable?: boolean;
 };
 
 export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
@@ -1506,6 +1621,7 @@ export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
   // advance: verify ONLY the current task; each pass appends its verified
   // snapshot and unlocks the next (auto-checks cascade in the same sweep)
   let pendingVerdict: QaVerdict | null = null;
+  let pendingCtx: QaContext | null = null;
   while (passed.length < scenario.steps.length) {
     const s = scenario.steps[passed.length];
     if (!activated[s.id]) {
@@ -1523,6 +1639,7 @@ export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
     }
     if (!v.done) {
       pendingVerdict = v;
+      pendingCtx = stepCtx;
       break;
     }
     passed.push({
@@ -1560,7 +1677,19 @@ export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
       const snap = passed[i];
       return { ...base, href: safeHref(s, ctx), canAuto: false, status: "done" as const, actual: snap.actual, record: snap.record };
     }
-    if (i === cursor)
+    if (i === cursor) {
+      // REQUIRED STARTING STATE — never show an impossible instruction:
+      // if exploration consumed the state this task needs, say exactly
+      // why and whether a one-click restore exists
+      let blocked: string | null = null;
+      if (s.ready && pendingCtx) {
+        try {
+          const r = s.ready(pendingCtx);
+          if (!r.ok) blocked = r.why;
+        } catch {
+          /* readiness check must never break evaluation */
+        }
+      }
       return {
         ...base,
         href: safeHref(s, ctx),
@@ -1568,7 +1697,10 @@ export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
         status: "pending" as const,
         actual: pendingVerdict?.actual ?? "…",
         record: (pendingVerdict && "record" in pendingVerdict ? pendingVerdict.record : undefined) ?? null,
+        blocked,
+        repairable: !!blocked && !!s.repair,
       };
+    }
     return { ...base, href: "#", canAuto: false, status: "locked" as const, actual: `locked — unlocks when test ${cursor + 1} passes`, record: null };
   });
 

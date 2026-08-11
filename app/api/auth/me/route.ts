@@ -54,7 +54,7 @@ export async function GET() {
       // tester mode is only meaningful on a demo deployment; production is
       // always the realistic experience (feature access, never auth state)
       testerMode: isDemoMode() ? (user.testerMode === "simulation" ? "simulation" : "demo") : "simulation",
-      demoTools: isDemoMode(), // demo deployment only: Test Center + Demo Controls visibility
+      demoTools: isDemoMode() && (user.role === "admin" || ["testcustomer", "testcreator", "testbusiness"].includes(user.handle)), // Test Center + demo controls: dev admins and QA personas ONLY (server routes enforce the same rule)
       campus: verification
         ? {
             name: verification.c.name,

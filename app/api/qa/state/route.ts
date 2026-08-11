@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
+import { requireQaOperator, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { ensureQaPersonas, QA_PERSONAS, isQaHandle, readRuns } from "@/lib/server/qa";
 import { QA_SCENARIOS, scenarioProgress } from "@/lib/server/qaScenarios";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const me = requireUser();
+    const me = requireQaOperator();
     ensureQaPersonas();
 
     const personas = QA_PERSONAS.map((p) => {

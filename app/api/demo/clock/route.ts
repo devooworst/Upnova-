@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
+import { requireUser, guarded, ApiError, isDemoMode , requireQaOperator } from "@/lib/server/auth";
 import { qaIds } from "@/lib/server/qa";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   return guarded(() => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireUser();
+    const user = requireQaOperator();
     const ms = Math.min(30 * 86400_000, Math.max(0, Number(body.advanceMs) || 0));
     if (!ms) throw new ApiError(400, "advanceMs required (max 30 days)");
 

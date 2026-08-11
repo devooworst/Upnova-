@@ -67,6 +67,8 @@ interface StepState {
   status: "done" | "pending" | "locked";
   actual: string;
   record: string | null;
+  blocked?: string | null;
+  repairable?: boolean;
 }
 interface ScenarioDetail extends ScenarioSummary {
   steps: StepState[];
@@ -512,6 +514,25 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                                 </button>
                               )}
                             </div>
+
+                            {/* REQUIRED STATE — never an impossible instruction */}
+                            {firstPendingMine.blocked && (
+                              <div className="mt-3 rounded-xl border border-rose-400/40 bg-rose-400/5 p-3">
+                                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-rose-300">Required state missing</p>
+                                <p className="mt-1 text-[11px] leading-relaxed text-zinc-300">{firstPendingMine.blocked}.</p>
+                                {firstPendingMine.repairable ? (
+                                  <button
+                                    disabled={busy === `repair:${s.id}`}
+                                    onClick={() => act(s.id, { action: "repair" }, `repair:${s.id}`)}
+                                    className="mt-2 rounded-lg border border-rose-400/50 bg-rose-400/10 px-3.5 py-1.5 text-xs font-bold text-rose-200 hover:bg-rose-400/20"
+                                  >
+                                    Restore required state — rewinds ONLY the QA records, credits nothing
+                                  </button>
+                                ) : (
+                                  <p className="mt-1.5 text-[10px] text-zinc-500">No automatic restore for this one — reset the scenario to start over.</p>
+                                )}
+                              </div>
+                            )}
 
                             {/* OBJECTIVE */}
                             <p className="mt-3 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">

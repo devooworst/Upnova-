@@ -45,6 +45,8 @@ type NextTask = {
   role: string;
   brief: MissionBriefing;
   instruction: string;
+  blocked: string | null;
+  repairable: boolean;
 };
 
 const GUIDE_KEY = "mavyn-qa-guide"; // sessionStorage: task id the guide is active for
@@ -96,6 +98,8 @@ export default function QaPersonaBar() {
             role: pick.role,
             brief: buildBriefing(pick),
             instruction: pick.instruction,
+            blocked: pick.blocked ?? null,
+            repairable: !!pick.repairable,
           } : null);
       } catch { /* the bar never breaks the page */ }
     };
@@ -270,6 +274,27 @@ export default function QaPersonaBar() {
                       </button>
                     )}
                   </div>
+                  {nextTask.blocked && (
+                    <div className="mt-2 rounded-lg border border-rose-400/40 bg-rose-400/5 p-2.5">
+                      <p className="font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-rose-300">Required state missing</p>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-300">{nextTask.blocked}.</p>
+                      {nextTask.repairable && (
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await fetch(`/api/qa/scenarios/${nextTask.sid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "repair" }) });
+                            } catch {}
+                            setBusy(false);
+                          }}
+                          className="mt-1.5 rounded-full border border-rose-400/50 bg-rose-400/10 px-2.5 py-1 text-[10px] font-bold text-rose-200 hover:bg-rose-400/20"
+                        >
+                          Restore required state
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-zinc-600">Your goal</p>
                   <p className="mt-0.5 text-[11px] font-bold text-zinc-100">{nextTask.brief.objective}</p>
                   {youWill && (
@@ -352,7 +377,7 @@ export default function QaPersonaBar() {
                 <span className="font-mono font-bold uppercase tracking-[0.1em] text-zinc-500">
                   {nextTask.scenario} · test {nextTask.idx} of {nextTask.total}
                 </span>{" "}
-                — {nextTask.role === "check" ? `auto-check verifying: ${nextTask.title}` : nextTask.mine ? nextTask.title : `waiting on ${QA_LABEL[nextTask.role] ?? nextTask.role}: ${nextTask.title}`}
+                — {nextTask.blocked ? `required state missing — open the briefing to restore it` : nextTask.role === "check" ? `auto-check verifying: ${nextTask.title}` : nextTask.mine ? nextTask.title : `waiting on ${QA_LABEL[nextTask.role] ?? nextTask.role}: ${nextTask.title}`}
               </p>
               {nextTask.mine && nextTask.role !== "check" && (
                 <button

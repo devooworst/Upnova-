@@ -287,6 +287,24 @@ export function requireAdmin(): SessionUser {
   return user;
 }
 
+/* QA / Test Center authorization — SERVER-SIDE, never just hidden
+   buttons. Authorized: dev admins (role=admin) and the three dedicated
+   QA test personas (they ARE development tooling — real rows, allow-
+   listed by handle). A normal customer/creator/business/guest account
+   gets 403 no matter how it reaches the endpoint: direct API call,
+   URL editing, cookie/localStorage manipulation — none of it helps,
+   because the check runs on the authenticated user's server record. */
+const QA_OPERATOR_HANDLES = ["testcustomer", "testcreator", "testbusiness"];
+export function isQaOperator(user: SessionUser): boolean {
+  return user.role === "admin" || QA_OPERATOR_HANDLES.includes(user.handle);
+}
+export function requireQaOperator(): SessionUser {
+  const user = requireUser();
+  if (!isQaOperator(user))
+    throw new AuthError(403, "Test Center and demo tools are restricted to authorized development accounts");
+  return user;
+}
+
 export class AuthError extends Error {
   constructor(
     public status: number,

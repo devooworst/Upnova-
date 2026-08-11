@@ -43,7 +43,7 @@ const sections = [
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "pro", label: "Plan & Billing", icon: Sparkles },
   { id: "help", label: "Help", icon: HelpCircle },
-  { id: "demo", label: "Demo Controls", icon: FlaskConical },
+  { id: "demo", label: "Demo Controls", icon: FlaskConical, demoToolsOnly: true },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 
@@ -303,7 +303,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* -------- settings nav -------- */}
         <nav className="no-scrollbar flex gap-1 overflow-x-auto lg:w-56 lg:shrink-0 lg:flex-col lg:self-start">
-          {sections.map((s) => (
+          {sections.filter((s) => !("demoToolsOnly" in s) || user?.demoTools).map((s) => (
             <button
               key={s.id}
               onClick={() => setSection(s.id)}
@@ -902,7 +902,7 @@ export default function SettingsPage() {
             </section>
           )}
 
-          {section === "demo" && user?.testerMode === "simulation" && (
+          {section === "demo" && user?.demoTools && user?.testerMode === "simulation" && (
             <section className="card p-5">
               <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-sky-300">
                 <FlaskConical className="h-4 w-4" /> Demo Controls
@@ -921,7 +921,7 @@ export default function SettingsPage() {
             </section>
           )}
 
-          {section === "demo" && user?.testerMode !== "simulation" && (
+          {section === "demo" && user?.demoTools && user?.testerMode !== "simulation" && (
             <section className="card overflow-hidden">
               <div className="border-b border-amber-400/20 bg-gradient-to-b from-amber-400/10 to-transparent p-5">
                 <p className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-amber-300">

@@ -63,8 +63,9 @@ export default function DemoModeSwitch() {
     }
   };
 
-  // guests: the plain informational chip (no account to switch)
-  if (!user) {
+  // guests AND unauthorized accounts: the plain informational chip —
+  // mode switching is a development tool (server enforces this too)
+  if (!user || !user.demoTools) {
     return (
       <span
         className="ml-1 hidden rounded border border-line px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.15em] text-zinc-500 sm:inline"
