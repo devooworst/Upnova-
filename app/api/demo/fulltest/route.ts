@@ -628,6 +628,32 @@ export async function POST(req: NextRequest) {
     const ln2 = ((await api("lena", "/api/notifications")).data as any).notifications ?? [];
     step(c, "ETA change recorded + client notified (never silent)", eta.status === 200 && ln2.some((n: any) => n.type === "eta_changed"), { route: "POST progress kind=eta" });
 
+    /* ---- ESTIMATED COMPLETION is a real DATETIME (date + time) ---- */
+    {
+      // a specific minute — 6:37 PM two days out — must round-trip EXACTLY
+      const preciseEta = new Date(Date.now() + 2 * 86400e3);
+      preciseEta.setHours(18, 37, 0, 0);
+      const upT = await api("tonbp", `/api/projects/${pid}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 80, message: "final pass — mixing", etaAt: preciseEta.toISOString() } });
+      const backT = (await api("lena", `/api/projects/${pid}/progress`)).data as any;
+      const stored = backT.progress?.etaAt ? new Date(backT.progress.etaAt) : null;
+      step(c, "estimated completion stores date AND time as ONE datetime — the client reads the exact minute back (6:37 PM stays 6:37 PM)",
+        upT.status === 200 && !!stored && stored.getTime() === preciseEta.getTime(), {
+        expected: preciseEta.toISOString(), actual: backT.progress?.etaAt ?? "null" });
+      // persists across a fresh read (new request = fresh DB read — survives refresh/logout/redeploy by construction)
+      const backT2 = (await api("tonbp", `/api/projects/${pid}/progress`)).data as any;
+      step(c, "the datetime persists across independent reads (fresh DB fetch each time — refresh/login safe)",
+        backT2.progress?.etaAt === backT.progress?.etaAt, { actual: String(backT2.progress?.etaAt) });
+      // percent bounds: out-of-range input can never store out-of-range state
+      const hi = await api("tonbp", `/api/projects/${pid}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 150, message: "clamp high" } });
+      const lo = await api("tonbp", `/api/projects/${pid}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: -5, message: "clamp low" } });
+      const hiPct = (hi.data as any).progress?.updates?.find((u: any) => u.message === "clamp high")?.percent;
+      const loPct = (lo.data as any).progress?.updates?.find((u: any) => u.message === "clamp low")?.percent;
+      step(c, "percent is bounded 0–100 server-side: 150 → 100, -5 → 0 (never trusts the client)",
+        hiPct === 100 && loPct === 0, { actual: `150→${hiPct} · -5→${loPct}` });
+      // leave the record's story as the flow expects: 70% is the latest state
+      await api("tonbp", `/api/projects/${pid}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 70, message: "nearly finished — final mixing pass", etaAt: preciseEta.toISOString() } });
+    }
+
     const ext = await api("tonbp", `/api/projects/${pid}/extension`, { method: "POST", body: { days: 2, reason: "Waiting for the final vocal files and need additional mixing time." } });
     const stExt = ((await api("lena", `/api/projects/${pid}`)).data as any).project;
     step(c, "extension requested (+2 days) → state extension_requested, client notified", ext.status === 200 && stExt?.state === "extension_requested" && (((await api("lena", "/api/notifications")).data as any).notifications ?? []).some((n: any) => n.type === "extension_requested"), { actual: stExt?.state });

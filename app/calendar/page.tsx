@@ -12,6 +12,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -646,7 +647,8 @@ function BookingProgressPanel({ b }: { b: Booking }) {
   const [status, setStatus] = useState("in_progress");
   const [percent, setPercent] = useState("");
   const [message, setMessage] = useState("");
-  const [eta, setEta] = useState("");
+  const [etaDate, setEtaDate] = useState("");
+  const [etaTime, setEtaTime] = useState("17:00");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -669,7 +671,7 @@ function BookingProgressPanel({ b }: { b: Booking }) {
         status,
         percent: percent === "" ? null : Number(percent),
         message,
-        etaAt: eta ? new Date(eta + "T17:00:00").toISOString() : null,
+        etaAt: combineEta(etaDate, etaTime),
       }),
     });
     const d = await res.json().catch(() => ({}));
@@ -678,7 +680,8 @@ function BookingProgressPanel({ b }: { b: Booking }) {
     setOpen(false);
     setMessage("");
     setPercent("");
-    setEta("");
+    setEtaDate("");
+    setEtaTime("17:00");
     load();
   };
 
@@ -715,9 +718,7 @@ function BookingProgressPanel({ b }: { b: Booking }) {
           {progress?.etaAt && (
             <p className="mt-1 text-[11px] text-zinc-500">
               Est. completion:{" "}
-              <span className="font-mono tracking-[0.08em] text-zinc-300">
-                {new Date(progress.etaAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </span>
+              <span className="font-mono tracking-[0.08em] text-zinc-300">{fmtEta(progress.etaAt)}</span>
             </p>
           )}
         </>
@@ -739,8 +740,10 @@ function BookingProgressPanel({ b }: { b: Booking }) {
               ))}
             </select>
             <input
-              type="number" min={0} max={100} value={percent} onChange={(e) => setPercent(e.target.value)}
-              placeholder="% done" className="input-dark py-1.5 text-xs"
+              type="number" min={0} max={100} step={1} inputMode="numeric" value={percent}
+              onChange={(e) => setPercent(clampPercent(e.target.value))}
+              placeholder="% complete (0–100)" className="input-dark py-1.5 text-xs"
+              aria-label="Percent complete, 0 to 100"
             />
           </div>
           <textarea
@@ -748,10 +751,8 @@ function BookingProgressPanel({ b }: { b: Booking }) {
             placeholder="What are you currently working on?"
             className="input-dark w-full resize-none py-1.5 text-xs"
           />
-          <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Estimated completion (optional)</span>
-            <input type="date" value={eta} onChange={(e) => setEta(e.target.value)} className="input-dark mt-1 w-full py-1.5 text-xs" />
-          </label>
+          <EtaPicker date={etaDate} time={etaTime} onDate={setEtaDate} onTime={setEtaTime} />
+          <UpdatePreview percent={percent} message={message} etaIso={combineEta(etaDate, etaTime)} />
           {err && <p className="text-xs font-medium text-rose-300">{err}</p>}
           <div className="flex gap-1.5">
             <button disabled={busy} onClick={post} className="btn-lime flex-1 justify-center py-1.5 text-xs">Post update</button>

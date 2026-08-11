@@ -46,7 +46,9 @@ type Target =
   | { kind: "project"; row: typeof tables.projects.$inferSelect }
   | { kind: "booking"; row: typeof tables.bookings.$inferSelect };
 
-const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// estimated completion is a real datetime — messages carry date AND time
+const fmtDate = (d: Date) =>
+  `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 
 function loadTarget(kind: "project" | "booking", id: string, userId: string): Target {
   if (kind === "project") {

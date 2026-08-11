@@ -11,6 +11,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useState } from "react";
+import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -136,10 +137,12 @@ export default function ProjectPage() {
   const [pPercent, setPPercent] = useState<string>("");
   const [pMessage, setPMessage] = useState("");
   const [pEta, setPEta] = useState("");
+  const [pEtaTime, setPEtaTime] = useState("17:00");
   const [pAttach, setPAttach] = useState("");
   // ETA form
   const [showEta, setShowEta] = useState(false);
   const [etaDate, setEtaDate] = useState("");
+  const [etaTime, setEtaTime] = useState("17:00");
   const [etaReason, setEtaReason] = useState("");
   // extension form
   const [showExt, setShowExt] = useState(false);
@@ -230,7 +233,7 @@ export default function ProjectPage() {
       status: pStatus,
       percent: pPercent === "" ? null : Number(pPercent),
       message: pMessage,
-      etaAt: pEta ? new Date(pEta + "T17:00:00").toISOString() : null,
+      etaAt: combineEta(pEta, pEtaTime),
       attachmentUrl: pAttach,
     });
     if (ok) {
@@ -238,6 +241,7 @@ export default function ProjectPage() {
       setPMessage("");
       setPPercent("");
       setPEta("");
+      setPEtaTime("17:00");
       setPAttach("");
     }
   };
@@ -246,12 +250,13 @@ export default function ProjectPage() {
     if (!etaDate) return setNotice("Pick the new estimated completion date");
     const ok = await call(`/api/projects/${project.id}/progress`, {
       kind: "eta",
-      etaAt: new Date(etaDate + "T17:00:00").toISOString(),
+      etaAt: combineEta(etaDate, etaTime),
       reason: etaReason,
     });
     if (ok) {
       setShowEta(false);
       setEtaDate("");
+      setEtaTime("17:00");
       setEtaReason("");
     }
   };
@@ -317,7 +322,7 @@ export default function ProjectPage() {
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Estimated completion</p>
               {eta ? (
                 <>
-                  <p className="mt-1 text-sm font-semibold text-zinc-100">{fmt(eta)}</p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-100">{fmtEta(eta)}</p>
                   {remaining(eta) && !["completed", "reviewed"].includes(project.state) && (
                     <p className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
                       <Clock className="h-3 w-3" /> {remaining(eta)} remaining
@@ -362,10 +367,11 @@ export default function ProjectPage() {
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Progress %</span>
                   <input
-                    type="number" min={0} max={100} value={pPercent}
-                    onChange={(e) => setPPercent(e.target.value)}
-                    placeholder="e.g. 60"
+                    type="number" min={0} max={100} step={1} inputMode="numeric" value={pPercent}
+                    onChange={(e) => setPPercent(clampPercent(e.target.value))}
+                    placeholder="% complete (0–100)"
                     className="input-dark mt-1 w-full py-1.5 text-xs"
+                    aria-label="Percent complete, 0 to 100"
                   />
                 </label>
               </div>
@@ -378,10 +384,7 @@ export default function ProjectPage() {
                 />
               </label>
               <div className="grid gap-2 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Estimated completion (optional)</span>
-                  <input type="date" value={pEta} onChange={(e) => setPEta(e.target.value)} className="input-dark mt-1 w-full py-1.5 text-xs" />
-                </label>
+                <EtaPicker date={pEta} time={pEtaTime} onDate={setPEta} onTime={setPEtaTime} />
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Attachment link (optional)</span>
                   <input
@@ -391,6 +394,12 @@ export default function ProjectPage() {
                   />
                 </label>
               </div>
+              <UpdatePreview
+                statusLabel={(PROGRESS_OPTIONS.find(([v]) => v === pStatus)?.[1] as string) ?? undefined}
+                percent={pPercent}
+                message={pMessage}
+                etaIso={combineEta(pEta, pEtaTime)}
+              />
               <button disabled={busy} onClick={postUpdate} className="btn-lime w-full justify-center py-2 text-xs">
                 Post update — {project.with.displayName} sees it immediately
               </button>
@@ -401,14 +410,17 @@ export default function ProjectPage() {
           {isCreator && showEta && (
             <div className="mt-3 space-y-2.5 rounded-xl border border-line bg-card-raised p-3.5">
               <p className="text-xs text-zinc-400">
-                {eta ? <>Current estimate: <span className="font-semibold text-zinc-200">{fmt(eta)}</span>. </> : null}
+                {eta ? <>Current estimate: <span className="font-semibold text-zinc-200">{fmtEta(eta)}</span>. </> : null}
                 The change is recorded on the timeline and {project.with.displayName} is notified — deadlines never move silently.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">New estimated completion</span>
-                  <input type="date" value={etaDate} onChange={(e) => setEtaDate(e.target.value)} className="input-dark mt-1 w-full py-1.5 text-xs" />
-                </label>
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">New estimated completion — date &amp; time</span>
+                  <div className="mt-1 grid grid-cols-2 gap-1.5">
+                    <input type="date" value={etaDate} onChange={(e) => setEtaDate(e.target.value)} className="input-dark py-1.5 text-xs" aria-label="New estimated completion date" />
+                    <input type="time" value={etaTime} onChange={(e) => setEtaTime(e.target.value)} className="input-dark py-1.5 text-xs" aria-label="New estimated completion time" />
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Reason</span>
                   <input
@@ -557,7 +569,7 @@ export default function ProjectPage() {
             {eta && eta !== project.deadline && (
               <div className="flex justify-between text-xs text-zinc-500">
                 <span>Est. completion</span>
-                <span className="font-mono tracking-[0.08em]">{fmt(eta)}</span>
+                <span className="font-mono tracking-[0.08em]">{fmtEta(eta)}</span>
               </div>
             )}
             {payment && (
