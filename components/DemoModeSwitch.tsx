@@ -81,6 +81,7 @@ export default function DemoModeSwitch() {
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
+        data-guide="demo-mode-switch"
         className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.15em] transition ${
           mode === "demo"
             ? "border-amber-400/50 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20"

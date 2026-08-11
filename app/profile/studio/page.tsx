@@ -244,7 +244,7 @@ export default function ProfileStudioPage() {
           <button onClick={reset} disabled={busy} className="btn-ghost px-4 py-2 text-xs disabled:opacity-50">
             <RotateCcw className="h-3.5 w-3.5" /> Reset to default
           </button>
-          <button onClick={save} disabled={busy || !dirty} className="btn-lime rounded-md px-5 py-2 text-xs disabled:opacity-50">
+          <button onClick={save} disabled={busy || !dirty} data-guide="studio-save" className="btn-lime rounded-md px-5 py-2 text-xs disabled:opacity-50">
             {busy ? "Saving…" : dirty ? "Save changes" : "Saved"}
           </button>
         </div>

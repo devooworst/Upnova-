@@ -12,6 +12,8 @@ import path from "path";
 import { QA_SCENARIOS } from "@/lib/server/qaScenarios";
 import { qaIds } from "@/lib/server/qa";
 import { QA_GUIDES, guideFor } from "@/lib/qaGuides";
+import { QA_EXAMPLES } from "@/lib/qaExamples";
+import { BUSINESS_LIMITS } from "@/lib/businessPlans";
 import { buildBriefing } from "@/lib/qaBriefing";
 import { signDemoToken } from "@/lib/server/auth";
 
@@ -64,6 +66,7 @@ const PLANNED_CATEGORIES = [
   "QA STRICT PROGRESSION",
   "QA STATE REPAIR",
   "QA ACCESS CONTROL",
+  "PLAN LAB (REAL BOUNDARIES)",
   "QA SCENARIO WALKTHROUGHS",
   "DATABASE INTEGRITY",
 ];
@@ -1663,9 +1666,9 @@ export async function POST(req: NextRequest) {
     };
     for (const d of srcDirs) walk(path.join(process.cwd(), d));
     const missingAnchor = Array.from(new Set(flat.map((g) => g.target).filter(Boolean))).filter(
-      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !src.includes(`"${t}"`)
+      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !t.startsWith("plan-") && !src.includes(`"${t}"`)
     );
-    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-"];
+    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-", "data-guide={`plan-"];
     const missingDynamic = dynamicPatterns.filter((pat) => !src.includes(pat));
     step(c, "GUIDANCE · every spotlight target is a real data-guide/data-tour anchor present in the interface source — instructions and visuals tell the same story",
       missingAnchor.length === 0 && missingDynamic.length === 0, { actual: missingAnchor.length || missingDynamic.length ? `MISSING: ${[...missingAnchor, ...missingDynamic].join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified (+${dynamicPatterns.length} dynamic families)` });
@@ -1674,6 +1677,19 @@ export async function POST(req: NextRequest) {
     const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
     step(c, "GUIDANCE · every guide advance-condition is a real page prefix or a real anchor — the guide can always tell where the user is",
       badUntil.length === 0, { actual: badUntil.length ? JSON.stringify(badUntil[0]) : "all reach-conditions well-formed" });
+
+    // 5) GUIDED INPUTS — example data integrity: every example maps to a
+    // real task, every field has a value, fills are pure data (populate,
+    // never submit), and every form-heavy task HAS examples
+    const stepIds = new Set(QA_SCENARIOS.flatMap((sc) => sc.steps.map((st) => `${sc.id}:${st.id}`)));
+    const orphanEx = Object.keys(QA_EXAMPLES).filter((k) => !stepIds.has(k));
+    const badEx = Object.entries(QA_EXAMPLES).filter(([, v]) => !v.fields.length || v.fields.some((f) => !f.label || !f.value));
+    const mustHave = ["opportunity:post", "project:draft", "hiring:post", "hiring:project", "project:progress", "project:extension"];
+    const missingEx = mustHave.filter((k) => !QA_EXAMPLES[k]);
+    const fillsPure = Object.values(QA_EXAMPLES).every((v) => !v.fill || JSON.stringify(v.fill) === JSON.stringify(JSON.parse(JSON.stringify(v.fill))));
+    step(c, "GUIDED INPUTS · every form task has copyable example values for its real fields; fill payloads are pure data that populate but never submit",
+      orphanEx.length === 0 && badEx.length === 0 && missingEx.length === 0 && fillsPure,
+      { actual: orphanEx.length || missingEx.length ? `orphans:${orphanEx.join(",")} missing:${missingEx.join(",")}` : `${Object.keys(QA_EXAMPLES).length} example sets, all valid` });
   }
 
   /* ================= QA STATE REPAIR ================= */
@@ -1759,6 +1775,76 @@ export async function POST(req: NextRequest) {
     step(c, "the QA personas themselves stay authorized (they ARE the dev tooling): testcustomer reads QA state fine", p1 === 200, { actual: String(p1) });
   }
 
+  /* ================= PLAN LAB (REAL BOUNDARIES) ================= */
+  /* Both sides of every plan gate, over real HTTP, on isolated QA      */
+  /* accounts in SIMULATION MODE (demo bypasses off — production rules).*/
+  /* Included feature works · restricted feature refuses WITH the       */
+  /* upgrade explanation · upgrading flips availability immediately,    */
+  /* verified in the database. No real billing exists anywhere here.    */
+  {
+    const c = cat("PLAN LAB (REAL BOUNDARIES)");
+    const tCrea = signDemoToken("testcreator");
+    const tBiz = signDemoToken("testbusiness");
+    const tCust = signDemoToken("testcustomer");
+    const tAdm = signDemoToken("devin");
+    const px = async (tok: string, pth: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      let data: any = {}; try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    };
+    // baseline fixture: arming the plans scenario resets personas to Free/demo/unverified/no-studio
+    await px(tAdm, "/api/qa/scenarios/plans", { method: "POST", body: { action: "reset" } });
+
+    /* ---- personal: Free → Pro (Studio gate) ---- */
+    await px(tCrea, "/api/demo/mode", { method: "PATCH", body: { mode: "simulation" } });
+    const denied = await px(tCrea, "/api/me/studio", { method: "PATCH", body: { studio: { accent: "lime" } } });
+    step(c, "FREE + simulation: the Pro feature refuses over real HTTP — 403 with the upgrade explanation, never a silent failure",
+      denied.status === 403 && /pro/i.test(String(denied.data.error)), { actual: `${denied.status} "${String(denied.data.error).slice(0, 80)}"` });
+    const up = await px(tCrea, "/api/me/plan", { method: "PATCH", body: { plan: "pro" } });
+    const nowOk = await px(tCrea, "/api/me/studio", { method: "PATCH", body: { studio: { accent: "lime" } } });
+    const creaRow = db.select().from(tables.users).where(eq(tables.users.handle, "testcreator")).get()!;
+    const studioRow = db.select().from(tables.profiles).where(eq(tables.profiles.userId, creaRow.id)).get()!;
+    step(c, "upgrade to PRO (TEST) → the same save succeeds IMMEDIATELY and the customization is really in the database",
+      up.status === 200 && nowOk.status === 200 && creaRow.plan === "pro" && (studioRow.studio ?? "").length > 2,
+      { actual: `plan=${creaRow.plan} save=${nowOk.status} studio=${(studioRow.studio ?? "").length} bytes` });
+
+    /* ---- business: Free capacity → Business Pro scale ---- */
+    await px(tBiz, "/api/demo/mode", { method: "PATCH", body: { mode: "simulation" } });
+    const mk = (n: number) => px(tBiz, "/api/opportunities", { method: "POST", body: { title: `[QA] capacity probe ${n}`, description: "Plan Lab boundary test.", budget: 50, type: "gig", location: "Baltimore, MD", remote: true } });
+    const r1 = await mk(1), r2 = await mk(2), r3 = await mk(3);
+    const r4 = await mk(4);
+    step(c, `BUSINESS FREE: ${BUSINESS_LIMITS.free.activeOpportunities} active opportunities work, the ${BUSINESS_LIMITS.free.activeOpportunities + 1}th refuses with the honest capacity message naming the Business Pro limit`,
+      r1.status === 200 && r2.status === 200 && r3.status === 200 && r4.status === 409 && /Business Pro raises this to/i.test(String(r4.data.error)),
+      { actual: `creates=${r1.status},${r2.status},${r3.status} then ${r4.status} "${String(r4.data.error).slice(0, 70)}"` });
+    await px(tBiz, "/api/me/plan", { method: "PATCH", body: { plan: "business_pro" } });
+    const r5 = await mk(5);
+    const bizRow = db.select().from(tables.users).where(eq(tables.users.handle, "testbusiness")).get()!;
+    step(c, "upgrade to BUSINESS PRO (TEST) → the very next post succeeds; capacity is read live from the database row",
+      bizRow.plan === "business_pro" && r5.status === 200, { actual: `plan=${bizRow.plan} post4th=${r5.status}` });
+
+    /* ---- eligibility: verification-based, never plan-based ---- */
+    const oppS = await px(tBiz, "/api/opportunities", { method: "POST", body: { title: "[QA] Students-only probe", description: "Plan Lab eligibility test.", budget: 50, type: "gig", location: "Baltimore, MD", remote: true, eligibility: "students" } });
+    const oppId = (oppS.data as any).id;
+    // SIMULATION mode = the realistic gate (demo mode seats testers at a
+    // default campus so exploration never dead-ends); verification flips
+    // happen in demo mode (that's where the account-state tool lives)
+    await px(tCust, "/api/demo/mode", { method: "PATCH", body: { mode: "simulation" } });
+    const noVerify = await px(tCust, `/api/opportunities/${oppId}/applications`, { method: "POST", body: { message: "[QA] probe" } });
+    await px(tCust, "/api/demo/mode", { method: "PATCH", body: { mode: "demo" } });
+    await px(tCust, "/api/demo/account-state", { method: "POST", body: { state: "current_student" } });
+    await px(tCust, "/api/demo/mode", { method: "PATCH", body: { mode: "simulation" } });
+    const verified = await px(tCust, `/api/opportunities/${oppId}/applications`, { method: "POST", body: { message: "[QA] probe as verified student" } });
+    step(c, "STUDENTS-ONLY eligibility (simulation mode): unverified refuses with the honest reason; the same account verifies (free — never a plan) and the SAME application then succeeds",
+      noVerify.status >= 400 && /verif/i.test(String(noVerify.data.error)) && verified.status === 200,
+      { actual: `unverified=${noVerify.status} "${String(noVerify.data.error).slice(0, 60)}" → verified=${verified.status}` });
+
+    // isolation: only QA personas were touched; reset restores their baseline
+    await px(tAdm, "/api/qa/scenarios/plans", { method: "POST", body: { action: "reset" } });
+    const after = ["testcreator", "testbusiness", "testcustomer"].map((h) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()!);
+    step(c, "ISOLATION: plan testing touched ONLY the QA personas, and the scenario reset restores all of them to Free/Demo/unverified baseline",
+      after.every((u) => u.plan === "free" && u.testerMode === "demo"), { actual: after.map((u) => `${u.handle}=${u.plan}/${u.testerMode}`).join(" ") });
+  }
+
   /* ================= QA SCENARIO WALKTHROUGHS ================= */
   /* Every scenario must be COMPLETABLE, start → finish, through the
      real HTTP routes — with the strict-order invariants holding at
@@ -1794,7 +1880,7 @@ export async function POST(req: NextRequest) {
       }
       return { st, invariantOk, stuck };
     };
-    for (const sid of ["opportunity", "hiring", "people"]) {
+    for (const sid of ["opportunity", "hiring", "people", "plans"]) {
       const { st, invariantOk, stuck } = await walk(sid);
       step(c, `${sid} scenario walks START → FINISH strictly in order — one pending task, later tasks locked, done=verified-prefix at every step — and completes fully`,
         st.completed === true && st.done === st.total && invariantOk, { actual: stuck || `${st.done}/${st.total} completed=${st.completed}` });

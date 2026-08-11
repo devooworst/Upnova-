@@ -45,7 +45,7 @@ for (const h of ["testcustomer", "testcreator", "testbusiness"]) {
 }
 
 /* ---- walk every scenario, in full, strictly in order ---- */
-const SCENARIOS = ["booking", "project", "opportunity", "hiring", "people"];
+const SCENARIOS = ["booking", "project", "opportunity", "hiring", "people", "plans"];
 for (const sid of SCENARIOS) {
   console.log(`\nSCENARIO: ${sid}`);
   const arm = await api("devin", `/api/qa/scenarios/${sid}`, { method: "POST", body: { action: "reset" } });

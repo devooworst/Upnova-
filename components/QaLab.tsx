@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildBriefing } from "@/lib/qaBriefing";
 import { guideBreadcrumb } from "@/lib/qaGuides";
+import QaExampleValues from "@/components/QaExampleValues";
 import { UserRound as PersonaIcon, Scissors, Building2, Target, ListChecks, CheckCircle2, Crosshair } from "lucide-react";
 import {
   Check,
@@ -556,6 +557,9 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                                 </li>
                               ))}
                             </ol>
+
+                            {/* GUIDED INPUTS — exactly what to type */}
+                            <QaExampleValues scenarioId={s.id} stepId={firstPendingMine.id} />
 
                             {/* SUCCESS CONDITION */}
                             <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">

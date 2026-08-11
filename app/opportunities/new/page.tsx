@@ -7,7 +7,7 @@
 /*  controls what's genuinely theirs to ask.                           */
 /* ------------------------------------------------------------------ */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Briefcase, Plus, X, Users } from "lucide-react";
@@ -29,6 +29,27 @@ export default function NewOpportunityPage() {
   const [applyBy, setApplyBy] = useState("");
   const [studentFriendly, setStudentFriendly] = useState(false);
   const [eligibility, setEligibility] = useState("anyone");
+
+  // QA GUIDED INPUTS — populate with example data on request; never submits
+  useEffect(() => {
+    const onFill = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d?.form !== "opportunity") return;
+      const v = d.values ?? {};
+      if (typeof v.title === "string") setTitle(v.title);
+      if (typeof v.description === "string") setDescription(v.description);
+      if (typeof v.paid === "boolean") setPaid(v.paid);
+      if (v.budget != null) setBudget(String(v.budget));
+      if (typeof v.location === "string") setLocation(v.location);
+      if (typeof v.remote === "boolean") setRemote(v.remote);
+      if (typeof v.eventDate === "string") setEventDate(v.eventDate);
+      if (typeof v.applyBy === "string") setApplyBy(v.applyBy);
+      if (typeof v.studentFriendly === "boolean") setStudentFriendly(v.studentFriendly);
+      if (typeof v.eligibility === "string") setEligibility(v.eligibility);
+    };
+    window.addEventListener("mavyn:qa-fill", onFill);
+    return () => window.removeEventListener("mavyn:qa-fill", onFill);
+  }, []);
   // applicant requirements — poster-controlled
   const [requireMessage, setRequireMessage] = useState(true);
   const [question, setQuestion] = useState("");

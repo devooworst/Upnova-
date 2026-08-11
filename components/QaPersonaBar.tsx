@@ -31,6 +31,7 @@ import { QA_HANDLES, QA_LABEL, isQaHandle, switchPersona, exitQa, stashedReturn 
 import { buildBriefing, type MissionBriefing } from "@/lib/qaBriefing";
 import { guideFor, guideBreadcrumb, type GuideStep } from "@/lib/qaGuides";
 import QaGuide from "@/components/QaGuide";
+import QaExampleValues from "@/components/QaExampleValues";
 
 type NextTask = {
   id: string; // "<scenario>:<step>"
@@ -310,6 +311,7 @@ export default function QaPersonaBar() {
                       </li>
                     ))}
                   </ol>
+                  <QaExampleValues scenarioId={nextTask.sid} stepId={nextTask.stepId} compact />
                   <p className="mt-1.5 font-mono text-[9px] leading-relaxed text-lime-300/90">success: ✓ {nextTask.brief.success}</p>
                   {user.handle === nextTask.brief.role && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">

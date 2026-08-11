@@ -200,6 +200,13 @@ export function resetQaData(): number {
     db.delete(tables.businessTeam).where(or(eq(tables.businessTeam.businessId, id), eq(tables.businessTeam.personId, id))).run();
     db.delete(tables.bookmarks).where(eq(tables.bookmarks.userId, id)).run();
     db.delete(tables.interactions).where(eq(tables.interactions.userId, id)).run();
+    // PLAN-NEUTRAL FIXTURE — every scenario starts from the same truth:
+    // Free plan, Demo Mode, no campus verification, no saved Studio.
+    // Only QA personas are touched; the Plan Lab flips these through
+    // the REAL routes and this reset always restores the baseline.
+    db.update(tables.users).set({ plan: "free", testerMode: "demo" }).where(eq(tables.users.id, id)).run();
+    db.delete(tables.campusVerifications).where(eq(tables.campusVerifications.userId, id)).run();
+    db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, id)).run();
   }
   return removed;
 }

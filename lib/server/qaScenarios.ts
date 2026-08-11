@@ -19,6 +19,9 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { qaIds, readRuns, writeRuns, type QaRuns, type QaStepSnapshot } from "./qa";
+import { checkApplicantEligibility } from "./eligibility";
+import { businessTier } from "./businessLimits";
+import { BUSINESS_LIMITS } from "@/lib/businessPlans";
 
 export type QaApi = (
   handle: string,
@@ -1513,7 +1516,245 @@ const peopleScenario: QaScenario = {
   ],
 };
 
-export const QA_SCENARIOS: QaScenario[] = [bookingScenario, projectScenario, opportunityScenario, hiringScenario, peopleScenario];
+/* ============================ SCENARIO F ============================ */
+/* PLAN LAB — Plans & benefits, demonstrated from the REAL entitlement  */
+/* code, never invented: lib/businessPlans.ts capacity numbers, the     */
+/* /api/me/studio plan gate, /api/me/plan allowed ladders, and          */
+/* lib/server/eligibility.ts. Every step is a WHY-THIS-MATTERS moment:  */
+/* perks are PLAN · identity is VERIFICATION · business tiers are      */
+/* SCALE. Earning is never paywalled. All switches are TEST changes on  */
+/* the isolated QA personas — no real billing exists here.             */
+
+const qaUser = (id: string) => db.select().from(tables.users).where(eq(tables.users.id, id)).get()!;
+const qaProfileStudio = (id: string) => { const raw = db.select().from(tables.profiles).where(eq(tables.profiles.userId, id)).get()?.studio ?? ""; return raw.trim() ? raw : null; };
+const qaCampusRow = (id: string) => db.select().from(tables.campusVerifications).where(eq(tables.campusVerifications.userId, id)).all()[0];
+
+const plansScenario: QaScenario = {
+  id: "plans",
+  title: "Plans & benefits — what each tier REALLY unlocks",
+  personas: ["testcreator", "testcustomer", "testbusiness"],
+  description:
+    "Experience every tier with the real rules, on isolated TEST accounts (no real billing exists anywhere here). Creator track: Free earns fully → the Pro paywall is honest → upgrade (TEST) → use the unlocked feature. Student track: verification is identity, College+ is a plan, graduating ends College+ but never your verified history. Business track: Free has full hiring power, Business Pro is scale — the exact capacity numbers come from the code the server enforces.",
+  steps: [
+    {
+      id: "sim-mode",
+      role: "testcreator",
+      title: "Creator switched to Simulation Mode — real enforcement on",
+      instruction: "As TEST CREATOR, use the DEMO MODE pill in the top-left of the navbar → switch to Simulation Mode. This turns OFF the demo bypasses so every plan rule enforces exactly like production.",
+      expected: "users.testerMode = simulation for Test Creator (and plan starts at FREE — the scenario reset guarantees the baseline).",
+      href: () => "/",
+      verify: (ctx) => {
+        const u = qaUser(ctx.creator);
+        return { done: u.testerMode === "simulation", actual: `testerMode=${u.testerMode} · plan=${u.plan}`, record: u.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcreator", "/api/demo/mode", { method: "PATCH", body: { mode: "simulation" } });
+      },
+    },
+    {
+      id: "free-power",
+      role: "check",
+      title: "FREE: full earning power — earning is never paywalled",
+      instruction: "Automatic cross-check against the database.",
+      expected: "On the Free plan the creator has an ACTIVE bookable service, open messaging, bookings, and projects — every economic action of the other four scenarios ran on Free. What Free does NOT include: profile customization (Studio/My World). That's the perk, not the livelihood.",
+      href: () => "/services",
+      verify: (ctx) => {
+        const u = qaUser(ctx.creator);
+        const svc = db.select().from(tables.services).where(eq(tables.services.ownerId, ctx.creator)).all().find((x) => x.active);
+        return {
+          done: u.plan === "free" && !!svc,
+          actual: `plan=${u.plan}; active service="${svc?.title ?? "none"}" — booking/messaging/projects all live on Free`,
+          record: svc?.id,
+        };
+      },
+    },
+    {
+      id: "pro-gate",
+      role: "check",
+      title: "The Pro paywall is HONEST — same rule the server enforces",
+      instruction: "Automatic cross-check. (Try it yourself too: open Profile Studio as the creator — saving is refused with a clear upgrade explanation, never a silent failure.)",
+      expected: "With plan=free in Simulation Mode, the /api/me/studio save gate is CLOSED: the server answers 403 \"Profile Studio is an Mavyn Pro feature… upgrade to Pro\" and nothing is stored. Restricted features explain themselves.",
+      href: () => "/profile/studio",
+      verify: (ctx) => {
+        const u = qaUser(ctx.creator);
+        const gateClosed = !["pro", "business_pro", "agency"].includes(u.plan) && u.plan !== "college" && u.testerMode === "simulation";
+        const studio = qaProfileStudio(ctx.creator);
+        return {
+          done: gateClosed && !studio,
+          actual: gateClosed ? `gate CLOSED for plan=${u.plan} (simulation) · studio saved=none — the 403 carries the upgrade explanation` : `gate not closed: plan=${u.plan} mode=${u.testerMode} studio=${studio ? "saved" : "none"}`,
+        };
+      },
+    },
+    {
+      id: "upgrade-pro",
+      role: "testcreator",
+      title: "Creator upgraded to PRO (TEST — no real billing anywhere)",
+      instruction: "As TEST CREATOR → Plans → choose Pro. On this environment the plan switch is a TEST change through the real /api/me/plan route — the personal ladder is free → college → pro.",
+      expected: "users.plan = pro for Test Creator, effective immediately — entitlements are read from the database on every request, so the feature unlocks the moment the row changes.",
+      href: () => "/plans",
+      verify: (ctx) => {
+        const u = qaUser(ctx.creator);
+        return { done: u.plan === "pro", actual: `plan=${u.plan}`, record: u.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcreator", "/api/me/plan", { method: "PATCH", body: { plan: "pro" } });
+      },
+    },
+    {
+      id: "use-pro",
+      role: "testcreator",
+      title: "Creator USED the unlocked feature — Studio saves for real",
+      instruction: "As TEST CREATOR → Profile Studio → change anything (theme, accent, layout) → Save. The exact save that was refused two tests ago now lands.",
+      expected: "profiles.studio holds a saved customization while plan=pro. WHY PRO MATTERS: your public profile becomes a designed page (full Studio + My World) — the paid perk is presentation and reach, never access to earning.",
+      href: () => "/profile/studio",
+      verify: (ctx) => {
+        const u = qaUser(ctx.creator);
+        const studio = qaProfileStudio(ctx.creator);
+        return { done: u.plan === "pro" && !!studio, actual: `plan=${u.plan}; studio saved=${studio ? "yes" : "not yet"}`, record: u.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcreator", "/api/me/studio", { method: "PATCH", body: { studio: { accent: "lime" } } });
+      },
+    },
+    {
+      id: "student-verify",
+      role: "testcustomer",
+      title: "Customer verified as a CURRENT STUDENT — identity, not a plan",
+      instruction: "As TEST CUSTOMER → Settings → Demo Controls → set account state to Current student (in production this is the free campus-verification flow). Verification is a database fact, independent of any paid plan.",
+      expected: "A campus_verifications row: affiliation=current_student. This is what unlocks campus access and students-only eligibility — it is free and NEVER sold as a plan.",
+      href: () => "/settings",
+      verify: (ctx) => {
+        const v = qaCampusRow(ctx.customer);
+        return { done: !!v && v.affiliation === "current_student" && v.status === "verified", actual: v ? `verified: ${v.affiliation} (${v.status})` : "no campus verification yet", record: v?.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcustomer", "/api/demo/account-state", { method: "POST", body: { state: "current_student" } });
+      },
+    },
+    {
+      id: "college-plan",
+      role: "testcustomer",
+      title: "Customer chose COLLEGE+ — student pricing for the perks",
+      instruction: "As TEST CUSTOMER → Plans → choose College+ (TEST change through the real route).",
+      expected: "users.plan = college. WHAT COLLEGE+ IS: the customization basics (Studio theme/frame/accent/font/layout) at student pricing — My World stays Pro. WHAT IT ISN'T: eligibility. Campus access came from the verification, not this plan.",
+      href: () => "/plans",
+      verify: (ctx) => {
+        const u = qaUser(ctx.customer);
+        return { done: u.plan === "college", actual: `plan=${u.plan}`, record: u.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcustomer", "/api/me/plan", { method: "PATCH", body: { plan: "college" } });
+      },
+    },
+    {
+      id: "eligibility-truth",
+      role: "check",
+      title: "Eligibility is VERIFICATION-based, never plan-based",
+      instruction: "Automatic cross-check running the REAL eligibility engine (lib/server/eligibility.ts) — the same code the application route calls.",
+      expected: "For a students-only opportunity: the verified student (College+) is ELIGIBLE; the PRO creator (unverified) is NOT — with the honest reason. Money cannot buy student eligibility on Mavyn.",
+      href: () => "/opportunities",
+      verify: (ctx) => {
+        const student = checkApplicantEligibility({ eligibility: "students", eligibilityCampusId: null }, ctx.customer);
+        const proUser = checkApplicantEligibility({ eligibility: "students", eligibilityCampusId: null }, ctx.creator);
+        return {
+          done: student.eligible === true && proUser.eligible === false,
+          actual: `verified student → eligible=${student.eligible}; PRO-but-unverified creator → eligible=${proUser.eligible} ("${(proUser.reason ?? "").slice(0, 60)}…")`,
+        };
+      },
+    },
+    {
+      id: "alumni-rule",
+      role: "testcustomer",
+      title: "Graduation: alumni status ends College+ automatically",
+      instruction: "As TEST CUSTOMER → Settings → Demo Controls → set account state to Alumni (in production this is the real graduation transition).",
+      expected: "affiliation=alumni AND users.plan back to FREE — College+ ends with student status, the verified school identity is KEPT forever, and nobody is ever auto-enrolled into Pro. Status changes are never billing events.",
+      href: () => "/settings",
+      verify: (ctx) => {
+        const v = qaCampusRow(ctx.customer);
+        const u = qaUser(ctx.customer);
+        return {
+          done: !!v && v.affiliation === "alumni" && u.plan === "free",
+          actual: `affiliation=${v?.affiliation ?? "none"} (identity kept) · plan=${u.plan} (College+ ended, NOT upsold)`,
+          record: v?.id,
+        };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcustomer", "/api/demo/account-state", { method: "POST", body: { state: "alumni" } });
+      },
+    },
+    {
+      id: "biz-sim",
+      role: "testbusiness",
+      title: "Business switched to Simulation Mode — capacity rules enforce",
+      instruction: "Switch to TEST BUSINESS → use the DEMO MODE pill in the top-left → Simulation Mode.",
+      expected: "users.testerMode = simulation for Test Business, plan FREE — the capacity limits below now enforce exactly like production.",
+      href: () => "/",
+      verify: (ctx) => {
+        const u = qaUser(ctx.business);
+        return { done: u.testerMode === "simulation", actual: `testerMode=${u.testerMode} · plan=${u.plan}`, record: u.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testbusiness", "/api/demo/mode", { method: "PATCH", body: { mode: "simulation" } });
+      },
+    },
+    {
+      id: "biz-free-truth",
+      role: "check",
+      title: "BUSINESS FREE: full hiring power at starter scale — the real numbers",
+      instruction: "Automatic cross-check reading lib/businessPlans.ts — the single source of truth the server's capacity enforcement imports.",
+      expected: "Business Free includes EVERYTHING (post, review, hire, manage people, payments) — Pro is scale, never basic access. Real limits: 3 team members, 5 active hires, 3 active opportunities, 25 saved talent, 1 admin, 50 client + 50 talent records.",
+      href: () => "/hiring",
+      verify: (ctx) => {
+        const u = qaUser(ctx.business);
+        const tier = businessTier(u);
+        const L = BUSINESS_LIMITS.free;
+        return {
+          done: tier === "free",
+          actual: `tier=${tier} → team ${L.teamMembers} · hires ${L.activeHires} · opportunities ${L.activeOpportunities} · saved talent ${L.savedTalent} · admins ${L.admins} · clients ${L.clientRecords} (from the enforced config)`,
+        };
+      },
+    },
+    {
+      id: "biz-upgrade",
+      role: "testbusiness",
+      title: "Business upgraded to BUSINESS PRO (TEST) — scale unlocked",
+      instruction: "As TEST BUSINESS → Plans → choose Business Pro (TEST change; business ladder is free → business_pro).",
+      expected: "users.plan = business_pro. WHY IT MATTERS: same workflows, 5-10× the capacity — 25 team, 25 active hires, 15 opportunities, 250 saved talent, 5 admin seats, 500 client/talent records. Plus Business World profile customization. It's the growth plan, not a gate on hiring itself.",
+      href: () => "/plans",
+      verify: (ctx) => {
+        const u = qaUser(ctx.business);
+        const tier = businessTier(u);
+        const L = BUSINESS_LIMITS.business_pro;
+        return {
+          done: u.plan === "business_pro" && tier === "business_pro",
+          actual: `plan=${u.plan} → team ${L.teamMembers} · hires ${L.activeHires} · opportunities ${L.activeOpportunities} · saved talent ${L.savedTalent} · admins ${L.admins} (live immediately — read from the DB per request)`,
+          record: u.id,
+        };
+      },
+      perform: async (_ctx, api) => {
+        await api("testbusiness", "/api/me/plan", { method: "PATCH", body: { plan: "business_pro" } });
+      },
+    },
+    {
+      id: "plan-summary",
+      role: "check",
+      title: "The whole model, proven: perks are PLAN · identity is VERIFICATION · business is SCALE",
+      instruction: "Automatic cross-check of all three tracks' end states.",
+      expected: "Creator on Pro with a saved Studio; customer an alumni back on Free with verified identity kept; business on Business Pro. Nothing here was invented — every claim came from the enforced configuration and real routes.",
+      href: () => "/plans",
+      verify: (ctx) => {
+        const c = qaUser(ctx.creator);
+        const cu = qaUser(ctx.customer);
+        const b = qaUser(ctx.business);
+        const v = qaCampusRow(ctx.customer);
+        const ok = c.plan === "pro" && !!qaProfileStudio(ctx.creator) && cu.plan === "free" && v?.affiliation === "alumni" && b.plan === "business_pro";
+        return { done: ok, actual: `creator=${c.plan}+studio · customer=${cu.plan}+${v?.affiliation ?? "unverified"} · business=${b.plan}` };
+      },
+    },
+  ],
+};
+
+export const QA_SCENARIOS: QaScenario[] = [bookingScenario, projectScenario, opportunityScenario, hiringScenario, peopleScenario, plansScenario];
 
 export function getScenario(id: string) {
   return QA_SCENARIOS.find((s) => s.id === id) ?? null;

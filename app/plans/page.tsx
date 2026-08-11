@@ -179,6 +179,7 @@ export default function PlansPage() {
               {action.href ? (
                 <Link
                   href={action.href}
+                  data-guide={`plan-${p.id}`}
                   className={`mt-4 flex w-full items-center justify-center rounded-md py-2 text-xs font-bold transition ${
                     p.id === "pro" ? "bg-lime-400 text-zinc-950 hover:bg-lime-300" : p.id === "college" ? "bg-violet-400 text-zinc-950 hover:bg-violet-300" : p.id === "business_pro" ? "bg-sky-400 text-zinc-950 hover:bg-sky-300" : "border border-line text-zinc-200 hover:border-zinc-600"
                   }`}

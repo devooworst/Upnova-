@@ -560,6 +560,23 @@ function ProjectPanel({
   const [amount, setAmount] = useState("");
   const [brief, setBrief] = useState("");
   const [deadline, setDeadline] = useState("");
+
+  // QA GUIDED INPUTS — "Fill example data" populates the draft form with
+  // safe demo values. It NEVER submits: the tester reviews and presses
+  // the real Create button; the checkpoint verifies only the database.
+  useEffect(() => {
+    const onFill = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d?.form !== "project-draft") return;
+      const v = d.values ?? {};
+      if (typeof v.title === "string") setTitle(v.title);
+      if (v.amount != null) setAmount(String(v.amount).replace(/[^0-9]/g, ""));
+      if (typeof v.brief === "string") setBrief(v.brief);
+      if (typeof v.deadline === "string") setDeadline(v.deadline);
+    };
+    window.addEventListener("mavyn:qa-fill", onFill);
+    return () => window.removeEventListener("mavyn:qa-fill", onFill);
+  }, []);
   const [asCreator, setAsCreator] = useState(false);
   // notes for deliver / revision / decline
   const [deliverNote, setDeliverNote] = useState("");

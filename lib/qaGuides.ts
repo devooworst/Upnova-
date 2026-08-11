@@ -128,6 +128,30 @@ export const QA_GUIDES: Record<string, GuideStep[]> = {
     { target: "chat-project", label: "Project", text: 'Click the "Project" button at the top of the chat', until: { visible: "project-review" } },
     { target: "project-review", label: "Review", text: 'Pick a star rating, write a short review, and click "Post review"' },
   ],
+
+  /* -------------------------- plan lab -------------------------- */
+  "plans:sim-mode": [
+    { target: "demo-mode-switch", label: "Mode switch", text: 'Click the DEMO MODE pill in the top-left corner and choose "Simulation Mode" — real enforcement turns on' },
+  ],
+  "plans:upgrade-pro": [
+    takeMeThere("Plans page", "/plans"),
+    { target: "plan-pro", label: "Go Pro", text: 'Click "Go Pro" and complete the TEST checkout — no real money exists here' },
+  ],
+  "plans:use-pro": [
+    takeMeThere("Profile Studio", "/profile/studio"),
+    { target: "studio-save", label: "Save", text: "Change anything (accent, theme, layout), then click Save changes — the exact save that was refused on Free" },
+  ],
+  "plans:college-plan": [
+    takeMeThere("Plans page", "/plans"),
+    { target: "plan-college", label: "College+", text: 'Click "Choose College+" and complete the TEST checkout' },
+  ],
+  "plans:biz-sim": [
+    { target: "demo-mode-switch", label: "Mode switch", text: 'Click the DEMO MODE pill in the top-left corner and choose "Simulation Mode"' },
+  ],
+  "plans:biz-upgrade": [
+    takeMeThere("Plans page", "/plans"),
+    { target: "plan-business_pro", label: "Business Pro", text: 'Click "Upgrade to Business" and complete the TEST checkout' },
+  ],
 };
 
 /* ------------------- fallback for unauthored tasks ------------------- */
