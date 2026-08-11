@@ -81,6 +81,22 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
   const [scenarios, setScenarios] = useState<ScenarioSummary[] | null>(null);
   const [overall, setOverall] = useState<Overall | null>(null);
 
+  /* "✓ Passed" moment: when a checkpoint flips pending→done between
+     evaluations, flash it — the user sees the pass WITHOUT navigating
+     anywhere, then continues on their own click. */
+  const prevSteps = useRef<Record<string, Record<string, string>>>({});
+  const [justPassed, setJustPassed] = useState<Set<string>>(new Set());
+  const trackPasses = (d: { id: string; steps?: StepState[] }) => {
+    if (!d.steps) return;
+    const prev = prevSteps.current[d.id] ?? {};
+    const flipped = d.steps.filter((s) => s.status === "done" && prev[s.id] === "pending").map((s) => s.id);
+    prevSteps.current[d.id] = Object.fromEntries(d.steps.map((s) => [s.id, s.status]));
+    if (flipped.length) {
+      setJustPassed((old) => new Set([...Array.from(old), ...flipped]));
+      setTimeout(() => setJustPassed((old) => { const n = new Set(Array.from(old)); flipped.forEach((f) => n.delete(f)); return n; }), 6000);
+    }
+  };
+
   /** persisted progress is the source of truth — whenever a scenario's
       fresh state arrives, the summary row updates with it, so collapsed
       cards always show the real score */
@@ -109,6 +125,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
       const d = await res.json();
       setDetail(d);
       syncSummary(d);
+      trackPasses(d);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -147,6 +164,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
     }
     setDetail(d);
     syncSummary(d);
+    trackPasses(d);
     loadState();
   };
 
@@ -181,6 +199,23 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
   const mySteps = (steps: StepState[]) => steps.filter((s) => s.role === lens || s.role === "check");
   const firstPending = detail?.steps.find((s) => s.status === "pending" && s.role !== "check");
   const firstPendingMine = detail?.steps.find((s) => s.status === "pending" && s.role === lens);
+
+  /** the curriculum decides where you go next — never hunt for it:
+      the next unfinished scenario in this persona's track */
+  const nextScenarioAfter = (currentId: string | null) => {
+    const list = lensScenarios;
+    if (!list.length) return null;
+    const start = currentId ? list.findIndex((s) => s.id === currentId) + 1 : 0;
+    for (let i = 0; i < list.length; i++) {
+      const s = list[(start + i) % list.length];
+      if (s.id !== currentId && !s.completed) return s;
+    }
+    return null;
+  };
+  const continueTo = async (id: string) => {
+    setOpen(id);
+    await act(id, { action: "start" }, `arm:${id}`);
+  };
 
   return (
     <section className="card overflow-hidden">
@@ -266,6 +301,30 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
           )}
         </div>
 
+        {/* ---- the curriculum at a glance: done → current → next ---- */}
+        {lensScenarios.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5" data-tut="qa-curriculum">
+            {lensScenarios.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setOpen(open === s.id ? null : s.id)}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.04em] transition ${
+                  s.completed
+                    ? "border-lime-400/50 bg-lime-400/10 text-lime-300"
+                    : s.startedAt
+                      ? "border-amber-400/50 bg-amber-400/10 text-amber-200"
+                      : "border-line text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                } ${open === s.id ? "ring-1 ring-zinc-400/50" : ""}`}
+                title={s.title}
+              >
+                <span aria-hidden>{s.completed ? "✓" : s.startedAt ? "→" : "○"}</span>
+                <span className="max-w-[9rem] truncate normal-case">{s.title.split(" — ")[0]}</span>
+                <span className="text-[9px] opacity-80">{s.done}/{s.total}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="space-y-2">
           {lensScenarios.map((s) => {
             const isOpen = open === s.id;
@@ -342,6 +401,83 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                       )}
                     </div>
 
+                    {/* ---- GUIDED FLOW: complete → confirm → continue.
+                         The card always knows the one right next action —
+                         the user never hunts for where they left off. ---- */}
+                    {d && d.completed && (() => {
+                      const nxt = nextScenarioAfter(s.id);
+                      return (
+                        <div className="mt-3 rounded-xl border border-lime-400/40 bg-lime-400/10 p-4">
+                          <p className="flex items-center gap-2 text-sm font-bold text-lime-300">
+                            <Check className="h-4 w-4" /> Scenario Complete — {d.done} / {d.total} tests passed
+                          </p>
+                          <p className="mt-1 text-[11px] text-zinc-400">
+                            This stays completed permanently — collapse, refresh, move on: the score keeps.
+                          </p>
+                          {nxt ? (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <p className="min-w-0 flex-1 text-xs text-zinc-300">
+                                Next: <span className="font-semibold text-zinc-100">{nxt.title.split(" — ")[0]}</span>
+                                <span className="font-mono text-[10px] text-zinc-500"> — {nxt.done}/{nxt.total}</span>
+                              </p>
+                              <button
+                                disabled={busy === `arm:${nxt.id}`}
+                                onClick={() => continueTo(nxt.id)}
+                                className="btn-lime shrink-0 px-4 py-1.5 text-xs"
+                              >
+                                Continue → {busy === `arm:${nxt.id}` ? "…" : ""}
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-xs font-semibold text-lime-200">
+                              Every stage in this track is complete — the whole system is verified. Switch personas to run the other tracks.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {d && !d.completed && sum.startedAt && (() => {
+                      const my = d.steps.filter((x) => x.role === lens);
+                      const myDone = my.filter((x) => x.status === "done").length;
+                      const overallIdx = firstPending ? d.steps.findIndex((x) => x.id === firstPending.id) : -1;
+                      if (firstPendingMine) {
+                        return (
+                          <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/5 p-4">
+                            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                              Test {d.steps.findIndex((x) => x.id === firstPendingMine.id) + 1} of {d.total} · your move
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-zinc-100">{firstPendingMine.title}</p>
+                            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">{firstPendingMine.instruction}</p>
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                              {firstPendingMine.href && firstPendingMine.href !== "#" && (
+                                <a href={firstPendingMine.href} target="_blank" rel="noreferrer" className="btn-lime px-4 py-1.5 text-xs">
+                                  Go to task →
+                                </a>
+                              )}
+                              <span className="font-mono text-[10px] text-zinc-500">your side: {myDone}/{my.length} done · checkpoints verify automatically as you act</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      if (firstPending) {
+                        return (
+                          <div className="mt-3 rounded-xl border border-violet-400/30 bg-violet-400/5 p-4">
+                            <p className="flex items-center gap-2 text-xs font-bold text-violet-200">
+                              <Check className="h-3.5 w-3.5 text-lime-400" /> Your side is done ({myDone}/{my.length}) — test {overallIdx + 1} of {d.total} happens on {roleLabel(firstPending.role)}&apos;s side
+                            </p>
+                            <button
+                              disabled={busy === `switch:${firstPending.role}`}
+                              onClick={() => openAs(firstPending.role, firstPending.href && firstPending.href !== "#" ? firstPending.href : "/")}
+                              className="btn-ghost mt-2 px-4 py-1.5 text-xs"
+                            >
+                              Continue as {roleLabel(firstPending.role)} →
+                            </button>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
                     {!sum.startedAt ? (
                       <p className="mt-3 text-xs text-zinc-500">
                         Press <span className="font-semibold text-zinc-300">Start scenario</span> — it clears the QA
@@ -389,6 +525,11 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                                     <span className={`rounded-full border px-1.5 py-px font-mono text-[8px] font-bold uppercase tracking-wide ${ROLE_STYLE[st.role]}`}>
                                       {roleLabel(st.role)}
                                     </span>
+                                    {justPassed.has(st.id) && (
+                                      <span className="animate-pulse rounded-full border border-lime-400/60 bg-lime-400/15 px-2 py-px font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-lime-300">
+                                        ✓ Test passed
+                                      </span>
+                                    )}
                                   </p>
                                   {st.status !== "done" && (
                                     <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{st.instruction}</p>

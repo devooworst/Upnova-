@@ -7,9 +7,9 @@
 /*  Renders only on demo deployments, only for QA personas.            */
 /* ------------------------------------------------------------------ */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { FlaskConical, LogOut, RefreshCw } from "lucide-react";
+import { FlaskConical, LogOut, RefreshCw, ArrowRight } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { QA_HANDLES, QA_LABEL, isQaHandle, switchPersona, exitQa, stashedReturn } from "@/lib/qaLab";
 
@@ -18,6 +18,41 @@ export default function QaPersonaBar() {
   const pathname = usePathname();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  /* the guided thread: while you act in the real UI, the bar knows your
+     next checkpoint — no trips back to the Lab to find where you left off */
+  const [nextTask, setNextTask] = useState<{ scenario: string; title: string; href: string; idx: number; total: number; mine: boolean; role: string } | null>(null);
+
+  useEffect(() => {
+    if (!user || !isQaHandle(user.handle)) return;
+    let dead = false;
+    const poll = async () => {
+      try {
+        const st = await (await fetch("/api/qa/state", { cache: "no-store" })).json();
+        const armed = (st.scenarios ?? []).find((s: { startedAt: string | null; completed?: boolean }) => s.startedAt && !s.completed);
+        if (!armed) { if (!dead) setNextTask(null); return; }
+        const d = await (await fetch(`/api/qa/scenarios/${armed.id}`, { cache: "no-store" })).json();
+        const steps = d.steps ?? [];
+        const mine = steps.find((x: { status: string; role: string }) => x.status === "pending" && x.role === user.handle);
+        const any = steps.find((x: { status: string; role: string }) => x.status === "pending" && x.role !== "check");
+        const pick = mine ?? any;
+        if (!dead)
+          setNextTask(pick ? {
+            scenario: String(d.title ?? "").split(" — ")[0],
+            title: pick.title,
+            href: pick.href && pick.href !== "#" ? pick.href : "/simulation",
+            idx: steps.findIndex((x: { id: string }) => x.id === pick.id) + 1,
+            total: steps.length,
+            mine: !!mine,
+            role: pick.role,
+          } : null);
+      } catch { /* the bar never breaks the page */ }
+    };
+    poll();
+    const t = setInterval(poll, 15000);
+    const onFocus = () => poll();
+    window.addEventListener("focus", onFocus);
+    return () => { dead = true; clearInterval(t); window.removeEventListener("focus", onFocus); };
+  }, [user?.handle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user || !user.demoTools || !isQaHandle(user.handle)) return null;
   if (pathname?.startsWith("/profile/studio/world")) return null; // full-screen editor stays clean
@@ -79,6 +114,30 @@ export default function QaPersonaBar() {
             </button>
           </div>
         </div>
+        {/* the next checkpoint, right where you're working */}
+        {nextTask && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-amber-400/15 pt-1.5">
+            <p className="min-w-0 flex-1 truncate text-[10px] text-zinc-400">
+              <span className="font-mono font-bold uppercase tracking-[0.1em] text-zinc-500">
+                {nextTask.scenario} · test {nextTask.idx}/{nextTask.total}
+              </span>{" "}
+              — {nextTask.mine ? nextTask.title : `waiting on ${QA_LABEL[nextTask.role] ?? nextTask.role}: ${nextTask.title}`}
+            </p>
+            {nextTask.mine ? (
+              <a href={nextTask.href} className="flex shrink-0 items-center gap-1 rounded-full border border-lime-400/50 bg-lime-400/10 px-2.5 py-0.5 text-[10px] font-bold text-lime-300 hover:bg-lime-400/20">
+                Next task <ArrowRight className="h-3 w-3" />
+              </a>
+            ) : (
+              <button
+                disabled={busy}
+                onClick={() => go(nextTask.role)}
+                className="flex shrink-0 items-center gap-1 rounded-full border border-violet-400/50 bg-violet-400/10 px-2.5 py-0.5 text-[10px] font-bold text-violet-300 hover:bg-violet-400/20"
+              >
+                Switch &amp; continue <ArrowRight className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
         {err && <p className="mt-1 text-[10px] font-medium text-rose-300">{err}</p>}
       </div>
     </div>
