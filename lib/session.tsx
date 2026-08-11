@@ -78,6 +78,18 @@ export const SESSION_EVENT = "mavyn:session-changed";
    same sessions table. Cleared on logout. When cookies work, this never
    activates. */
 const TOKEN_KEY = "mavyn-session-token";
+const LEGACY_TOKEN_KEY = "upnova-session-token"; // pre-rebrand — migrated on first read
+function migrateLegacyToken() {
+  try {
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+      if (legacy) {
+        localStorage.setItem(TOKEN_KEY, legacy);
+        localStorage.removeItem(LEGACY_TOKEN_KEY);
+      }
+    }
+  } catch {}
+}
 
 /* memory first: some embedded views block localStorage/sessionStorage
    entirely. The in-memory copy keeps the session alive across ALL
@@ -126,6 +138,7 @@ const TOKEN_SHAPE = /^([a-f0-9]{32,128}|demo\.[a-z0-9_]+\.\d+\.([a-f0-9]{8}\.)?[
 export function getFallbackToken(): string | null {
   if (memoryToken) return memoryToken;
   if (typeof window === "undefined") return null;
+  migrateLegacyToken(); // pre-rebrand UpNova token → Mavyn key (one-time)
   for (const layer of storageLayers) {
     try {
       const v = layer.get();

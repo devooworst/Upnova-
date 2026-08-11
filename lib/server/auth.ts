@@ -129,6 +129,11 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 
 export const SESSION_COOKIE = "mavyn_session";
+/** the pre-rebrand cookie names — READ as fallbacks so existing UpNova
+    sessions stay signed in (the tokens live in the same sessions table);
+    all writes use the Mavyn names. */
+export const LEGACY_SESSION_COOKIE = "upnova_session";
+const LEGACY_TOKEN_COOKIE = "upnova-session-token";
 const SESSION_DAYS = 30;
 
 /* Session cookie attributes — THE fix for "login succeeds but I'm logged
@@ -200,7 +205,7 @@ export type SessionUser = {
 
 /** Resolve the authenticated user from the request cookie. Null when logged out. */
 export function getSessionUser(): SessionUser | null {
-  let token = cookies().get(SESSION_COOKIE)?.value;
+  let token = cookies().get(SESSION_COOKIE)?.value || cookies().get(LEGACY_SESSION_COOKIE)?.value;
   if (!token) {
     // DEV/DEMO fallback transport: embedded previews can block third-party
     // cookies entirely. The client then presents the SAME opaque session
@@ -214,7 +219,7 @@ export function getSessionUser(): SessionUser | null {
     }
     // demo transport #3: the JS-set token cookie (first-party contexts
     // send it automatically on every request, including full page loads)
-    if (!token) token = cookies().get("mavyn-session-token")?.value || undefined;
+    if (!token) token = cookies().get("mavyn-session-token")?.value || cookies().get(LEGACY_TOKEN_COOKIE)?.value || undefined;
     // demo transport #4 (LAST): no credentials at all — the sandbox's own
     // sticky marker restores the current demo session (see block above)
     if (!token) token = readDemoSession() ?? undefined;

@@ -29,6 +29,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { readFileSync } from "fs";
+import fs from "fs";
 import path from "path";
 import * as schema from "./schema";
 
@@ -149,7 +150,27 @@ function healSchemaDrift(sqlite: Database.Database) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/*  REBRAND CONTINUITY — an existing UpNova database IS the Mavyn      */
+/*  database. If this build's default path has no database yet but the */
+/*  legacy upnova.dev.db file exists, we RENAME the file (plus its     */
+/*  WAL/SHM journals) — a pure filesystem move: same rows, same user   */
+/*  ids, same passwords, zero data mutation, no duplicates. Without    */
+/*  this, a rebranded deploy would open an empty file and autoseed a   */
+/*  fresh world while every real account sat ignored in the old file.  */
+/* ------------------------------------------------------------------ */
+function migrateLegacyDatabase() {
+  if (process.env.DATABASE_PATH) return; // explicit path — owner's choice, never second-guessed
+  const legacy = path.join(process.cwd(), "db", "upnova.dev.db");
+  if (fs.existsSync(DB_PATH) || !fs.existsSync(legacy)) return;
+  console.warn(`[mavyn] found legacy UpNova database at ${legacy} — adopting it as the Mavyn database (file rename, no data changes)`);
+  fs.renameSync(legacy, DB_PATH);
+  for (const ext of ["-wal", "-shm"])
+    if (fs.existsSync(legacy + ext)) fs.renameSync(legacy + ext, DB_PATH + ext);
+}
+
 function create() {
+  migrateLegacyDatabase();
   const sqlite = new Database(DB_PATH);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");

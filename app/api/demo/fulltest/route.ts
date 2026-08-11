@@ -272,6 +272,37 @@ export async function POST(req: NextRequest) {
     const gs = await fetch(BASE + "/signup", { redirect: "manual" });
     step(c, "Sign In and Join pages load directly from Guest Mode (200 each, no loop back)",
       gl.status === 200 && gs.status === 200, { actual: `login=${gl.status} signup=${gs.status}` });
+
+    /* ---- DATA PERSISTENCE: the account IS the database record ----
+       create → edit → logout → login → the SAME row comes back, byte
+       for byte. Identity is the user id — never recreated, never
+       reseeded, never duplicated (rebranding included). */
+    {
+      const su = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbkeep.${runNonce()}@mavyn.dev`, password: "Persist-check-2026", handle: "tonbkeep", displayName: "Before Edit" } });
+      tok.tonbkeep = (su.data as { sessionToken?: string }).sessionToken ?? "";
+      const idBefore = String((su.data as any).id ?? "");
+      await api("tonbkeep", "/api/me/profile", { method: "PATCH", body: { displayName: "Persisted Name", bio: "Edited bio that must survive logout, login, and redeploys.", city: "Baltimore" } });
+      await api("tonbkeep", "/api/auth/logout", { method: "POST" });
+      const re = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "tonbkeep", password: "Persist-check-2026" } });
+      tok.tonbkeep = (re.data as { sessionToken?: string }).sessionToken ?? "";
+      const meBack = (await api("tonbkeep", "/api/auth/me")).data as any;
+      step(c, "PERSISTENCE: create → edit profile → logout → login → the EDITED data returns (same user id, no reset, no duplicate)",
+        re.status === 200 && String((re.data as any).id) === idBefore && meBack.user?.profile?.displayName === "Persisted Name" && /must survive/.test(String(meBack.user?.profile?.bio ?? "")), {
+        expected: "same id + 'Persisted Name' + edited bio",
+        actual: `id=${String((re.data as any).id) === idBefore ? "same" : "DIFFERENT"} name=${meBack.user?.profile?.displayName} bio=${String(meBack.user?.profile?.bio ?? "").slice(0, 30)}` });
+      const dupes = db.select().from(tables.users).all().filter((u) => u.handle === "tonbkeep").length;
+      step(c, "exactly ONE database row carries this account — logins load it, they never recreate it", dupes === 1, { actual: `${dupes} rows` });
+
+      // REBRAND CONTINUITY: a session issued under the old UpNova cookie
+      // name still resolves — same sessions table, legacy name accepted
+      const rawLogin = await fetch(BASE + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: "tonbkeep", password: "Persist-check-2026" }) });
+      const setCookie = rawLogin.headers.get("set-cookie") ?? "";
+      const cookieToken = /mavyn_session=([^;]+)/.exec(setCookie)?.[1] ?? "";
+      const legacyMe = cookieToken ? await fetch(BASE + "/api/auth/me", { headers: { cookie: `upnova_session=${cookieToken}` } }) : null;
+      const legacyUser = legacyMe ? ((await legacyMe.json()) as any).user : null;
+      step(c, "REBRAND CONTINUITY: the same session token under the LEGACY upnova_session cookie name still signs in — old UpNova sessions are Mavyn sessions",
+        !!cookieToken && legacyUser?.handle === "tonbkeep", { actual: `token=${!!cookieToken} user=${legacyUser?.handle ?? "null"}` });
+    }
   }
 
   /* ================= PROFILES + SEARCH ================= */
