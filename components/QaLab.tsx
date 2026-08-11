@@ -16,7 +16,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildBriefing } from "@/lib/qaBriefing";
-import { UserRound as PersonaIcon, Scissors, Building2, Target, ListChecks, CheckCircle2 } from "lucide-react";
+import { guideBreadcrumb } from "@/lib/qaGuides";
+import { UserRound as PersonaIcon, Scissors, Building2, Target, ListChecks, CheckCircle2, Crosshair } from "lucide-react";
 import {
   Check,
   ChevronDown,
@@ -484,6 +485,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                              where · what does success look like ---- */
                         const brief = buildBriefing(firstPendingMine);
                         const iAmRole = viewerHandle === brief.role;
+                        const youWill = guideBreadcrumb(s.id, firstPendingMine.id, firstPendingMine.href, firstPendingMine.title);
                         const RoleGlyph = brief.role === "testcreator" ? Scissors : brief.role === "testbusiness" ? Building2 : PersonaIcon;
                         return (
                           <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/5 p-4" data-tut="qa-briefing">
@@ -516,6 +518,11 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                               <Target className="h-3 w-3" /> Objective
                             </p>
                             <p className="mt-0.5 text-sm font-bold text-zinc-100">{brief.objective}</p>
+                            {youWill && (
+                              <p className="mt-1 font-mono text-[10px] tracking-[0.04em] text-zinc-500">
+                                <span className="font-bold uppercase tracking-[0.14em] text-zinc-600">You will:</span> {youWill}
+                              </p>
+                            )}
 
                             {/* WHAT TO DO */}
                             <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
@@ -537,7 +544,23 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
 
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               {iAmRole ? (
-                                <a href={brief.href} className="btn-lime px-4 py-1.5 text-xs" title="Opens the page where this task happens — same tab, the Test Session bar follows you">Start task →</a>
+                                <>
+                                  <a href={brief.href} className="btn-lime px-4 py-1.5 text-xs" title="Opens the page where this task happens — same tab, the Test Session bar follows you">Start task →</a>
+                                  <button
+                                    onClick={() => {
+                                      // "SHOW ME WHERE" — visual guidance only. The
+                                      // spotlight follows you and points at each control;
+                                      // it never clicks, types, or completes anything.
+                                      const id = `${s.id}:${firstPendingMine.id}`;
+                                      try { sessionStorage.setItem("mavyn-qa-guide", id); } catch {}
+                                      window.dispatchEvent(new CustomEvent("mavyn:qa-guide", { detail: { task: id } }));
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-400/10 px-4 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-400/20"
+                                    title="A spotlight points at the exact button for each step — you still perform every action yourself"
+                                  >
+                                    <Crosshair className="h-3.5 w-3.5" /> Show me where
+                                  </button>
+                                </>
                               ) : (
                                 <button
                                   disabled={busy === `switch:${brief.role}`}

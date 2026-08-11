@@ -409,7 +409,7 @@ function PendingCard({ b, onChanged, onOpen }: { b: Booking; onChanged: () => vo
       </button>
       {b.status === "pending" && b.myRole === "provider" && (
         <div className="mt-2 flex gap-1.5">
-          <button disabled={busy} onClick={() => act("accept")} className="btn-lime flex-1 justify-center py-1.5 text-[11px]">
+          <button disabled={busy} onClick={() => act("accept")} data-guide="booking-accept" className="btn-lime flex-1 justify-center py-1.5 text-[11px]">
             Accept
           </button>
           <button disabled={busy} onClick={() => act("decline")} className="flex-1 rounded-full border border-line py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300">
@@ -548,7 +548,7 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
         <div className="mt-4 space-y-1.5">
           {b.status === "pending" && b.myRole === "provider" && (
             <div className="flex gap-1.5">
-              <button disabled={busy} onClick={() => act("accept")} className="btn-lime flex-1 justify-center py-2 text-xs">Accept</button>
+              <button disabled={busy} onClick={() => act("accept")} data-guide="booking-accept" className="btn-lime flex-1 justify-center py-2 text-xs">Accept</button>
               <button disabled={busy} onClick={() => act("decline")} className="flex-1 rounded-full border border-line py-2 text-xs font-semibold text-zinc-400 hover:border-rose-400/40 hover:text-rose-300">Decline</button>
             </div>
           )}
@@ -556,7 +556,7 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
             <p className="text-xs text-zinc-500">Waiting for {b.with.displayName} to accept your request.</p>
           )}
           {b.status === "accepted" && b.myRole === "client" && (
-            <button disabled={busy} onClick={() => act("pay")} className="btn-lime w-full justify-center py-2 text-sm">
+            <button disabled={busy} onClick={() => act("pay")} data-guide="booking-pay" className="btn-lime w-full justify-center py-2 text-sm">
               Pay ${((b.price + (b.travelFee ?? 0)) * 1.05).toFixed(2)} — secures the booking
             </button>
           )}
@@ -574,6 +574,7 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
               <button
                 disabled={busy}
                 onClick={() => act("complete")}
+                data-guide="booking-complete"
                 className="btn-lime w-full justify-center py-2 text-xs"
                 title={`The customer's payment is secured. When you mark the service completed, the secured $${b.price + (b.travelFee ?? 0)} is released to you.`}
               >
@@ -699,7 +700,7 @@ function BookingProgressPanel({ b }: { b: Booking }) {
   };
 
   return (
-    <div className="mt-3 rounded-xl border border-line bg-card-raised p-3.5">
+    <div data-guide="booking-progress" className="mt-3 rounded-xl border border-line bg-card-raised p-3.5">
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Progress</p>
         {latest && <span className="font-mono text-[10px] tracking-[0.08em] text-zinc-600">updated {agoTxt(latest.at)}</span>}

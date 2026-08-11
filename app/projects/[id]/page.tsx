@@ -339,14 +339,14 @@ export default function ProjectPage() {
           {/* creator controls — the workspace, not the Activity mirror */}
           {isCreator && ["in_progress", "extension_requested", "submitted"].includes(project.state) && (
             <div className="mt-4 flex flex-wrap gap-2 border-t border-dashed border-line pt-4">
-              <button onClick={() => { setShowComposer((v) => !v); setShowEta(false); setShowExt(false); }} className="btn-lime px-4 py-1.5 text-xs">
+              <button data-guide="project-progress" onClick={() => { setShowComposer((v) => !v); setShowEta(false); setShowExt(false); }} className="btn-lime px-4 py-1.5 text-xs">
                 <Send className="h-3.5 w-3.5" /> Post progress update
               </button>
-              <button onClick={() => { setShowEta((v) => !v); setShowComposer(false); setShowExt(false); }} className="btn-ghost px-4 py-1.5 text-xs">
+              <button data-guide="project-eta" onClick={() => { setShowEta((v) => !v); setShowComposer(false); setShowExt(false); }} className="btn-ghost px-4 py-1.5 text-xs">
                 <CalendarClock className="h-3.5 w-3.5" /> Update ETA
               </button>
               {project.state === "in_progress" && !pendingExt && (
-                <button onClick={() => { setShowExt((v) => !v); setShowComposer(false); setShowEta(false); }} className="btn-ghost px-4 py-1.5 text-xs">
+                <button data-guide="project-extension" onClick={() => { setShowExt((v) => !v); setShowComposer(false); setShowEta(false); }} className="btn-ghost px-4 py-1.5 text-xs">
                   <TimerReset className="h-3.5 w-3.5" /> Request extension
                 </button>
               )}
@@ -511,7 +511,7 @@ export default function ProjectPage() {
             </p>
           )}
           {!pendingExt.mine && project.myRole === "client" ? (
-            <div className="mt-3 flex gap-2">
+            <div data-guide="project-ext-decide" className="mt-3 flex gap-2">
               <button
                 disabled={busy}
                 onClick={() => call(`/api/extensions/${pendingExt.id}`, { approve: true }, "PATCH")}
@@ -538,6 +538,7 @@ export default function ProjectPage() {
         <button
           disabled={busy}
           onClick={() => call(`/api/projects/${project.id}`, { action: nextStep.action, expectedAmount: project.amount }, "PATCH")}
+          data-guide="project-primary"
           className="btn-lime w-full justify-center py-2.5 text-sm"
         >
           {nextStep.label}

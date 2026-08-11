@@ -272,6 +272,7 @@ export default function DbMessages() {
             convos.map((c) => (
               <button
                 key={c.id}
+                data-guide={`conversation-${c.with?.handle ?? ""}`}
                 onClick={() => setActiveId(c.id)}
                 className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
                   c.id === activeId ? "bg-card-raised" : "hover:bg-card-raised/50"
@@ -322,7 +323,7 @@ export default function DbMessages() {
         ) : (
           <>
             {/* header */}
-            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+            <div data-guide={`chat-with-${active.with?.handle ?? ""}`} className="flex items-center gap-3 border-b border-line px-4 py-3">
               <button onClick={() => setActiveId(null)} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200 sm:hidden">
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -339,6 +340,7 @@ export default function DbMessages() {
                 <p className="truncate text-[11px] text-zinc-500">{active.with?.roleLine || `@${active.with?.handle}`}</p>
               </div>
               <button
+                data-guide="chat-project"
                 onClick={() => setPanelOpen(!panelOpen)}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                   project
@@ -495,7 +497,7 @@ export default function DbMessages() {
             )}
 
             {/* composer */}
-            <div className="flex items-center gap-2 border-t border-line px-4 py-3">
+            <div data-guide="chat-composer" className="flex items-center gap-2 border-t border-line px-4 py-3">
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -680,6 +682,7 @@ function ProjectPanel({
                 })
               )
             }
+            data-guide="project-create-draft"
             className="btn-lime w-full justify-center py-2 text-sm disabled:opacity-40"
           >
             {asCreator ? "Create project — then send the offer" : "Create project draft"}
@@ -762,7 +765,7 @@ function ProjectPanel({
           <div className="space-y-2">
             {project.state === "draft" && project.myRole === "creator" && (
               <>
-                <button disabled={busy} onClick={act("send_offer")} className="btn-lime w-full justify-center py-2 text-sm">
+                <button disabled={busy} onClick={act("send_offer")} data-guide="project-send-offer" className="btn-lime w-full justify-center py-2 text-sm">
                   Send offer · ${project.amount}
                 </button>
                 <TermsEditor
@@ -967,7 +970,7 @@ function ProjectPanel({
                   </div>
                 ))}
                 {!myReview && project.state !== "reviewed" && (
-                  <div className="rounded-xl border border-line bg-card-raised p-3 space-y-2">
+                  <div data-guide="project-review" className="rounded-xl border border-line bg-card-raised p-3 space-y-2">
                     <p className="text-xs font-bold text-zinc-200">Review {project.with.displayName}</p>
                     <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map((n) => (

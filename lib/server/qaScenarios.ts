@@ -28,6 +28,12 @@ export type QaApi = (
 
 export interface QaContext {
   startedAt: Date;
+  /** when the CURRENT task became active. Creation-type checkpoints only
+      count records made AFTER this — an action performed while its task
+      was still locked never counts and must be performed again once the
+      task is actually reached (the Lab tests the WORKFLOW, in order, not
+      whether the database happens to contain a row). */
+  taskStartedAt: Date;
   customer: string;
   creator: string;
   business: string;
@@ -66,6 +72,14 @@ export interface QaScenario {
 /* ------------------------------ helpers ------------------------------ */
 
 const after = (d: Date | null | undefined, started: Date) => !!d && d.getTime() >= started.getTime() - 2000;
+
+/** §ACCIDENTAL FUTURE COMPLETION — a creation-type checkpoint only counts
+    records made while ITS task was active. Anything created earlier (while
+    the task was still locked) is reported but never counted: the tester
+    performs the action again during the task. The Lab verifies the
+    WORKFLOW in order, not whether the database happens to contain a row. */
+const inTask = (d: Date | null | undefined, ctx: QaContext) => !!d && d.getTime() >= ctx.taskStartedAt.getTime();
+const REDO = "exists from BEFORE this test became active — it doesn't count. Do it again now: the Lab verifies the workflow in order, not leftover records.";
 
 function pairConversation(a: string, b: string) {
   for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, a)).all()) {
@@ -173,17 +187,22 @@ const bookingScenario: QaScenario = {
       id: "profile",
       role: "testcustomer",
       title: "Customer opened the creator's profile",
-      instruction: "As TEST CUSTOMER, open @testcreator's profile (search, Discover, or the button below).",
-      expected: "A profile_view interaction by Test Customer on Test Creator, recorded after the scenario started.",
+      instruction: "As TEST CUSTOMER, search \"Test Creator\" in the top search bar → open their profile. Just viewing the page completes this test.",
+      expected: "A profile_view interaction by Test Customer on Test Creator, recorded after this test became active.",
       href: () => "/creator/testcreator",
       verify: (ctx) => {
-        const row = db
+        const rows = db
           .select()
           .from(tables.interactions)
           .where(and(eq(tables.interactions.userId, ctx.customer), eq(tables.interactions.targetId, ctx.creator), eq(tables.interactions.action, "profile_view")))
           .all()
-          .find((r) => after(r.createdAt, ctx.startedAt));
-        return { done: !!row, actual: row ? `profile_view recorded ${row.createdAt.toLocaleTimeString()}` : "no profile view recorded yet", record: row?.id };
+          .filter((r) => after(r.createdAt, ctx.startedAt));
+        const row = rows.find((r) => inTask(r.createdAt, ctx));
+        return {
+          done: !!row,
+          actual: row ? `profile_view recorded ${row.createdAt.toLocaleTimeString()}` : rows.length ? `a profile view ${REDO}` : "no profile view recorded yet",
+          record: row?.id,
+        };
       },
       perform: async (_ctx, api) => {
         await api("testcustomer", "/api/track", { method: "POST", body: { targetType: "user", targetId: _ctx.creator, action: "profile_view" } });
@@ -193,13 +212,18 @@ const bookingScenario: QaScenario = {
       id: "message",
       role: "testcustomer",
       title: "Customer messaged the creator",
-      instruction: "Send Test Creator a message about the QA Test Session.",
-      expected: "A message from Test Customer exists in the testcustomer↔testcreator conversation.",
+      instruction: "As TEST CUSTOMER → Messages → open the Test Creator conversation → type a message in the box at the bottom → send it.",
+      expected: "A message from Test Customer, sent while this test was active, in the testcustomer↔testcreator conversation.",
       href: () => "/messages?to=testcreator",
       verify: (ctx) => {
         const { conv, msgs } = messagesBetween(ctx, ctx.customer, ctx.creator);
-        const mine = msgs.find((m) => m.senderId === ctx.customer);
-        return { done: !!mine, actual: mine ? `"${mine.body.slice(0, 60)}"` : conv ? "conversation exists, no customer message yet" : "no conversation yet", record: conv ?? undefined };
+        const mine = msgs.find((m) => m.senderId === ctx.customer && inTask(m.createdAt, ctx));
+        const staleMine = !mine && msgs.some((m) => m.senderId === ctx.customer);
+        return {
+          done: !!mine,
+          actual: mine ? `"${mine.body.slice(0, 60)}"` : staleMine ? `a message ${REDO}` : conv ? "conversation exists, no customer message yet" : "no conversation yet",
+          record: conv ?? undefined,
+        };
       },
       perform: async (_ctx, api) => {
         await api("testcustomer", "/api/conversations", { method: "POST", body: { toHandle: "testcreator", firstMessage: "[QA] Hi! I'd like to book your QA Test Session." } });
@@ -221,13 +245,14 @@ const bookingScenario: QaScenario = {
       id: "reply",
       role: "testcreator",
       title: "Creator replied in the same thread",
-      instruction: "Switch to TEST CREATOR (button below), open Messages, reply to Test Customer.",
-      expected: "A message from Test Creator in the same two-person conversation.",
+      instruction: "Switch to TEST CREATOR (button below) → Messages → open the Test Customer conversation → send a reply.",
+      expected: "A message from Test Creator, sent while this test was active, in the same two-person conversation.",
       href: () => "/messages?to=testcustomer",
       verify: (ctx) => {
         const { msgs } = messagesBetween(ctx, ctx.customer, ctx.creator);
-        const theirs = msgs.find((m) => m.senderId === ctx.creator);
-        return { done: !!theirs, actual: theirs ? `"${theirs.body.slice(0, 60)}"` : "no creator reply yet" };
+        const theirs = msgs.find((m) => m.senderId === ctx.creator && inTask(m.createdAt, ctx));
+        const stale = !theirs && msgs.some((m) => m.senderId === ctx.creator);
+        return { done: !!theirs, actual: theirs ? `"${theirs.body.slice(0, 60)}"` : stale ? `a reply ${REDO}` : "no creator reply yet" };
       },
       perform: async (_ctx, api) => {
         await api("testcreator", "/api/conversations", { method: "POST", body: { toHandle: "testcustomer", firstMessage: "[QA] Happy to help — book any weekday slot." } });
@@ -237,12 +262,14 @@ const bookingScenario: QaScenario = {
       id: "book",
       role: "testcustomer",
       title: "Customer requested the booking",
-      instruction: "As TEST CUSTOMER, open the QA Test Session service and request a weekday slot.",
-      expected: "A booking row: client=testcustomer, provider=testcreator, status pending (the creator has NOT auto-accepted — QA personas have no bots).",
+      instruction: "As TEST CUSTOMER → Services → find \"QA Test Session\" by Test Creator → click Book → pick any weekday date and an available time → confirm.",
+      expected: "A booking made while this test was active: client=testcustomer, provider=testcreator, status pending (the creator has NOT auto-accepted — QA personas have no bots).",
       href: (ctx) => `/services/${ctx.serviceId}`,
       verify: (ctx) => {
         const b = qaBooking(ctx);
-        return { done: !!b, actual: b ? `booking ${b.id.slice(0, 8)}… status=${b.status}` : "no booking created yet", record: b?.id };
+        if (!b) return { done: false, actual: "no booking created yet" };
+        if (!inTask(b.createdAt, ctx)) return { done: false, actual: `a booking ${REDO}`, record: b.id };
+        return { done: true, actual: `booking ${b.id.slice(0, 8)}… status=${b.status}`, record: b.id };
       },
       perform: async (ctx, api) => {
         await api("testcustomer", "/api/bookings", { method: "POST", body: { serviceId: ctx.serviceId, startsAt: nextWeekday(10).toISOString(), durationMin: 60 } });
@@ -252,7 +279,7 @@ const bookingScenario: QaScenario = {
       id: "accept",
       role: "testcreator",
       title: "Creator accepted the request",
-      instruction: "Switch to TEST CREATOR → Bookings → open the request → Accept.",
+      instruction: "Switch to TEST CREATOR → Bookings → find the pending request → click Accept.",
       expected: "Booking status pending → accepted, and Test Customer notified.",
       href: () => "/calendar",
       verify: (ctx) => {
@@ -270,7 +297,7 @@ const bookingScenario: QaScenario = {
       id: "pay",
       role: "testcustomer",
       title: "Customer paid — TEST payment secured",
-      instruction: "As TEST CUSTOMER → Bookings → open the booking → Pay (clearly labeled TEST — no real money exists here).",
+      instruction: "As TEST CUSTOMER → Bookings → open the accepted booking → click Pay (clearly labeled TEST — no real money exists here).",
       expected: "Booking confirmed + a payment row in HELD state (secured, releases on completion).",
       href: () => "/calendar",
       verify: (ctx) => {
@@ -318,19 +345,24 @@ const bookingScenario: QaScenario = {
       id: "progress",
       role: "testcreator",
       title: "Creator posted a progress update",
-      instruction: "As TEST CREATOR → Bookings → open the booking → Post progress update (status, %, message).",
-      expected: "A real progress_updates row on this booking, authored by Test Creator.",
+      instruction: "As TEST CREATOR → Bookings → open the booking's progress panel → pick a status and % → write a short note → click Post update.",
+      expected: "A real progress_updates row on this booking, authored by Test Creator while this test was active.",
       href: () => "/calendar",
       verify: (ctx) => {
         const b = qaBooking(ctx);
         if (!b) return { done: false, actual: "no booking yet" };
-        const row = db
+        const all = db
           .select()
           .from(tables.progressUpdates)
           .where(eq(tables.progressUpdates.bookingId, b.id))
           .all()
-          .find((r) => r.authorId === ctx.creator && r.kind === "update");
-        return { done: !!row, actual: row ? `${row.percent ?? "—"}% · ${row.status} · "${row.message.slice(0, 40)}"` : "no progress update yet", record: row?.id };
+          .filter((r) => r.authorId === ctx.creator && r.kind === "update");
+        const row = all.find((r) => inTask(r.createdAt, ctx));
+        return {
+          done: !!row,
+          actual: row ? `${row.percent ?? "—"}% · ${row.status} · "${row.message.slice(0, 40)}"` : all.length ? `an update ${REDO}` : "no progress update yet",
+          record: row?.id,
+        };
       },
       perform: async (ctx, api) => {
         const b = qaBooking(ctx);
@@ -353,7 +385,7 @@ const bookingScenario: QaScenario = {
       id: "complete",
       role: "testcreator",
       title: "Creator completed — payment RELEASED (TEST)",
-      instruction: "As TEST CREATOR → Bookings → open the booking → Mark completed.",
+      instruction: "As TEST CREATOR → Bookings → open the booking → click \"Mark completed — release $ to me\".",
       expected: "Booking completed + the held TEST payment flips to RELEASED.",
       href: () => "/calendar",
       verify: (ctx) => {
@@ -407,12 +439,14 @@ const projectScenario: QaScenario = {
       id: "draft",
       role: "testcustomer",
       title: "Customer opened a project with the creator",
-      instruction: "As TEST CUSTOMER → Messages → thread with Test Creator → project panel → Create project draft (any title, an amount, and a deadline).",
-      expected: "A project row: client=testcustomer, creator=testcreator, state draft (no bot sends the offer — the creator must).",
+      instruction: "As TEST CUSTOMER → Messages → open the Test Creator conversation → click the \"Project\" button (briefcase icon) at the top of the chat → fill in a title, an amount, and a deadline → click \"Create project draft\".",
+      expected: "A project made while this test was active: client=testcustomer, creator=testcreator, state draft (no bot sends the offer — the creator must).",
       href: () => "/messages?to=testcreator",
       verify: (ctx) => {
         const p = qaProject(ctx);
-        return { done: !!p, actual: p ? `project "${p.title}" state=${p.state}` : "no project yet", record: p?.id };
+        if (!p) return { done: false, actual: "no project yet" };
+        if (!inTask(p.createdAt, ctx)) return { done: false, actual: `a project ${REDO}`, record: p.id };
+        return { done: true, actual: `project "${p.title}" state=${p.state}`, record: p.id };
       },
       perform: async (ctx, api) => {
         await api("testcustomer", "/api/projects", {
@@ -425,7 +459,7 @@ const projectScenario: QaScenario = {
       id: "offer",
       role: "testcreator",
       title: "Creator sent the offer",
-      instruction: "Switch to TEST CREATOR → same thread → project panel → Send offer.",
+      instruction: "Switch to TEST CREATOR → Messages → open the Test Customer conversation → click the \"Project\" button at the top of the chat → click \"Send offer\".",
       expected: "State draft → offer_sent; customer notified.",
       href: () => "/messages?to=testcustomer",
       verify: (ctx) => {
@@ -442,7 +476,7 @@ const projectScenario: QaScenario = {
       id: "start",
       role: "testcustomer",
       title: "Customer accepted + paid to start (TEST)",
-      instruction: "As TEST CUSTOMER → project panel → Accept offer → Pay to start (labeled TEST PAYMENT).",
+      instruction: "As TEST CUSTOMER → open the project page → click \"Accept offer\" → then click the pay button that replaces it (labeled TEST PAYMENT).",
       expected: "State in_progress + a HELD payment row.",
       href: (ctx) => {
         const p = qaProject(ctx);
@@ -474,8 +508,9 @@ const projectScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const row = db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.projectId, p.id)).all().find((r) => r.kind === "update");
-        return { done: !!row, actual: row ? `${row.percent ?? "—"}% · "${row.message.slice(0, 40)}"` : "no update yet", record: row?.id };
+        const rows = db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.projectId, p.id)).all().filter((r) => r.kind === "update");
+        const row = rows.find((r) => inTask(r.createdAt, ctx));
+        return { done: !!row, actual: row ? `${row.percent ?? "—"}% · "${row.message.slice(0, 40)}"` : rows.length ? `an update ${REDO}` : "no update yet", record: row?.id };
       },
       perform: async (ctx, api) => {
         const p = qaProject(ctx);
@@ -499,8 +534,9 @@ const projectScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const row = db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.projectId, p.id)).all().find((r) => r.kind === "eta");
-        return { done: !!row, actual: row ? `${fmtDate(row.prevEtaAt)} → ${fmtDate(row.etaAt)}${row.message ? ` — "${row.message.slice(0, 40)}"` : ""}` : "no ETA change yet", record: row?.id };
+        const rows = db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.projectId, p.id)).all().filter((r) => r.kind === "eta");
+        const row = rows.find((r) => inTask(r.createdAt, ctx));
+        return { done: !!row, actual: row ? `${fmtDate(row.prevEtaAt)} → ${fmtDate(row.etaAt)}${row.message ? ` — "${row.message.slice(0, 40)}"` : ""}` : rows.length ? `an ETA change ${REDO}` : "no ETA change yet", record: row?.id };
       },
       perform: async (ctx, api) => {
         const p = qaProject(ctx);
@@ -533,8 +569,9 @@ const projectScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const ext = db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all()[0];
-        return { done: !!ext, actual: ext ? `+${ext.days} days, status=${ext.status}` : `no extension request yet (state=${p.state})`, record: ext?.id };
+        const exts = db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all();
+        const ext = exts.find((e) => inTask(e.createdAt, ctx));
+        return { done: !!ext, actual: ext ? `+${ext.days} days, status=${ext.status}` : exts.length ? `an extension request ${REDO}` : `no extension request yet (state=${p.state})`, record: ext?.id };
       },
       perform: async (ctx, api) => {
         const p = qaProject(ctx);
@@ -613,7 +650,7 @@ const projectScenario: QaScenario = {
       id: "review",
       role: "testcustomer",
       title: "Customer left a review",
-      instruction: "On the completed project → leave a rating + review.",
+      instruction: "As TEST CUSTOMER → Messages → open the Test Creator conversation → click the \"Project\" button → pick a star rating, write a line → click \"Post review\".",
       expected: "A review row by Test Customer about Test Creator on this project.",
       href: (ctx) => {
         const p = qaProject(ctx);
@@ -622,8 +659,9 @@ const projectScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const r = db.select().from(tables.reviews).where(eq(tables.reviews.projectId, p.id)).all().find((x) => x.authorId === ctx.customer);
-        return { done: !!r, actual: r ? `${r.rating.toFixed(1)}★ "${r.body.slice(0, 40)}"` : "no review yet", record: r?.id };
+        const all2 = db.select().from(tables.reviews).where(eq(tables.reviews.projectId, p.id)).all().filter((x) => x.authorId === ctx.customer);
+        const r = all2.find((x) => inTask(x.createdAt, ctx));
+        return { done: !!r, actual: r ? `${r.rating.toFixed(1)}★ "${r.body.slice(0, 40)}"` : all2.length ? `a review ${REDO}` : "no review yet", record: r?.id };
       },
       perform: async (ctx, api) => {
         const p = qaProject(ctx);
@@ -665,7 +703,9 @@ const opportunityScenario: QaScenario = {
       href: () => "/opportunities/new",
       verify: (ctx) => {
         const o = qaOpportunity(ctx);
-        return { done: !!o, actual: o ? `"${o.title}" (${o.status})` : "no opportunity yet", record: o?.id };
+        if (!o) return { done: false, actual: "no opportunity yet" };
+        if (!inTask(o.createdAt, ctx)) return { done: false, actual: `an opportunity ${REDO}`, record: o.id };
+        return { done: true, actual: `"${o.title}" (${o.status})`, record: o.id };
       },
       perform: async (_ctx, api) => {
         await api("testbusiness", "/api/opportunities", { method: "POST", body: { title: "[QA] Event photographer — test gig", description: "QA scenario opportunity.", budget: 250, type: "gig", location: "Baltimore, MD", remote: true } });
@@ -685,7 +725,9 @@ const opportunityScenario: QaScenario = {
         const o = qaOpportunity(ctx);
         if (!o) return { done: false, actual: "no opportunity yet" };
         const a = db.select().from(tables.applications).where(and(eq(tables.applications.opportunityId, o.id), eq(tables.applications.applicantId, ctx.customer))).get();
-        return { done: !!a, actual: a ? `application status=${a.status}` : "no application yet", record: a?.id };
+        if (!a) return { done: false, actual: "no application yet" };
+        if (!inTask(a.createdAt, ctx)) return { done: false, actual: `an application ${REDO}`, record: a.id };
+        return { done: true, actual: `application status=${a.status}`, record: a.id };
       },
       perform: async (ctx, api) => {
         const o = qaOpportunity(ctx);
@@ -751,7 +793,8 @@ const opportunityScenario: QaScenario = {
       href: () => "/messages?to=testcustomer",
       verify: (ctx) => {
         const { conv, msgs } = messagesBetween(ctx, ctx.business, ctx.customer);
-        return { done: msgs.length > 0, actual: msgs.length ? `${msgs.length} message(s) in ${conv?.slice(0, 8)}…` : "no conversation between business and applicant yet", record: conv ?? undefined };
+        const fresh = msgs.filter((m) => inTask(m.createdAt, ctx));
+        return { done: fresh.length > 0, actual: fresh.length ? `${fresh.length} message(s) in ${conv?.slice(0, 8)}…` : msgs.length ? `a conversation ${REDO}` : "no conversation between business and applicant yet", record: conv ?? undefined };
       },
       perform: async (_ctx, api) => {
         await api("testbusiness", "/api/conversations", { method: "POST", body: { toHandle: "testcustomer", firstMessage: "[QA] You're selected — let's plan the shoot." } });
@@ -792,13 +835,14 @@ const hiringScenario: QaScenario = {
       expected: "A profile_view interaction by Test Business on Test Creator after the scenario started.",
       href: () => "/creator/testcreator",
       verify: (ctx) => {
-        const row = db
+        const rows = db
           .select()
           .from(tables.interactions)
           .where(and(eq(tables.interactions.userId, ctx.business), eq(tables.interactions.targetId, ctx.creator), eq(tables.interactions.action, "profile_view")))
           .all()
-          .find((r) => after(r.createdAt, ctx.startedAt));
-        return { done: !!row, actual: row ? `profile_view recorded ${row.createdAt.toLocaleTimeString()}` : "no profile view by the business yet", record: row?.id };
+          .filter((r) => after(r.createdAt, ctx.startedAt));
+        const row = rows.find((r) => inTask(r.createdAt, ctx));
+        return { done: !!row, actual: row ? `profile_view recorded ${row.createdAt.toLocaleTimeString()}` : rows.length ? `a profile view ${REDO}` : "no profile view by the business yet", record: row?.id };
       },
       perform: async (ctx, api) => {
         await api("testbusiness", "/api/track", { method: "POST", body: { targetType: "user", targetId: ctx.creator, action: "profile_view" } });
@@ -813,8 +857,9 @@ const hiringScenario: QaScenario = {
       href: () => "/messages?to=testcreator",
       verify: (ctx) => {
         const { msgs } = messagesBetween(ctx, ctx.business, ctx.creator);
-        const mine = msgs.find((m) => m.senderId === ctx.business);
-        return { done: !!mine, actual: mine ? `"${mine.body.slice(0, 60)}"` : "no message from the business yet" };
+        const mine = msgs.find((m) => m.senderId === ctx.business && inTask(m.createdAt, ctx));
+        const stale = !mine && msgs.some((m) => m.senderId === ctx.business);
+        return { done: !!mine, actual: mine ? `"${mine.body.slice(0, 60)}"` : stale ? `a message ${REDO}` : "no message from the business yet" };
       },
       perform: async (_ctx, api) => {
         await api("testbusiness", "/api/conversations", { method: "POST", body: { toHandle: "testcreator", firstMessage: "[QA] We have a campaign coming up — keep an eye on our opportunity." } });
@@ -829,7 +874,9 @@ const hiringScenario: QaScenario = {
       href: () => "/opportunities/new",
       verify: (ctx) => {
         const o = qaOpportunity(ctx);
-        return { done: !!o, actual: o ? `"${o.title}" status=${o.status}` : "no opportunity yet", record: o?.id };
+        if (!o) return { done: false, actual: "no opportunity yet" };
+        if (!inTask(o.createdAt, ctx)) return { done: false, actual: `an opportunity ${REDO}`, record: o.id };
+        return { done: true, actual: `"${o.title}" status=${o.status}`, record: o.id };
       },
       perform: async (_ctx, api) => {
         await api("testbusiness", "/api/opportunities", { method: "POST", body: { title: "[QA] Campaign content creator", description: "QA hiring scenario gig.", budget: 300, type: "gig", location: "Baltimore, MD", remote: true } });
@@ -849,7 +896,9 @@ const hiringScenario: QaScenario = {
         const o = qaOpportunity(ctx);
         if (!o) return { done: false, actual: "no opportunity yet" };
         const a = db.select().from(tables.applications).where(and(eq(tables.applications.opportunityId, o.id), eq(tables.applications.applicantId, ctx.creator))).get();
-        return { done: !!a, actual: a ? `application status=${a.status}` : "no application yet", record: a?.id };
+        if (!a) return { done: false, actual: "no application yet" };
+        if (!inTask(a.createdAt, ctx)) return { done: false, actual: `an application ${REDO}`, record: a.id };
+        return { done: true, actual: `application status=${a.status}`, record: a.id };
       },
       perform: async (ctx, api) => {
         const o = qaOpportunity(ctx);
@@ -921,12 +970,14 @@ const hiringScenario: QaScenario = {
       id: "project",
       role: "testbusiness",
       title: "Business opened the project with the hire",
-      instruction: "As TEST BUSINESS → Messages → thread with Test Creator → project panel → Create project draft (title, amount, deadline).",
+      instruction: "As TEST BUSINESS → Messages → open the Test Creator conversation → click the \"Project\" button (briefcase icon) at the top of the chat → fill in a title, amount, and deadline → click \"Create project draft\".",
       expected: "A project row: client=testbusiness, creator=testcreator.",
       href: () => "/messages?to=testcreator",
       verify: (ctx) => {
         const p = qaBizProject(ctx);
-        return { done: !!p, actual: p ? `project "${p.title}" state=${p.state}` : "no business→creator project yet", record: p?.id };
+        if (!p) return { done: false, actual: "no business→creator project yet" };
+        if (!inTask(p.createdAt, ctx)) return { done: false, actual: `a project ${REDO}`, record: p.id };
+        return { done: true, actual: `project "${p.title}" state=${p.state}`, record: p.id };
       },
       perform: async (ctx, api) => {
         await api("testbusiness", "/api/projects", {
@@ -939,7 +990,7 @@ const hiringScenario: QaScenario = {
       id: "offer",
       role: "testcreator",
       title: "Creator sent the offer",
-      instruction: "Switch to TEST CREATOR → same thread → project panel → Send offer.",
+      instruction: "Switch to TEST CREATOR → Messages → open the Test Business conversation → click the \"Project\" button at the top of the chat → click \"Send offer\".",
       expected: "Project state draft → offer_sent.",
       href: () => "/messages?to=testbusiness",
       verify: (ctx) => {
@@ -956,7 +1007,7 @@ const hiringScenario: QaScenario = {
       id: "fund",
       role: "testbusiness",
       title: "Business accepted + secured the TEST payment",
-      instruction: "As TEST BUSINESS → project panel → Accept offer → Pay to start (labeled TEST PAYMENT).",
+      instruction: "As TEST BUSINESS → open the project page → click \"Accept offer\" → then click the pay button that replaces it (labeled TEST PAYMENT).",
       expected: "State in_progress + a HELD payment row (payer = the business).",
       href: (ctx) => {
         const p = qaBizProject(ctx);
@@ -992,9 +1043,10 @@ const hiringScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const row = db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.projectId, p.id)).all().find((r) => r.kind === "update");
+        const rows = db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.projectId, p.id)).all().filter((r) => r.kind === "update");
+        const row = rows.find((r) => inTask(r.createdAt, ctx));
         const n = notif(ctx, ctx.business, "progress_update");
-        return { done: !!row && !!n, actual: row ? `${row.percent ?? "—"}% · "${row.message.slice(0, 40)}"; business notified=${n ? "yes" : "no"}` : "no progress update yet", record: row?.id };
+        return { done: !!row && !!n, actual: row ? `${row.percent ?? "—"}% · "${row.message.slice(0, 40)}"; business notified=${n ? "yes" : "no"}` : rows.length ? `an update ${REDO}` : "no progress update yet", record: row?.id };
       },
       perform: async (ctx, api) => {
         const p = qaBizProject(ctx);
@@ -1018,9 +1070,10 @@ const hiringScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const ext = db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all()[0];
+        const exts = db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, p.id)).all();
+        const ext = exts.find((e) => inTask(e.createdAt, ctx));
         const n = notif(ctx, ctx.business, "extension_requested");
-        return { done: !!ext && !!n, actual: ext ? `+${ext.days} days, status=${ext.status}; business notified=${n ? "yes" : "no"}` : "no extension request yet", record: ext?.id };
+        return { done: !!ext && !!n, actual: ext ? `+${ext.days} days, status=${ext.status}; business notified=${n ? "yes" : "no"}` : exts.length ? `an extension request ${REDO}` : "no extension request yet", record: ext?.id };
       },
       perform: async (ctx, api) => {
         const p = qaBizProject(ctx);
@@ -1108,8 +1161,9 @@ const hiringScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
-        const r = db.select().from(tables.reviews).where(eq(tables.reviews.projectId, p.id)).all().find((x) => x.authorId === ctx.business && x.subjectId === ctx.creator);
-        return { done: !!r, actual: r ? `${r.rating.toFixed(1)}★ "${r.body.slice(0, 40)}" — public on @testcreator` : "no business review yet", record: r?.id };
+        const all2 = db.select().from(tables.reviews).where(eq(tables.reviews.projectId, p.id)).all().filter((x) => x.authorId === ctx.business && x.subjectId === ctx.creator);
+        const r = all2.find((x) => inTask(x.createdAt, ctx));
+        return { done: !!r, actual: r ? `${r.rating.toFixed(1)}★ "${r.body.slice(0, 40)}" — public on @testcreator` : all2.length ? `a review ${REDO}` : "no business review yet", record: r?.id };
       },
       perform: async (ctx, api) => {
         const p = qaBizProject(ctx);
@@ -1174,7 +1228,9 @@ const peopleScenario: QaScenario = {
       href: () => "/messages?to=testcustomer",
       verify: (ctx) => {
         const { msgs } = messagesBetween(ctx, ctx.business, ctx.customer);
-        if (msgs.length === 0) return { done: false, actual: "no conversation with the customer yet" };
+        const fresh = msgs.filter((m) => m.senderId === ctx.business && inTask(m.createdAt, ctx));
+        if (fresh.length === 0)
+          return { done: false, actual: msgs.some((m) => m.senderId === ctx.business) ? `a message ${REDO}` : "no conversation with the customer yet" };
         const hasBooking = !!qaBizBooking(ctx);
         return {
           done: true,
@@ -1195,6 +1251,7 @@ const peopleScenario: QaScenario = {
       verify: (ctx) => {
         const b = qaBizBooking(ctx);
         if (!b) return { done: false, actual: "no customer→business booking yet" };
+        if (!inTask(b.createdAt, ctx)) return { done: false, actual: `a booking ${REDO}`, record: b.id };
         const pay = payFor("bookingId", b.id);
         return { done: !!pay, actual: `booking status=${b.status}; payment=${pay ? `${pay.status} (TEST)` : "none — pay after the business accepts"}`, record: b.id };
       },
@@ -1236,6 +1293,7 @@ const peopleScenario: QaScenario = {
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no business→creator project yet" };
+        if (!inTask(p.createdAt, ctx)) return { done: false, actual: `a project ${REDO}`, record: p.id };
         const pay = payFor("projectId", p.id);
         return { done: ["completed", "reviewed"].includes(p.state) && pay?.status === "released", actual: `state=${p.state}; payment=${pay?.status ?? "none"}`, record: p.id };
       },
@@ -1277,6 +1335,7 @@ const peopleScenario: QaScenario = {
       href: () => "/people?tab=team",
       verify: (ctx) => {
         const team = db.select().from(tables.businessTeam).where(and(eq(tables.businessTeam.businessId, ctx.business), eq(tables.businessTeam.personId, ctx.creator))).get();
+        if (team && !inTask(team.createdAt, ctx)) return { done: false, actual: `a team row ${REDO}`, record: team.id };
         return {
           done: !!team,
           actual: team
@@ -1351,9 +1410,9 @@ export function getScenario(id: string) {
   return QA_SCENARIOS.find((s) => s.id === id) ?? null;
 }
 
-export function buildContext(startedAt: Date): QaContext {
+export function buildContext(startedAt: Date, taskStartedAt?: Date): QaContext {
   const ids = qaIds();
-  return { startedAt, ...ids };
+  return { startedAt, taskStartedAt: taskStartedAt ?? startedAt, ...ids };
 }
 
 /** evaluate a scenario against the REAL database */
@@ -1439,14 +1498,26 @@ export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
   while (valid < passed.length && valid < scenario.steps.length && passed[valid].id === scenario.steps[valid].id) valid++;
   passed = passed.slice(0, valid);
 
+  // per-task ACTIVATION times: a task's clock starts only when it becomes
+  // the current task. Creation checkpoints count nothing from before it.
+  const activated: Record<string, string> = { ...(run.activated ?? {}) };
+  let activatedChanged = false;
+
   // advance: verify ONLY the current task; each pass appends its verified
   // snapshot and unlocks the next (auto-checks cascade in the same sweep)
   let pendingVerdict: QaVerdict | null = null;
   while (passed.length < scenario.steps.length) {
     const s = scenario.steps[passed.length];
+    if (!activated[s.id]) {
+      // the first task activates at scenario start; later tasks at the
+      // moment the previous one was VERIFIED (i.e., right now)
+      activated[s.id] = passed.length === 0 ? run.startedAt : new Date().toISOString();
+      activatedChanged = true;
+    }
+    const stepCtx = buildContext(new Date(run.startedAt), new Date(activated[s.id]));
     let v: QaVerdict;
     try {
-      v = s.verify(ctx);
+      v = s.verify(stepCtx);
     } catch {
       v = { done: false, actual: "verification error — retry" };
     }
@@ -1469,10 +1540,10 @@ export function scenarioProgress(scenario: QaScenario, runs: QaRuns) {
 
   // persist any advancement (fresh read so concurrent writes aren't clobbered)
   let completedAt: string | null = null;
-  if (passed.length !== (run.passed?.length ?? 0) || complete) {
+  if (passed.length !== (run.passed?.length ?? 0) || activatedChanged || complete) {
     const fresh = readRuns();
     if (fresh[scenario.id]) {
-      fresh[scenario.id] = { ...fresh[scenario.id], passed };
+      fresh[scenario.id] = { ...fresh[scenario.id], passed, activated };
       if (complete && !fresh[scenario.id].completedAt) {
         fresh[scenario.id].completedAt = new Date().toISOString();
         fresh[scenario.id].snapshot = passed;

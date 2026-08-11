@@ -238,6 +238,11 @@ export type QaRuns = Record<
         task can only be derived from here — never from whichever
         database checkpoint happens to be true. */
     passed?: QaStepSnapshot[];
+    /** when each task became ACTIVE (stepId → ISO). A task's checkpoint
+        only counts records created AFTER its activation — §accidental
+        future completion: work done while a task was still locked never
+        counts; the tester performs it again when the task is reached. */
+    activated?: Record<string, string>;
   }
 >;
 

@@ -1,7 +1,7 @@
-"use client";
-
 /* ------------------------------------------------------------------ */
 /*  Mission briefings — every QA task explains itself.                 */
+/*  Pure functions, usable on both client (briefing UI) and server     */
+/*  (regression tests verify every task briefs completely).            */
 /*                                                                     */
 /*  Built from each checkpoint's OWN data (never generic):             */
 /*   · role        → who you must be (with a switch action if needed)  */

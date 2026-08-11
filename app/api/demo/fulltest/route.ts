@@ -11,6 +11,8 @@ import fs from "fs";
 import path from "path";
 import { QA_SCENARIOS } from "@/lib/server/qaScenarios";
 import { qaIds } from "@/lib/server/qa";
+import { QA_GUIDES, guideFor } from "@/lib/qaGuides";
+import { buildBriefing } from "@/lib/qaBriefing";
 import { signDemoToken } from "@/lib/server/auth";
 
 /* per-run email nonce — throwaway signups get a UNIQUE email every run so
@@ -1587,14 +1589,33 @@ export async function POST(req: NextRequest) {
     step(c, "switching personas does not corrupt progression: customer and creator views read the SAME persisted state (1 done, current Test 2)",
       asCust.done === 1 && asCrea.done === 1 && asCust.current === 1 && asCrea.current === 1, { actual: `cust=${asCust.done}/${asCust.current} crea=${asCrea.done}/${asCrea.current}` });
 
+    // §ACCIDENTAL FUTURE COMPLETION: walk forward to the task whose DB
+    // condition was created EARLY (while it was locked) — it must NOT
+    // auto-pass; the tester performs the action again during the task
+    await asT(tokAdmin2, "/api/qa/scenarios/booking", { method: "POST", body: { action: "auto", step: "message" } });
+    await asT(tokAdmin2, "/api/qa/scenarios/booking", { method: "POST", body: { action: "auto", step: "reply" } });
+    const atBook = await getB();
+    const bookStep = atBook.steps.find((x: any) => x.id === "book");
+    step(c, "ACCIDENTAL FUTURE WORK NEVER COUNTS: reaching the booking task, the early-made booking does NOT auto-pass it — the step stays pending and says the record doesn't count (redo required)",
+      atBook.current === 4 && bookStep?.status === "pending" && /doesn't count/i.test(String(bookStep?.actual)),
+      { actual: `current=${atBook.current} book=${bookStep?.status} · "${String(bookStep?.actual).slice(0, 80)}"` });
+
+    // performing the action AGAIN — during the task — passes it
+    const redoDay = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); t.setHours(13, 0, 0, 0); return t; })();
+    const redoBk = await asT(tokCust2, "/api/bookings", { method: "POST", body: { serviceId: ids.serviceId, startsAt: redoDay.toISOString(), durationMin: 60 } });
+    const afterRedo = await getB();
+    step(c, "REDOING THE ACTION DURING THE TASK PASSES IT: a booking made while the task is active verifies, and exactly the next task unlocks",
+      redoBk.status === 200 && afterRedo.done === 5 && afterRedo.current === 5 && afterRedo.steps[4].status === "done",
+      { actual: `bk=${redoBk.status} done=${afterRedo.done} current=${afterRedo.current}` });
+
     // scenario independence: arming/resetting ANOTHER scenario leaves this one's passed tasks intact
     await asT(tokAdmin2, "/api/qa/scenarios/project", { method: "POST", body: { action: "start" } });
     const proj1 = (await asT(tokAdmin2, "/api/qa/scenarios/project")).data as any;
     const bAfterArm = await getB();
     await asT(tokAdmin2, "/api/qa/scenarios/project", { method: "POST", body: { action: "reset" } });
     const bAfterOtherReset = await getB();
-    step(c, "resetting one scenario NEVER resets another: project arms+resets at its own Test 1 while booking keeps its passed Test 1 and current Test 2",
-      proj1.current === 0 && proj1.done === 0 && bAfterArm.done === 1 && bAfterArm.steps[0].status === "done" && bAfterOtherReset.done === 1 && bAfterOtherReset.current === 1,
+    step(c, "resetting one scenario NEVER resets another: project arms+resets at its own Test 1 while booking keeps all 5 passed tasks and its current task",
+      proj1.current === 0 && proj1.done === 0 && bAfterArm.done === 5 && bAfterArm.steps[0].status === "done" && bAfterOtherReset.done === 5 && bAfterOtherReset.current === 5,
       { actual: `project=${proj1.done}/c${proj1.current} · booking after arm=${bAfterArm.done} after other-reset=${bAfterOtherReset.done}` });
 
     // explicit reset of THIS scenario → back to Test 1 of N, no stale task number
@@ -1602,6 +1623,51 @@ export async function POST(req: NextRequest) {
     step(c, "explicit reset returns THIS scenario to TEST 1 OF N — 0 done, Test 1 pending, all later tasks locked; no stale current-task state survives",
       resetB.done === 0 && resetB.current === 0 && resetB.steps[0].status === "pending" && resetB.steps.slice(1).every((x: any) => x.status === "locked"),
       { actual: `done=${resetB.done} current=${resetB.current}` });
+
+    /* ---- GUIDANCE SYSTEM (Show me where) — structural guarantees ---- */
+    // 1) every user-action task briefs completely AND resolves a guide
+    const noGuide: string[] = [];
+    const noBrief: string[] = [];
+    for (const sc of QA_SCENARIOS)
+      for (const st of sc.steps) {
+        if (st.role === "check") continue;
+        const brief = buildBriefing({ role: st.role, title: st.title, instruction: st.instruction, expected: st.expected, href: "#" });
+        if (!brief.roleLabel || !brief.objective || brief.steps.length === 0 || !brief.success) noBrief.push(`${sc.id}:${st.id}`);
+        const g = guideFor(sc.id, st.id, "/messages", st.instruction);
+        if (!g.length || g.some((x) => !x.text || !x.label)) noGuide.push(`${sc.id}:${st.id}`);
+      }
+    step(c, "GUIDANCE · every user-action task has a full briefing (persona, objective, steps, success) AND resolves a Show-me-where guide",
+      noBrief.length === 0 && noGuide.length === 0, { actual: noBrief.length || noGuide.length ? `brief:${noBrief.join(",")} guide:${noGuide.join(",")}` : `${QA_SCENARIOS.reduce((a, x) => a + x.steps.filter((y) => y.role !== "check").length, 0)} tasks, all guided` });
+
+    // 2) guides are PURE DATA — pointing only, no actions possible
+    const flat = Object.values(QA_GUIDES).flat();
+    const badKeys = flat.filter((g) => Object.keys(g).some((k) => !["target", "label", "text", "until"].includes(k)));
+    const serializable = JSON.stringify(flat) === JSON.stringify(JSON.parse(JSON.stringify(flat)));
+    step(c, "GUIDANCE · Show me where is declarative data only ({target,label,text,until}) — it structurally CANNOT click, submit, fetch, or complete anything",
+      badKeys.length === 0 && serializable && flat.every((g) => typeof g.text === "string" && typeof g.target === "string"),
+      { actual: `${flat.length} guide steps, keys clean=${badKeys.length === 0}` });
+
+    // 3) every spotlight target actually exists as an anchor in the UI source
+    const srcDirs = ["components", "app"];
+    let src = "";
+    const walk = (dir: string) => {
+      for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, f.name);
+        if (f.isDirectory()) walk(full);
+        else if (/\.(tsx|ts)$/.test(f.name)) src += fs.readFileSync(full, "utf8");
+      }
+    };
+    for (const d of srcDirs) walk(path.join(process.cwd(), d));
+    const missingAnchor = Array.from(new Set(flat.map((g) => g.target).filter(Boolean))).filter(
+      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !src.includes(`"${t}"`)
+    );
+    step(c, "GUIDANCE · every spotlight target is a real data-guide/data-tour anchor present in the interface source — instructions and visuals tell the same story",
+      missingAnchor.length === 0, { actual: missingAnchor.length ? `MISSING: ${missingAnchor.join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified` });
+
+    // 4) location-aware guides: reach-conditions are well-formed (path prefix or anchor)
+    const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
+    step(c, "GUIDANCE · every guide advance-condition is a real page prefix or a real anchor — the guide can always tell where the user is",
+      badUntil.length === 0, { actual: badUntil.length ? JSON.stringify(badUntil[0]) : "all reach-conditions well-formed" });
   }
 
   /* ================= DATABASE INTEGRITY ================= */

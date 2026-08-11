@@ -57,7 +57,7 @@ const navGroups: {
       { href: "/works", label: "Works", icon: Disc3 },
       { href: "/calendar", label: "Bookings", icon: CalendarCheck, tour: "calendar" },
       { href: "/clients", label: "Clients", icon: UserCheck },
-      { href: "/activity", label: "Activity", icon: ActivityIcon },
+      { href: "/activity", label: "Activity", icon: ActivityIcon, tour: "activity" },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
@@ -113,9 +113,9 @@ export default function Sidebar({
       label: "business",
       dot: "bg-sky-400",
       items: [
-        { href: "/hiring", label: "Hiring", icon: UserPlus },
-        { href: "/people", label: "People", icon: ContactRound },
-        { href: "/payments", label: "Payments", icon: Wallet },
+        { href: "/hiring", label: "Hiring", icon: UserPlus, tour: "hiring" },
+        { href: "/people", label: "People", icon: ContactRound, tour: "people" },
+        { href: "/payments", label: "Payments", icon: Wallet, tour: "payments" },
       ],
     });
 

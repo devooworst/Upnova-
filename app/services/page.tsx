@@ -276,7 +276,7 @@ export default function ServicesPage() {
                     >
                       <Bookmark className={`h-3.5 w-3.5 ${saved.has(s.id) ? "fill-violet-300" : ""}`} />
                     </button>
-                    <button onClick={() => hire(s)} className="btn-lime px-3.5 py-1.5 text-xs">
+                    <button onClick={() => hire(s)} data-guide={s.owner.handle === "testcreator" || s.owner.handle === "testbusiness" ? "qa-service-book" : undefined} className="btn-lime px-3.5 py-1.5 text-xs">
                       {s.fulfillment === "appointment" ? (
                         <CalendarDays className="h-3.5 w-3.5" />
                       ) : (
@@ -442,7 +442,7 @@ function BookWizard({ service, initialDate, onClose }: { service: ServiceItem; i
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => !busy && onClose()}>
-      <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+      <div data-guide="book-wizard" className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
