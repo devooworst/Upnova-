@@ -63,19 +63,22 @@ export const QA_GUIDES: Record<string, GuideStep[]> = {
   ],
   "booking:accept": [
     nav("calendar", "Bookings", "/calendar"),
-    { target: "booking-accept", label: "Accept", text: 'Find the pending "QA Test Session" request and click Accept' },
+    { target: "booking-accept", label: "Accept", text: 'Find the pending "QA Test Session" request from Test Customer and click Accept' },
   ],
   "booking:pay": [
     nav("calendar", "Bookings", "/calendar"),
-    { target: "booking-pay", label: "Pay (TEST)", text: "Click the Pay button on the accepted booking — it's a TEST payment, no real money exists here" },
+    { target: "booking-card-testcreator", label: "Open booking", text: "Click the QA Test Session booking in the Upcoming list to open it", until: { visible: "booking-pay" } },
+    { target: "booking-pay", label: "Pay (TEST)", text: "Click the Pay button — it's a TEST payment, no real money exists here" },
   ],
   "booking:progress": [
     nav("calendar", "Bookings", "/calendar"),
-    { target: "booking-progress", label: "Post update", text: "In the booking's progress panel: pick a status and %, write a short note, then click Post update" },
+    { target: "booking-card-testcustomer", label: "Open booking", text: "Click the QA Test Session booking in the Upcoming list to open it", until: { visible: "booking-progress" } },
+    { target: "booking-progress", label: "Post update", text: "In the Progress panel: pick a status and %, write a short note, then click Post update" },
   ],
   "booking:complete": [
     nav("calendar", "Bookings", "/calendar"),
-    { target: "booking-complete", label: "Mark completed", text: 'Click "Mark completed — release $ to me" on the confirmed booking' },
+    { target: "booking-card-testcustomer", label: "Open booking", text: "Click the QA Test Session booking in the Upcoming list to open it", until: { visible: "booking-complete" } },
+    { target: "booking-complete", label: "Mark completed", text: 'Click "Mark completed — release $ to me"' },
   ],
 
   /* ------------------------- project scenario ------------------------- */

@@ -14,7 +14,7 @@
 /*    only judge.                                                      */
 /* ------------------------------------------------------------------ */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ArrowDown, ArrowUp, X, Check } from "lucide-react";
 import type { GuideStep } from "@/lib/qaGuides";
@@ -44,6 +44,10 @@ export default function QaGuide({
   const pathname = usePathname();
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  // one gentle scroll per step — if the target exists but sits under the
+  // fixed navbar or below the fold, bring it into view (a view adjustment,
+  // never an action: nothing is clicked, typed, or submitted)
+  const scrolledFor = useRef<string | null>(null);
 
   const compute = useCallback(() => {
     // the guide knows where you are: the active step is the FIRST one
@@ -66,6 +70,15 @@ export default function QaGuide({
     const el = findAnchor(steps[active]?.target ?? "");
     if (!el) return setRect(null);
     const r = el.getBoundingClientRect();
+    // covered by the fixed navbar (top ~72px) or cut off by the viewport /
+    // Test Session bar? Scroll it to center ONCE for this step — the
+    // spotlight must never point at something the user cannot see.
+    const key = `${pathname}:${active}:${steps[active]?.target}`;
+    const hidden = r.top < 80 || r.bottom > window.innerHeight - 90;
+    if (hidden && scrolledFor.current !== key) {
+      scrolledFor.current = key;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, [steps, pathname]);
 

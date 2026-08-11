@@ -62,6 +62,7 @@ const PLANNED_CATEGORIES = [
   "SUBSCRIPTIONS & MY WORLD",
   "BOOKING FLOW & QA LAB",
   "QA STRICT PROGRESSION",
+  "QA SCENARIO WALKTHROUGHS",
   "DATABASE INTEGRITY",
 ];
 
@@ -1659,15 +1660,60 @@ export async function POST(req: NextRequest) {
     };
     for (const d of srcDirs) walk(path.join(process.cwd(), d));
     const missingAnchor = Array.from(new Set(flat.map((g) => g.target).filter(Boolean))).filter(
-      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !src.includes(`"${t}"`)
+      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !src.includes(`"${t}"`)
     );
+    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-"];
+    const missingDynamic = dynamicPatterns.filter((pat) => !src.includes(pat));
     step(c, "GUIDANCE · every spotlight target is a real data-guide/data-tour anchor present in the interface source — instructions and visuals tell the same story",
-      missingAnchor.length === 0, { actual: missingAnchor.length ? `MISSING: ${missingAnchor.join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified` });
+      missingAnchor.length === 0 && missingDynamic.length === 0, { actual: missingAnchor.length || missingDynamic.length ? `MISSING: ${[...missingAnchor, ...missingDynamic].join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified (+${dynamicPatterns.length} dynamic families)` });
 
     // 4) location-aware guides: reach-conditions are well-formed (path prefix or anchor)
     const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
     step(c, "GUIDANCE · every guide advance-condition is a real page prefix or a real anchor — the guide can always tell where the user is",
       badUntil.length === 0, { actual: badUntil.length ? JSON.stringify(badUntil[0]) : "all reach-conditions well-formed" });
+  }
+
+  /* ================= QA SCENARIO WALKTHROUGHS ================= */
+  /* Every scenario must be COMPLETABLE, start → finish, through the
+     real HTTP routes — with the strict-order invariants holding at
+     every single step: exactly one pending task, everything after it
+     locked, displayed done-count equal to the verified prefix. The
+     booking + project walks live in earlier categories; these three
+     were previously never walked end-to-end. */
+  {
+    const c = cat("QA SCENARIO WALKTHROUGHS");
+    const tokA = signDemoToken("devin");
+    const asA = async (pth: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokA}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      let data: any = {}; try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    };
+    const walk = async (sid: string) => {
+      let st = (await asA(`/api/qa/scenarios/${sid}`, { method: "POST", body: { action: "reset" } })).data as any;
+      let guard = 0, same = 0, lastId = "", stuck = "", invariantOk = true;
+      while (!st.completed && guard++ < 80) {
+        const pend = (st.steps ?? []).filter((x: any) => x.status === "pending");
+        if (pend.length !== 1) { invariantOk = false; stuck = `${pend.length} pending steps`; break; }
+        const cur = pend[0];
+        const idx = st.steps.findIndex((x: any) => x.id === cur.id);
+        if (idx !== st.current || st.done !== idx || !st.steps.slice(idx + 1).every((x: any) => x.status === "locked")) {
+          invariantOk = false; stuck = `order invariant broke at ${cur.id} (idx=${idx} current=${st.current} done=${st.done})`; break;
+        }
+        if (cur.id === lastId) { if (++same > 3) { stuck = `stuck at ${cur.id}: "${String(cur.actual).slice(0, 80)}"`; break; } } else same = 0;
+        lastId = cur.id;
+        if (cur.role === "check") { st = (await asA(`/api/qa/scenarios/${sid}`)).data as any; continue; }
+        const r = await asA(`/api/qa/scenarios/${sid}`, { method: "POST", body: { action: "auto", step: cur.id } });
+        if (r.status !== 200) { stuck = `auto ${cur.id} → ${r.status} ${JSON.stringify(r.data).slice(0, 80)}`; break; }
+        st = r.data as any;
+      }
+      return { st, invariantOk, stuck };
+    };
+    for (const sid of ["opportunity", "hiring", "people"]) {
+      const { st, invariantOk, stuck } = await walk(sid);
+      step(c, `${sid} scenario walks START → FINISH strictly in order — one pending task, later tasks locked, done=verified-prefix at every step — and completes fully`,
+        st.completed === true && st.done === st.total && invariantOk, { actual: stuck || `${st.done}/${st.total} completed=${st.completed}` });
+      await asA(`/api/qa/scenarios/${sid}`, { method: "POST", body: { action: "reset" } });
+    }
   }
 
   /* ================= DATABASE INTEGRITY ================= */

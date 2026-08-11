@@ -214,7 +214,11 @@ export default function DbMessages() {
   }, [activeId, convos?.find((x) => x.id === activeId)?.projectId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // scroll ONLY the message pane — scrollIntoView walks every scrollable
+    // ancestor including the WINDOW, which slid the whole card (list header
+    // + chat header with the Project button) underneath the fixed navbar
+    const box = bottomRef.current?.parentElement;
+    if (box) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
   }, [messagesById[activeId ?? ""]?.length]);
 
   const send = async () => {

@@ -338,7 +338,7 @@ export default function BookingsPage() {
             ) : (
               <div className="mt-3 space-y-1.5">
                 {upcoming.slice(0, 6).map((b) => (
-                  <button key={b.id} onClick={() => { setSelected(new Date(b.startsAt)); setOpen(b); }} className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition hover:bg-card-raised">
+                  <button key={b.id} data-guide={`booking-card-${b.with.handle}`} onClick={() => { setSelected(new Date(b.startsAt)); setOpen(b); }} className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition hover:bg-card-raised">
                     <span className={`h-8 w-1 shrink-0 rounded-full ${STATUS[b.status]?.bar}`} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-semibold text-zinc-100">{b.title}</p>
@@ -399,7 +399,7 @@ function PendingCard({ b, onChanged, onOpen }: { b: Booking; onChanged: () => vo
   };
 
   return (
-    <div className="rounded-xl border border-amber-400/25 bg-amber-400/5 p-3">
+    <div data-guide={`booking-card-${b.with.handle}`} className="rounded-xl border border-amber-400/25 bg-amber-400/5 p-3">
       <button onClick={onOpen} className="w-full text-left">
         <p className="text-xs font-bold text-zinc-100">{b.title} — {b.with.displayName}</p>
         <p className="mt-0.5 text-[11px] text-zinc-500">
