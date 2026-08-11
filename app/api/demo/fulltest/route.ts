@@ -1267,7 +1267,7 @@ export async function POST(req: NextRequest) {
 
     const sunday = (() => { let t = new Date(Date.now() + 2 * 86400e3); while (t.getDay() !== 0) t = new Date(t.getTime() + 86400e3); return t.toISOString().slice(0, 10); })();
     const slotsSun = (await api("rachel", `/api/services/${svcF.id}/availability?date=${sunday}`)).data as any;
-    const farDate = new Date(Date.now() + 75 * 86400e3).toISOString().slice(0, 10);
+    const farDate = (() => { let t = new Date(Date.now() + 75 * 86400e3); while (t.getDay() === 0) t = new Date(t.getTime() + 86400e3); return t.toISOString().slice(0, 10); })(); // weekday-safe: closed days rightly outrank the horizon
     const slotsFar = (await api("rachel", `/api/services/${svcF.id}/availability?date=${farDate}`)).data as any;
     step(c, "closed days offer NO times (with the reason) · outside-horizon dates offer NO times (with when they open)",
       slotsSun.dayStatus === "booking_closed" && (slotsSun.slots ?? []).length === 0 && slotsFar.dayStatus === "outside_horizon" && (slotsFar.slots ?? []).length === 0 && !!slotsFar.opensAt, {
