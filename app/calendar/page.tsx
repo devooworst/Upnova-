@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
+import { defaultPercentFor } from "@/lib/progressDefaults";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -713,7 +714,7 @@ function BookingProgressPanel({ b }: { b: Booking }) {
               {latest.percent != null ? `${latest.percent}%` : "—"}
             </span>
           </div>
-          <p className="mt-1.5 text-xs font-semibold text-zinc-200">{latest.statusLabel}</p>
+          <p className="mt-1.5 text-xs font-semibold text-zinc-200">{latest.statusLabel}{latest.percent != null ? ` — ${latest.percent}% complete` : ""}</p>
           {latest.message && <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">&ldquo;{latest.message}&rdquo;</p>}
           {progress?.etaAt && (
             <p className="mt-1 text-[11px] text-zinc-500">
@@ -734,7 +735,15 @@ function BookingProgressPanel({ b }: { b: Booking }) {
       {canPost && open && (
         <div className="mt-2.5 space-y-2">
           <div className="grid grid-cols-2 gap-2">
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-dark py-1.5 text-xs">
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                const d = defaultPercentFor(e.target.value);
+                if (d != null) setPercent(String(d));
+              }}
+              className="input-dark py-1.5 text-xs"
+            >
               {BOOKING_PROGRESS_OPTIONS.map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}

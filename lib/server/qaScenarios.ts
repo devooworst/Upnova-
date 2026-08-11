@@ -1357,6 +1357,60 @@ export function buildContext(startedAt: Date): QaContext {
 }
 
 /** evaluate a scenario against the REAL database */
+/* ------------------------------------------------------------------ */
+/*  PROGRESSION — completed stages STAY completed.                     */
+/*                                                                     */
+/*  Live checkpoints verify the real database; the moment every        */
+/*  checkpoint of an armed scenario passes, that run is snapshotted    */
+/*  into the run state (db/.qa-runs.json). From then on the scenario   */
+/*  reports 14/14 COMPLETE — collapsed, refreshed, after moving to     */
+/*  the next scenario, after logout, after redeploy — until the user   */
+/*  explicitly resets it to replay. Nothing is ever marked passed      */
+/*  artificially: the snapshot is only ever captured from a fully      */
+/*  verified live evaluation.                                          */
+/* ------------------------------------------------------------------ */
+export function scenarioProgress(scenario: QaScenario, runs: import("./qa").QaRuns) {
+  const run = runs[scenario.id];
+  // completed → the verified snapshot is the record of achievement
+  if (run?.completedAt && run.snapshot?.length) {
+    const byId = new Map(run.snapshot.map((s) => [s.id, s]));
+    const steps = scenario.steps.map((s) => {
+      const snap = byId.get(s.id);
+      return {
+        id: s.id,
+        role: s.role,
+        title: s.title,
+        instruction: s.instruction,
+        expected: s.expected,
+        href: "#",
+        canAuto: false,
+        status: "done" as const,
+        actual: snap?.actual ?? "verified",
+        record: snap?.record ?? null,
+      };
+    });
+    return { steps, done: steps.length, total: steps.length, startedAt: run.startedAt, completed: true, completedAt: run.completedAt };
+  }
+  const startedAt = run ? new Date(run.startedAt) : null;
+  const steps = evaluateScenario(scenario, startedAt);
+  const done = steps.filter((x) => x.status === "done").length;
+  // every checkpoint verified → capture the achievement permanently
+  if (run && steps.length > 0 && done === steps.length) {
+    const { readRuns, writeRuns } = require("./qa") as typeof import("./qa");
+    const fresh = readRuns();
+    if (fresh[scenario.id] && !fresh[scenario.id].completedAt) {
+      fresh[scenario.id] = {
+        ...fresh[scenario.id],
+        completedAt: new Date().toISOString(),
+        snapshot: steps.map((s) => ({ id: s.id, role: s.role, title: s.title, instruction: s.instruction, expected: s.expected, actual: s.actual, record: s.record })),
+      };
+      writeRuns(fresh);
+    }
+    return { steps, done, total: steps.length, startedAt: run.startedAt, completed: true, completedAt: new Date().toISOString() };
+  }
+  return { steps, done, total: steps.length, startedAt: run?.startedAt ?? null, completed: false, completedAt: null };
+}
+
 export function evaluateScenario(scenario: QaScenario, startedAt: Date | null) {
   const ctx = startedAt ? buildContext(startedAt) : null;
   return scenario.steps.map((s) => {

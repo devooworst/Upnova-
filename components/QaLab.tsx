@@ -42,8 +42,15 @@ interface ScenarioSummary {
   personas: string[];
   description: string;
   startedAt: string | null;
+  completed?: boolean;
   done: number;
   total: number;
+}
+interface Overall {
+  done: number;
+  total: number;
+  completedScenarios: number;
+  scenarioCount: number;
 }
 interface StepState {
   id: string;
@@ -72,6 +79,15 @@ const roleLabel = (r: string) => (r === "check" ? "AUTO CHECK" : QA_LABEL[r] ?? 
 export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
   const [personas, setPersonas] = useState<Persona[] | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioSummary[] | null>(null);
+  const [overall, setOverall] = useState<Overall | null>(null);
+
+  /** persisted progress is the source of truth — whenever a scenario's
+      fresh state arrives, the summary row updates with it, so collapsed
+      cards always show the real score */
+  const syncSummary = (d: { id: string; done: number; total: number; startedAt: string | null; completed?: boolean }) =>
+    setScenarios((prev) =>
+      prev ? prev.map((x) => (x.id === d.id ? { ...x, done: d.done, total: d.total, startedAt: d.startedAt, completed: d.completed } : x)) : prev
+    );
   const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<ScenarioDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -84,12 +100,17 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
     const d = await res.json();
     setPersonas(d.personas);
     setScenarios(d.scenarios);
+    setOverall(d.overall ?? null);
   }, []);
 
   const loadDetail = useCallback(async (id: string) => {
     const res = await fetch(`/api/qa/scenarios/${id}`, { cache: "no-store" });
-    if (res.ok) setDetail(await res.json());
-  }, []);
+    if (res.ok) {
+      const d = await res.json();
+      setDetail(d);
+      syncSummary(d);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadState();
@@ -125,6 +146,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
       return;
     }
     setDetail(d);
+    syncSummary(d);
     loadState();
   };
 
@@ -200,6 +222,29 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
         {msg && <p className="rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">{msg}</p>}
 
         {/* scenarios */}
+        {/* ---- OVERALL PROGRESSION: the curriculum view — completed
+             stages count forever, moving on never resets them ---- */}
+        {overall && (
+          <div className="rounded-xl border border-line bg-card-raised px-4 py-3" data-tut="qa-progress">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">Lab progression</p>
+              <p className="font-mono text-[11px] font-bold tracking-[0.08em] text-zinc-200">
+                {overall.done}/{overall.total} checks verified ·{" "}
+                <span className={overall.completedScenarios > 0 ? "text-lime-300" : "text-zinc-400"}>
+                  {overall.completedScenarios} of {overall.scenarioCount} stages complete
+                </span>
+              </p>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/40">
+              <div className="h-full rounded-full bg-lime-400 transition-all" style={{ width: `${overall.total ? (overall.done / overall.total) * 100 : 0}%` }} />
+            </div>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+              Complete a stage and it stays complete — verified snapshots survive collapsing, refreshing, moving to the
+              next stage, and redeploys. Only replaying a stage resets it.
+            </p>
+          </div>
+        )}
+
         {/* the lens switcher — three separate environments, zero mixing */}
         <div className="flex flex-wrap items-center gap-1.5" data-tut="qa-lens">
           <span className="mr-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">Testing as</span>
@@ -233,10 +278,17 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                   className="flex w-full flex-wrap items-center gap-3 px-4 py-3 text-left"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-zinc-100">{s.title}</p>
+                    <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+                      {s.title}
+                      {sum.completed && (
+                        <span className="rounded-full border border-lime-400/50 bg-lime-400/10 px-2 py-px font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-lime-300">
+                          ✓ Complete
+                        </span>
+                      )}
+                    </p>
                     <p className="mt-0.5 text-[11px] text-zinc-500">
                       {s.personas.map((h) => QA_LABEL[h] ?? h).join(" ↔ ")}
-                      {sum.startedAt ? ` · started ${new Date(sum.startedAt).toLocaleTimeString()}` : " · not started"}
+                      {sum.completed ? " · stage complete — progress kept" : sum.startedAt ? ` · started ${new Date(sum.startedAt).toLocaleTimeString()}` : " · not started"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -259,7 +311,11 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                         onClick={() => act(s.id, { action: sum.startedAt ? "reset" : "start" }, `arm:${s.id}`)}
                         className={`${sum.startedAt ? "btn-ghost" : "btn-lime"} px-4 py-1.5 text-xs`}
                       >
-                        {sum.startedAt ? (
+                        {sum.completed ? (
+                          <>
+                            <RotateCcw className="h-3.5 w-3.5" /> Replay stage (resets ITS records — other completed stages keep their progress)
+                          </>
+                        ) : sum.startedAt ? (
                           <>
                             <RotateCcw className="h-3.5 w-3.5" /> Reset scenario (wipes QA test records)
                           </>

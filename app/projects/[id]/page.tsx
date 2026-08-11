@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
+import { defaultPercentFor } from "@/lib/progressDefaults";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -314,7 +315,7 @@ export default function ProjectPage() {
             <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Current status</p>
               <p className="mt-1 text-sm font-semibold text-zinc-100">
-                {latest ? latest.statusLabel : STATE_LABEL[project.state]}
+                {latest ? `${latest.statusLabel}${latest.percent != null ? ` — ${latest.percent}% complete` : ""}` : STATE_LABEL[project.state]}
               </p>
               {latest?.message && <p className="mt-1 text-xs leading-relaxed text-zinc-400">&ldquo;{latest.message}&rdquo;</p>}
             </div>
@@ -358,7 +359,16 @@ export default function ProjectPage() {
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Current status</span>
-                  <select value={pStatus} onChange={(e) => setPStatus(e.target.value)} className="input-dark mt-1 w-full py-1.5 text-xs">
+                  <select
+                    value={pStatus}
+                    onChange={(e) => {
+                      setPStatus(e.target.value);
+                      // the status suggests its typical percent — adjust freely after
+                      const d = defaultPercentFor(e.target.value);
+                      if (d != null) setPPercent(String(d));
+                    }}
+                    className="input-dark mt-1 w-full py-1.5 text-xs"
+                  >
                     {PROGRESS_OPTIONS.map(([v, l]) => (
                       <option key={v} value={v}>{l}</option>
                     ))}

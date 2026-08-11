@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
 import { ensureQaPersonas, QA_PERSONAS, isQaHandle, readRuns } from "@/lib/server/qa";
-import { QA_SCENARIOS, evaluateScenario } from "@/lib/server/qaScenarios";
+import { QA_SCENARIOS, scenarioProgress } from "@/lib/server/qaScenarios";
 
 export const dynamic = "force-dynamic";
 
@@ -32,20 +32,27 @@ export async function GET() {
 
     const runs = readRuns();
     const scenarios = QA_SCENARIOS.map((s) => {
-      const run = runs[s.id];
-      const startedAt = run ? new Date(run.startedAt) : null;
-      const steps = evaluateScenario(s, startedAt);
+      const prog = scenarioProgress(s, runs);
       return {
         id: s.id,
         title: s.title,
         personas: s.personas,
         description: s.description,
-        startedAt: startedAt?.toISOString() ?? null,
-        done: steps.filter((x) => x.status === "done").length,
-        total: steps.length,
+        startedAt: prog.startedAt,
+        completed: prog.completed,
+        done: prog.done,
+        total: prog.total,
       };
     });
 
-    return { personas, scenarios, viewerIsPersona: isQaHandle(me.handle), viewerHandle: me.handle };
+    // the curriculum view: completed stages count forever
+    const overall = {
+      done: scenarios.reduce((a, s) => a + s.done, 0),
+      total: scenarios.reduce((a, s) => a + s.total, 0),
+      completedScenarios: scenarios.filter((s) => s.completed).length,
+      scenarioCount: scenarios.length,
+    };
+
+    return { personas, scenarios, overall, viewerIsPersona: isQaHandle(me.handle), viewerHandle: me.handle };
   });
 }

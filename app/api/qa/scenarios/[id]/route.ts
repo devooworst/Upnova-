@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireUser, guarded, ApiError, isDemoMode, signDemoToken } from "@/lib/server/auth";
 import { ensureQaPersonas, resetQaData, readRuns, writeRuns } from "@/lib/server/qa";
-import { getScenario, evaluateScenario, buildContext, type QaApi } from "@/lib/server/qaScenarios";
+import { getScenario, scenarioProgress, buildContext, type QaApi } from "@/lib/server/qaScenarios";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,17 +10,18 @@ function scenarioState(id: string) {
   const scenario = getScenario(id);
   if (!scenario) throw new ApiError(404, "Unknown scenario");
   const runs = readRuns();
-  const startedAt = runs[id] ? new Date(runs[id].startedAt) : null;
-  const steps = evaluateScenario(scenario, startedAt);
+  const prog = scenarioProgress(scenario, runs);
   return {
     id: scenario.id,
     title: scenario.title,
     personas: scenario.personas,
     description: scenario.description,
-    startedAt: startedAt?.toISOString() ?? null,
-    done: steps.filter((s) => s.status === "done").length,
-    total: steps.length,
-    steps,
+    startedAt: prog.startedAt,
+    completed: prog.completed,
+    completedAt: prog.completedAt,
+    done: prog.done,
+    total: prog.total,
+    steps: prog.steps,
   };
 }
 
@@ -63,8 +64,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (action === "start" || action === "reset") {
     const removed = resetQaData();
     const runs = readRuns();
-    // arming one scenario resets the shared QA data, so other runs restart
-    for (const k of Object.keys(runs)) delete runs[k];
+    // PROGRESSION RULE: completed scenarios keep their verified snapshot —
+    // moving to the next stage never erases an achievement. Incomplete
+    // runs restart (their shared QA data was just wiped), and explicitly
+    // arming THIS scenario always starts it fresh (replay clears its
+    // snapshot — choosing to redo is the ONLY way an achievement resets).
+    for (const k of Object.keys(runs)) if (!runs[k].completedAt || k === scenario.id) delete runs[k];
     runs[scenario.id] = { startedAt: new Date().toISOString() };
     writeRuns(runs);
     return Response.json({ ...scenarioState(scenario.id), resetRecords: removed });

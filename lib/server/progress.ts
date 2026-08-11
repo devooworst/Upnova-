@@ -14,6 +14,7 @@
 /* ------------------------------------------------------------------ */
 
 import { randomBytes } from "crypto";
+import { defaultPercentFor } from "@/lib/progressDefaults";
 import { and, asc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { ApiError } from "./auth";
@@ -124,7 +125,10 @@ export function postProgressUpdate(
 
   const status = String(input.status ?? "in_progress") as ProgressStatus;
   if (!PROGRESS_STATUSES.includes(status)) throw new ApiError(400, "Unknown progress status");
-  const percent = input.percent == null ? null : Math.max(0, Math.min(100, Math.round(Number(input.percent))));
+  // the STATUS is the primary indicator; a missing percent takes the
+  // status's default (completed→100, not_started→0, …) — an explicit
+  // percent always wins, clamped 0–100
+  const percent = input.percent == null ? defaultPercentFor(status) : Math.max(0, Math.min(100, Math.round(Number(input.percent))));
   if (input.percent != null && !Number.isFinite(Number(input.percent))) throw new ApiError(400, "Percent must be a number");
   const message = String(input.message ?? "").trim().slice(0, 600);
   const etaAt = input.etaAt ? new Date(input.etaAt) : null;

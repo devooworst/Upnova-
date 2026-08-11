@@ -1459,7 +1459,57 @@ export async function POST(req: NextRequest) {
     const scenarioNow = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
     const progStep = (scenarioNow.steps ?? []).find((x: any) => x.id === "progress");
     step(c, "the scenario checkpoint flips to DONE from the database state", progStep?.status === "done", { actual: JSON.stringify({ status: progStep?.status, actual: progStep?.actual }).slice(0, 120) });
-    await qaAct({ action: "reset" }); // leave the QA stage clean
+
+    /* ===== PROGRESSION: completed stages STAY completed =====
+       Finish the booking stage for real, then prove the score survives
+       collapsing, refreshing, moving to the next stage, and reopening —
+       and that the overall lab progression counts it forever. */
+    await qaAct({ action: "auto", step: "complete" });
+    const doneA = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    step(c, "PROGRESSION · the booking stage completes for real: 14/14, every checkpoint verified against the database",
+      doneA.done === doneA.total && doneA.total === 14 && doneA.completed === true, { actual: `${doneA.done}/${doneA.total} completed=${doneA.completed}` });
+
+    // collapse/refresh = fresh, independent reads — the score never wobbles
+    const re1 = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    const re2 = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    step(c, "PROGRESSION · collapse + refresh (two fresh reads): STILL 14/14 — persisted state is the source of truth, not what's on screen",
+      re1.done === 14 && re2.done === 14 && re1.completed && re2.completed, { actual: `${re1.done}/14 then ${re2.done}/14` });
+
+    // move to the NEXT stage — the previous one keeps its achievement
+    await asTok(tokAdmin, "/api/qa/scenarios/project", { method: "POST", body: { action: "start" } });
+    const afterB = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    const projState = (await asTok(tokAdmin, "/api/qa/scenarios/project")).data as any;
+    step(c, "PROGRESSION · starting the NEXT stage never resets the last one: booking stays ✓ 14/14 while project arms at 0/" + projState.total,
+      afterB.done === 14 && afterB.completed === true && projState.startedAt && projState.done === 0, {
+      actual: `booking=${afterB.done}/14 completed=${afterB.completed} · project=${projState.done}/${projState.total}` });
+
+    // reopen the completed stage — still complete
+    const reopenA = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    step(c, "PROGRESSION · reopening the completed stage: still complete, checkpoints shown from its verified snapshot",
+      reopenA.completed === true && (reopenA.steps ?? []).every((s: any) => s.status === "done"), { actual: `${reopenA.done}/${reopenA.total}` });
+
+    // partial progress in stage B survives navigating away and back
+    await asTok(tokAdmin, "/api/qa/scenarios/project", { method: "POST", body: { action: "auto", step: "draft" } });
+    await asTok(tokAdmin, "/api/qa/scenarios/project", { method: "POST", body: { action: "auto", step: "offer" } });
+    const partial1 = (await asTok(tokAdmin, "/api/qa/scenarios/project")).data as any;
+    await asTok(tokAdmin, "/api/qa/state"); // navigate away (lab overview)…
+    const partial2 = (await asTok(tokAdmin, "/api/qa/scenarios/project")).data as any;
+    step(c, "PROGRESSION · partial progress in the next stage survives navigating away and returning",
+      partial1.done >= 2 && partial2.done === partial1.done, { actual: `before=${partial1.done} after=${partial2.done}` });
+
+    // the curriculum view: overall progression includes the completed stage
+    const lab = (await asTok(tokAdmin, "/api/qa/state")).data as any;
+    const bookRow = (lab.scenarios ?? []).find((s: any) => s.id === "booking");
+    step(c, "PROGRESSION · overall lab progression counts completed stages forever (booking ✓ 14/14 + project partial in the totals)",
+      bookRow?.completed === true && bookRow?.done === 14 && lab.overall?.done >= 14 + partial2.done && lab.overall?.completedScenarios >= 1, {
+      actual: `overall=${lab.overall?.done}/${lab.overall?.total} stagesComplete=${lab.overall?.completedScenarios}` });
+
+    // stage clean: explicit replay is the ONLY thing that resets a completed stage
+    await asTok(tokAdmin, "/api/qa/scenarios/project", { method: "POST", body: { action: "reset" } });
+    await qaAct({ action: "reset" }); // booking replay — clears its snapshot by choice
+    const afterReset = (await asTok(tokAdmin, "/api/qa/scenarios/booking")).data as any;
+    step(c, "PROGRESSION · explicitly replaying a stage resets it (0/14) — the user's choice, never a side effect",
+      afterReset.done === 0 && !afterReset.completed, { actual: `${afterReset.done}/${afterReset.total}` });
   }
 
   /* ================= DATABASE INTEGRITY ================= */

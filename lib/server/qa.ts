@@ -211,7 +211,23 @@ export function resetQaData(): number {
 
 const RUNS_FILE = join(process.cwd(), "db", ".qa-runs.json");
 
-export type QaRuns = Record<string, { startedAt: string }>;
+/** a completed scenario keeps its VERIFIED snapshot forever: the steps
+    as they evaluated (against real DB state) at the moment everything
+    passed. Moving on to another scenario never erases the achievement —
+    only an explicit reset of THAT scenario does. */
+export type QaStepSnapshot = {
+  id: string;
+  role: string;
+  title: string;
+  instruction: string;
+  expected: string;
+  actual: string;
+  record: string | null;
+};
+export type QaRuns = Record<
+  string,
+  { startedAt: string; completedAt?: string; snapshot?: QaStepSnapshot[] }
+>;
 
 export function readRuns(): QaRuns {
   try {
