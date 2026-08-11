@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/* UpNova monetization — single source of truth.                       */
+/* Mavyn monetization — single source of truth.                       */
 /*                                                                     */
 /* Model: buyer pays the platform fee separately. The creator's listed */
 /* price is exactly what the creator earns (before payment-processing  */
@@ -8,7 +8,7 @@
 /* Production architecture: Stripe Connect (connected accounts,        */
 /* onboarding/verification, destination charges with application_fee,  */
 /* payouts, refunds, disputes). No proprietary wallet. No stored       */
-/* balances. UpNova never holds funds itself — the processor does.     */
+/* balances. Mavyn never holds funds itself — the processor does.     */
 /* Every amount shown in the UI must flow through these helpers so the */
 /* fee model is a config change, not a rewrite.                        */
 /* ------------------------------------------------------------------ */

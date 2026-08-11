@@ -2,11 +2,11 @@
 
 /* ------------------------------------------------------------------ */
 /*  ShareSheet — post-publish sharing for every publishable type.      */
-/*  The UpNova URL is permanent and canonical: sharing drives people   */
+/*  The Mavyn URL is permanent and canonical: sharing drives people   */
 /*  BACK to the real post/opportunity/service/product/work — never a   */
 /*  disconnected copy. Native device sharing where available           */
 /*  (navigator.share), universal web intents + copy-link everywhere    */
-/*  else. No one has to leave UpNova to get their link.                */
+/*  else. No one has to leave Mavyn to get their link.                */
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";

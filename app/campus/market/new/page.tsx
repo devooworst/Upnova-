@@ -100,7 +100,7 @@ export default function NewCampusListingPage() {
   if (user === null)
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <p className="text-sm font-semibold text-zinc-200">Join UpNova and verify your campus to list</p>
+        <p className="text-sm font-semibold text-zinc-200">Join Mavyn and verify your campus to list</p>
         <Link href="/signup?next=%2Fcampus%2Fmarket%2Fnew" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Create free account</Link>
       </div>
     );
@@ -135,7 +135,7 @@ export default function NewCampusListingPage() {
           {type === "need_borrow" && "You're asking to borrow something. Owners nearby can offer theirs."}
           {type === "auction" && "Optional — most campus listings do fine as fixed price or OBO."}
           {type === "trade" && "Offers happen in Messages — describe what you'd trade for."}
-          {["fixed", "negotiable"].includes(type) && "Paid campus sales run through UpNova's protected orders — funds held until handoff."}
+          {["fixed", "negotiable"].includes(type) && "Paid campus sales run through Mavyn's protected orders — funds held until handoff."}
         </p>
       </section>
 

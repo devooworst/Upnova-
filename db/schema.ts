@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/*  UpNova — production data model (Drizzle ORM)                       */
+/*  Mavyn — production data model (Drizzle ORM)                       */
 /*                                                                     */
 /*  Dev runs on SQLite (zero-config in any sandbox). The schema is     */
 /*  written to be portable to Postgres for production: swap the        */
@@ -61,7 +61,7 @@ export const users = sqliteTable("users", {
   smsConsent: integer("sms_consent", { mode: "boolean" }).notNull().default(false),
   notifyPrefs: text("notify_prefs").notNull().default(""),
   status: text("status").notNull().default("active"), // active | suspended
-  // individual | business. businessVerified is EARNED through UpNova's
+  // individual | business. businessVerified is EARNED through Mavyn's
   // business-verification process — it is never granted by a subscription.
   accountType: text("account_type").notNull().default("individual"),
   businessVerified: integer("business_verified", { mode: "boolean" }).notNull().default(false),
@@ -209,8 +209,8 @@ export const posts = sqliteTable(
     disclosure: text("disclosure").notNull().default("unspecified"), // original | ai_assisted | ai_generated | credited | unspecified
     attested: bool("attested", false),
     credit: text("credit").notNull().default(""), // who made it, when disclosure=credited
-    projectId: text("project_id"), // completed UpNova project this work came from
-    bookingId: text("booking_id"), // completed UpNova booking this work came from
+    projectId: text("project_id"), // completed Mavyn project this work came from
+    bookingId: text("booking_id"), // completed Mavyn booking this work came from
     clientConfirmed: bool("client_confirmed", false),
     isSeed: seed(),
     createdAt: ts("created_at"),
@@ -413,7 +413,7 @@ export const communityPosts = sqliteTable(
     identity: text("identity").notNull().default("real"), // real | alias | anonymous
     body: text("body").notNull(),
     media: text("media").notNull().default("[]"),
-    // optional link to another UpNova record (service, opportunity, event,
+    // optional link to another Mavyn record (service, opportunity, event,
     // campus listing, product, work) — source preserved, never copied
     refType: text("ref_type"),
     refId: text("ref_id"),
@@ -600,7 +600,7 @@ export const services = sqliteTable("services", {
   fulfillment: text("fulfillment").notNull().default("project"),
   // creator-defined business rules (JSON — see lib/servicePolicies.ts):
   // location mode, travel fees, service radius, scheduling limits, and
-  // cancellation/reschedule/late/no-show policies. UpNova provides the
+  // cancellation/reschedule/late/no-show policies. Mavyn provides the
   // infrastructure; the creator decides how their business operates.
   config: text("config").notNull().default("{}"),
   // "show your work" — up to 3 images attached to the listing (JSON array)
@@ -665,10 +665,10 @@ export const opportunities = sqliteTable("opportunities", {
   // ENGAGEMENT configuration (JSON, lib/engagement.ts) — one-time work vs
   // ongoing relationships on the SAME system: {type: one_time|short_term|
   // ongoing|part_time|full_time|temporary|collab|custom, workload, schedule,
-  // startDate, duration, compModel, rate, classification: upnova_freelance|
-  // external_employment, interviewMode: none|upnova|external}. UpNova never
+  // startDate, duration, compModel, rate, classification: mavyn_freelance|
+  // external_employment, interviewMode: none|mavyn|external}. Mavyn never
   // classifies anyone as employee/contractor — the poster configures it and
-  // external employment is labeled as handled OUTSIDE UpNova.
+  // external employment is labeled as handled OUTSIDE Mavyn.
   engagement: text("engagement").notNull().default("{}"),
   status: text("status").notNull().default("open"), // open | closed | filled
   isSeed: seed(),
@@ -688,8 +688,8 @@ export const applications = sqliteTable(
     message: text("message").notNull().default(""),
     // which role this person applied for (role opportunities only)
     roleId: text("role_id"),
-    // interview stage (JSON): {mode: "upnova"|"external", at?, note?} —
-    // external interviews are labeled as happening OUTSIDE UpNova
+    // interview stage (JSON): {mode: "mavyn"|"external", at?, note?} —
+    // external interviews are labeled as happening OUTSIDE Mavyn
     interview: text("interview").notNull().default("{}"),
     // the configurable OFFER the poster sent (JSON, lib/engagement.ts):
     // role, comp model + amount, schedule, start date, duration,
@@ -952,10 +952,10 @@ export const portfolioItems = sqliteTable("portfolio_items", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  kind: text("kind").notNull().default("image"), // image | video | audio | link | project | upnova_project
+  kind: text("kind").notNull().default("image"), // image | video | audio | link | project | mavyn_project
   mediaUrl: text("media_url"),
   client: text("client").notNull().default(""),
-  projectId: text("project_id"), // set when sourced from a completed UpNova project
+  projectId: text("project_id"), // set when sourced from a completed Mavyn project
   aiInvolvement: text("ai_involvement").notNull().default("none"),
   visible: bool("visible", true),
   createdAt: ts("created_at"),
@@ -980,9 +980,9 @@ export const experiences = sqliteTable("experiences", {
    offer · Booking = someone scheduled you · Project = structured paid work
    · Opportunity = you're asking for people · PRODUCT = something you SELL.
    One configurable listing system: category (official or custom), variants,
-   quantity, fulfillment options, and either UpNova checkout (orders below)
+   quantity, fulfillment options, and either Mavyn checkout (orders below)
    or an HONEST external link ("you'll complete your purchase on the
-   seller's website" — UpNova never pretends it processed that sale). */
+   seller's website" — Mavyn never pretends it processed that sale). */
 
 export const products = sqliteTable("products", {
   id: id(),
@@ -991,7 +991,7 @@ export const products = sqliteTable("products", {
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
-  // whole dollars, seller payout; buyer pays the 5% fee on top (UpNova checkout)
+  // whole dollars, seller payout; buyer pays the 5% fee on top (Mavyn checkout)
   price: integer("price").notNull(),
   category: text("category").notNull().default("other"),
   condition: text("condition").notNull().default(""), // "", new, like_new, used
@@ -1005,7 +1005,7 @@ export const products = sqliteTable("products", {
   // seller-defined return policy (JSON, lib/protection.ts) — disclosed
   // BEFORE checkout. Platform protections survive "no returns".
   returnPolicy: text("return_policy").notNull().default("{}"),
-  // set ⇒ external checkout: discovery on UpNova, purchase on their site
+  // set ⇒ external checkout: discovery on Mavyn, purchase on their site
   externalUrl: text("external_url"),
   status: text("status").notNull().default("active"), // active | sold_out | archived
   isSeed: seed(),
@@ -1059,7 +1059,7 @@ export const orders = sqliteTable(
 /* ---------------------------------- works ---------------------------------- */
 /* Licensable creative WORK — beats, tracks, packs, photos, designs. The
    seventh entity: showcased safely (configurable preview, creator-controlled
-   watermark labeling) and licensed on the CREATOR's terms. UpNova never
+   watermark labeling) and licensed on the CREATOR's terms. Mavyn never
    claims content can't be recorded or stolen — the protection is clear
    terms, preserved license records, and a dispute lane with evidence. */
 

@@ -43,7 +43,7 @@
   --scrollbar: #2b2b33;
 }
 
-/* ---------- light mode: same UpNova, different room ---------- */
+/* ---------- light mode: same Mavyn, different room ---------- */
 html.light {
   color-scheme: light;
   --c-ink: 244 244 246;

@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- UpNova — Row Level Security policies (production / Postgres)
+-- Mavyn — Row Level Security policies (production / Postgres)
 --
 -- Dev runs on SQLite where RLS does not exist; lib/server/authz.ts
 -- enforces the same rules in the app layer. When the datasource moves

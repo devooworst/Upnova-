@@ -2,14 +2,14 @@
 /*  Engagement configuration — one-time work AND ongoing professional  */
 /*  relationships on the SAME universal Opportunity system.            */
 /*                                                                     */
-/*  · The poster configures the type; UpNova never auto-classifies     */
+/*  · The poster configures the type; Mavyn never auto-classifies     */
 /*    anyone as employee vs contractor.                                */
-/*  · classification distinguishes work FACILITATED through UpNova     */
+/*  · classification distinguishes work FACILITATED through Mavyn     */
 /*    (freelance/contract, native payment workflow) from EMPLOYMENT    */
-/*    handled by an external employer (clearly labeled, no UpNova      */
+/*    handled by an external employer (clearly labeled, no Mavyn      */
 /*    payment pretense).                                               */
 /*  · Compensation schedules are configuration: hourly, per-project,   */
-/*    milestone, weekly, biweekly, monthly, custom. Ongoing UpNova     */
+/*    milestone, weekly, biweekly, monthly, custom. Ongoing Mavyn     */
 /*    engagements are paid in CYCLES through the existing secured →    */
 /*    released payment machinery — one cycle, one visible payment.     */
 /* ------------------------------------------------------------------ */
@@ -51,8 +51,8 @@ export interface EngagementConfig {
   compModel: CompModel;
   rate?: number; // dollars per cycle/unit (poster payout basis)
   rateNote?: string; // "per finished video", custom arrangements
-  classification: "upnova_freelance" | "external_employment";
-  interviewMode: "none" | "upnova" | "external";
+  classification: "mavyn_freelance" | "external_employment";
+  interviewMode: "none" | "mavyn" | "external";
   externalNote?: string; // how the external process works
 }
 
@@ -79,8 +79,8 @@ export function normalizeEngagement(p: Record<string, unknown>): EngagementConfi
     compModel: (COMP_MODELS.find((c) => c.id === p.compModel)?.id ?? "per_project") as CompModel,
     rate: p.rate == null || p.rate === "" ? undefined : Math.min(1_000_000, Math.max(0, Math.round(Number(p.rate) || 0))),
     rateNote: String(p.rateNote || "").slice(0, 120) || undefined,
-    classification: p.classification === "external_employment" ? "external_employment" : "upnova_freelance",
-    interviewMode: ["none", "upnova", "external"].includes(String(p.interviewMode)) ? (p.interviewMode as EngagementConfig["interviewMode"]) : "none",
+    classification: p.classification === "external_employment" ? "external_employment" : "mavyn_freelance",
+    interviewMode: ["none", "mavyn", "external"].includes(String(p.interviewMode)) ? (p.interviewMode as EngagementConfig["interviewMode"]) : "none",
     externalNote: String(p.externalNote || "").slice(0, 200) || undefined,
   };
 }
@@ -109,9 +109,9 @@ export interface EngagementOffer {
   schedule?: string;
   startDate?: string;
   duration?: string;
-  classification: "upnova_freelance" | "external_employment";
+  classification: "mavyn_freelance" | "external_employment";
   note?: string; // other agreed terms
-  cycles?: number; // paid cycles started so far (UpNova-native only)
+  cycles?: number; // paid cycles started so far (Mavyn-native only)
 }
 
 export function parseOffer(raw: string | null | undefined): EngagementOffer | null {
@@ -125,8 +125,8 @@ export function parseOffer(raw: string | null | undefined): EngagementOffer | nu
 }
 
 export interface InterviewInfo {
-  mode: "upnova" | "external";
-  at?: string; // ISO — UpNova-scheduled
+  mode: "mavyn" | "external";
+  at?: string; // ISO — Mavyn-scheduled
   note?: string;
 }
 

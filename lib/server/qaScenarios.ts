@@ -3,7 +3,7 @@
 /*                                                                     */
 /*  Each checkpoint names WHO acts (TEST CUSTOMER / TEST CREATOR /     */
 /*  TEST BUSINESS), tells the tester exactly what to do in the REAL    */
-/*  UpNova interface, and has a verify() that inspects the REAL        */
+/*  Mavyn interface, and has a verify() that inspects the REAL        */
 /*  database. A checkpoint is DONE only when the expected state        */
 /*  actually exists — never because a button was clicked or an API     */
 /*  returned 200.                                                      */

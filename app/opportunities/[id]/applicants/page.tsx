@@ -228,7 +228,7 @@ export default function ApplicantsPage() {
       {a.status === "interview" && a.interview && (
         <p className="mt-2 rounded-lg border border-sky-400/25 bg-sky-400/5 px-3 py-2 text-[11px] text-zinc-300">
           {a.interview.mode === "external"
-            ? "Interview happens OUTSIDE UpNova — external process, coordinate in Messages."
+            ? "Interview happens OUTSIDE Mavyn — external process, coordinate in Messages."
             : `Interview scheduled ${a.interview.at ? new Date(a.interview.at).toLocaleDateString("en-US", { month: "long", day: "numeric" }) + " · " + new Date(a.interview.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""} — on both calendars.`}
         </p>
       )}
@@ -238,7 +238,7 @@ export default function ApplicantsPage() {
             <span className="font-semibold text-lime-300">Active</span> — {a.offer.title} ·{" "}
             {ENGAGEMENT_TYPES.find((t) => t.id === a.offer!.engagementType)?.label}
             {a.offer.classification === "external_employment"
-              ? " · compensation handled OUTSIDE UpNova"
+              ? " · compensation handled OUTSIDE Mavyn"
               : ` · $${a.offer.amount} per ${cycleLabel(a.offer.compModel)} · ${a.offer.cycles ?? 0} cycle${(a.offer.cycles ?? 0) === 1 ? "" : "s"} started`}
           </p>
           {a.offer.classification !== "external_employment" && (
@@ -281,7 +281,7 @@ export default function ApplicantsPage() {
           )}
           {opportunity.engagement && opportunity.engagement.interviewMode !== "none" && a.status !== "interview" && (
             interviewFor === a.id ? (
-              opportunity.engagement.interviewMode === "upnova" ? (
+              opportunity.engagement.interviewMode === "mavyn" ? (
                 <span className="flex items-center gap-1.5">
                   <input type="datetime-local" value={interviewAt} onChange={(e) => setInterviewAt(e.target.value)} className="rounded-lg border border-line bg-card-raised px-2 py-1.5 text-xs text-zinc-100 outline-none" />
                   <button onClick={() => interviewAt && act(a.id, { action: "interview", at: new Date(interviewAt).toISOString() })} className="btn-ghost px-2.5 py-1.5 text-xs">Book</button>
@@ -482,7 +482,7 @@ function OfferModal({
   const [startDate, setStartDate] = useState(engagement?.startDate?.slice(0, 10) ?? "");
   const [duration, setDuration] = useState(engagement?.duration ?? "");
   const [note, setNote] = useState("");
-  const classification = engagement?.classification ?? "upnova_freelance";
+  const classification = engagement?.classification ?? "mavyn_freelance";
   const inputCls =
     "w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50";
 
@@ -518,8 +518,8 @@ function OfferModal({
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Other agreed terms (optional)" className={`${inputCls} resize-none`} />
           <p className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${classification === "external_employment" ? "border-sky-400/25 bg-sky-400/5 text-sky-200" : "border-lime-400/25 bg-lime-400/5 text-zinc-300"}`}>
             {classification === "external_employment"
-              ? "External employment — payroll and classification are handled by the employer OUTSIDE UpNova. No UpNova payment workflow."
-              : "Freelance / contract through UpNova — each cycle is secured up front and released on completion. Buyer pays the 5% fee on top."}
+              ? "External employment — payroll and classification are handled by the employer OUTSIDE Mavyn. No Mavyn payment workflow."
+              : "Freelance / contract through Mavyn — each cycle is secured up front and released on completion. Buyer pays the 5% fee on top."}
           </p>
           <button
             onClick={() => onSend({ title, engagementType, compModel, amount: Number(amount) || 0, schedule, startDate: startDate || undefined, duration, note, classification })}

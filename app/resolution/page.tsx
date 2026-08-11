@@ -41,7 +41,7 @@ export default function ResolutionPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       <header>
         <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-lime-400">
-          <ShieldCheck className="h-3.5 w-3.5" /> upnova protected
+          <ShieldCheck className="h-3.5 w-3.5" /> mavyn protected
         </p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-50">Resolution Center</h1>
         <p className="mt-1.5 max-w-lg text-sm text-zinc-500">
@@ -148,7 +148,7 @@ export default function ResolutionPage() {
 Creative Integrity Review
         </h2>
         <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-          UpNova doesn&apos;t prohibit AI — it prohibits <span className="font-semibold text-zinc-300">misrepresentation</span>.
+          Mavyn doesn&apos;t prohibit AI — it prohibits <span className="font-semibold text-zinc-300">misrepresentation</span>.
           Every project records its agreed AI policy. If a client believes the policy was violated
           (&ldquo;this hand-painted illustration looks AI-generated&rdquo;), they can open a review.
           We don&apos;t claim automatic AI detection — reviews rely on the agreement, disclosures,
@@ -191,7 +191,7 @@ Creative Integrity Review
       <section className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4">
         <p className="flex items-center gap-2 text-sm font-bold text-amber-300">⚠️ Stay protected</p>
         <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-          Never send payment outside UpNova. Payments made outside UpNova may not be covered by
+          Never send payment outside Mavyn. Payments made outside Mavyn may not be covered by
           transaction protections. If someone asks you to pay through Cash App, Venmo, or Zelle
           instead — that&apos;s a red flag. <button onClick={() => setReportOpen(true)} className="font-semibold text-amber-300 underline-offset-2 hover:underline">Report it</button>.
         </p>
@@ -206,7 +206,7 @@ Creative Integrity Review
 
       <p className="text-center text-[10px] leading-relaxed text-zinc-600">
         Production dispute handling runs on the payment provider&apos;s hold, refund, and dispute
-        mechanisms (Stripe Connect) — UpNova never holds funds itself.{" "}
+        mechanisms (Stripe Connect) — Mavyn never holds funds itself.{" "}
         <Link href="/settings" className="underline-offset-2 hover:underline">Payment settings</Link>
       </p>
 

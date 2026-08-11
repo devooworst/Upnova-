@@ -521,7 +521,7 @@ export default function CampusPage() {
       {section === "opps" && (
         <div className="space-y-4 animate-fade-up">
           <p className="text-sm text-zinc-500">
-            Paid work, gigs, and collaborations on campus — same protected system as everywhere on UpNova.
+            Paid work, gigs, and collaborations on campus — same protected system as everywhere on Mavyn.
           </p>
           {campusOppIds.map((id) => (
             <OpportunityCard key={id} id={id} />
@@ -578,7 +578,7 @@ export default function CampusPage() {
             </span>
           </a>
           <p className="px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-600">
-            Real name · alias · anonymous — anonymous to the community, always accountable to UpNova
+            Real name · alias · anonymous — anonymous to the community, always accountable to Mavyn
           </p>
         </div>
       )}

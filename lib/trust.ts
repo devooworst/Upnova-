@@ -2,18 +2,18 @@
 /*  Trust & Authenticity — the shared vocabulary.                      */
 /*                                                                     */
 /*  Principle: show users what has actually been VERIFIED, never tell  */
-/*  them who to trust. UpNova doesn't guarantee skill or originality — */
+/*  them who to trust. Mavyn doesn't guarantee skill or originality — */
 /*  it labels the evidence it actually has:                            */
 /*                                                                     */
 /*   Account signals (earned, NEVER purchasable — Pro/Business         */
 /*   subscriptions grant zero of these):                               */
-/*     identity_verified  — UpNova verified the person's identity      */
-/*     business_verified  — UpNova verified the organization           */
-/*     student_verified   — UpNova verified student status             */
+/*     identity_verified  — Mavyn verified the person's identity      */
+/*     business_verified  — Mavyn verified the organization           */
+/*     student_verified   — Mavyn verified student status             */
 /*                                                                     */
 /*   Content signals (per post, computed/recorded server-side):        */
 /*     verified_work      — the work is associated with a COMPLETED    */
-/*                          UpNova project or booking (server-checked) */
+/*                          Mavyn project or booking (server-checked) */
 /*     client_confirmed   — the counterparty confirmed it happened     */
 /*     creator_attested   — the creator confirms the right to publish  */
 /*                          and isn't presenting someone else's work   */
@@ -65,17 +65,17 @@ export const ACCOUNT_BADGES: Record<AccountBadge, { label: string; tone: string;
   identity_verified: {
     label: "Identity Verified",
     tone: "lime",
-    description: "UpNova has verified this person's identity. Only the badge is shown — never documents.",
+    description: "Mavyn has verified this person's identity. Only the badge is shown — never documents.",
   },
   business_verified: {
     label: "Business Verified",
     tone: "sky",
-    description: "UpNova has verified this organization's business information.",
+    description: "Mavyn has verified this organization's business information.",
   },
   student_verified: {
     label: "Student Verified",
     tone: "violet",
-    description: "UpNova has verified current student status at the listed campus.",
+    description: "Mavyn has verified current student status at the listed campus.",
   },
 };
 
@@ -87,7 +87,7 @@ export const CONTENT_SIGNALS: Record<ContentSignal, { label: string; tone: strin
   verified_work: {
     label: "Verified Work",
     tone: "lime",
-    description: "UpNova can associate this work with a completed UpNova project or booking.",
+    description: "Mavyn can associate this work with a completed Mavyn project or booking.",
   },
   client_confirmed: {
     label: "Client Confirmed",
@@ -98,7 +98,7 @@ export const CONTENT_SIGNALS: Record<ContentSignal, { label: string; tone: strin
     label: "Creator Attested",
     tone: "zinc",
     description:
-      "The creator confirms they have the right to publish this and aren't presenting someone else's work as their own. This is the creator's claim — UpNova has not independently verified it.",
+      "The creator confirms they have the right to publish this and aren't presenting someone else's work as their own. This is the creator's claim — Mavyn has not independently verified it.",
   },
 };
 

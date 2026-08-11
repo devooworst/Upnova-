@@ -258,7 +258,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                 {user.accountType !== "business" && user.trustLevel !== "standard" && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300"
-                    title="Verified through UpNova's identity process. Documents are never shown to other users — only this badge."
+                    title="Verified through Mavyn's identity process. Documents are never shown to other users — only this badge."
                   >
                     Identity verified
                   </span>
@@ -270,7 +270,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                   <Link
                     href={data.academic.schoolSlug ? `/schools/${data.academic.schoolSlug}` : "#"}
                     className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300 transition hover:bg-violet-400/20"
-                    title="Platform-verified school affiliation. Tap to see everyone at this school on UpNova."
+                    title="Platform-verified school affiliation. Tap to see everyone at this school on Mavyn."
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
                     {data.academic.school}
@@ -339,7 +339,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
           {stats.completedProjects != null && (
             <div>
               <dd className="text-xl font-bold text-zinc-50">{stats.completedProjects}</dd>
-              <dt className="text-xs text-zinc-500" title="Calculated from completed UpNova projects — never self-reported">
+              <dt className="text-xs text-zinc-500" title="Calculated from completed Mavyn projects — never self-reported">
                 Completed
               </dt>
             </div>
@@ -409,7 +409,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     trust: (
       <React.Fragment key="trust">
       {/* ---- Trust & authenticity — what's actually verified, computed from
-     records. UpNova shows the evidence; it doesn't tell you who to
+     records. Mavyn shows the evidence; it doesn't tell you who to
      trust. Badges are earned, never part of any subscription. ---- */}
       {data.trust && (
   <section className={`card p-5 ${theme.card} ${effect.cls}`}>
@@ -441,7 +441,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         <span className="block font-mono text-base font-semibold tracking-[0.05em] text-zinc-100">
           {data.trust.completedProjects + data.trust.completedBookings}
         </span>
-        Completed on UpNova
+        Completed on Mavyn
       </li>
       <li>
         <span className="block font-mono text-base font-semibold tracking-[0.05em] text-lime-300">{data.trust.verifiedWorkPosts}</span>
@@ -580,7 +580,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
      Free placement of APPROVED elements on desktop; below sm everything
      stacks in top-to-bottom order so mobile never breaks. The hero (name,
      identity, actions) is indivisible and always visible; every function
-     inside it stays standard UpNova. */
+     inside it stays standard Mavyn. */
   const world = studio?.world;
   if (world?.enabled) {
     /* WHICH LAYOUT? The editor edits its selected device; the viewer
@@ -860,7 +860,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                   {showTitle && (
                     <div className="pointer-events-none absolute inset-x-1 top-0 z-[1] flex items-center justify-between px-3 pt-1" aria-hidden={!worldTitle}>
                       <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-zinc-400/90">{worldTitle}</p>
-                      <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on UpNova</p>
+                      <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500/80">built on Mavyn</p>
                     </div>
                   )}
                   {/* SMART GUIDES — rose lines while dragging, gone on release */}
@@ -1013,7 +1013,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
 
       {/* ---- Profile Studio (Pro, appearance-only): approved design system
            values only; the header, actions, and every function stay
-           UpNova-controlled. Sections below render in the owner's saved
+           Mavyn-controlled. Sections below render in the owner's saved
            order. ---- */}
       {data.studioDemoPreview && (
         <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-2 text-[11px] text-amber-300">

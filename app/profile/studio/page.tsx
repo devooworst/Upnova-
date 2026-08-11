@@ -154,13 +154,13 @@ export default function ProfileStudioPage() {
   };
 
   const reset = async () => {
-    if (!window.confirm("Reset your profile to the standard UpNova design? Your customization is deleted.")) return;
+    if (!window.confirm("Reset your profile to the standard Mavyn design? Your customization is deleted.")) return;
     setBusy(true);
     const res = await fetch("/api/me/studio", { method: "DELETE" });
     if (res.ok) {
       setCfg(DEFAULT_STUDIO);
       setDirty(false);
-      setMsg({ kind: "ok", text: "Back to the standard UpNova design." });
+      setMsg({ kind: "ok", text: "Back to the standard Mavyn design." });
       setMeta((m) => (m ? { ...m, saved: false, active: false } : m));
     }
     setBusy(false);
@@ -196,7 +196,7 @@ export default function ProfileStudioPage() {
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">Profile Studio</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
           Full visual customization of your profile — themes, frames, accents, and section layout —
-          is an <span className="font-semibold text-lime-300">UpNova Pro</span> feature.
+          is an <span className="font-semibold text-lime-300">Mavyn Pro</span> feature.
           {meta.saved && (
             <span className="mt-2 block text-zinc-400">
               Your previously saved customization is <span className="font-semibold text-zinc-200">preserved</span> and
@@ -226,7 +226,7 @@ export default function ProfileStudioPage() {
       <header className="flex flex-wrap items-end justify-between gap-3 pt-2">
         <div>
           <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-lime-400">
-            <Sparkles className="h-3.5 w-3.5" /> upnova pro
+            <Sparkles className="h-3.5 w-3.5" /> mavyn pro
           </p>
           <h1 className="mt-1 flex items-center gap-2.5 text-2xl font-bold tracking-tight text-zinc-50">
             <Palette className="h-6 w-6 text-lime-400" /> Profile Studio
@@ -234,7 +234,7 @@ export default function ProfileStudioPage() {
           <p className="mt-1 max-w-xl text-sm text-zinc-500">
             Make your profile yours — themes, frames, accents, and section order from the approved
             design system. Appearance only: navigation, messaging, payments, verification, and
-            safety always stay standard UpNova.
+            safety always stay standard Mavyn.
           </p>
         </div>
         <div className="flex gap-2">
@@ -465,7 +465,7 @@ export default function ProfileStudioPage() {
               <h2 className="text-sm font-bold text-zinc-100">Section layout</h2>
               <p className="mt-1 text-xs text-zinc-500">
                 Reordering sections (and My World) is part of the full Pro Studio — College+ keeps
-                the standard UpNova structure while you decorate it.
+                the standard Mavyn structure while you decorate it.
               </p>
               <Link href="/pro" className="btn-lime mt-3 inline-flex rounded-md px-4 py-1.5 text-xs">Upgrade to Pro</Link>
             </section>
@@ -474,7 +474,7 @@ export default function ProfileStudioPage() {
             <h2 className="text-sm font-bold text-zinc-100">Section layout</h2>
             <p className="mt-1 text-xs text-zinc-500">
               Reorder your profile&apos;s content sections. The header (name, identity, actions) is fixed —
-              that&apos;s UpNova&apos;s, always.
+              that&apos;s Mavyn&apos;s, always.
             </p>
             <ul className="mt-3 space-y-1.5">
               {cfg.sections.map((id, i) => (

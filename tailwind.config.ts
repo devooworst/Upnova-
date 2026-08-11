@@ -10,7 +10,7 @@ const config: Config = {
     extend: {
       colors: {
         /* the whole palette rides on CSS variables so light mode is a
-           class on <html>, not a rewrite — same UpNova, different room */
+           class on <html>, not a rewrite — same Mavyn, different room */
         ink: {
           DEFAULT: "rgb(var(--c-ink) / <alpha-value>)",
           soft: "rgb(var(--c-ink-soft) / <alpha-value>)",

@@ -45,7 +45,7 @@ function LearnInner() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-16 pt-6">
-      <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Learn UpNova</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Learn Mavyn</h1>
       <p className="mt-1 max-w-xl text-sm leading-relaxed text-zinc-400">
         Short, real-world walkthroughs — not a manual. You don&apos;t need to understand everything right now:
         pick what fits you, and explore at your own pace.

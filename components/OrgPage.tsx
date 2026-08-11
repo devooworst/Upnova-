@@ -188,7 +188,7 @@ export default function OrgPage({ id }: { id: string }) {
               ))}
             </ul>
             <p className="border-t border-line-soft px-4 py-2.5 text-[10px] text-zinc-600">
-              Bigger org events (ticketed, 21+, capacity) run on the full UpNova Events system.
+              Bigger org events (ticketed, 21+, capacity) run on the full Mavyn Events system.
             </p>
           </section>
 

@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const { product, user, profile } = row;
 
     // seller history — computed from records, never self-reported.
-    // "Here's what UpNova has actually verified", not "trust this person".
+    // "Here's what Mavyn has actually verified", not "trust this person".
     const completedOrders = db
       .select()
       .from(tables.orders)

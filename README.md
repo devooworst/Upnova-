@@ -1,8 +1,8 @@
-# ✦ UpNova
+# ✦ Mavyn
 
 **Find what's happening around you — and find the people who can make it happen.**
 
-UpNova is a local-first platform where creators, businesses, and everyday people can discover each other,
+Mavyn is a local-first platform where creators, businesses, and everyday people can discover each other,
 find opportunities, offer services, build communities, attend events, collaborate, and make money.
 
 Not Instagram with a job board attached. Not LinkedIn. Not Craigslist. Not Discord.
@@ -34,9 +34,9 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   (Near You / Following / Opportunities / Trending) and a mixed feed of
   featured opportunity, creator posts, audio posts (with simulated playback),
   polls (votable), and events.
-- **Navbar**: ✦ UpNova, global search, Create `+`, Messages, Notifications, profile dropdown.
+- **Navbar**: ✦ Mavyn, global search, Create `+`, Messages, Notifications, profile dropdown.
 - **Left sidebar**: Near You, Discover, Communities, Opportunities, Events, Marketplace,
-  Messages, Bookmarks, Analytics + Your Communities + UpNova Pro + profile.
+  Messages, Bookmarks, Analytics + Your Communities + Mavyn Pro + profile.
 - **Right sidebar** (focused, not overloaded): Opportunities Near You, Trending, Who to Follow.
 - **Discover**: ecosystem search across Creators / Services / Opportunities / Communities /
   Events / Businesses with Location, Category, and Availability filters.
@@ -61,7 +61,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 - Background `#0A0A0F` (dark), cards `#111111`, zinc borders. One UI family: **Plus Jakarta Sans**
   (weight/size/tracking carry all hierarchy — every page title is `text-2xl` bold tight).
   **JetBrains Mono** is the data voice: distances, budgets, receipt lines, overlines.
-  **Syne** appears exactly once, as the UpNova wordmark.
+  **Syne** appears exactly once, as the Mavyn wordmark.
 - Accent colors have **jobs**, so the eye learns the language:
   - **lime** = money & opportunity (budgets, Apply, Hire, Open to Work, revenue)
   - **violet** = people & community (follow, join, messages, online, likes)
@@ -80,7 +80,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 - **Monetization (lib/fees.ts is the single source of truth).** Free to join and
   earn — the core ability to make money is never paywalled. Three revenue streams:
   (1) **5% transaction fee**, paid by the buyer on top of the creator's listed price,
-  shown transparently before checkout; (2) **UpNova Pro, $7.99/mo** — growth tools,
+  shown transparently before checkout; (2) **Mavyn Pro, $7.99/mo** — growth tools,
   not earning ability; (3) **paid promotion** (Boost Service $3.99/3d, Featured
   Profile $7.99/7d, Featured Opportunity $9.99/7d) — always labeled, never overrides
   relevance. No proprietary wallet, no stored balances: production payments are
@@ -91,10 +91,10 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   independent properties: Plan (free / college / pro — perks only), Verification
   (student identity — controls campus eligibility, survives plan changes),
   Communities/School (navigation destinations), Feed Scope (a filter, never a mode).
-  "Your Campus" is navigation for a verified student; "UpNova College ✓" is a
+  "Your Campus" is navigation for a verified student; "Mavyn College ✓" is a
   subscription indicator — never the same thing. Switching College → Pro drops
   College perks but keeps verified school identity and campus access. College never
-  takes over the interface: a College subscriber browses global UpNova normally.
+  takes over the interface: a College subscriber browses global Mavyn normally.
 - **Your Campus is layered, not one giant group chat.** Six sections with distinct
   jobs: 💬 Communities (interest-based conversation — fashion, gaming, memes, late
   night), 🛍️ Campus Services (a searchable directory of student providers with
@@ -111,7 +111,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   portfolio, analytics, priority placement — "pay to get seen," never "pay for
   permission to talk to your school." Account matrix: Free / Verified Student ($0,
   campus access) / College+ (exposure) / Pro (professional) / Alumni ($0).
-- **UpNova College — the campus-to-career pipeline.** Three plans with three jobs:
+- **Mavyn College — the campus-to-career pipeline.** Three plans with three jobs:
   Free ($0, get discovered — earning is never paywalled), College ($4.99/mo test
   price, verified students only: 🎓 badge, Student Boost, Student Opportunities,
   campus discovery, student earnings dashboard, Spotlight eligibility), Pro
@@ -125,7 +125,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   (creative/digital work; no ID needed to sell a logo), 🟡 Identity Verified
   (in-person work, valuables), 🔴 High-Trust (unsupervised access to a person,
   child, pet, home, vehicle, or property: identity + age verification + background
-  screening where legally permitted). Verification runs through a provider — UpNova
+  screening where legally permitted). Verification runs through a provider — Mavyn
   never stores IDs, and status never exposes legal name/DOB/address. Enforced, not
   suggested: high-trust services can't be published without verification, high-trust
   opportunities gate applicants, and buyers see a safety-verification interstitial
@@ -144,7 +144,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   lifecycle: two ways to find work, one transaction system.
 - **Work History & Reliability.** Every paid job creates a verified work record.
   Portfolio = "look what I can create"; Experience = "look what I've actually done"
-  (Verified UpNova Project — added to the public portfolio only with the creator's
+  (Verified Mavyn Project — added to the public portfolio only with the creator's
   permission; client work is never auto-exposed). Reliability is a private record
   (on-time / approved extension / late-communicated / late-silent / cancels /
   disputes) shown to the owner in the Work Performance dashboard; the public surface
@@ -180,7 +180,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   permissions (promotion, opportunities, events, links, post approval). Roles:
   Owner → Admin → Moderator → Member. Modes actually change the product: Daily
   Inspiration is a broadcast community — admins post, members react and save.
-  Community rules never override UpNova's safety policies. V2: advanced roles,
+  Community rules never override Mavyn's safety policies. V2: advanced roles,
   approval workflows, community analytics, community-scoped services/opportunities
   surfaces, private org chats. Later: sponsored communities, community monetization.
 - **Organizations & Campus Groups (V1 scope, deliberately).** Org pages are another
@@ -190,7 +190,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   opportunities feeding the work ecosystem. V2: private org/leadership chats, sports
   teams, dorm communities (privacy-conscious, opt-in), admin-approved ✓ Verified
   Member, org dashboards. Later: Greek-life integrations, school partnerships.
-- **Creative Integrity — AI-transparent, creator-controlled.** UpNova does not
+- **Creative Integrity — AI-transparent, creator-controlled.** Mavyn does not
   prohibit AI universally; it prohibits misrepresentation. Every service carries an
   AI policy (🔴 No AI / 🟡 with disclosure / 🟠 assisted / 🟢 client decides), clients
   set AI requirements when hiring, the agreed policy becomes part of the project
@@ -204,7 +204,7 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
   capacity (auto sold-out + optional waitlist), required attendee fields, and rules
   (acknowledged at registration). Organizers get an Event Manager: attendees,
   tickets, QR check-in, payments (buyer-pays fee; listed price = organizer payout),
-  settings, analytics. Ticketing is UpNova's third transaction stream.
+  settings, analytics. Ticketing is Mavyn's third transaction stream.
 - **Services vs Opportunities — never mixed.** Services (`/services`) is the creator
   catalog: clients hire a creator's predefined offering; the CTA is always **Hire Me**.
   Opportunities (`/opportunities`) is the job board: projects looking for people; the
@@ -228,17 +228,17 @@ the create flow) via `<ReachBadge />` and is a first-class field in `lib/data.ts
 
 ```bash
 npm install
-npm run db:push          # create the SQLite schema (db/upnova.dev.db)
+npm run db:push          # create the SQLite schema (db/mavyn.dev.db)
 npm run db:seed          # load development seed data (see below)
 npm run dev              # http://localhost:3000
 ```
 
-> **Self-initializing dev database:** if `db/upnova.dev.db` is missing (fresh clone, reset
+> **Self-initializing dev database:** if `db/mavyn.dev.db` is missing (fresh clone, reset
 > workspace), the server creates the schema from `db/bootstrap.sql` and seeds the demo world on
 > first touch — the exact failure that used to surface as "Internal error" on login (better-sqlite3
 > silently creates an EMPTY file, then every query dies with `no such table: users`, which
 > `guarded()` masked). Route errors now surface their real message outside production
-> (`UPNOVA_VERBOSE_ERRORS=1` to force). Auto-seed is dev/demo behavior — set `UPNOVA_AUTOSEED=0`
+> (`MAVYN_VERBOSE_ERRORS=1` to force). Auto-seed is dev/demo behavior — set `MAVYN_AUTOSEED=0`
 > to disable; a Postgres production deployment never hits this path. Nothing bypasses
 > authentication: bootstrap only guarantees the schema and seed accounts EXIST so real
 > scrypt/session auth can run against them. After schema changes run `npm run db:bootstrap` to
@@ -254,7 +254,7 @@ npm run dev              # http://localhost:3000
 The app is now a real multi-user application. localStorage mock state has been replaced by a
 database + authenticated APIs for every core system.
 
-**Stack** — Drizzle ORM on SQLite in dev (`db/upnova.dev.db`, gitignored); the schema
+**Stack** — Drizzle ORM on SQLite in dev (`db/mavyn.dev.db`, gitignored); the schema
 (`db/schema.ts`) is written to port straight to Postgres. Auth is email/password (bcrypt) with
 DB-backed sessions in an httpOnly cookie — no tokens in JS.
 
@@ -305,7 +305,7 @@ Transaction-authorization integrity per OWASP: `accept_offer` and `start` carry
 `expectedAmount` — if the creator changed the price since the client loaded the screen, the
 server refuses (409) and the change is announced in-thread; terms lock entirely once accepted.
 Cancellation exists only before payment. Payment language is deliberately "secured/released" —
-never "escrow", which is a specific legal service UpNova does not claim to provide. Every project
+never "escrow", which is a specific legal service Mavyn does not claim to provide. Every project
 carries the transaction-safety banner, and off-platform payment mentions trigger the client-side
 warning.
 
@@ -323,7 +323,7 @@ customer-facing card before Publish; and the post-publish screen offers an edita
 auto-generated announcement post ("Retwist appointments are open…"). Verification is explained,
 not thrown: care categories say WHY High-Trust is needed and link to Settings. The legacy
 Create-modal Service/Opportunity forms now route to the real builders. Everything lands in the
-listing's config (`lib/servicePolicies.ts`). UpNova compiles the config into the customer flow: travel fees are
+listing's config (`lib/servicePolicies.ts`). Mavyn compiles the config into the customer flow: travel fees are
 computed from real profile distances ($2/mi after 5 mi → calculated automatically), service
 radius rejects out-of-area bookings, maxPerDay caps the creator's calendar, duration comes from
 their scheduling rules, and cancellation/reschedule/late/no-show policies are shown IN the
@@ -333,7 +333,7 @@ operates differently on purpose: Imani (no travel, 15-min grace + $10 late fee, 
 (free travel within 10 mi, cancel anytime), Ava (per-mile travel, 48h partial policy), TJ (flat
 $25 travel, 1 booking/day, no-show full charge).
 
-**The service menu** — creators build their own price structure, not UpNova's. A service can
+**The service menu** — creators build their own price structure, not Mavyn's. A service can
 carry a `menu` in its config: **add-ons** (name, price mode fixed / starting-at / quote-required,
 minutes added to the appointment, optional/required) and **packages** (creator-priced bundles of
 the base service + add-ons, so "Retwist $60 / Retwist + Wash $70 / Retwist + Style $80 / Full
@@ -382,7 +382,7 @@ Capacity → Applications → Selection → Acceptance → Booking → Payment �
 never a separate casting/hiring/fashion/job system. Applicants pick WHICH role they're applying
 for (role cards with live "2 of 3 openings left"; full roles reject with 409 server-side). The
 poster reviews applicants GROUPED by role with Shortlist / Select / Message / Decline; selecting
-sends an OFFER ("You've been selected — Role · $pay · date · location · via UpNova payment"),
+sends an OFFER ("You've been selected — Role · $pay · date · location · via Mavyn payment"),
 the applicant Accepts (→ a real booking lands on BOTH calendars in payment-pending state, wired
 to the shared conversation) or declines (the opening frees up). The poster's page becomes a
 **Team board**: every selected member with Awaiting response / Confirmed status, secured through
@@ -399,20 +399,20 @@ engagement (`opportunities.engagement`, `lib/engagement.ts`): type (one-time / s
 ongoing freelance / part-time / full-time / temporary / collaboration / custom label), workload,
 schedule, start date, duration, and a compensation schedule (hourly / per-project / milestone /
 weekly / biweekly / monthly / custom). The hiring workflow is states, not vibes: Open →
-Applications → Review → Shortlisted → **Interview** (scheduled through UpNova = a $0 booking on
-BOTH calendars, or an external process labeled "happens OUTSIDE UpNova") → **Offer** (a
+Applications → Review → Shortlisted → **Interview** (scheduled through Mavyn = a $0 booking on
+BOTH calendars, or an external process labeled "happens OUTSIDE Mavyn") → **Offer** (a
 configurable terms sheet: role, comp model + amount, schedule, start, duration, classification,
 notes) → Accepted → **Active** → Completed. Classification is configuration, never automatic:
-**freelance/contract through UpNova** runs each cycle through the real payment machinery — accept
+**freelance/contract through Mavyn** runs each cycle through the real payment machinery — accept
 → cycle 1 booking → secured ($150 + fee, verified) → completed → released, poster starts cycle N
 from the team board — while **external employment** is labeled everywhere as handled by the
-employer outside UpNova, refuses UpNova payment cycles (409, verified), and creates no payment
-records. Seed: Devin's "Ongoing Video Editor — 2 videos/week" (weekly $150, UpNova interviews)
+employer outside Mavyn, refuses Mavyn payment cycles (409, verified), and creates no payment
+records. Seed: Devin's "Ongoing Video Editor — 2 videos/week" (weekly $150, Mavyn interviews)
 with three applicants ready for the full hiring demo.
 
 **Works & Licensing — showcase safely, license on the creator's terms.** WORK is the seventh
 entity: beats, tracks, sample packs, photos, designs (`works`, `lib/licensing.ts`). Protection is
-honest by design — UpNova never claims content can't be recorded or stolen. The stack is:
+honest by design — Mavyn never claims content can't be recorded or stolen. The stack is:
 **streaming previews** instead of source files (creator-configured length + watermark/tag
 labeling; original files are delivered after licensing, in the conversation), **creator-defined
 license options** (free / non-commercial / commercial / exclusive / custom — each with the
@@ -445,7 +445,7 @@ The opportunity form also got marketplace-grade money handling: Openings inputs 
 fields (clearable, retypable, min 1 on submit), and **live budget validation** — total
 compensation = Σ pay × openings recalculated on every keystroke against the Max budget, with
 "Over budget by $X" blocking publish (and the SERVER enforces the same rule: over-budget posts
-are 400'd, verified). Freelance opportunities fund through UpNova (secured before work, released
+are 400'd, verified). Freelance opportunities fund through Mavyn (secured before work, released
 on completion); external employment stays labeled and outside — unchanged and re-verified.
 
 **Post-publish sharing + social preview cards.** Every published public item has a permanent
@@ -457,10 +457,10 @@ everywhere — copy link, X, WhatsApp, Facebook, email intents. The composer sho
 posting; opportunity/product/work publishing lands on the permanent page with a one-shot
 "Published — it's live" banner; the service wizard's success screen embeds it. Shared links
 unfurl with **server-generated social preview cards** (`next/og` + `lib/server/ogCard.tsx`,
-per-route `opengraph-image.tsx` + `generateMetadata`): dark UpNova frame, type overline
+per-route `opengraph-image.tsx` + `generateMetadata`): dark Mavyn frame, type overline
 (SERVICE · BOOK, OPPORTUNITY · APPLY…), title, creator, price/compensation and location where
-appropriate (respecting location visibility), and the lime UpNova CTA — verified rendering
-offline. The UpNova object stays the source of truth: every share drives people back to the
+appropriate (respecting location visibility), and the lime Mavyn CTA — verified rendering
+offline. The Mavyn object stays the source of truth: every share drives people back to the
 real, actionable page, never a copy. Set `NEXT_PUBLIC_APP_URL` in production so og:image URLs
 resolve to the public domain.
 
@@ -469,13 +469,13 @@ Service = offer · Booking = scheduled · Project = paid work · Opportunity = a
 Product = SELL), on the same configurable listing system: photos, price, quantity (qty 1 = a
 one-time sale that shows SOLD and stays in history), condition, official + custom categories,
 variant groups (Size/Color…), and fulfillment options (shipping / local pickup / local delivery /
-digital). Two DISCLOSED checkout modes: **UpNova checkout** — the order timeline the buyer can
+digital). Two DISCLOSED checkout modes: **Mavyn checkout** — the order timeline the buyer can
 actually see (placed → payment secured → preparing → shipped with carrier/tracking/ETA →
 delivered → completed), funds held from payment until the buyer confirms receipt, cancels before
 shipping refund in full, stock re-checked at pay time, `expectedTotal` transaction authentication
 (tampered totals 409) — or **External checkout**, labeled "you'll complete your purchase on the
-seller's website; UpNova doesn't process this sale". Pickup orders never store or show an address:
-the exact spot is arranged in Messages after confirmation. Seller pages show only what UpNova has
+seller's website; Mavyn doesn't process this sale". Pickup orders never store or show an address:
+the exact spot is arranged in Messages after confirmation. Seller pages show only what Mavyn has
 verified and counted — badges, rating, completed orders, joined date, other listings — never a
 guarantee. "Report a problem" (item never shipped / not received / wrong item / not as described /
 damaged / seller unresponsive) files into the human moderation queue; no automatic refunds or
@@ -573,7 +573,7 @@ nails, pet care, photo sessions, DJ sets) book real time slots with double-booki
 server-side; project services keep the project-request flow — a calendar is never forced onto
 project work. Project work shows as a compact deadline-based strip below the calendar.
 
-**Poster identity** — every opportunity communicates WHO is posting and how much UpNova has
+**Poster identity** — every opportunity communicates WHO is posting and how much Mavyn has
 verified them, never rank: `Verified Business` (dedicated sky accent — reserved alongside
 lime=money, violet=people, amber=events — subtle left border + overline + BadgeCheck icon),
 `Business · Verification pending`, `Independent Creator`, and `Local Creator · <city>`. Always
@@ -581,7 +581,7 @@ color + label + icon so the distinction survives color-blindness and quick scann
 (`components/PosterBadge.tsx`, consistent across opportunity cards, the apply screen, profiles,
 conversations, the sidebar widget, and feed posts). **Business verification is independent of any
 subscription** — accounts choose Individual/Business at signup, businesses start unverified, and
-only UpNova's verification process (admin dashboard action; a document flow in production) grants
+only Mavyn's verification process (admin dashboard action; a document flow in production) grants
 the badge. Verified live: a business bought Pro and stayed "pending".
 
 **Adaptive intake** — no universal application form. Opportunities are a short application
@@ -602,7 +602,7 @@ one principle: show what has actually been verified, never tell users who to tru
 *Account badges* (earned, never purchasable — Pro/Business grant zero of these): Identity
 Verified (from High-Trust verification), Business Verified, Student Verified (from campus
 verification rows). *Content signals per post*: **Verified Work** — exists ONLY when the server
-validated a link between the post and a completed UpNova project/booking the poster actually
+validated a link between the post and a completed Mavyn project/booking the poster actually
 participated in (`lib/server/trust.ts` — client sends ids, server 403/404/409s anything else);
 **Client Confirmed** — set only by the linked counterparty via `POST /api/posts/[id]/confirm`
 (the poster and third parties get 403, verified live); **Creator Attested** — the creator's
@@ -610,7 +610,7 @@ recorded claim of publishing rights, explicitly labeled as a claim, not verifica
 "Original Work" declaration is replaced by a *content disclosure*: original / AI-assisted /
 AI-generated / credited (with a name) / unspecified — set in the composer, rendered as chips
 (`components/TrustChips.tsx`) in the feed and profile grid. The composer's trust panel appears
-progressively (work posts / photos), offers "link to completed UpNova work" from `/api/me/work`,
+progressively (work posts / photos), offers "link to completed Mavyn work" from `/api/me/work`,
 and the linked client is notified to confirm (seed counterparties confirm instantly in Demo
 Mode). Profiles get a computed **Trust & authenticity** panel: badges + completed transactions,
 verified-work posts, client confirmations, and review history — all derived from records, none
@@ -642,7 +642,7 @@ bookings, services, opportunities, projects, applications, track, profile all 40
 session; only signup/login/forgot/reset are public). The conversion UX is contextual, not a
 wall: `components/GuestGate.tsx` provides `promptJoin(action)` — pressing Book says "Create an
 account to book", Apply says "Create an account to apply … your profile becomes your
-application", Create says "Join UpNova to create", likes/saves/follows/messages/personalization
+application", Create says "Join Mavyn to create", likes/saves/follows/messages/personalization
 each get their own copy, always with a "Already have an account? Sign in" path. Guests browse
 freely first: one inline join card after the Discover feed, one dismissible banner after ~6 page
 views per session (sessionStorage), and never a repeat nag after dismissal.
@@ -664,8 +664,8 @@ private reference, never returned by any API.
 **Seed vs production data** — every seeded record carries `isSeed=true`.
 `npm run db:seed` (idempotent) · `npm run db:seed -- --fresh` (reset demo world) ·
 `npm run db:seed -- --wipe` (remove ALL seed data, keep real users).
-Seed accounts: `devin@upnova.dev` (admin), `ava@`, `jordanmiles@`, `marcusj@`, `nia@`, `lena@`
-— all `upnova123`.
+Seed accounts: `devin@mavyn.dev` (admin), `ava@`, `jordanmiles@`, `marcusj@`, `nia@`, `lena@`
+— all `mavyn123`.
 
 **Admin** — `/admin` (role-gated): platform stats, user management (suspend/reactivate kills
 sessions immediately), and report moderation with an emergency lane.
@@ -707,7 +707,7 @@ user would use; none of it runs for non-seed accounts. Delete that module for pr
 
 Communities are real: creation (`/communities/create`), discovery with categories/search/counts,
 public/private/invite access, join approval, invitations, and a full discussion layer
-(posts, threads, reactions, mentions, attached UpNova links, in-community search).
+(posts, threads, reactions, mentions, attached Mavyn links, in-community search).
 
 **Identity is per-post, not per-account.** Each community's creator chooses which modes it
 permits — real profile, alias, anonymous — and every post/reply carries the identity it was
@@ -715,7 +715,7 @@ written under. The composer's "Post as:" selector remembers your last choice per
 
 - **Anonymous ≠ untraceable.** Masking happens server-side in ONE place
   (`lib/server/communities.ts::maskAuthor`): an alias/anonymous post never carries a userId in
-  any API response, URL, notification, or page source. UpNova retains the account on every row
+  any API response, URL, notification, or page source. Mavyn retains the account on every row
   for moderation, safety, and legal compliance — anonymous to the crowd, accountable to the
   platform.
 - **Stable anon codes.** "Anonymous • 482" is per-member per-community (random, no
@@ -814,7 +814,7 @@ identity modes, and optional pricing per **weekly / monthly / yearly / custom-da
 
 ### Campus verification & academic identity (two layers)
 
-**UpNova — everybody participates. Your Campus — verified people of that institution.**
+**Mavyn — everybody participates. Your Campus — verified people of that institution.**
 Access is VERIFICATION-BASED, never subscription-based: Free vs Pro gates platform
 features; belonging to a school is proven (locked state on /campus explains it), not
 purchased.
@@ -862,7 +862,7 @@ The database schema in `db/schema.ts` mirrors it 1:1 where the shapes matter.
 The money flow this UI already describes: view service → contact creator → discuss → agree price →
 payment processed → creator delivers → client approves → creator gets paid → both review → reputation grows.
 
-> **Design rule:** do not redesign UpNova into a generic social-media website. Preserve the dark
+> **Design rule:** do not redesign Mavyn into a generic social-media website. Preserve the dark
 > black/lime identity and these components; improve quality, spacing, responsiveness, hierarchy,
 > and functionality while staying centered on local creator discovery, paid opportunities,
 > services, communities, and events. Every feature must help somebody discover something,

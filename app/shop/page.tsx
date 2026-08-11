@@ -3,7 +3,7 @@
 /* ------------------------------------------------------------------ */
 /*  Shop — Products alongside Posts, Services, and Opportunities.      */
 /*  PRODUCT = "buy this". Two honest modes per listing:                */
-/*   · UpNova checkout — funds held until delivery (orders timeline)   */
+/*   · Mavyn checkout — funds held until delivery (orders timeline)   */
 /*   · External checkout — clearly disclosed: "you'll complete your    */
 /*     purchase on the seller's website". Never disguised.             */
 /*  Guests browse everything; buying asks for an account.              */
@@ -66,7 +66,7 @@ export default function ShopPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Shop</h1>
           <p className="text-sm text-zinc-400">
-            Real things from real people. UpNova checkout holds funds until delivery; external listings say so.
+            Real things from real people. Mavyn checkout holds funds until delivery; external listings say so.
           </p>
         </div>
         {me && (

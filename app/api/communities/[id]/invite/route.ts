@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!handle) throw new ApiError(400, "Who do you want to invite? Enter their handle");
 
     const target = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
-    if (!target) throw new ApiError(404, `No one on UpNova has the handle @${handle}`);
+    if (!target) throw new ApiError(404, `No one on Mavyn has the handle @${handle}`);
     if (target.id === user.id) throw new ApiError(400, "You're already here");
 
     const existing = getMembership(c.id, target.id);

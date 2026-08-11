@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!["shortlist", "select", "decline", "interview", "offer", "complete_engagement"].includes(action))
       throw new ApiError(400, "Unknown action");
 
-    /* ---- interview: scheduled through UpNova, or clearly EXTERNAL ---- */
+    /* ---- interview: scheduled through Mavyn, or clearly EXTERNAL ---- */
     if (action === "interview") {
       if (!["submitted", "shortlisted", "interview"].includes(app.status))
         throw new ApiError(409, `Cannot schedule an interview from "${app.status}"`);
@@ -65,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         notify({
           userId: app.applicantId, actorId: user.id, type: "application",
           title: `Interview — ${opp.title}`,
-          body: `The interview happens OUTSIDE UpNova.${body.note ? ` ${String(body.note).slice(0, 120)}` : ""} Details in Messages.`,
+          body: `The interview happens OUTSIDE Mavyn.${body.note ? ` ${String(body.note).slice(0, 120)}` : ""} Details in Messages.`,
           href: "/opportunities?apps=1",
         });
         return { status: "interview", external: true };
@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const at = new Date(body.at);
       if (isNaN(at.getTime()) || at.getTime() < Date.now()) throw new ApiError(400, "Pick a future interview time");
       const convId = conversationBetween(user.id, app.applicantId);
-      // UpNova-scheduled: a $0 booking lands on BOTH calendars
+      // Mavyn-scheduled: a $0 booking lands on BOTH calendars
       db.insert(tables.bookings)
         .values({
           id: randomBytes(12).toString("hex"),
@@ -84,7 +84,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         })
         .run();
       db.update(tables.applications)
-        .set({ status: "interview", interview: JSON.stringify({ mode: "upnova", at: at.toISOString() }) })
+        .set({ status: "interview", interview: JSON.stringify({ mode: "mavyn", at: at.toISOString() }) })
         .where(eq(tables.applications.id, app.id))
         .run();
       db.insert(tables.messages)
@@ -121,7 +121,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         duration: String(body.duration || eng.duration || "").slice(0, 60) || undefined,
         classification: body.classification === "external_employment" || eng.classification === "external_employment"
           ? "external_employment"
-          : "upnova_freelance",
+          : "mavyn_freelance",
         note: String(body.note || "").slice(0, 500) || undefined,
         cycles: 0,
       };
@@ -132,7 +132,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       notify({
         userId: app.applicantId, actorId: user.id, type: "application_selected",
         title: `Offer — ${offer.title}`,
-        body: `${ENGAGEMENT_TYPES.find((t) => t.id === offer.engagementType)?.label}${offer.amount ? ` · $${offer.amount}${["weekly","biweekly","monthly","hourly"].includes(offer.compModel) ? ` per ${cycleLabel(offer.compModel)}` : ""}` : ""}${offer.classification === "external_employment" ? " · employment handled OUTSIDE UpNova" : " · paid through UpNova (secured → released)"}. Review it in My Applications.`,
+        body: `${ENGAGEMENT_TYPES.find((t) => t.id === offer.engagementType)?.label}${offer.amount ? ` · $${offer.amount}${["weekly","biweekly","monthly","hourly"].includes(offer.compModel) ? ` per ${cycleLabel(offer.compModel)}` : ""}` : ""}${offer.classification === "external_employment" ? " · employment handled OUTSIDE Mavyn" : " · paid through Mavyn (secured → released)"}. Review it in My Applications.`,
         href: "/opportunities?apps=1",
       });
       seedAcceptsRoleOffer(app.id); // demo: seed applicants accept instantly
@@ -213,7 +213,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         actorId: user.id,
         type: "application_selected",
         title: `You've been selected — ${role.title}`,
-        body: `${opp.title} · ${when} · ${opp.remote ? "Remote" : opp.location}${role.pay ? ` · $${role.pay} via UpNova payment` : ""}. Accept in My Applications.`,
+        body: `${opp.title} · ${when} · ${opp.remote ? "Remote" : opp.location}${role.pay ? ` · $${role.pay} via Mavyn payment` : ""}. Accept in My Applications.`,
         href: `/opportunities?apps=1`,
       });
 

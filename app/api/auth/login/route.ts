@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     const { token, expiresAt } = createSession(user.id);
     rememberDemoSession(token); // dev sticky marker (no-op unless enabled)
-    const cookieless = process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1";
+    const cookieless = process.env.MAVYN_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     // security notification: every new sign-in is visible to the account

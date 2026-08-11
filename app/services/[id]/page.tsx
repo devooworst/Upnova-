@@ -219,7 +219,7 @@ export default function ServicePage() {
               </span>
             )}
             {s.completedBookings + s.completedProjects > 0 && (
-              <span>{s.completedBookings + s.completedProjects} completed on UpNova</span>
+              <span>{s.completedBookings + s.completedProjects} completed on Mavyn</span>
             )}
             {s.identityVerified && (
               <span className="inline-flex items-center gap-1 text-lime-300">

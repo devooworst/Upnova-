@@ -24,7 +24,7 @@ import { promptJoin } from "./GuestGate";
 
 /* ------------------------------------------------------------------ */
 /* The Create system. One rule: each creation type gets its own        */
-/* purpose-specific form — UpNova asks only what that type needs.      */
+/* purpose-specific form — Mavyn asks only what that type needs.      */
 /* Posts are social. Opportunities request people. Services offer      */
 /* skills. Polls ask. Events host. Lives broadcast. Shared controls:   */
 /* audience/reach, community, tags.                                    */
@@ -376,7 +376,7 @@ export default function CreateModal() {
             <p className="text-sm font-semibold text-zinc-100">Services get the full builder</p>
             <p className="mx-auto max-w-sm text-xs leading-relaxed text-zinc-500">
               What you offer, how it&apos;s fulfilled, availability, travel, pricing, and your
-              policies — set once, and UpNova builds the booking experience from your rules.
+              policies — set once, and Mavyn builds the booking experience from your rules.
             </p>
             <a href="/services/new" className="btn-lime inline-flex px-5 py-2 text-sm">
               Open the service builder
@@ -388,7 +388,7 @@ export default function CreateModal() {
           <div className="space-y-3 px-5 py-6 text-center">
             <p className="text-sm font-semibold text-zinc-100">Products get the full builder</p>
             <p className="mx-auto max-w-sm text-xs leading-relaxed text-zinc-500">
-              Photos, price, quantity, variants, and fulfillment — sell through UpNova checkout
+              Photos, price, quantity, variants, and fulfillment — sell through Mavyn checkout
               (funds held until delivery) or link to your own store, clearly disclosed.
             </p>
             <a href="/shop/new" className="btn-lime inline-flex px-5 py-2 text-sm">

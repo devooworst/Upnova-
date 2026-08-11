@@ -8,7 +8,7 @@
 /*  requests, blocks, reports, moderation) reference the CONTENT id    */
 /*  and the server resolves the account internally.                    */
 /*                                                                     */
-/*  UpNova retains the underlying account identity on every row for    */
+/*  Mavyn retains the underlying account identity on every row for    */
 /*  moderation, safety, abuse prevention, and legal compliance —       */
 /*  anonymous to the crowd, accountable to the platform.               */
 /* ------------------------------------------------------------------ */
@@ -505,7 +505,7 @@ export function memberIsMuted(m: Membership): boolean {
 
 /* --------------------------- attached links --------------------------- */
 
-/** resolve an attached UpNova link to a typed ref card (source preserved) */
+/** resolve an attached Mavyn link to a typed ref card (source preserved) */
 export function resolveRef(refType: string, refId: string): { title: string } | null {
   const q = {
     service: () => db.select({ t: tables.services.title }).from(tables.services).where(eq(tables.services.id, refId)).get(),

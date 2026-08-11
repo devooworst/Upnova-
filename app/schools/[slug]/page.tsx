@@ -69,7 +69,7 @@ export default function SchoolDirectoryPage() {
         </p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-50">{data.school.name}</h1>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-zinc-500">
-          <Users className="h-4 w-4" /> {data.count} member{data.count === 1 ? "" : "s"} on UpNova show this school
+          <Users className="h-4 w-4" /> {data.count} member{data.count === 1 ? "" : "s"} on Mavyn show this school
         </p>
       </header>
 

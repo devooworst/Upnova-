@@ -594,9 +594,9 @@ export default function ProjectPage() {
       {/* transaction safety banner — every project carries it */}
       <div className="rounded-xl border border-line-soft bg-card px-4 py-2.5">
         <p className="text-[11px] leading-relaxed text-zinc-500">
-          <span className="font-bold uppercase tracking-wide text-zinc-400">UpNova transaction</span> ·
-          Keep communication, agreements, and payments on UpNova to maintain your transaction
-          protections. Transactions completed outside UpNova may not be protected by UpNova&apos;s
+          <span className="font-bold uppercase tracking-wide text-zinc-400">Mavyn transaction</span> ·
+          Keep communication, agreements, and payments on Mavyn to maintain your transaction
+          protections. Transactions completed outside Mavyn may not be protected by Mavyn&apos;s
           dispute or payment systems.
         </p>
       </div>

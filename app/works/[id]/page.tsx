@@ -110,7 +110,7 @@ export default function WorkPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Works
       </Link>
 
-      <PublishedBanner path={`/works/${w.id}`} title={`${w.title} — license on UpNova`} text="Stream the preview, license on the creator's terms" />
+      <PublishedBanner path={`/works/${w.id}`} title={`${w.title} — license on Mavyn`} text="Stream the preview, license on the creator's terms" />
 
       <article className="card-money p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">

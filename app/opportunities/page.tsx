@@ -183,7 +183,7 @@ export default function OpportunitiesPage() {
                 {a.status === "interview" && a.interview && (
                   <p className="mt-3 rounded-xl border border-sky-400/30 bg-sky-400/5 px-3.5 py-2.5 text-xs leading-relaxed text-zinc-300">
                     {a.interview.mode === "external" ? (
-                      <>Interview stage — <span className="font-semibold text-sky-300">external process</span>: it happens outside UpNova.{a.interview.note ? ` ${a.interview.note}` : ""} Coordinate in Messages.</>
+                      <>Interview stage — <span className="font-semibold text-sky-300">external process</span>: it happens outside Mavyn.{a.interview.note ? ` ${a.interview.note}` : ""} Coordinate in Messages.</>
                     ) : (
                       <>Interview scheduled{a.interview.at ? ` — ${new Date(a.interview.at).toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${new Date(a.interview.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}. It&apos;s on your <Link href="/calendar" className="font-semibold text-sky-300 underline-offset-2 hover:underline">calendar</Link>.</>
                     )}
@@ -201,8 +201,8 @@ export default function OpportunitiesPage() {
                       {a.offer.note && <li className="text-zinc-400">&ldquo;{a.offer.note}&rdquo;</li>}
                       <li className={a.offer.classification === "external_employment" ? "text-sky-300" : "text-zinc-400"}>
                         {a.offer.classification === "external_employment"
-                          ? "External employment — pay & paperwork handled by the employer OUTSIDE UpNova."
-                          : "Freelance via UpNova — each cycle secured up front, released on completion."}
+                          ? "External employment — pay & paperwork handled by the employer OUTSIDE Mavyn."
+                          : "Freelance via Mavyn — each cycle secured up front, released on completion."}
                       </li>
                     </ul>
                     <div className="mt-2.5 flex gap-2">
@@ -215,7 +215,7 @@ export default function OpportunitiesPage() {
                   <p className="mt-3 rounded-xl border border-lime-400/30 bg-lime-400/5 px-3.5 py-2.5 text-xs leading-relaxed text-zinc-300">
                     <span className="font-semibold text-lime-300">Active</span> — {a.offer.title}.
                     {a.offer.classification === "external_employment"
-                      ? " Compensation handled outside UpNova."
+                      ? " Compensation handled outside Mavyn."
                       : ` ${a.offer.cycles ?? 0} paid cycle${(a.offer.cycles ?? 0) === 1 ? "" : "s"} started — track them in `}
                     {a.offer.classification !== "external_employment" && (
                       <Link href="/calendar" className="font-semibold text-lime-300 underline-offset-2 hover:underline">Bookings</Link>
@@ -233,7 +233,7 @@ export default function OpportunitiesPage() {
                         <> · {new Date(a.opportunity.eventDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</>
                       )}
                       {" "}· {a.opportunity.location}
-                      {a.role.pay != null && <> · <span className="font-mono tracking-[0.05em] text-lime-300">${a.role.pay}</span> via UpNova payment (secured, released after completion)</>}
+                      {a.role.pay != null && <> · <span className="font-mono tracking-[0.05em] text-lime-300">${a.role.pay}</span> via Mavyn payment (secured, released after completion)</>}
                     </p>
                     <div className="mt-2.5 flex gap-2">
                       <button onClick={() => respond(a.id, "accept")} className="btn-lime px-4 py-1.5 text-xs">

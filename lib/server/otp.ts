@@ -12,7 +12,7 @@ export const normalizePhone = (raw: unknown): string | null => {
   return m ? `+${m[1]}` : null;
 };
 
-export const hashOtp = (code: string) => createHash("sha256").update(`upnova-otp|${code}`).digest("hex");
+export const hashOtp = (code: string) => createHash("sha256").update(`mavyn-otp|${code}`).digest("hex");
 
 /** Verify-and-consume: returns the phone on success, throws generic errors. */
 export function consumeOtp(phoneRaw: unknown, codeRaw: unknown): string {

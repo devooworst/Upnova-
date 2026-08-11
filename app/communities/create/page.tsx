@@ -198,7 +198,7 @@ export default function CreateCommunityPage() {
       <section className="card-people space-y-3 p-4">
         <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Identity modes allowed</h2>
         <p className="text-xs text-zinc-500">
-          You decide how members can appear here. Anonymity is to the community — UpNova always retains the account behind every post
+          You decide how members can appear here. Anonymity is to the community — Mavyn always retains the account behind every post
           for moderation and safety.
         </p>
         {IDENTITY_MODES.map((m) => (

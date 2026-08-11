@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const isAdmin = user.role === "admin";
     const m = getMembership(c.id, user.id);
     if (!isAdmin && (!m || m.role !== "owner"))
-      throw new ApiError(403, "Identity reveals are limited to the community owner and UpNova moderation");
+      throw new ApiError(403, "Identity reveals are limited to the community owner and Mavyn moderation");
 
     const body = await req.json().catch(() => ({}));
     const postId = body.postId ? String(body.postId) : null;

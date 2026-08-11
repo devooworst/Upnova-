@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /* ------------------------------------------------------------------ */
-/* FULL UPNOVA SYSTEM TEST — the Test Center "game mode" backend.      */
+/* FULL MAVYN SYSTEM TEST — the Test Center "game mode" backend.      */
 /*                                                                     */
 /* Runs the REAL platform end-to-end over HTTP against this very       */
 /* server: three personas (rachel=client, lena=creator/seed,           */
@@ -183,12 +183,12 @@ export async function POST(req: NextRequest) {
   /* ================= AUTHENTICATION ================= */
   {
     const c = cat("AUTHENTICATION");
-    for (const [who, pw] of [["rachel", "upnova123"], ["lena", "upnova123"], ["harboroak", "upnova123"]] as const) {
+    for (const [who, pw] of [["rachel", "mavyn123"], ["lena", "mavyn123"], ["harboroak", "mavyn123"]] as const) {
       const r = await api(null, "/api/auth/login", { method: "POST", body: { identifier: who, password: pw } });
       tok[who] = (r.data as { sessionToken?: string }).sessionToken ?? "";
       step(c, `login ${who} (own session)`, r.status === 200 && !!tok[who], { route: "POST /api/auth/login" });
     }
-    const r2 = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "rachel", password: "upnova123" } });
+    const r2 = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "rachel", password: "mavyn123" } });
     tok.rachel2 = (r2.data as { sessionToken?: string }).sessionToken ?? "";
     const meA = await api("rachel", "/api/auth/me");
     const meB = await api("lena", "/api/auth/me");
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
     // (simulated=false → automation can never message or act as them).
     const devinRow = db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get();
     const jaylinRow = db.select().from(tables.users).where(eq(tables.users.handle, "jaylin")).get();
-    const jl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "jaylin@upnova.dev", password: "upnova123" } });
+    const jl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "jaylin@mavyn.dev", password: "mavyn123" } });
     tok.jaylin = (jl.data as { sessionToken?: string }).sessionToken ?? "";
     const jme = (await api("jaylin", "/api/auth/me")).data as any;
     step(
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
         !devinRow.simulated && !jaylinRow.simulated &&
         jme.user?.handle === "jaylin" && jme.user?.role === "admin",
       {
-        route: "POST /api/auth/login (jaylin@upnova.dev)",
+        route: "POST /api/auth/login (jaylin@mavyn.dev)",
         expected: "distinct ids · role=admin ×2 · simulated=false ×2 · session identifies jaylin",
         actual: `ids ${devinRow?.id?.slice(0, 6)}…≠${jaylinRow?.id?.slice(0, 6)}… roles=${devinRow?.role}/${jaylinRow?.role} simulated=${!!devinRow?.simulated}/${!!jaylinRow?.simulated} me=${jme.user?.handle}`,
       }
@@ -297,7 +297,7 @@ export async function POST(req: NextRequest) {
     const s4 = (await api("rachel", "/api/search?q=zzzznotauser")).data as any;
     step(c, "SEARCH nonexistent account → honest empty PEOPLE (200, never an error)", Array.isArray(s4.people) && s4.people.length === 0, { actual: `people=${s4.people?.length}` });
     // a brand-new account is searchable the moment it exists
-    const nu = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbsearch.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle: "tonbsearch", displayName: "Searchme Fresh" } });
+    const nu = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbsearch.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle: "tonbsearch", displayName: "Searchme Fresh" } });
     const s5 = (await api("rachel", "/api/search?q=tonbsearch")).data as any;
     const s6 = (await api("rachel", "/api/search?q=searchme")).data as any;
     step(c, "NEW account is searchable immediately — by handle AND display name", nu.status === 200 && (s5.people ?? []).some((p: any) => p.handle === "tonbsearch") && (s6.people ?? []).some((p: any) => p.handle === "tonbsearch"), {
@@ -330,7 +330,7 @@ export async function POST(req: NextRequest) {
 
     /* ---- REAL vs SIMULATED accounts: automation NEVER speaks for real people ---- */
     const mkReal = async (handle: string) => {
-      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Real ${handle}` } });
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle, displayName: `Real ${handle}` } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
     };
     await mkReal("tonbm1");
@@ -355,7 +355,7 @@ export async function POST(req: NextRequest) {
     const adMsgs = await plainMsgs("tonbm1", cAD);
     step(c, "@devin RECEIVES the message and does NOT auto-reply — no scripted 'Sounds good…'", adMsgs.length === 1 && adMsgs[0]?.mine === true, { expected: "exactly 1 message (the sender's own)", actual: `${adMsgs.length} messages: ${adMsgs.map((m: any) => `"${m.body.slice(0, 25)}"`).join(", ")}`, record: cAD });
     // devin replies MANUALLY through his own real session
-    const dl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "devin", password: "upnova123" } });
+    const dl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "devin", password: "mavyn123" } });
     tok.devinq = (dl.data as any).sessionToken ?? "";
     await api("devinq", `/api/conversations/${cAD}/messages`, { method: "POST", body: { body: "[TEST] What's up?" } });
     const adAfter = await plainMsgs("tonbm1", cAD);
@@ -419,7 +419,7 @@ export async function POST(req: NextRequest) {
       await set(3);
       const far3 = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svcH.id, startsAt: wk(5, 9), durationMin: 60 } });
       const badSet = await api("lena", `/api/services/${svcH.id}`, { method: "PATCH", body: { scheduling: { horizonDays: 999 } } });
-      step(c, "custom horizon (3 days) enforced · invalid horizon (999) rejected — providers differ, UpNova never assumes one schedule",
+      step(c, "custom horizon (3 days) enforced · invalid horizon (999) rejected — providers differ, Mavyn never assumes one schedule",
         far3.status === 409 && badSet.status === 400, { actual: `far=${far3.status} badSet=${badSet.status}` });
       await set(60); // restore the default for later categories
     }
@@ -530,7 +530,7 @@ export async function POST(req: NextRequest) {
     // removes it next time. lena is the client — every action below is a
     // real authenticated HTTP call: updates → ETA → extension → approval
     // → delivery → completion → payment → review.
-    const mkProv = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbp.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle: "tonbp", displayName: "Pat Provider" } });
+    const mkProv = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbp.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle: "tonbp", displayName: "Pat Provider" } });
     tok.tonbp = (mkProv.data as { sessionToken?: string }).sessionToken ?? "";
     const deadline = new Date(Date.now() + 4 * 86400e3);
     const pr = await api("tonbp", "/api/projects", {
@@ -707,7 +707,7 @@ export async function POST(req: NextRequest) {
        reopens a slot; no overbooking, no duplicates. */
     // two preferred clients + one outsider
     await api("lena", "/api/preferred-clients", { method: "POST", body: { clientId: rachel.id, benefits: [{ key: "priority_booking" }] } });
-    const pc2 = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbpc.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle: "tonbpc", displayName: "Second Preferred" } });
+    const pc2 = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbpc.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle: "tonbpc", displayName: "Second Preferred" } });
     tok.tonbpc = (pc2.data as { sessionToken?: string }).sessionToken ?? "";
     await api("tonbpc", "/api/conversations", { method: "POST", body: { toHandle: "lena", firstMessage: "Hi! Interested in your work." } });
     const addPc2 = await api("lena", "/api/preferred-clients", { method: "POST", body: { clientHandle: "tonbpc", benefits: [{ key: "priority_booking" }] } });
@@ -856,7 +856,7 @@ export async function POST(req: NextRequest) {
   {
     const c = cat("ONBOARDING");
     const mk = async (handle: string, extra: Record<string, unknown> = {}) => {
-      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Tour ${handle}`, ...extra } });
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle, displayName: `Tour ${handle}`, ...extra } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
       return r;
     };
@@ -884,7 +884,7 @@ export async function POST(req: NextRequest) {
     const tourC = (await api("tonbc", "/api/onboarding/tour")).data as any;
     step(c, "business signup → business-oriented tour", tourC.audience === "business" && (tourC.steps ?? []).some((s: any) => /talent|brand|organization/i.test(s.body)), { actual: tourC.audience });
 
-    const nlog = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "nia", password: "upnova123" } });
+    const nlog = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "nia", password: "mavyn123" } });
     tok.nia = (nlog.data as any).sessionToken ?? "";
     const tourN = (await api("nia", "/api/onboarding/tour")).data as any;
     step(c, "verified student → student tour incl. Your Campus", tourN.audience === "student" && (tourN.steps ?? []).some((s: any) => s.id === "campus"), { actual: tourN.audience });
@@ -979,7 +979,7 @@ export async function POST(req: NextRequest) {
     // SIMULATION mode so capacity limits actually enforce (demo mode
     // bypasses gates by doctrine). Cleaned up by the tonb* reset.
     const mkU = async (handle: string, extra: Record<string, unknown> = {}) => {
-      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@upnova.dev`, password: "Tour-walkthrough-99", handle, displayName: `Cap ${handle}`, ...extra } });
+      const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle, displayName: `Cap ${handle}`, ...extra } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
       db.update(tables.users).set({ testerMode: "simulation" }).where(eq(tables.users.handle, handle)).run();
       return r;

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------------ */
 /*  Development seed data.                                             */
 /*                                                                     */
-/*  Creates the demo world as REAL users (password: upnova123) so the  */
+/*  Creates the demo world as REAL users (password: mavyn123) so the  */
 /*  whole platform is testable end-to-end. Every record is flagged     */
 /*  isSeed=true and can be wiped without touching production users:    */
 /*                                                                     */
@@ -18,12 +18,12 @@ import { randomBytes } from "crypto";
 import path from "path";
 import * as t from "./schema";
 
-const sqlite = new Database(path.join(process.cwd(), "db", "upnova.dev.db"));
+const sqlite = new Database(path.join(process.cwd(), "db", "mavyn.dev.db"));
 sqlite.pragma("foreign_keys = ON");
 const db = drizzle(sqlite, { schema: t });
 
 const id = () => randomBytes(12).toString("hex");
-const PASSWORD = bcrypt.hashSync("upnova123", 10);
+const PASSWORD = bcrypt.hashSync("mavyn123", 10);
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000);
 const daysAgo = (d: number) => new Date(Date.now() - d * 86400_000);
 const daysFromNow = (d: number) => new Date(Date.now() + d * 86400_000);
@@ -149,7 +149,7 @@ function seed() {
       // admin:true → role admin + simulated:false (REAL account: the
       // platform never auto-messages or acts as Jaylin, same as Devin).
       handle: "jaylin", name: "Jaylin", role: "Development Admin",
-      bio: "UpNova development and platform administration.",
+      bio: "Mavyn development and platform administration.",
       avatar: null, city: "Baltimore", state: "MD", county: "Baltimore City",
       lat: 39.2904, lng: -76.6122,
       skills: ["Platform Development", "QA"],
@@ -291,7 +291,7 @@ function seed() {
     db.insert(t.users)
       .values({
         id: userId,
-        email: `${d.handle}@upnova.dev`,
+        email: `${d.handle}@mavyn.dev`,
         passwordHash: PASSWORD,
         handle: d.handle,
         role: d.admin ? "admin" : "user",
@@ -805,7 +805,7 @@ function seed() {
   }).run();
 
   /* -------------------------------- products -------------------------------- */
-  // PRODUCT = "buy this" — the sixth entity. UpNova checkout listings,
+  // PRODUCT = "buy this" — the sixth entity. Mavyn checkout listings,
   // a one-time sale, a digital good, and an HONEST external listing.
   const prodTote = id();
   db.insert(t.products).values({
@@ -906,7 +906,7 @@ function seed() {
   db.insert(t.opportunities).values({
     id: id(), posterId: uid["nia"],
     title: "Paid Campus Photographer — Bowie State University",
-    description: "Shoot two campus events per month for the student activities board. Gear provided if needed. VISIBLE to everyone on UpNova; applications are limited to verified Bowie State students — verification is free.",
+    description: "Shoot two campus events per month for the student activities board. Gear provided if needed. VISIBLE to everyone on Mavyn; applications are limited to verified Bowie State students — verification is free.",
     budget: 120, type: "campus", location: "Bowie, MD", remote: false,
     studentFriendly: true,
     eligibility: "my_school", eligibilityCampusId: campusId,
@@ -923,12 +923,12 @@ function seed() {
   db.insert(t.opportunities).values({
     id: editorOppId, posterId: uid["devin"],
     title: "Ongoing Video Editor — 2 videos/week",
-    description: "Looking for an editor to own my weekly uploads long-term. You get raw footage Mondays, cuts due Thursdays. Consistent style, fast comms. Paid weekly through UpNova.",
+    description: "Looking for an editor to own my weekly uploads long-term. You get raw footage Mondays, cuts due Thursdays. Consistent style, fast comms. Paid weekly through Mavyn.",
     budget: 150, type: "gig", location: "Baltimore, MD", remote: true,
     engagement: JSON.stringify({
       type: "ongoing", workload: "≈10 hrs/week", schedule: "2 videos/week, cuts due Thursdays",
       duration: "3 months to start", compModel: "weekly", rate: 150,
-      classification: "upnova_freelance", interviewMode: "upnova",
+      classification: "mavyn_freelance", interviewMode: "mavyn",
     }),
     applyConfig: JSON.stringify({ requireMessage: true, question: "Link two edits that show your pacing.", notifyUnselected: true }),
     lat: defs.find((d) => d.handle === "devin")!.lat, lng: defs.find((d) => d.handle === "devin")!.lng,
@@ -1067,16 +1067,16 @@ function seed() {
     { author: "marcusj", body: "Color graded 4 music videos this week. If your footage looks flat, it's not your camera — it's your grade. Happy to consult.", hours: 30, likes: ["devin"], comments: [["jordanmiles", "Facts. Grade makes the video."]], disclosure: "ai_assisted", attested: true },
     { author: "lena", body: "Brand identity delivered for a Baltimore coffee brand today. Logo, palette, menus, cups. Small brands deserve big design.", hours: 44, image: "/images/portfolio-spotify.jpg", likes: ["ava", "devin", "nia", "darius"], comments: [["ava", "The cup design is so clean"]], kind: "work", cat: "Brand Identity" },
     { author: "maya", body: "Cut vocals for three records this week. If your hook feels empty, it's not the melody — it's the stacks. Layer, then layer again.", hours: 3, likes: ["devin", "jordanmiles", "kofi"], comments: [["jordanmiles", "Stacks are everything 💯"]], kind: "work", cat: "Vocals" },
-    { author: "kofi", body: "Sold my first exclusive through UpNova today. Buyer found me through the 25-mile feed. Local-first actually works.", hours: 7, likes: ["devin", "jordanmiles", "maya", "tj"], comments: [["devin", "This is exactly the point. Congrats!"]] },
+    { author: "kofi", body: "Sold my first exclusive through Mavyn today. Buyer found me through the 25-mile feed. Local-first actually works.", hours: 7, likes: ["devin", "jordanmiles", "maya", "tj"], comments: [["devin", "This is exactly the point. Congrats!"]] },
     { author: "sofia", body: "Styled a 12-look editorial in one day. Pull list, steamer, three racks, zero panic. Ask me about shoot styling.", hours: 11, image: "/images/community-streetwear.jpg", likes: ["ava", "rachel", "lena"], comments: [["rachel", "The silhouettes in look 7 😍"]], kind: "work", cat: "Styling", sub: "Editorial" },
     { author: "tj", body: "Rooftop set this Friday. Bringing the full rig. If you're a photographer who wants event shots for your portfolio, pull up — trade content.", hours: 16, likes: ["devin", "nia", "omar"], comments: [["omar", "I might pull up with the 35mm"]] },
     { author: "imani", body: "Booked out for homecoming week already 💅 Waitlist is open — campus people get priority.", hours: 20, likes: ["nia", "omar"], comments: [], kind: "announcement", cat: "Nails" },
     { author: "darius", body: "Shipped a creator site in 9 days. Portfolio, booking, and a merch page. Your link-in-bio deserves better than a list of links.", hours: 27, likes: ["lena", "devin", "kofi"], comments: [["lena", "The type choices on this one are great"]], kind: "work", cat: "Websites" , disclosure: "ai_assisted" },
     { author: "rachel", body: "Fashion film premiere next month. Two years of learning color inside one 90-second cut.", hours: 33, image: "/images/community-film.jpg", likes: ["sofia", "marcusj", "ava"], comments: [["marcusj", "Can't wait to see the grade"]], kind: "bts", cat: "Fashion Film" },
     { author: "omar", body: "Grad season is coming. Booking portrait slots for April now — campus rate stays $90.", hours: 38, likes: ["nia", "imani", "devin"], comments: [["imani", "Booking for my sister 🙌"]] },
-    { author: "jordanmiles", body: "Placement news I can finally share: two records on a major project this fall. Everything routed through verified UpNova work. Keep your history clean.", hours: 50, image: "/images/beat-cover.jpg", likes: ["devin", "kofi", "maya", "marcusj", "ava"], comments: [["kofi", "Inspiring fr"], ["maya", "Huge!! 🎉"]] },
+    { author: "jordanmiles", body: "Placement news I can finally share: two records on a major project this fall. Everything routed through verified Mavyn work. Keep your history clean.", hours: 50, image: "/images/beat-cover.jpg", likes: ["devin", "kofi", "maya", "marcusj", "ava"], comments: [["kofi", "Inspiring fr"], ["maya", "Huge!! 🎉"]] },
     { author: "ava", body: "PSA for new photographers: your rate is not just the shoot. It's the edit, the gear, the years. Price the whole thing.", hours: 55, likes: ["omar", "sofia", "devin", "rachel"], comments: [["omar", "Needed this today"]] },
-    { author: "nia", body: "Dog sitting this weekend booked through my UpNova listing. Verified profile made the difference — the client said so directly.", hours: 60, likes: ["devin", "ava"], comments: [] },
+    { author: "nia", body: "Dog sitting this weekend booked through my Mavyn listing. Verified profile made the difference — the client said so directly.", hours: 60, likes: ["devin", "ava"], comments: [] },
     { author: "marcusj", body: "Three-camera live session edit delivered. Multicam is a cheat code for artists who hate reshoots.", hours: 70, image: "/images/event-afterdark.jpg", likes: ["jordanmiles", "devin", "rachel"], comments: [], kind: "work", cat: "Video", sub: "Multicam" , disclosure: "credited", credit: "Live stills: Rachel Kim" },
     { author: "devin", body: "Studio day. Two mixes, one master, and a rough for something special. The 'Open to Work' badge stays on for a reason.", hours: 80, likes: ["ava", "maya", "jordanmiles", "tj", "kofi"], comments: [["maya", "That rough better be ours 👀"]], kind: "bts", cat: "Production" },
   ];
@@ -1128,7 +1128,7 @@ function seed() {
   makeConversation("lena", "devin", [
     ["devin", "Hi Lena! I'm interested in your Brand Identity service.", 5],
     ["lena", "Hey! Absolutely. What kind of brand are you building?", 5],
-    ["devin", "I'm working on a creator platform called UpNova.", 4],
+    ["devin", "I'm working on a creator platform called Mavyn.", 4],
     ["lena", "That sounds interesting. I can definitely help with the visual identity.", 4],
     ["devin", "What would you need from me to get started?", 3],
     ["lena", "I'll send over a project proposal with the scope and price — or you can open a project right from this chat whenever you're ready.", 3],
@@ -1199,7 +1199,7 @@ function seed() {
     category: "stolen_work",
     details: "The artwork on this drop looks like a still from my fashion film — I have the original RAW files and timestamps.",
     signals: JSON.stringify([
-      "No linked UpNova transaction backs this post (context, not proof)",
+      "No linked Mavyn transaction backs this post (context, not proof)",
       "No identical image file found among other accounts' posts",
     ]),
     status: "open",
@@ -1326,7 +1326,7 @@ function seed() {
 
   /* ------------------------- portfolio / experience ------------------------- */
   db.insert(t.portfolioItems).values([
-    { id: id(), userId: uid["devin"], title: "Homecoming Recap Track", kind: "upnova_project", projectId: projNia, client: "Nia Brooks" },
+    { id: id(), userId: uid["devin"], title: "Homecoming Recap Track", kind: "mavyn_project", projectId: projNia, client: "Nia Brooks" },
     { id: id(), userId: uid["devin"], title: "Nike Fall Campaign", kind: "video", client: "Nike", aiInvolvement: "none" },
     { id: id(), userId: uid["ava"], title: "Rooftop Golden Hour Series", kind: "image", mediaUrl: "/images/post-photo.jpg" },
   ]).run();
@@ -1343,7 +1343,7 @@ function seed() {
   const BALT = { lat: 39.2904, lng: -76.6122, state: "MD" };
   const DC = { lat: 38.9072, lng: -77.0369, state: "DC" };
   const eventDefs = [
-    { slug: "meetup", host: "devin", title: "UpNova Creator Meetup", time: "7:00 PM", loc: "The Assembly Room", city: "Baltimore, MD", days: 15, price: null, cap: 150, att: 84, img: "/images/event-meetup.jpg", kind: "rsvp", cat: "Networking", geo: BALT, desc: "Meet the creators you keep seeing in your feed. Demos, collabs, and a live showcase." },
+    { slug: "meetup", host: "devin", title: "Mavyn Creator Meetup", time: "7:00 PM", loc: "The Assembly Room", city: "Baltimore, MD", days: 15, price: null, cap: 150, att: 84, img: "/images/event-meetup.jpg", kind: "rsvp", cat: "Networking", geo: BALT, desc: "Meet the creators you keep seeing in your feed. Demos, collabs, and a live showcase." },
     { slug: "networking", host: "tj", title: "DMV Music Networking Night", time: "8:00 PM", loc: "Union Stage", city: "Washington, DC", days: 21, price: 15, cap: 200, att: 132, img: "/images/event-networking.jpg", kind: "ticket", cat: "Networking", geo: DC, desc: "Producers, artists, engineers, and managers in one room. Bring business cards." },
     { slug: "photo-walk", host: "ava", title: "Golden Hour Photo Walk", time: "6:30 PM", loc: "Federal Hill Park", city: "Baltimore, MD", days: 9, price: null, cap: 40, att: 27, img: "/images/event-photowalk.jpg", kind: "registration", cat: "Creative / Art", geo: BALT, desc: "All levels. Bring any camera — we shoot the skyline at golden hour, then compare edits." },
     { slug: "after-dark", host: "tj", title: "After Dark — Rooftop Set", time: "10:00 PM", loc: "Rooftop at The Crown", city: "Baltimore, MD", days: 12, price: 25, cap: 180, att: 164, img: "/images/event-afterdark.jpg", kind: "ticket", age: "21+", cat: "Party / Nightlife", geo: BALT, desc: "Full rig on the roof. Photographers welcome — trade content for entry." },
@@ -1462,7 +1462,7 @@ function seed() {
     db.insert(t.users)
       .values({
         id: qid,
-        email: `${q.handle}@upnova.dev`,
+        email: `${q.handle}@mavyn.dev`,
         passwordHash: PASSWORD,
         handle: q.handle,
         accountType: q.type,
@@ -1511,7 +1511,7 @@ function seed() {
         .run();
   }
 
-  console.log("Seeded:", defs.length, "users · password: upnova123 · admin: devin@upnova.dev");
+  console.log("Seeded:", defs.length, "users · password: mavyn123 · admin: devin@mavyn.dev");
 }
 
 const args = process.argv.slice(2);

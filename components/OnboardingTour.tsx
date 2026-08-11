@@ -32,7 +32,7 @@ type Tour = { audience: string; demoMode: "demo" | "simulation" | null; steps: T
 
 const HIDDEN_PATHS = ["/login", "/signup", "/welcome", "/forgot", "/reset", "/debug", "/profile/studio/world"];
 
-export const TOUR_EVENT = "upnova:start-tour";
+export const TOUR_EVENT = "mavyn:start-tour";
 
 export default function OnboardingTour() {
   const { user, refresh } = useSession();
@@ -155,7 +155,7 @@ export default function OnboardingTour() {
             <Sparkles className="h-6 w-6 text-violet-300" />
           </div>
           <h1 className="mt-4 text-xl font-bold tracking-tight text-zinc-50">
-            Welcome to UpNova, {user.profile.displayName.split(" ")[0]}
+            Welcome to Mavyn, {user.profile.displayName.split(" ")[0]}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-zinc-400">
             You just entered a new world. Let&apos;s take a quick look around so you know your way —
@@ -170,7 +170,7 @@ export default function OnboardingTour() {
             </button>
           </div>
           <p className="mt-3 text-[10px] text-zinc-600">
-            Nothing is locked behind this — UpNova is fully yours either way.
+            Nothing is locked behind this — Mavyn is fully yours either way.
           </p>
         </div>
       </div>
@@ -187,7 +187,7 @@ export default function OnboardingTour() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-zinc-50">You&apos;re all set.</h2>
-              <p className="text-xs text-zinc-500">Welcome to UpNova. Your world starts here.</p>
+              <p className="text-xs text-zinc-500">Welcome to Mavyn. Your world starts here.</p>
             </div>
           </div>
 
@@ -218,7 +218,7 @@ export default function OnboardingTour() {
 
           {/* LEVEL 2: now you know the basics — learn by scenario */}
           <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-400/5 p-3.5">
-            <p className="text-xs font-bold text-zinc-100">Want to see how UpNova works for you?</p>
+            <p className="text-xs font-bold text-zinc-100">Want to see how Mavyn works for you?</p>
             <p className="mt-0.5 text-[11px] text-zinc-500">Short real-world walkthroughs — pick your path:</p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               {[
@@ -258,7 +258,7 @@ export default function OnboardingTour() {
             ))}
           </div>
           <button onClick={() => finish(false)} className="btn-lime mt-3 w-full justify-center py-2.5 text-sm">
-            Explore UpNova <ArrowRight className="h-4 w-4" />
+            Explore Mavyn <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -286,7 +286,7 @@ export default function OnboardingTour() {
   }
 
   return (
-    <div className="fixed inset-0 z-[95]" role="dialog" aria-label="UpNova tour">
+    <div className="fixed inset-0 z-[95]" role="dialog" aria-label="Mavyn tour">
       {/* dimmed world with a spotlight cut around the real element */}
       {rect ? (
         <div

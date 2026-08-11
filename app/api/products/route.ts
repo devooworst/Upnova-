@@ -38,7 +38,7 @@ export async function GET() {
         variants: parseVariants(r.product.variants),
         fulfillment: parseFulfillment(r.product.fulfillment),
         media: (() => { try { return JSON.parse(r.product.media); } catch { return []; } })(),
-        // external checkout is DISCLOSED, never disguised as an UpNova sale
+        // external checkout is DISCLOSED, never disguised as an Mavyn sale
         external: !!r.product.externalUrl,
         seller: publicUser(r.user, r.profile),
         isMine: viewer?.id === r.product.sellerId,

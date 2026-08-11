@@ -181,7 +181,7 @@ export function hasRelationshipBasis(providerId: string, clientId: string): bool
     .get();
   if (p) return true;
   // a shared conversation counts — the provider may want to reward a
-  // long-time client whose earlier work predates UpNova
+  // long-time client whose earlier work predates Mavyn
   const convs = db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, providerId)).all();
   for (const c of convs) {
     const other = db

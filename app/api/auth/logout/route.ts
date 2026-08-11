@@ -13,7 +13,7 @@ export async function POST() {
     const auth = headers().get("authorization") ?? "";
     if (auth.startsWith("Bearer ")) token = auth.slice(7).trim() || undefined;
   }
-  if (!token) token = cookies().get("upnova-session-token")?.value || undefined;
+  if (!token) token = cookies().get("mavyn-session-token")?.value || undefined;
   if (!token) token = readDemoSession() ?? undefined; // storage-blocked browsers still sign out
   // signed demo token: revoke ALL demo tokens for that handle from now on
   if (token?.startsWith("demo.")) {

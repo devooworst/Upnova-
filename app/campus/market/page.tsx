@@ -292,7 +292,7 @@ export default function CampusMarketPage() {
                   <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-500">
                     {ln.with}&apos;s borrowing record:{" "}
                     {ln.withRecord.onTime + ln.withRecord.late + ln.withRecord.problems === 0 && ln.withRecord.overdueNow === 0 ? (
-                      <span className="text-zinc-400">first borrow on UpNova</span>
+                      <span className="text-zinc-400">first borrow on Mavyn</span>
                     ) : (
                       <>
                         <span className="text-lime-300">{ln.withRecord.onTime} on time</span>

@@ -107,7 +107,7 @@ export default function OpportunityPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Opportunities
       </Link>
 
-      <PublishedBanner path={`/opportunities/${opp.id}`} title={`${opp.title} — apply on UpNova`} text={opp.budget != null ? `$${opp.budget} · ${opp.remote ? "Remote" : opp.location}` : opp.location} />
+      <PublishedBanner path={`/opportunities/${opp.id}`} title={`${opp.title} — apply on Mavyn`} text={opp.budget != null ? `$${opp.budget} · ${opp.remote ? "Remote" : opp.location}` : opp.location} />
 
       <article className="card-event p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -165,11 +165,11 @@ export default function OpportunityPage() {
               {opp.engagement.startDate && <li>Starts {new Date(opp.engagement.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</li>}
               <li className={opp.engagement.classification === "external_employment" ? "text-sky-300" : "text-zinc-400"}>
                 {opp.engagement.classification === "external_employment"
-                  ? "Employment handled by the employer — payroll and paperwork happen outside UpNova."
-                  : "Freelance/contract through UpNova — payments secured per cycle, released on completion."}
+                  ? "Employment handled by the employer — payroll and paperwork happen outside Mavyn."
+                  : "Freelance/contract through Mavyn — payments secured per cycle, released on completion."}
               </li>
-              {opp.engagement.interviewMode === "external" && <li className="text-zinc-500">Interview process happens outside UpNova (labeled external).</li>}
-              {opp.engagement.interviewMode === "upnova" && <li className="text-zinc-500">Interviews scheduled through UpNova — they land on both calendars.</li>}
+              {opp.engagement.interviewMode === "external" && <li className="text-zinc-500">Interview process happens outside Mavyn (labeled external).</li>}
+              {opp.engagement.interviewMode === "mavyn" && <li className="text-zinc-500">Interviews scheduled through Mavyn — they land on both calendars.</li>}
             </ul>
           </div>
         )}

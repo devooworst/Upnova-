@@ -3,7 +3,7 @@ import ProfileView from "@/components/profile/ProfileView";
 
 export const metadata: Metadata = {
   title: "Profile",
-  description: "Your UpNova profile — portfolio, services, and opportunities.",
+  description: "Your Mavyn profile — portfolio, services, and opportunities.",
 };
 
 export default function ProfilePage() {

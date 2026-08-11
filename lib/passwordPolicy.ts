@@ -33,7 +33,7 @@ const COMMON = new Set(
   fuckyou asshole pussy696969 696969 mustang corvette ferrari mercedes
   liverpool arsenal chelsea barcelona realmadrid pokemon naruto minecraft fortnite
   summer2024 summer2025 winter2024 spring2025 autumn2024 january february
-  baltimore maryland upnova upnova123 upnova1234 creator creative
+  baltimore maryland mavyn mavyn123 mavyn1234 creator creative
   letmeinplease passwordpassword 123123123123 111222333444 aaa111bbb222`
     .split(/\s+/)
     .filter(Boolean)

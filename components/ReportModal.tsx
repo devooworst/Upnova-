@@ -25,7 +25,7 @@ const groups: { label: string; items: string[] }[] = [
     items: [
       "Client hasn't paid",
       "Client received work but refuses to pay",
-      "Client asked me to work outside UpNova",
+      "Client asked me to work outside Mavyn",
       "Client changed the agreement",
       "Client is attempting fraud",
     ],
@@ -175,7 +175,7 @@ export default function ReportModal({
               Submit Report
             </button>
             <p className="mt-2.5 text-center text-[10px] leading-relaxed text-zinc-600">
-              UpNova protects the transaction and investigates disputes fairly — for clients and
+              Mavyn protects the transaction and investigates disputes fairly — for clients and
               creators.
             </p>
           </>

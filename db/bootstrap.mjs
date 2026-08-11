@@ -4,7 +4,7 @@
 import Database from "better-sqlite3";
 import { writeFileSync } from "fs";
 
-const db = new Database("db/upnova.dev.db");
+const db = new Database("db/mavyn.dev.db");
 const rows = db
   .prepare(
     "select type, name, sql from sqlite_master where sql is not null and name not like 'sqlite_%' order by case type when 'table' then 0 else 1 end, name"

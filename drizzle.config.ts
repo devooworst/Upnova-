@@ -4,5 +4,5 @@ export default defineConfig({
   dialect: "sqlite",
   schema: "./db/schema.ts",
   out: "./db/migrations",
-  dbCredentials: { url: "./db/upnova.dev.db" },
+  dbCredentials: { url: "./db/mavyn.dev.db" },
 });

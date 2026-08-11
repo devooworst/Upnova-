@@ -13,13 +13,13 @@ export default async function Image({ params }: { params: { id: string } }) {
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.services.ownerId))
     .where(eq(tables.services.id, params.id))
     .get();
-  if (!row) return ogCard({ overline: "SERVICE", title: "UpNova", creator: "", cta: "Open UpNova" });
+  if (!row) return ogCard({ overline: "SERVICE", title: "Mavyn", creator: "", cta: "Open Mavyn" });
   const cfg = parseConfig(row.service.config);
   return ogCard({
     overline: `SERVICE · ${row.service.fulfillment === "appointment" ? "BOOK" : "REQUEST"}`,
     title: row.service.title,
     creator: row.profile.displayName,
     meta: `${priceLabel(cfg, row.service.price)}${row.profile.city && row.profile.locationVisibility !== "hidden" ? ` · ${row.profile.city}, ${row.profile.state}` : ""}`,
-    cta: row.service.fulfillment === "appointment" ? "Book on UpNova" : "Request on UpNova",
+    cta: row.service.fulfillment === "appointment" ? "Book on Mavyn" : "Request on Mavyn",
   });
 }

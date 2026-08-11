@@ -5,7 +5,7 @@
 /*  Streaming previews (configurable length, creator-controlled        */
 /*  watermark labeling) instead of source files; license options are   */
 /*  the creator's own. "My licenses" is the permanent record both      */
-/*  sides can point to. UpNova never claims audio can't be recorded —  */
+/*  sides can point to. Mavyn never claims audio can't be recorded —  */
 /*  terms + records + a dispute lane are the real protection.          */
 /* ------------------------------------------------------------------ */
 

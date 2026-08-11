@@ -3,7 +3,7 @@
 /* ------------------------------------------------------------------ */
 /*  Product page — the shareable unit for "buy this".                  */
 /*  Guests see everything (photos, price, variants, seller's VERIFIED  */
-/*  history); the account ask happens at Buy. UpNova checkout secures  */
+/*  history); the account ask happens at Buy. Mavyn checkout secures  */
 /*  funds until delivery; external listings say exactly where the      */
 /*  purchase actually happens.                                         */
 /* ------------------------------------------------------------------ */
@@ -135,7 +135,7 @@ export default function ProductPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Shop
       </Link>
 
-      <PublishedBanner path={`/shop/${p.id}`} title={`${p.title} — $${p.price} on UpNova`} text={p.external ? "Sold on the seller's website" : "Funds held until delivery"} />
+      <PublishedBanner path={`/shop/${p.id}`} title={`${p.title} — $${p.price} on Mavyn`} text={p.external ? "Sold on the seller's website" : "Funds held until delivery"} />
 
       <article className="card-money p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -189,7 +189,7 @@ export default function ProductPage() {
             </a>
             <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-zinc-500">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-              External checkout — you&apos;ll complete your purchase on the seller&apos;s website. UpNova doesn&apos;t process this sale.
+              External checkout — you&apos;ll complete your purchase on the seller&apos;s website. Mavyn doesn&apos;t process this sale.
             </p>
           </div>
         ) : p.soldOut || p.archived ? (
@@ -206,7 +206,7 @@ export default function ProductPage() {
             </p>
             <dl className="space-y-1.5 rounded-xl border border-line bg-card-raised p-3.5 text-sm">
               <div className="flex justify-between"><dt className="text-zinc-500">{p.title}{Object.keys(picks).length ? ` (${Object.entries(picks).map(([k, v]) => `${k}: ${v}`).join(" · ")})` : ""}</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${subtotal.toFixed(2)}</dd></div>
-              <div className="flex justify-between"><dt className="text-zinc-500">UpNova fee (5%)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${fee.toFixed(2)}</dd></div>
+              <div className="flex justify-between"><dt className="text-zinc-500">Mavyn fee (5%)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${fee.toFixed(2)}</dd></div>
               <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold"><dt className="text-zinc-200">Total</dt><dd className="font-mono tracking-[0.08em] text-lime-300">${total.toFixed(2)}</dd></div>
             </dl>
             {buyError && <p className="text-xs font-medium text-rose-300">{buyError}</p>}
@@ -326,7 +326,7 @@ export default function ProductPage() {
             </div>
           )}
           <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
-            These are the things UpNova has actually verified and counted — not a guarantee. Problems with an
+            These are the things Mavyn has actually verified and counted — not a guarantee. Problems with an
             order? Report it from your orders page and a human reviews it.
           </p>
         </div>

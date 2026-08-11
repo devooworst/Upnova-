@@ -298,7 +298,7 @@ export default function RightSidebar({ scope }: { scope: FeedScope }) {
 
       <p className="px-2 font-mono text-[10px] leading-relaxed text-zinc-600">
         about · help · privacy · terms
-        <br />© 2026 UpNova, Baltimore MD
+        <br />© 2026 Mavyn, Baltimore MD
       </p>
     </aside>
   );

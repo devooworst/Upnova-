@@ -17,11 +17,11 @@ export type Plan = "free" | "college" | "pro" | "business_pro" | "agency";
 // business_pro -> agency. Status transitions (student -> alumni) are
 // never billing events.
 
-export const PRO_EVENT = "upnova:account-changed";
+export const PRO_EVENT = "mavyn:account-changed";
 
 export function getPlan(): Plan {
   if (typeof window === "undefined") return "free";
-  const v = window.localStorage.getItem("upnova-plan");
+  const v = window.localStorage.getItem("mavyn-plan");
   return v === "pro" || v === "college" ? v : "free";
 }
 
@@ -41,7 +41,7 @@ export async function setPlan(plan: Plan): Promise<boolean> {
   } catch {
     return false;
   }
-  window.localStorage.setItem("upnova-plan", plan); // legacy mirror only — UI reads user.plan
+  window.localStorage.setItem("mavyn-plan", plan); // legacy mirror only — UI reads user.plan
   window.dispatchEvent(new Event(PRO_EVENT));
   // soft session refetch: user.plan updates everywhere without a reload
   const { invalidateSession } = await import("./session");
@@ -54,11 +54,11 @@ export async function setPlan(plan: Plan): Promise<boolean> {
     anymore; kept only so old localStorage keys are still cleaned on logout. */
 export function isStudentVerified(): boolean {
   if (typeof window === "undefined") return false;
-  return window.localStorage.getItem("upnova-student-verified") === "1";
+  return window.localStorage.getItem("mavyn-student-verified") === "1";
 }
 
 export function setStudentVerified(v: boolean) {
-  window.localStorage.setItem("upnova-student-verified", v ? "1" : "0");
+  window.localStorage.setItem("mavyn-student-verified", v ? "1" : "0");
   window.dispatchEvent(new Event(PRO_EVENT));
 }
 
@@ -76,11 +76,11 @@ export type TrustStatus = "standard" | "identity" | "high-trust";
 
 export function getTrustStatus(): TrustStatus {
   if (typeof window === "undefined") return "identity";
-  const v = window.localStorage.getItem("upnova-trust");
+  const v = window.localStorage.getItem("mavyn-trust");
   return v === "high-trust" ? "high-trust" : "identity";
 }
 
 export function setTrustStatus(t: TrustStatus) {
-  window.localStorage.setItem("upnova-trust", t);
+  window.localStorage.setItem("mavyn-trust", t);
   window.dispatchEvent(new Event(PRO_EVENT));
 }

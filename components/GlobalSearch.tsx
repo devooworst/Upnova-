@@ -126,7 +126,7 @@ export default function GlobalSearch({ variant = "desktop" }: { variant?: "deskt
           }
         }}
         placeholder="Search people, opportunities, communities…"
-        aria-label="Search UpNova"
+        aria-label="Search Mavyn"
         className={
           variant === "desktop"
             ? "w-full rounded-full border border-line bg-card px-10 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/40 focus:ring-2 focus:ring-lime-400/15"

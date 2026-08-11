@@ -86,7 +86,7 @@ export default function Home() {
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
             {user?.profile.city
               ? `${user.profile.city}, ${user.profile.state}`
-              : "UpNova"}{" "}
+              : "Mavyn"}{" "}
             · {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
           </p>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -141,7 +141,7 @@ export default function Home() {
             <div className="mt-2">
               <p className="text-sm text-zinc-400">
                 Find what&apos;s happening around you — and the people who can make it happen. You&apos;re
-                browsing the public side of UpNova.
+                browsing the public side of Mavyn.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link href="/services" className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100">

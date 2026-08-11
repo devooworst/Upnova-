@@ -61,7 +61,7 @@ export const PROTECTED_REASONS = new Set([
 
 export const DISPUTE_STATUS_LABEL: Record<string, string> = {
   open: "Open — awaiting the other party",
-  under_review: "Under UpNova review",
+  under_review: "Under Mavyn review",
   return_authorized: "Return authorized — ship it back",
   return_in_transit: "Return in transit",
   resolved_refund: "Resolved — refunded to buyer",
@@ -113,7 +113,7 @@ export function returnPolicyLines(p: ReturnPolicy): string[] {
     `Return shipping paid by the ${p.whoPaysShipping}`,
     p.restockingPct > 0 ? `${p.restockingPct}% restocking fee` : "No restocking fee",
     p.conditions ? `Condition: ${p.conditions}` : "Item must come back in the condition it arrived",
-    "Refund issued after the seller receives the return (or UpNova resolves a dispute)",
+    "Refund issued after the seller receives the return (or Mavyn resolves a dispute)",
     "Platform protection applies regardless: non-delivery and misrepresented/defective/counterfeit items are always disputable",
   ];
 }

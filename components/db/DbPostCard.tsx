@@ -158,7 +158,7 @@ export default function DbPostCard({
 
   const share = async () => {
     const url = `${window.location.origin}/posts/${post.id}`;
-    const title = `${post.author.displayName} on UpNova`;
+    const title = `${post.author.displayName} on Mavyn`;
     if (navigator.share) {
       try { await navigator.share({ title, url }); } catch {}
     } else {

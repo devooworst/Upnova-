@@ -167,7 +167,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-400">
           Three dedicated TEST accounts with <span className="font-semibold text-zinc-300">zero automation</span> —
           nobody accepts, replies, or delivers unless you do it. Pick a scenario, act it out in the real
-          UpNova interface, and watch each checkpoint verify against the actual database. A checkpoint
+          Mavyn interface, and watch each checkpoint verify against the actual database. A checkpoint
           only turns green when the expected state truly exists. Real accounts are never touched, and
           every scenario resets cleanly.
         </p>

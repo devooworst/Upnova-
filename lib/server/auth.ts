@@ -24,7 +24,7 @@ import { join } from "path";
 /* ---------------- DEV/DEMO ONLY: sticky sandbox session ----------------
    Some embedded previews block EVERY client storage mechanism (cookies,
    localStorage, sessionStorage, window.name). No client can survive a
-   refresh there. When UPNOVA_DEMO_STICKY_SESSION=1, the sandbox itself
+   refresh there. When MAVYN_DEMO_STICKY_SESSION=1, the sandbox itself
    remembers the demo session: login writes the session token to a local
    marker file; a request arriving with NO credentials restores that
    session; logout destroys the session row AND the marker. It restores a
@@ -32,7 +32,7 @@ import { join } from "path";
    create one, sign-out really ends it. Single-user demo sandboxes only;
    NEVER set in production (any visitor would resume the demo session).  */
 const STICKY_FILE = join(process.cwd(), "db", ".demo-session");
-const stickyOn = () => process.env.UPNOVA_DEMO_STICKY_SESSION === "1";
+const stickyOn = () => process.env.MAVYN_DEMO_STICKY_SESSION === "1";
 /* Demo mode gate that SURVIVES instance swaps: env files are per-machine
    and do not travel with the platform's snapshots — a committed marker
    file does. Production deletes db/DEMO_MODE (see README + the file
@@ -50,7 +50,7 @@ import { createHmac } from "crypto";
 /* CONSTANT on purpose: cross-instance verification must not depend on any
    per-machine env value. Demo-only — production removes db/DEMO_MODE and
    this whole path goes dead. */
-const demoSecret = () => "upnova-demo-signing-key-NOT-FOR-PRODUCTION";
+const demoSecret = () => "mavyn-demo-signing-key-NOT-FOR-PRODUCTION";
 
 export const isDemoMode = () => demoModeOn();
 
@@ -128,7 +128,7 @@ export function forgetDemoSession(token?: string) {
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 
-export const SESSION_COOKIE = "upnova_session";
+export const SESSION_COOKIE = "mavyn_session";
 const SESSION_DAYS = 30;
 
 /* Session cookie attributes — THE fix for "login succeeds but I'm logged
@@ -159,7 +159,7 @@ export function sessionCookieOptions(expiresAt?: Date) {
       // known HTTPS-only preview domains — belt and suspenders in case the
       // proxy doesn't forward the proto header
       host.endsWith(".e2b.app") ||
-      process.env.UPNOVA_SECURE_COOKIES === "1";
+      process.env.MAVYN_SECURE_COOKIES === "1";
   } catch {
     /* outside a request scope — default to http attributes */
   }
@@ -214,7 +214,7 @@ export function getSessionUser(): SessionUser | null {
     }
     // demo transport #3: the JS-set token cookie (first-party contexts
     // send it automatically on every request, including full page loads)
-    if (!token) token = cookies().get("upnova-session-token")?.value || undefined;
+    if (!token) token = cookies().get("mavyn-session-token")?.value || undefined;
     // demo transport #4 (LAST): no credentials at all — the sandbox's own
     // sticky marker restores the current demo session (see block above)
     if (!token) token = readDemoSession() ?? undefined;
@@ -302,9 +302,9 @@ export function guarded<T>(fn: () => T | Promise<T>): Promise<Response> {
       // never mask the real failure while developing — surfacing
       // "no such table: users" instead of "Internal error" is the
       // difference between a 5-minute fix and a mystery
-      console.error("[upnova] unhandled route error:", err);
+      console.error("[mavyn] unhandled route error:", err);
       const detail =
-        process.env.NODE_ENV !== "production" || process.env.UPNOVA_VERBOSE_ERRORS === "1"
+        process.env.NODE_ENV !== "production" || process.env.MAVYN_VERBOSE_ERRORS === "1"
           ? `: ${err instanceof Error ? err.message : String(err)}`
           : "";
       return Response.json({ error: `Internal error${detail}` }, { status: 500 });

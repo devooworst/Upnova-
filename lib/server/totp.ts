@@ -51,5 +51,5 @@ export function verifyTotp(secret: string, code: string, at = Date.now()): boole
 }
 
 export function otpauthUrl(secret: string, email: string): string {
-  return `otpauth://totp/UpNova:${encodeURIComponent(email)}?secret=${secret}&issuer=UpNova&algorithm=SHA1&digits=6&period=30`;
+  return `otpauth://totp/Mavyn:${encodeURIComponent(email)}?secret=${secret}&issuer=Mavyn&algorithm=SHA1&digits=6&period=30`;
 }

@@ -381,7 +381,7 @@ export default function SettingsPage() {
                 <Select
                   label="Profile visibility"
                   hint="Who can find and view your profile"
-                  options={["Everyone", "UpNova members only", "People you follow"]}
+                  options={["Everyone", "Mavyn members only", "People you follow"]}
                 />
                 <div className="mt-2 flex justify-end">
                   <button className="btn-lime rounded-md px-5 py-2 text-xs">Save changes</button>
@@ -572,7 +572,7 @@ export default function SettingsPage() {
               <p className="mt-1 text-xs text-zinc-500">
                 Per category, per channel — saved to your account. SMS needs a verified phone and
                 explicit consent (Settings → Account → Phone &amp; Login). Projects, payments and
-                bookings SMS look like: &quot;UpNova: Payment submitted for your project. Open UpNova to review.&quot;
+                bookings SMS look like: &quot;Mavyn: Payment submitted for your project. Open Mavyn to review.&quot;
               </p>
               {np ? (
                 <div className="mt-3 overflow-x-auto">
@@ -635,7 +635,7 @@ export default function SettingsPage() {
               <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Privacy &amp; Safety</h2>
               <div className="mt-2">
                 <Select label="Who can message you" options={["Everyone", "People you follow", "No one"]} />
-                <Select label="Who can see your profile" options={["Everyone", "UpNova members", "Followers"]} />
+                <Select label="Who can see your profile" options={["Everyone", "Mavyn members", "Followers"]} />
                 <Select
                   label="Who can see your location"
                   hint="Distance is always shown as a range, never an address"
@@ -643,7 +643,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="divide-y divide-line-soft border-t border-line-soft">
-                <Row label="Identity verification" hint="Status only — your ID never lives on UpNova">
+                <Row label="Identity verification" hint="Status only — your ID never lives on Mavyn">
                   <span className="flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-2.5 py-1 text-[11px] font-semibold text-zinc-200"><span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Identity Verified</span>
                 </Row>
                 <Row label="High-Trust verification" hint="Required for childcare, pet care, home access, transportation">
@@ -776,7 +776,7 @@ export default function SettingsPage() {
                     <Compass className="h-4 w-4 text-violet-300" /> Take the tour again
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-                    Replay the guided walkthrough of UpNova — Home, Discover, Opportunities, Services,
+                    Replay the guided walkthrough of Mavyn — Home, Discover, Opportunities, Services,
                     Messages, your profile, and My World. It highlights the real interface and takes about a minute.
                   </p>
                   <button
@@ -790,14 +790,14 @@ export default function SettingsPage() {
                 </div>
                 <div className="rounded-xl border border-line bg-card-raised p-4">
                   <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-                    <HelpCircle className="h-4 w-4 text-violet-300" /> Learn UpNova — real-world guides
+                    <HelpCircle className="h-4 w-4 text-violet-300" /> Learn Mavyn — real-world guides
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-zinc-500">
                     Scenario-based walkthroughs of the deeper features — Clients, Preferred Clients, bookings,
                     releases, payments, hiring, and more. Pick a path (client, provider, business, creator) and
                     learn through actual situations, at your own pace.
                   </p>
-                  <a href="/learn" className="btn-ghost mt-3 inline-flex px-4 py-1.5 text-xs">Open Learn UpNova</a>
+                  <a href="/learn" className="btn-ghost mt-3 inline-flex px-4 py-1.5 text-xs">Open Learn Mavyn</a>
                 </div>
                 <div className="rounded-xl border border-line bg-card-raised p-4">
                   <p className="text-sm font-semibold text-zinc-100">Quick answers</p>
@@ -818,8 +818,8 @@ export default function SettingsPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {(
                   [
-                    ["dark", "Dark", "The UpNova look"],
-                    ["light", "Light", "Same UpNova, brighter room"],
+                    ["dark", "Dark", "The Mavyn look"],
+                    ["light", "Light", "Same Mavyn, brighter room"],
                     ["system", "Use device settings", "Follows your computer"],
                   ] as [ThemeChoice, string, string][]
                 ).map(([id, label, desc]) => (
@@ -864,9 +864,9 @@ export default function SettingsPage() {
                 <ul className="divide-y divide-line-soft">
                   {(
                     [
-                      ["free", "UpNova Free", "$0", "Everyone. The full core platform."],
-                      ["college", "UpNova College+", "$4.99/mo", "Optional student exposure boost. Verification & campus access are free."],
-                      ["pro", "UpNova Pro", "$12.99/mo", "Serious creators — analytics, discovery, pro tools."],
+                      ["free", "Mavyn Free", "$0", "Everyone. The full core platform."],
+                      ["college", "Mavyn College+", "$4.99/mo", "Optional student exposure boost. Verification & campus access are free."],
+                      ["pro", "Mavyn Pro", "$12.99/mo", "Serious creators — analytics, discovery, pro tools."],
                     ] as [Plan, string, string, string][]
                   ).map(([id, name, price, desc]) => (
                     <li key={id} className="flex items-center justify-between gap-3 py-3">
@@ -895,7 +895,7 @@ export default function SettingsPage() {
                   Change plan
                 </a>
                 <p className="mt-2 text-center text-[10px] text-zinc-600">
-                  Test prices. Transaction fees on paid work are separate — UpNova earns even from
+                  Test prices. Transaction fees on paid work are separate — Mavyn earns even from
                   Free users when they earn.
                 </p>
               </div>

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     const id = randomBytes(12).toString("hex");
 
     if (body.projectId) {
-      // add a completed UpNova project as a verified portfolio entry
+      // add a completed Mavyn project as a verified portfolio entry
       const p = db.select().from(tables.projects).where(eq(tables.projects.id, String(body.projectId))).get();
       if (!p || p.creatorId !== user.id) throw new ApiError(403, "Not your project");
       if (!["completed", "reviewed"].includes(p.state)) throw new ApiError(409, "Only completed projects");
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       if (existing) return { id: existing.id };
       const client = db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.clientId)).get();
       db.insert(tables.portfolioItems)
-        .values({ id, userId: user.id, title: p.title, kind: "upnova_project", projectId: p.id, client: client?.displayName ?? "" })
+        .values({ id, userId: user.id, title: p.title, kind: "mavyn_project", projectId: p.id, client: client?.displayName ?? "" })
         .run();
       return { id };
     }

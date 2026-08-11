@@ -17,7 +17,7 @@ export const QA_LABEL: Record<string, string> = {
 };
 export const isQaHandle = (h: string | undefined | null) => !!h && (QA_HANDLES as readonly string[]).includes(h);
 
-const RETURN_KEY = "upnova-qa-return";
+const RETURN_KEY = "mavyn-qa-return";
 
 export function stashedReturn(): { token: string; handle: string } | null {
   try {

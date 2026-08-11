@@ -184,7 +184,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       pushEvidence(d, user.id, String(body.note || "Seller contests the claim."), body.photos);
       set({ status: "under_review" });
       logOrderEvent(o.id, user.id, "escalated", "Seller contested — sent to platform review");
-      notify({ userId: other, actorId: user.id, type: "order", title: `Case under review — ${o.title}`, body: "The seller contested with evidence. UpNova will review both sides.", href: "/orders" });
+      notify({ userId: other, actorId: user.id, type: "order", title: `Case under review — ${o.title}`, body: "The seller contested with evidence. Mavyn will review both sides.", href: "/orders" });
       return { status: "under_review" };
     }
 

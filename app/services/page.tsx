@@ -735,7 +735,7 @@ function BookWizard({ service, initialDate, onClose }: { service: ServiceItem; i
               {travelFee > 0 && (
                 <div className="flex justify-between"><dt className="text-zinc-500">Travel{service.distanceMi != null ? ` (${service.distanceMi} mi)` : ""}</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${travelFee.toFixed(2)}</dd></div>
               )}
-              <div className="flex justify-between"><dt className="text-zinc-500">UpNova fee (5%)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${fee.toFixed(2)}</dd></div>
+              <div className="flex justify-between"><dt className="text-zinc-500">Mavyn fee (5%)</dt><dd className="font-mono tracking-[0.08em] text-zinc-200">${fee.toFixed(2)}</dd></div>
               <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold"><dt className="text-zinc-200">Total</dt><dd className="font-mono tracking-[0.08em] text-lime-300">${(subtotal + fee).toFixed(2)}</dd></div>
             </dl>
             {error && (

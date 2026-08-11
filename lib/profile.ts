@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import type { SessionUser } from "./session";
 
-export const PROFILE_EVENT = "upnova:profile-changed";
+export const PROFILE_EVENT = "mavyn:profile-changed";
 
 /* ------------------------------- types ------------------------------- */
 

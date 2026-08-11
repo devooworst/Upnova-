@@ -111,7 +111,7 @@ Original Work Available
               {creator.onTimeRate !== undefined && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full border border-line bg-card-raised px-2 py-0.5 text-[10px] font-semibold text-zinc-200"
-                  title="Share of verified UpNova projects completed on time"
+                  title="Share of verified Mavyn projects completed on time"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> {creator.onTimeRate}% on time
                 </span>

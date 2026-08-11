@@ -1,12 +1,12 @@
 /* ------------------------------------------------------------------ */
-/*  Licensing — the creator's terms, not UpNova's.                     */
+/*  Licensing — the creator's terms, not Mavyn's.                     */
 /*                                                                     */
 /*  A work carries the license OPTIONS its creator chose to offer:     */
 /*  free use, non-commercial, commercial, exclusive, custom — each     */
 /*  with the creator's own price, attribution requirement, permitted   */
 /*  usage, and restrictions. Nobody is forced into a standard model.   */
 /*                                                                     */
-/*  Honesty rule: UpNova does NOT claim content can't be recorded or   */
+/*  Honesty rule: Mavyn does NOT claim content can't be recorded or   */
 /*  stolen. The protection stack is: streaming previews (configurable  */
 /*  length, creator-controlled watermark labeling) instead of source   */
 /*  files, clear terms, preserved license records, and a dispute lane  */

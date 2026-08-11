@@ -38,7 +38,7 @@ export function middleware(req: NextRequest) {
 
   if (originHost !== selfHost)
     return NextResponse.json(
-      { error: "Rejected: cross-site request. UpNova's API only accepts requests from its own pages." },
+      { error: "Rejected: cross-site request. Mavyn's API only accepts requests from its own pages." },
       { status: 403 }
     );
 

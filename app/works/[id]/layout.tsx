@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   return {
     title: row.work.title,
     description: desc,
-    openGraph: { title: `${row.work.title} • UpNova`, description: desc, type: "website" },
-    twitter: { card: "summary_large_image", title: `${row.work.title} • UpNova`, description: desc },
+    openGraph: { title: `${row.work.title} • Mavyn`, description: desc, type: "website" },
+    twitter: { card: "summary_large_image", title: `${row.work.title} • Mavyn`, description: desc },
   };
 }
 

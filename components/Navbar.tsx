@@ -62,12 +62,12 @@ export default function Navbar() {
           <Menu className="h-5 w-5" />
         </button>
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-1.5" aria-label="UpNova home">
+        <Link href="/" className="flex shrink-0 items-center gap-1.5" aria-label="Mavyn home">
           <span className="text-xl leading-none text-lime-400" aria-hidden>
             ✦
           </span>
           <span className="font-display text-lg font-bold tracking-tight text-zinc-50">
-            UpNova
+            Mavyn
           </span>
         </Link>
         {/* DEMO MODE / SIMULATION MODE master switch — outside the logo link */}
@@ -155,7 +155,7 @@ export default function Navbar() {
                           ? "border-violet-400/40 bg-violet-400/10 text-violet-300"
                           : "border-line text-zinc-400"
                       }`}>
-                        UpNova {planLabel}
+                        Mavyn {planLabel}
                       </span>
                     </div>
                   </div>
@@ -208,7 +208,7 @@ export default function Navbar() {
           onClick={() => setLogoutOpen(false)}
         >
           <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Log out of UpNova?</p>
+            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Log out of Mavyn?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
               You&apos;ll need to sign back in to access your account. Nothing is deleted — your
               profile, portfolio, messages, and projects stay right here.

@@ -1,8 +1,8 @@
 {
-  "name": "upnova",
+  "name": "mavyn",
   "version": "0.1.0",
   "private": true,
-  "description": "UpNova \u2014 the local-first creator economy platform. Discover creators, opportunities, services, communities, and events around you.",
+  "description": "Mavyn \u2014 the local-first creator economy platform. Discover creators, opportunities, services, communities, and events around you.",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",

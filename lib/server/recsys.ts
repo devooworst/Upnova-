@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/*  UpNova recommendation engine — modular, transparent, swappable.    */
+/*  Mavyn recommendation engine — modular, transparent, swappable.    */
 /*                                                                     */
 /*  Architecture:                                                      */
 /*    interactions table  → raw behavioral signals (recordInteraction) */

@@ -1,7 +1,7 @@
 "use client";
 
 /* ------------------------------------------------------------------ */
-/*  Event Setup — the organizer chooses the model, UpNova provides the */
+/*  Event Setup — the organizer chooses the model, Mavyn provides the */
 /*  tools. THE FIRST CHOICE IS SCOPE:                                  */
 /*    · Campus event → lives in Your Campus, visible to your school's  */
 /*      verified members only. On-campus / school-associated things.   */

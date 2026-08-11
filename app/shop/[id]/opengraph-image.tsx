@@ -12,12 +12,12 @@ export default async function Image({ params }: { params: { id: string } }) {
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.products.sellerId))
     .where(eq(tables.products.id, params.id))
     .get();
-  if (!row) return ogCard({ overline: "PRODUCT", title: "UpNova", creator: "", cta: "Open UpNova" });
+  if (!row) return ogCard({ overline: "PRODUCT", title: "Mavyn", creator: "", cta: "Open Mavyn" });
   return ogCard({
     overline: `PRODUCT · ${row.product.externalUrl ? "SHOP" : "BUY"}`,
     title: row.product.title,
     creator: row.profile.displayName,
     meta: `$${row.product.price}${row.profile.city && row.profile.locationVisibility !== "hidden" ? ` · ${row.profile.city}, ${row.profile.state}` : ""}`,
-    cta: row.product.externalUrl ? "View on UpNova" : "Buy on UpNova",
+    cta: row.product.externalUrl ? "View on Mavyn" : "Buy on Mavyn",
   });
 }

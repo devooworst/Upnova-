@@ -140,7 +140,7 @@ export interface StudioConfig {
 
 /* My World canvas elements — the hero block (avatar, name, identity
    badges, Message/Book/Follow actions) is one indivisible element:
-   its INTERNALS are UpNova's and can never be split or hidden. */
+   its INTERNALS are Mavyn's and can never be split or hidden. */
 export const WORLD_ELEMENT_IDS = ["hero", "trust", "posts", "services", "reviews", "experience"] as const;
 export const WORLD_ELEMENT_LABELS: Record<string, string> = {
   hero: "Profile card (picture, name, bio, actions)",
@@ -151,7 +151,7 @@ export const WORLD_ELEMENT_LABELS: Record<string, string> = {
   experience: "Experience",
 };
 
-/* THE CANONICAL DEFAULT = the original UpNova profile structure:
+/* THE CANONICAL DEFAULT = the original Mavyn profile structure:
    one full-width column, original section order, original spacing,
    no rotation, content-sized heights. "Default layout" restores
    exactly this — the profile every visitor knows. */
@@ -170,7 +170,7 @@ export const DEFAULT_WORLD: WorldConfig = {
 
 /* full-bleed environment scenes — pure CSS from THIS file only (users
    pick an id; they never supply style values). Text always sits on
-   UpNova cards, so readability survives every scene. */
+   Mavyn cards, so readability survives every scene. */
 export const ENVIRONMENTS: Record<string, { label: string; desc: string; css: string; overlay: string }> = {
   cosmic: {
     label: "Cosmic",
@@ -322,7 +322,7 @@ export const DEFAULT_STUDIO: StudioConfig = {
 /* themes — page wash + card tint + decoration line. No emojis in UI;
    the vibe comes from color, texture, and the deco strip. */
 export const THEMES: Record<string, { label: string; desc: string; wash: string; card: string; deco: string; headerRing: string }> = {
-  none: { label: "UpNova Standard", desc: "The default look", wash: "", card: "", deco: "", headerRing: "" },
+  none: { label: "Mavyn Standard", desc: "The default look", wash: "", card: "", deco: "", headerRing: "" },
   earthy: {
     label: "Earthy",
     desc: "Nature — moss, leaves, warm ground",

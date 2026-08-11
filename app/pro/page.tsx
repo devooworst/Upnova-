@@ -134,7 +134,7 @@ export default function ProPage() {
     try {
       const slug = SCHOOL_SLUGS[school];
       if (!slug) {
-        setVerifyError("That school isn't on UpNova yet — pick a listed school or check back soon.");
+        setVerifyError("That school isn't on Mavyn yet — pick a listed school or check back soon.");
         return;
       }
       const yearMatch = gradDate.match(/(19|20)\d{2}/);
@@ -154,7 +154,7 @@ export default function ProPage() {
         return;
       }
       if (res.status === 404) {
-        setVerifyError(`${school} isn't onboarded on UpNova yet. Bowie State University is live in this demo.`);
+        setVerifyError(`${school} isn't onboarded on Mavyn yet. Bowie State University is live in this demo.`);
         return;
       }
       if (!res.ok) {
@@ -209,7 +209,7 @@ export default function ProPage() {
               </section>
             ))}
           </div>
-          <p className="text-center text-[10px] text-zinc-600">TEST/DEMO PAYMENT — no real money can move. A small business never pays just to exist on UpNova.</p>
+          <p className="text-center text-[10px] text-zinc-600">TEST/DEMO PAYMENT — no real money can move. A small business never pays just to exist on Mavyn.</p>
         </>
       )}
 
@@ -219,7 +219,7 @@ export default function ProPage() {
           <header className="pt-2 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Choose how you grow</h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
-              Earning is free on UpNova, always. Plans buy growth — never the ability to make money.
+              Earning is free on Mavyn, always. Plans buy growth — never the ability to make money.
             </p>
             <Link href="/plans" className="mt-2 inline-block text-xs font-semibold text-lime-400 hover:text-lime-300">
               Compare all plans &amp; benefits →
@@ -487,7 +487,7 @@ export default function ProPage() {
               <div className="mt-3 border-t border-zinc-600" />
               <div className="mt-[3px] border-t border-zinc-600" />
               <p className="mt-2.5 flex items-baseline justify-between">
-                <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">earned through upnova · 2026</span>
+                <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">earned through mavyn · 2026</span>
                 <span className="text-base font-extrabold tracking-tight tabular-nums text-lime-400">$2,840</span>
               </p>
             </section>
@@ -572,7 +572,7 @@ export default function ProPage() {
       {view === "collegeCheckout" && (
         <div className="card-people mx-auto max-w-sm border-violet-400/30 p-5">
           <div className="flex items-center justify-between">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">UpNova</p>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">Mavyn</p>
             <button onClick={() => setView("plans")} className="icon-btn h-8 w-8" aria-label="Back">
               <X className="h-4 w-4" />
             </button>
@@ -617,14 +617,14 @@ export default function ProPage() {
       {view === "checkout" && (
         <div className="card-money mx-auto max-w-sm p-5">
           <div className="flex items-center justify-between">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">UpNova</p>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">Mavyn</p>
             <button onClick={() => setView("plans")} className="icon-btn h-8 w-8" aria-label="Back">
               <X className="h-4 w-4" />
             </button>
           </div>
           <Perforation className="mt-3" />
           <h1 className="mt-4 text-[15px] font-bold tracking-tight text-zinc-50">
-            {isAlumni ? "Upgrade to Alumni Pro" : "Upgrade to UpNova Pro"}
+            {isAlumni ? "Upgrade to Alumni Pro" : "Upgrade to Mavyn Pro"}
           </h1>
           <p className="text-xs text-zinc-500">{isAlumni ? `Pro Monthly — permanent alumni rate ($${ALUMNI_PRO_PRICE} instead of $${PRO_PRICE})` : "Pro Monthly"}</p>
           <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
@@ -640,7 +640,7 @@ export default function ProPage() {
             disabled={planBusy}
             className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm disabled:opacity-50"
           >
-            {processing ? "Processing test payment…" : planBusy ? "Activating…" : "Subscribe to UpNova Pro"}
+            {processing ? "Processing test payment…" : planBusy ? "Activating…" : "Subscribe to Mavyn Pro"}
           </button>
           <p className="mt-2.5 text-center font-mono text-[10px] font-medium text-zinc-500">
             TEST/DEMO PAYMENT — no real money can move. Billing runs on Stripe when we go live.
@@ -652,7 +652,7 @@ export default function ProPage() {
       {view === "success" && (
         <div className="card-money mx-auto max-w-sm p-6 text-center">
           <Sparkles className="mx-auto h-9 w-9 text-lime-400" />
-          <h1 className="mt-3 text-xl font-bold tracking-tight text-zinc-50">Welcome to UpNova Pro</h1>
+          <h1 className="mt-3 text-xl font-bold tracking-tight text-zinc-50">Welcome to Mavyn Pro</h1>
           <p className="mt-1.5 text-sm text-zinc-500">Your Pro membership is now active.</p>
           <div className="mt-5 flex gap-2">
             <Link href="/analytics" className="btn-lime flex-1 rounded-md py-2 text-xs">Go to Dashboard</Link>
@@ -666,7 +666,7 @@ export default function ProPage() {
         <>
           <header className="pt-2">
             <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-lime-400">
-              <Sparkles className="h-3.5 w-3.5" /> UpNova Pro
+              <Sparkles className="h-3.5 w-3.5" /> Mavyn Pro
             </p>
             <div className="mt-1 flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Your subscription</h1>
@@ -704,7 +704,7 @@ export default function ProPage() {
       {cancelOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setCancelOpen(false)}>
           <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Cancel UpNova Pro?</p>
+            <p className="text-[15px] font-bold tracking-tight text-zinc-50">Cancel Mavyn Pro?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
               You&apos;ll keep Pro benefits until the end of your current billing period (September 7).
             </p>

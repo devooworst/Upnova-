@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">Advanced Analytics</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
           Profile views, application rates, earnings breakdowns, and audience location are part of
-          UpNova Pro. Your current plan: <span className="font-semibold text-zinc-300">{user?.plan === "college" ? "College+" : "Free"}</span>.
+          Mavyn Pro. Your current plan: <span className="font-semibold text-zinc-300">{user?.plan === "college" ? "College+" : "Free"}</span>.
         </p>
         <Link
           href="/pro"

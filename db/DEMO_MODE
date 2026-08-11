@@ -1,3 +1,3 @@
-This file enables UpNova's DEMO authentication conveniences on every
+This file enables Mavyn's DEMO authentication conveniences on every
 instance built from this checkout (signed demo tokens, seed logins).
 DELETE THIS FILE FOR ANY PRODUCTION DEPLOYMENT.

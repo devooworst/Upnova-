@@ -48,8 +48,8 @@ export default function NewOpportunityPage() {
   const [startDate, setStartDate] = useState("");
   const [compModel, setCompModel] = useState<CompModel>("per_project");
   const [rate, setRate] = useState("");
-  const [classification, setClassification] = useState<"upnova_freelance" | "external_employment">("upnova_freelance");
-  const [interviewMode, setInterviewMode] = useState<"none" | "upnova" | "external">("none");
+  const [classification, setClassification] = useState<"mavyn_freelance" | "external_employment">("mavyn_freelance");
+  const [interviewMode, setInterviewMode] = useState<"none" | "mavyn" | "external">("none");
   const ongoing = engType !== "one_time";
   const newRole = () =>
     setRoles((r) => [...r, { id: Math.random().toString(36).slice(2, 10), title: "", count: "1", pay: "" }]);
@@ -200,7 +200,7 @@ export default function NewOpportunityPage() {
           <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Who can apply?</p>
           <div className="space-y-1.5">
             {[
-              { id: "anyone", label: "Anyone on UpNova" },
+              { id: "anyone", label: "Anyone on Mavyn" },
               { id: "students", label: "Verified students only", hint: "any school" },
               { id: "my_school", label: "Students from my school only", hint: "requires your own verified campus status" },
               { id: "alumni", label: "Alumni only", hint: "scoped to your school if you're verified" },
@@ -226,7 +226,7 @@ export default function NewOpportunityPage() {
       </section>
 
       {/* ENGAGEMENT — one-time project or ongoing relationship. Type is
-          configuration; UpNova never auto-classifies employee/contractor. */}
+          configuration; Mavyn never auto-classifies employee/contractor. */}
       <section className="card p-5">
         <h2 className="text-sm font-bold text-zinc-100">Engagement</h2>
         <p className="mt-1 text-xs text-zinc-500">
@@ -292,13 +292,13 @@ export default function NewOpportunityPage() {
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Who handles pay &amp; paperwork?</p>
           <div className="mt-1.5 space-y-1.5">
             <button
-              onClick={() => setClassification("upnova_freelance")}
-              className={`flex w-full items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${classification === "upnova_freelance" ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"}`}
+              onClick={() => setClassification("mavyn_freelance")}
+              className={`flex w-full items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${classification === "mavyn_freelance" ? "border-lime-400/50 bg-lime-400/5" : "border-line hover:border-zinc-600"}`}
             >
-              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${classification === "upnova_freelance" ? "bg-lime-400" : "bg-zinc-700"}`} />
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${classification === "mavyn_freelance" ? "bg-lime-400" : "bg-zinc-700"}`} />
               <span>
-                <span className={`block text-sm font-semibold ${classification === "upnova_freelance" ? "text-lime-300" : "text-zinc-200"}`}>Freelance / contract through UpNova</span>
-                <span className="block text-xs text-zinc-500">Payments run through UpNova — secured per cycle, released on completion.</span>
+                <span className={`block text-sm font-semibold ${classification === "mavyn_freelance" ? "text-lime-300" : "text-zinc-200"}`}>Freelance / contract through Mavyn</span>
+                <span className="block text-xs text-zinc-500">Payments run through Mavyn — secured per cycle, released on completion.</span>
               </span>
             </button>
             <button
@@ -308,7 +308,7 @@ export default function NewOpportunityPage() {
               <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${classification === "external_employment" ? "bg-sky-400" : "bg-zinc-700"}`} />
               <span>
                 <span className={`block text-sm font-semibold ${classification === "external_employment" ? "text-sky-300" : "text-zinc-200"}`}>Employment handled by the employer</span>
-                <span className="block text-xs text-zinc-500">Payroll, classification, and paperwork happen OUTSIDE UpNova — labeled as external throughout.</span>
+                <span className="block text-xs text-zinc-500">Payroll, classification, and paperwork happen OUTSIDE Mavyn — labeled as external throughout.</span>
               </span>
             </button>
           </div>
@@ -317,14 +317,14 @@ export default function NewOpportunityPage() {
         <div className="mt-3 border-t border-line-soft pt-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Interviews</p>
           <div className="mt-1.5 flex gap-1.5">
-            {([["none", "No interview"], ["upnova", "Schedule through UpNova"], ["external", "External process"]] as const).map(([v, l]) => (
+            {([["none", "No interview"], ["mavyn", "Schedule through Mavyn"], ["external", "External process"]] as const).map(([v, l]) => (
               <button key={v} onClick={() => setInterviewMode(v)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${interviewMode === v ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}>
                 {l}
               </button>
             ))}
           </div>
           {interviewMode === "external" && (
-            <p className="mt-1.5 text-[11px] text-zinc-600">External interviews are labeled clearly — applicants know the process leaves UpNova.</p>
+            <p className="mt-1.5 text-[11px] text-zinc-600">External interviews are labeled clearly — applicants know the process leaves Mavyn.</p>
           )}
         </div>
       </section>
@@ -485,7 +485,7 @@ export default function NewOpportunityPage() {
           <div className="flex items-center justify-between gap-3 rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2.5 opacity-80">
             <span className="text-sm text-zinc-400">
               Profile, portfolio, ratings, verification
-              <span className="block text-xs text-zinc-600">Always attached — applicants never re-type what UpNova knows.</span>
+              <span className="block text-xs text-zinc-600">Always attached — applicants never re-type what Mavyn knows.</span>
             </span>
             <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">auto</span>
           </div>

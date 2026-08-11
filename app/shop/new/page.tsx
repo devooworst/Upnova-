@@ -4,7 +4,7 @@
 /*  List a product — the same configurable-listing philosophy as       */
 /*  services: category = defaults + custom, variants and fulfillment   */
 /*  are the seller's configuration, and checkout is an HONEST choice:  */
-/*  UpNova checkout (funds held until delivery) or the seller's own    */
+/*  Mavyn checkout (funds held until delivery) or the seller's own    */
 /*  website (disclosed as external). One-time sales welcome: qty 1,    */
 /*  sold once, kept in history.                                        */
 /* ------------------------------------------------------------------ */
@@ -70,7 +70,7 @@ export default function NewProductPage() {
     setError(null);
     if (!title.trim()) return setError("What are you selling?");
     if (!price || Number(price) < 1) return setError("Set the price");
-    if (external && !externalUrl.trim()) return setError("Add your store link — or switch to UpNova checkout");
+    if (external && !externalUrl.trim()) return setError("Add your store link — or switch to Mavyn checkout");
     if (!external && fulfillment.length === 0) return setError("Pick at least one way buyers receive it");
     setBusy(true);
     const res = await fetch("/api/products", {
@@ -109,7 +109,7 @@ export default function NewProductPage() {
   if (user === null)
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <p className="text-sm font-semibold text-zinc-200">Join UpNova to sell</p>
+        <p className="text-sm font-semibold text-zinc-200">Join Mavyn to sell</p>
         <Link href="/signup?next=%2Fshop%2Fnew" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Create free account</Link>
       </div>
     );
@@ -129,7 +129,7 @@ export default function NewProductPage() {
       </div>
 
       <section className="card space-y-3 p-5">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What are you selling? — e.g. Black UpNova Hoodie" className={inputCls} maxLength={80} autoFocus />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What are you selling? — e.g. Black Mavyn Hoodie" className={inputCls} maxLength={80} autoFocus />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe it — material, sizing, story. Honest listings sell." className={`${inputCls} resize-none`} />
 
         {/* photos */}
@@ -231,8 +231,8 @@ export default function NewProductPage() {
             <span>
               Sell on my own website instead
               <span className="block text-xs leading-relaxed text-zinc-500">
-                UpNova becomes the discovery layer. Buyers see &quot;External checkout — you&apos;ll complete your
-                purchase on the seller&apos;s website&quot;. UpNova checkout (with funds held until delivery) doesn&apos;t apply.
+                Mavyn becomes the discovery layer. Buyers see &quot;External checkout — you&apos;ll complete your
+                purchase on the seller&apos;s website&quot;. Mavyn checkout (with funds held until delivery) doesn&apos;t apply.
               </span>
             </span>
           </label>

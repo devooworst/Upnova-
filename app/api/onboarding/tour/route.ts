@@ -33,7 +33,7 @@ export async function GET() {
       id: "home",
       target: "home",
       title: "Home",
-      body: "Home is where your UpNova world comes together — posts, updates, people you follow, opportunities, and activity relevant to you.",
+      body: "Home is where your Mavyn world comes together — posts, updates, people you follow, opportunities, and activity relevant to you.",
       href: "/",
     });
     add({
@@ -75,8 +75,8 @@ export async function GET() {
       target: "services",
       title: "Services",
       body: isBusiness
-        ? "Book creators' services for your business — browse, message, book, and manage the whole engagement on UpNova."
-        : "Need something done — or offering something yourself? Browse, message, book, and manage the entire service process through UpNova.",
+        ? "Book creators' services for your business — browse, message, book, and manage the whole engagement on Mavyn."
+        : "Need something done — or offering something yourself? Browse, message, book, and manage the entire service process through Mavyn.",
       href: "/services",
     });
     add({
@@ -117,10 +117,10 @@ export async function GET() {
       target: "profile",
       title: isBusiness ? "Your Business profile" : "Your profile",
       body: isBusiness
-        ? "Your organization's home on UpNova: represent your brand, list open roles, and show your work. Verification is earned through the business-verification process."
+        ? "Your organization's home on Mavyn: represent your brand, list open roles, and show your work. Verification is earned through the business-verification process."
         : isStudent
-          ? "Your UpNova identity — who you are, what you do, your work and experience. As a verified student, your school and class year can appear here (you control that in Settings)."
-          : "Your UpNova identity — show people who you are, what you do, your work, services, and experience.",
+          ? "Your Mavyn identity — who you are, what you do, your work and experience. As a verified student, your school and class year can appear here (you control that in Settings)."
+          : "Your Mavyn identity — show people who you are, what you do, your work, services, and experience.",
       href: "/profile",
     });
     add({

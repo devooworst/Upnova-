@@ -159,7 +159,7 @@ export function notify(input: NotifyInput) {
 
   /* channel fanout — only for mapped categories, only per the user's
      explicit preferences. SMS bodies are short, actionable, and carry
-     NO sensitive detail: title + "open UpNova", plus the managed-alerts
+     NO sensitive detail: title + "open Mavyn", plus the managed-alerts
      line for non-essential messages. */
   if (!prefCat || !recipient) return;
   if (prefs[prefCat].email && recipient.email) {
@@ -167,13 +167,13 @@ export function notify(input: NotifyInput) {
       input.userId,
       "email",
       recipient.email,
-      `${input.title}${input.body ? ` — ${input.body}` : ""} · Open UpNova: ${input.href}`,
+      `${input.title}${input.body ? ` — ${input.body}` : ""} · Open Mavyn: ${input.href}`,
       prefCat
     );
   }
   const smsAllowed = recipient.phone && recipient.phoneVerified && recipient.smsConsent && prefs[prefCat].sms;
   if (smsAllowed) {
-    const manage = prefCat === "security" ? "" : " Manage alerts in UpNova Settings.";
-    deliver(input.userId, "sms", recipient.phone!, `UpNova: ${input.title}. Open UpNova to review.${manage}`, prefCat);
+    const manage = prefCat === "security" ? "" : " Manage alerts in Mavyn Settings.";
+    deliver(input.userId, "sms", recipient.phone!, `Mavyn: ${input.title}. Open Mavyn to review.${manage}`, prefCat);
   }
 }

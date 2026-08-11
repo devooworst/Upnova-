@@ -671,12 +671,12 @@ function CommunityInner() {
             <input
               value={refUrl}
               onChange={(e) => setRefUrl(e.target.value)}
-              placeholder="Paste an UpNova link — service, opportunity, listing, event, product, or work"
+              placeholder="Paste an Mavyn link — service, opportunity, listing, event, product, or work"
               className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
             />
           ) : (
             <button onClick={() => setShowRef(true)} className="inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.1em] text-zinc-500 hover:text-violet-300">
-              <Link2 className="h-3 w-3" /> ATTACH AN UPNOVA LINK
+              <Link2 className="h-3 w-3" /> ATTACH AN MAVYN LINK
             </button>
           )}
           <div className="flex justify-end">
@@ -830,7 +830,7 @@ function CommunityInner() {
 
       {!user && (
         <p className="px-1 pb-4 text-center text-xs text-zinc-600">
-          You&apos;re browsing as a guest — join UpNova to post, reply, and react.
+          You&apos;re browsing as a guest — join Mavyn to post, reply, and react.
         </p>
       )}
 

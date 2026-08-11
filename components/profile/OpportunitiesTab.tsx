@@ -106,10 +106,10 @@ export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
         )}
       </p>
 
-      {/* Verified UpNova projects — the real completed record */}
+      {/* Verified Mavyn projects — the real completed record */}
       <section>
         <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          Experience · Verified UpNova Projects
+          Experience · Verified Mavyn Projects
         </h3>
         {completed === null ? (
           <div className="card h-16 animate-pulse" aria-hidden />

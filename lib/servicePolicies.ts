@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------------ */
 /*  Creator-defined service policies — the vocabulary of the           */
-/*  configurable service engine. UpNova never dictates "every stylist  */
-/*  charges a $20 travel fee"; the creator picks the rules and UpNova  */
+/*  configurable service engine. Mavyn never dictates "every stylist  */
+/*  charges a $20 travel fee"; the creator picks the rules and Mavyn  */
 /*  compiles them into the customer-facing flow, always disclosed      */
 /*  BEFORE payment. Shared by the creation form, the services API,     */
 /*  the booking wizard, and the booking record.                        */
@@ -46,7 +46,7 @@ export const VISIBILITY_OPTIONS: { id: ServiceVisibility; label: string; hint: s
 ];
 
 /* ----------------------------- service menu ----------------------------- */
-/* The creator builds their own menu — UpNova never forces one price on a
+/* The creator builds their own menu — Mavyn never forces one price on a
    business that actually sells "Retwist $60 · Wash +$10 · Style +$20".
    Add-ons can change the price AND the appointment length; packages bundle
    the base service with add-ons at the creator's own bundle price. */

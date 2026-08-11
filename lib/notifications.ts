@@ -135,7 +135,7 @@ export const notifications: UpNotification[] = [
     category: "campus",
     priority: "normal",
     title: "Campus event reminder",
-    body: "UpNova Creator Meetup · Sat Aug 22 · 7:00 PM · you\u2019re going",
+    body: "Mavyn Creator Meetup · Sat Aug 22 · 7:00 PM · you\u2019re going",
     time: "2 days ago",
     day: "earlier",
     href: "/events/meetup",
@@ -164,8 +164,8 @@ export const notifications: UpNotification[] = [
 
 /* ---- read state (localStorage until real backend) ---- */
 
-export const NOTIF_EVENT = "upnova:notifications-changed";
-const KEY = "upnova-notif-read";
+export const NOTIF_EVENT = "mavyn:notifications-changed";
+const KEY = "mavyn-notif-read";
 
 export function getReadIds(): Set<string> {
   if (typeof window === "undefined") return new Set();

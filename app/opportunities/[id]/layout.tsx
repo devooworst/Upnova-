@@ -10,12 +10,12 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     .where(eq(tables.opportunities.id, params.id))
     .get();
   if (!row) return { title: "Opportunity" };
-  const desc = `${row.profile.displayName}${row.opp.budget != null ? ` · $${row.opp.budget}` : ""} · ${row.opp.remote ? "Remote" : row.opp.location} — apply through UpNova.`;
+  const desc = `${row.profile.displayName}${row.opp.budget != null ? ` · $${row.opp.budget}` : ""} · ${row.opp.remote ? "Remote" : row.opp.location} — apply through Mavyn.`;
   return {
     title: row.opp.title,
     description: desc,
-    openGraph: { title: `${row.opp.title} • UpNova`, description: desc, type: "website" },
-    twitter: { card: "summary_large_image", title: `${row.opp.title} • UpNova`, description: desc },
+    openGraph: { title: `${row.opp.title} • Mavyn`, description: desc, type: "website" },
+    twitter: { card: "summary_large_image", title: `${row.opp.title} • Mavyn`, description: desc },
   };
 }
 

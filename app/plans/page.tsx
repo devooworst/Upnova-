@@ -19,7 +19,7 @@ import { PRO_PRICE, COLLEGE_PRICE, ALUMNI_PRO_PRICE, BUSINESS_PRO_PRICE } from "
 /* ------------------------------------------------------------------ */
 /* Plans & Benefits — the ONE comparison screen.                       */
 /*                                                                     */
-/* Philosophy (enforced across the product, stated here): UpNova is    */
+/* Philosophy (enforced across the product, stated here): Mavyn is    */
 /* never a walking paywall. The core social/networking experience —    */
 /* posting, following, messaging, communities, events, applying,       */
 /* earning — is FREE forever. Paid plans buy enhancement: student      */
@@ -62,9 +62,9 @@ const PLAN_META = [
     price: 0,
     accent: "text-zinc-100",
     card: "card",
-    best: "Anyone who wants to use UpNova.",
+    best: "Anyone who wants to use Mavyn.",
     features: ["Free to use, forever", "Profile, posts & portfolio", "Follow, connect & message", "Communities & events", "Browse & apply to opportunities", "Offer services & earn", "Basic My World", "Basic discovery & analytics"],
-    why: "Use UpNova without paying for the core experience.",
+    why: "Use Mavyn without paying for the core experience.",
   },
   {
     id: "college",
@@ -86,7 +86,7 @@ const PLAN_META = [
     card: "card-money",
     best: "Creators, freelancers and professionals building their brand.",
     features: ["Everything in Free", "Advanced Profile Studio", "Full My World customization", "Advanced profile & portfolio analytics", "Enhanced professional discovery", "Advanced services & creator tools", "Professional visibility tools", "Increased customization"],
-    why: "Turn your UpNova presence into a serious professional or creative brand.",
+    why: "Turn your Mavyn presence into a serious professional or creative brand.",
   },
   {
     id: "business_pro",
@@ -137,7 +137,7 @@ export default function PlansPage() {
       <header className="pt-2 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Plans &amp; Benefits</h1>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-zinc-500">
-          The core UpNova experience — posting, connecting, messaging, communities, events,
+          The core Mavyn experience — posting, connecting, messaging, communities, events,
           applying, and <span className="font-semibold text-lime-300">earning</span> — is free,
           always. Plans add student tools, professional power, or business capability. Never a
           paywall on being part of it.
@@ -317,7 +317,7 @@ export default function PlansPage() {
             </h2>
             <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-zinc-400">
               Your account transitions to <span className="font-semibold text-zinc-200">Alumni status</span> while
-              everything you&apos;ve built on UpNova stays with you. Alumni can upgrade to Pro at a
+              everything you&apos;ve built on Mavyn stays with you. Alumni can upgrade to Pro at a
               discounted alumni rate (${ALUMNI_PRO_PRICE}/mo instead of ${PRO_PRICE}) — or keep using the free core
               experience forever. Alumni is a status, not a fifth subscription.
             </p>

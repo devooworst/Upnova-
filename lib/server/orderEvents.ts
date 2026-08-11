@@ -22,7 +22,7 @@ export function orderTimeline(orderId: string) {
     .all()
     .map((e) => ({
       at: e.createdAt.toISOString(),
-      actor: e.actorId ? names.get(e.actorId) ?? "—" : "UpNova",
+      actor: e.actorId ? names.get(e.actorId) ?? "—" : "Mavyn",
       kind: e.kind,
       note: e.note,
     }));

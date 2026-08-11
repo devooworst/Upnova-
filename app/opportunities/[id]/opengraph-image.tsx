@@ -13,13 +13,13 @@ export default async function Image({ params }: { params: { id: string } }) {
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.opportunities.posterId))
     .where(eq(tables.opportunities.id, params.id))
     .get();
-  if (!row) return ogCard({ overline: "OPPORTUNITY", title: "UpNova", creator: "", cta: "Open UpNova" });
+  if (!row) return ogCard({ overline: "OPPORTUNITY", title: "Mavyn", creator: "", cta: "Open Mavyn" });
   const roles = rolesSummary(parseRoles(row.opp.roles));
   return ogCard({
     overline: "OPPORTUNITY · APPLY",
     title: row.opp.title,
     creator: row.profile.displayName,
     meta: [row.opp.budget != null ? `$${row.opp.budget}` : null, row.opp.remote ? "Remote" : row.opp.location, roles].filter(Boolean).join(" · "),
-    cta: "Apply on UpNova",
+    cta: "Apply on Mavyn",
   });
 }

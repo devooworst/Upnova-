@@ -17,7 +17,7 @@ import * as Lucide from "lucide-react";
 import { useSession } from "@/lib/session";
 import { scenarioById, LEARN_PATHS, type LearnScenario } from "@/lib/learnScenarios";
 
-const EVENT = "upnova:learn";
+const EVENT = "mavyn:learn";
 
 export function openLearnGuide(id: string, pathId?: string) {
   window.dispatchEvent(new CustomEvent<{ id: string; pathId?: string }>(EVENT, { detail: { id, pathId } }));
@@ -142,7 +142,7 @@ export default function LearnGuide() {
             Close
           </button>
         </div>
-        <p className="mt-2 text-[10px] text-zinc-600">You don&apos;t need to understand everything right now — explore UpNova at your own pace.</p>
+        <p className="mt-2 text-[10px] text-zinc-600">You don&apos;t need to understand everything right now — explore Mavyn at your own pace.</p>
       </div>
     </div>
   );

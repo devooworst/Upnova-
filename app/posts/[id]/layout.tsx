@@ -12,10 +12,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   if (!row) return { title: "Post" };
   const first = row.post.body.split("\n")[0].slice(0, 70);
   return {
-    title: `${row.profile.displayName} on UpNova`,
+    title: `${row.profile.displayName} on Mavyn`,
     description: first,
-    openGraph: { title: `${row.profile.displayName} on UpNova`, description: first, type: "article" },
-    twitter: { card: "summary_large_image", title: `${row.profile.displayName} on UpNova`, description: first },
+    openGraph: { title: `${row.profile.displayName} on Mavyn`, description: first, type: "article" },
+    twitter: { card: "summary_large_image", title: `${row.profile.displayName} on Mavyn`, description: first },
   };
 }
 

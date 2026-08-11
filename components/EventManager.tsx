@@ -178,7 +178,7 @@ export default function EventManager({ id }: { id: string }) {
           <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Payments</h2>
           <div className="mt-3 space-y-1.5 text-sm">
             <p className="flex justify-between text-zinc-400"><span>Gross ticket sales</span><span className="font-bold tabular-nums text-zinc-100">${revenue.toLocaleString()}</span></p>
-            <p className="flex justify-between text-xs text-zinc-500"><span>UpNova event fee (5%, paid by buyers)</span><span className="tabular-nums">{money(fees)}</span></p>
+            <p className="flex justify-between text-xs text-zinc-500"><span>Mavyn event fee (5%, paid by buyers)</span><span className="tabular-nums">{money(fees)}</span></p>
             <p className="flex justify-between text-xs text-zinc-500"><span>Refunds</span><span className="tabular-nums">$0.00</span></p>
             <div className="border-t border-zinc-600" />
             <div className="mt-[3px] border-t border-zinc-600" />

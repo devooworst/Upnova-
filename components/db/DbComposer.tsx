@@ -125,7 +125,7 @@ export default function DbComposer() {
             <span className="text-xs text-zinc-400">It&apos;s in the feed and on your profile — want to share it further?</span>
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <ShareSheet path={`/posts/${justPosted.id}`} title={`${user?.profile.displayName ?? "New post"} on UpNova`} text={justPosted.body} compact />
+            <ShareSheet path={`/posts/${justPosted.id}`} title={`${user?.profile.displayName ?? "New post"} on Mavyn`} text={justPosted.body} compact />
             <Link href={`/posts/${justPosted.id}`} className="btn-ghost px-3 py-1.5 text-xs">View post</Link>
             <button onClick={() => setJustPosted(null)} className="ml-auto rounded-full px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300">Dismiss</button>
           </div>
@@ -261,7 +261,7 @@ export default function DbComposer() {
 
                 {myWork && myWork.length > 0 && (
                   <div className="mt-2.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Link to completed UpNova work (optional)</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Link to completed Mavyn work (optional)</p>
                     <select
                       value={workLink}
                       onChange={(e) => setWorkLink(e.target.value)}
@@ -275,7 +275,7 @@ export default function DbComposer() {
                       ))}
                     </select>
                     <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
-                      Adds a <span className="text-lime-300">Verified Work</span> label (UpNova checked the
+                      Adds a <span className="text-lime-300">Verified Work</span> label (Mavyn checked the
                       transaction). {workLink ? "The client will be asked to confirm it happened — that adds Client Confirmed." : ""}
                     </p>
                   </div>

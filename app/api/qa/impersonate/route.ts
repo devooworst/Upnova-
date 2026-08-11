@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const token = signDemoToken(target.handle);
     // the HTTP session cookie takes precedence over Bearer fallbacks, so
     // switch it too (demo tokens ride every transport identically)
-    const cookieless = process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1";
+    const cookieless = process.env.MAVYN_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions());
 
     return {

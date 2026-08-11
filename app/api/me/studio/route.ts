@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * PATCH  — save. Pro-gated: SIMULATION MODE / production require the
  *          real Pro plan; DEMO MODE lets a tester exercise everything.
  *          Input is allow-list sanitized — off-menu values can't persist.
- * DELETE — reset to the standard UpNova design (always allowed).
+ * DELETE — reset to the standard Mavyn design (always allowed).
  *
  * Downgrade never deletes anything: the config stays, display turns off
  * until Pro is active again (enforced where the public payload is built).
@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest) {
         403,
         u.accountType === "business"
           ? "Business World customization comes with Business Pro. Your saved design (if any) is preserved — upgrade to edit and display it."
-          : "Profile Studio is an UpNova Pro feature. Your saved customization (if any) is preserved — upgrade to Pro to edit and display it."
+          : "Profile Studio is an Mavyn Pro feature. Your saved customization (if any) is preserved — upgrade to Pro to edit and display it."
       );
 
     // MERGE-ON-SAVE: changing one thing never erases the rest. The saved

@@ -1,8 +1,8 @@
 /* ------------------------------------------------------------------ */
 /*  Communities & identity — the shared vocabulary (client + server).  */
 /*                                                                     */
-/*  Core philosophy: anonymity on UpNova means controlling what OTHER  */
-/*  MEMBERS see — never hiding from the platform. UpNova always        */
+/*  Core philosophy: anonymity on Mavyn means controlling what OTHER  */
+/*  MEMBERS see — never hiding from the platform. Mavyn always        */
 /*  retains the underlying account for moderation, safety, and abuse   */
 /*  prevention. Masked identities are anonymous to the crowd,          */
 /*  accountable to the platform.                                       */
@@ -19,7 +19,7 @@
 export type IdentityMode = "real" | "alias" | "anonymous";
 
 export const IDENTITY_MODES: { id: IdentityMode; label: string; desc: string }[] = [
-  { id: "real", label: "Real profile", desc: "Your normal UpNova profile identity" },
+  { id: "real", label: "Real profile", desc: "Your normal Mavyn profile identity" },
   { id: "alias", label: "Alias", desc: "A chosen nickname — not linked to your profile" },
   { id: "anonymous", label: "Anonymous", desc: "Shown as Anonymous with a per-community number" },
 ];

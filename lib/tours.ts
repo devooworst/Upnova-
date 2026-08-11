@@ -62,7 +62,7 @@ export const TOURS: { prefix: string; tour: FeatureTourDef }[] = [
       title: "Your profile",
       steps: [
         { title: "Your public face", body: "Your profile is what clients, collaborators, and businesses see: bio, roles, skills, services, reviews, and verified work." },
-        { title: "Trust is earned, not claimed", body: "Badges and verified work come from real completed transactions on UpNova — nobody can buy them." },
+        { title: "Trust is earned, not claimed", body: "Badges and verified work come from real completed transactions on Mavyn — nobody can buy them." },
         { title: "Make it yours", body: "Profile Studio (Pro) adds themes, banners, decorations — and My World, a free-layout canvas with per-device designs." },
       ],
     },
@@ -75,7 +75,7 @@ export const TOURS: { prefix: string; tour: FeatureTourDef }[] = [
       steps: [
         { title: "Your menu, your rules", body: "Each service carries its own pricing, packages, add-ons, travel policy, and scheduling rules — all enforced server-side when someone books." },
         { sel: "service-release-mode", title: "How bookings are released", body: "Rolling availability: customers can always book up to X days ahead — right for continuous businesses. Scheduled releases: you open availability on specific dates ('September opens August 25 at 9 AM') — right for monthly books, seasonal dates, and limited drops." },
-        { sel: "service-horizon", title: "Booking horizon", body: "In rolling mode: how far into the future customers can book — 7, 14, 30, 60 days or custom. Every provider sets their own; UpNova never assumes one universal schedule." },
+        { sel: "service-horizon", title: "Booking horizon", body: "In rolling mode: how far into the future customers can book — 7, 14, 30, 60 days or custom. Every provider sets their own; Mavyn never assumes one universal schedule." },
         { title: "Availability is the hard limit", body: "Working days, hours, buffers, daily caps, and slot capacity decide how many bookings exist. Preferred Early Access only decides who gets access first — never how many." },
       ],
     },
@@ -99,7 +99,7 @@ export const TOURS: { prefix: string; tour: FeatureTourDef }[] = [
       title: "Opportunities & applications",
       steps: [
         { title: "Real work, posted openly", body: "Opportunities are gigs, collabs, and roles posted by creators and businesses. Filter by type, budget, and location." },
-        { title: "Your profile is your application", body: "Apply once — your UpNova profile carries your work, reviews, and verified history. Track every application's status from here." },
+        { title: "Your profile is your application", body: "Apply once — your Mavyn profile carries your work, reviews, and verified history. Track every application's status from here." },
         { title: "Posting your own", body: "Anyone can post an opportunity. Business accounts get hiring tools on top: applicant pipelines, team capacity, and saved talent." },
       ],
     },

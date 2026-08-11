@@ -71,7 +71,7 @@ function SearchInner() {
           <Search className="h-3.5 w-3.5" /> Search
         </p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-50">
-          {q ? <>Results for &ldquo;{q}&rdquo;</> : "Search UpNova"}
+          {q ? <>Results for &ldquo;{q}&rdquo;</> : "Search Mavyn"}
         </h1>
         {data && !loading && (
           <p className="mt-1 text-xs text-zinc-500">

@@ -19,7 +19,7 @@ import type { FeedScope } from "@/components/Feed";
 export type FeedTab = "For You" | "Following" | "Opportunities" | "Trending";
 const tabs: FeedTab[] = ["For You", "Following", "Opportunities", "Trending"];
 
-export const FEED_EVENT = "upnova:feed-changed";
+export const FEED_EVENT = "mavyn:feed-changed";
 
 const scopeParam: Record<FeedScope, string> = {
   foryou: "for-you",
@@ -409,12 +409,12 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
           {guest && posts.length > 0 && (
             <aside className="card p-6 text-center">
               <p className="text-sm font-bold text-zinc-100">
-                {guestTotal > posts.length ? "You've seen the preview." : "You're exploring UpNova as a guest."}
+                {guestTotal > posts.length ? "You've seen the preview." : "You're exploring Mavyn as a guest."}
               </p>
               <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-400">
                 {guestTotal > posts.length
-                  ? `That's ${posts.length} of ${guestTotal} public posts. Create a free UpNova account to keep exploring — `
-                  : "Create a free UpNova account to keep exploring — "}
+                  ? `That's ${posts.length} of ${guestTotal} public posts. Create a free Mavyn account to keep exploring — `
+                  : "Create a free Mavyn account to keep exploring — "}
                 follow creators, save posts, message people, book services, and apply to opportunities.
               </p>
               <div className="mt-4 flex justify-center gap-2">

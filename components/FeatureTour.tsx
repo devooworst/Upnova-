@@ -54,7 +54,7 @@ export default function FeatureTour() {
     setRunning(null);
     setStep(0);
     try {
-      setOfferHidden(!!tour && sessionStorage.getItem(`upnova-tour-offer-${tour.id}`) === "later");
+      setOfferHidden(!!tour && sessionStorage.getItem(`mavyn-tour-offer-${tour.id}`) === "later");
     } catch {
       setOfferHidden(false);
     }
@@ -110,7 +110,7 @@ export default function FeatureTour() {
   const start = () => { setStep(0); setRunning(tour); };
   const later = () => {
     setOfferHidden(true);
-    try { sessionStorage.setItem(`upnova-tour-offer-${tour.id}`, "later"); } catch {}
+    try { sessionStorage.setItem(`mavyn-tour-offer-${tour.id}`, "later"); } catch {}
   };
 
   const s = running?.steps[step];

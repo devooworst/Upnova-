@@ -10,7 +10,7 @@ export function generateMetadata({ params }: { params: { id: string } }): Metada
     .get();
   if (!e) return { title: "Event" };
   // campus events keep their titles out of public metadata surfaces
-  if (e.campusId) return { title: "Campus event — UpNova" };
+  if (e.campusId) return { title: "Campus event — Mavyn" };
   return { title: e.title, description: e.description.slice(0, 160) };
 }
 

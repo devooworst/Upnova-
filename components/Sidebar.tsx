@@ -257,7 +257,7 @@ export default function Sidebar({
         ) : plan === "pro" ? (
           <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-gradient-to-b from-lime-400/10 to-card p-4">
             <Sparkles className="absolute -right-3 -top-3 h-16 w-16 text-lime-400/10" />
-            <p className="text-sm font-bold text-lime-300">✦ UpNova Pro ✓</p>
+            <p className="text-sm font-bold text-lime-300">✦ Mavyn Pro ✓</p>
             <p className="mt-0.5 text-xs text-zinc-400">Your Pro membership is active</p>
             {campus && (
               <p className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold text-violet-300">
@@ -274,7 +274,7 @@ export default function Sidebar({
           </div>
         ) : plan === "college" ? (
           <div className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-400/10 to-card p-4">
-            <p className="text-sm font-bold text-violet-300">UpNova College+ ✓</p>
+            <p className="text-sm font-bold text-violet-300">Mavyn College+ ✓</p>
             {campus ? (
               <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-violet-300">
                 <GraduationCap className="h-3.5 w-3.5" /> Verified {campus.affiliation === "alumni" ? "Alumni" : "Student"} — {campus.name.replace(" University", "")}
@@ -336,7 +336,7 @@ export default function Sidebar({
           </div>
         ) : (
           <div className="relative overflow-hidden rounded-2xl border border-line bg-card p-4">
-            <p className="text-sm font-bold text-zinc-100">UpNova</p>
+            <p className="text-sm font-bold text-zinc-100">Mavyn</p>
             <p className="mt-0.5 text-xs text-zinc-500">Free Plan</p>
             <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
               Unlock creator tools and greater reach.

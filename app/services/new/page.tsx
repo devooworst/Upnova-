@@ -264,7 +264,7 @@ export default function NewServicePage() {
               Permanent link — anyone can view it, no account needed. Booking brings them back here.
             </p>
             <div className="mt-2 flex justify-center">
-              <ShareSheet path={`/services/${liveId}`} title={`${title} — book on UpNova`} text={priceLabel(config, Number(price) || 0)} />
+              <ShareSheet path={`/services/${liveId}`} title={`${title} — book on Mavyn`} text={priceLabel(config, Number(price) || 0)} />
             </div>
           </div>
         )}
@@ -564,7 +564,7 @@ export default function NewServicePage() {
               </label>
               <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
                 How far into the future customers can book your services. Yours alone — one stylist can open 1 week ahead, another
-                1 month; UpNova never assumes one universal schedule. Separate from Preferred Early Access, which only controls
+                1 month; Mavyn never assumes one universal schedule. Separate from Preferred Early Access, which only controls
                 who gets first access when you release availability.
               </p>
             </div>
@@ -699,7 +699,7 @@ export default function NewServicePage() {
                 <input value={config.pricing?.deposit ?? ""} onChange={(e) => setPricing({ deposit: Number(e.target.value.replace(/[^0-9]/g, "")) || undefined })} className={`${inputCls} w-20 py-1.5`} />
               </label>
             </div>
-            <p className="mt-1.5 text-[11px] text-zinc-600">Your price is your payout — buyers pay the 5% UpNova fee on top.</p>
+            <p className="mt-1.5 text-[11px] text-zinc-600">Your price is your payout — buyers pay the 5% Mavyn fee on top.</p>
           </div>
 
           <div className="border-t border-line-soft pt-3">

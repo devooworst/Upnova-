@@ -170,7 +170,7 @@ export default function DbMessages() {
         // NEVER fall back to another person's conversation. The person you
         // picked is the person you get — or an honest error, nothing else.
         setLinkError(
-          `Couldn't open a conversation with @${to} — ${(data as { error?: string }).error || "this account isn't on UpNova"}. No other conversation was opened in its place.`
+          `Couldn't open a conversation with @${to} — ${(data as { error?: string }).error || "this account isn't on Mavyn"}. No other conversation was opened in its place.`
         );
         if (list.length > 0) setActiveId(null);
         return;
@@ -489,7 +489,7 @@ export default function DbMessages() {
             {/* off-platform tripwire */}
             {offPlatform && (
               <div className="mx-4 mb-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3.5 py-2 text-xs text-amber-300">
-                Keep payments on UpNova — off-platform payments aren&apos;t protected, and we can&apos;t help
+                Keep payments on Mavyn — off-platform payments aren&apos;t protected, and we can&apos;t help
                 if something goes wrong.
               </div>
             )}
@@ -1002,9 +1002,9 @@ function ProjectPanel({
           </div>
 
           <p className="rounded-lg border border-line-soft bg-card-raised/50 px-3 py-2.5 text-[10px] leading-relaxed text-zinc-500">
-            <span className="font-bold uppercase tracking-wide text-zinc-400">UpNova transaction</span>
+            <span className="font-bold uppercase tracking-wide text-zinc-400">Mavyn transaction</span>
             <br />
-            Keep communication, agreements, and payments on UpNova to maintain your transaction
+            Keep communication, agreements, and payments on Mavyn to maintain your transaction
             protections. Payment is secured when work starts and released when you approve the
             delivery. The 5% fee is paid by the buyer on top — the listed price is the creator&apos;s payout.
           </p>

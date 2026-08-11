@@ -374,8 +374,8 @@ export default function CommunityView({ id }: { id: string }) {
               </ul>
             </div>
             <p className="mt-3 border-t border-line-soft pt-3 text-xs text-zinc-500">
-              Created by <span className="font-semibold text-zinc-300">{content?.createdBy ?? "UpNova"}</span>
-              <span className="text-zinc-600"> · communities follow UpNova&apos;s platform rules — creators control their space, not safety policy</span>
+              Created by <span className="font-semibold text-zinc-300">{content?.createdBy ?? "Mavyn"}</span>
+              <span className="text-zinc-600"> · communities follow Mavyn&apos;s platform rules — creators control their space, not safety policy</span>
             </p>
           </section>
           {joined && (

@@ -171,7 +171,7 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
             <span className="font-bold tabular-nums text-zinc-100">{money(price)}</span>
           </p>
           <p className="flex justify-between text-xs text-zinc-500">
-            <span>UpNova service fee ({PLATFORM_FEE_RATE * 100}%)</span>
+            <span>Mavyn service fee ({PLATFORM_FEE_RATE * 100}%)</span>
             <span className="tabular-nums">{money(feeFor(price))}</span>
           </p>
           <p className="flex justify-between border-t border-line-soft pt-2 text-zinc-300">
@@ -185,9 +185,9 @@ export default function HireModal({ creator, service, onClose }: HireModalProps)
           <Lock className="h-3 w-3" /> secure payment · nothing is charged until you both agree
         </p>
         <p className="mt-2 rounded-md border border-lime-400/25 bg-lime-400/5 p-2.5 text-[10px] leading-relaxed text-zinc-400">
-          <span className="font-semibold text-lime-300">UpNova Protected.</span> The agreement,
+          <span className="font-semibold text-lime-300">Mavyn Protected.</span> The agreement,
           payment, and delivery are recorded — if anything goes wrong, the Resolution Center has
-          the full record. Never pay outside UpNova.
+          the full record. Never pay outside Mavyn.
         </p>
 
         <button onClick={() => router.push(`/messages?to=${creator.handle}`)} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm">

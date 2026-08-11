@@ -128,7 +128,7 @@ export async function PATCH(req: NextRequest) {
         notify({
           userId: user.id,
           type: "campus",
-          title: "Welcome to UpNova Alumni",
+          title: "Welcome to Mavyn Alumni",
           body: "Your College+ journey is complete — your free Alumni account is ready and everything you built stays. Alumni Pro is available anytime at your permanent alumni rate.",
           href: "/pro",
           category: "campus",

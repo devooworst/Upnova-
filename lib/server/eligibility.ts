@@ -6,7 +6,7 @@
 /* application time (server-side), surfaced as a badge on cards and a  */
 /* lock panel on the apply flow.                                       */
 /*                                                                     */
-/*   anyone     — any UpNova member                                    */
+/*   anyone     — any Mavyn member                                    */
 /*   students   — any verified CURRENT student (any school)            */
 /*   my_school  — current students verified at eligibilityCampusId     */
 /*   alumni     — verified alumni (of eligibilityCampusId when set)    */
@@ -75,7 +75,7 @@ export function checkApplicantEligibility(
     // alumni
     if (!v) return { eligible: false, reason: `Alumni verification required — this opportunity is limited to verified ${school ? school + " " : ""}alumni. Verify your affiliation for free to apply.`, verifyFixes: true };
     if (opp.eligibilityCampusId && v.campusId !== opp.eligibilityCampusId) return { eligible: false, reason: `This opportunity is limited to ${school} alumni — your verification is at a different school.` };
-    if (v.affiliation !== "alumni") return { eligible: false, reason: "This opportunity is for alumni. Current students can find student opportunities across UpNova." };
+    if (v.affiliation !== "alumni") return { eligible: false, reason: "This opportunity is for alumni. Current students can find student opportunities across Mavyn." };
     return { eligible: true };
   })();
 

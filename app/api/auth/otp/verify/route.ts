@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     const { token, expiresAt } = createSession(user.id);
     rememberDemoSession(token);
-    const cookieless = process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1";
+    const cookieless = process.env.MAVYN_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     notify({

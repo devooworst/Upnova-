@@ -140,9 +140,9 @@ export function declineRoleOffer(applicationId: string, userId: string) {
 /**
  * Accepting a configurable engagement offer.
  * · external_employment → ACTIVE relationship, clearly labeled as handled
- *   by the employer OUTSIDE UpNova — no UpNova payment pretense.
- * · upnova_freelance one-time → a single booking (existing machinery).
- * · upnova_freelance ongoing → ACTIVE + the first paid CYCLE as a booking;
+ *   by the employer OUTSIDE Mavyn — no Mavyn payment pretense.
+ * · mavyn_freelance one-time → a single booking (existing machinery).
+ * · mavyn_freelance ongoing → ACTIVE + the first paid CYCLE as a booking;
  *   each cycle runs secured → completed → released, visibly.
  */
 function acceptEngagementOffer(
@@ -159,14 +159,14 @@ function acceptEngagementOffer(
     db.insert(tables.messages)
       .values({
         id: rid(), conversationId: convId, senderId: app.applicantId, kind: "system",
-        body: `${name} accepted the ${offer.title} offer — external employment: compensation and payroll are handled by the employer OUTSIDE UpNova.`,
+        body: `${name} accepted the ${offer.title} offer — external employment: compensation and payroll are handled by the employer OUTSIDE Mavyn.`,
       })
       .run();
     db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
     notify({
       userId: opp.posterId, actorId: app.applicantId, type: "application",
       title: `${name} accepted — ${offer.title}`,
-      body: "External employment — handled outside UpNova.",
+      body: "External employment — handled outside Mavyn.",
       href: `/opportunities/${opp.id}/applicants`,
     });
     return { status: "active", conversationId: convId, external: true };
@@ -221,7 +221,7 @@ export function startEngagementCycle(applicationId: string) {
   const offer = parseOffer(app.offer);
   if (!offer) throw new ApiError(409, "No offer terms on file");
   if (offer.classification === "external_employment")
-    throw new ApiError(409, "External employment — compensation is handled outside UpNova");
+    throw new ApiError(409, "External employment — compensation is handled outside Mavyn");
   const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get()!;
 
   const n = (offer.cycles ?? 0) + 1;

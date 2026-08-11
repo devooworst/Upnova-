@@ -14,7 +14,7 @@ function whyUnauthenticated(): string {
     const auth = headers().get("authorization") ?? "";
     if (auth.startsWith("Bearer ")) { token = auth.slice(7).trim() || undefined; via = "bearer header"; }
   }
-  if (!token) { token = cookies().get("upnova-session-token")?.value || undefined; via = "js token cookie"; }
+  if (!token) { token = cookies().get("mavyn-session-token")?.value || undefined; via = "js token cookie"; }
   if (!token) { token = readDemoSession() ?? undefined; via = "server sticky marker"; }
   if (!token) return "no_credentials_presented";
   if (token.startsWith("demo.")) {
@@ -69,7 +69,7 @@ export async function GET() {
   } catch (err) {
     // NEVER an empty/HTML error body — the client always gets parseable
     // JSON, and an internal failure reads as "unauthenticated", not a crash
-    console.error("[upnova] /api/auth/me failed:", err);
+    console.error("[mavyn] /api/auth/me failed:", err);
     return Response.json({ user: null });
   }
 }

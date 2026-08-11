@@ -53,7 +53,7 @@ export default function EventDetail({ id }: { id: string }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({
     "Full name": currentUser.name,
-    Email: "devin@upnova.app",
+    Email: "devin@mavyn.app",
   });
 
   const going = flow === "confirmed" ? 1 : 0;
@@ -258,7 +258,7 @@ export default function EventDetail({ id }: { id: string }) {
             {needsAge && (
               <p className="mt-3 border-t border-line-soft pt-3 text-xs text-zinc-500">
                 {event.age} · Valid government-issued ID may be required at entry. The organizer
-                defines the rules; UpNova enforces them at registration and check-in.
+                defines the rules; Mavyn enforces them at registration and check-in.
               </p>
             )}
           </section>
@@ -433,7 +433,7 @@ export default function EventDetail({ id }: { id: string }) {
                     <span className="font-bold tabular-nums text-zinc-100">${ticket.price}.00</span>
                   </p>
                   <p className="flex justify-between text-xs text-zinc-500">
-                    <span>UpNova / event fees</span>
+                    <span>Mavyn / event fees</span>
                     <span className="tabular-nums">{money(feeFor(ticket.price))}</span>
                   </p>
                   <p className="flex justify-between border-t border-line-soft pt-2 text-zinc-200">

@@ -11,8 +11,8 @@
 
 import { useEffect, useState } from "react";
 
-const EVT = "upnova:sidebar-changed";
-const LS_KEY = "upnova-sidebar-collapsed";
+const EVT = "mavyn:sidebar-changed";
+const LS_KEY = "mavyn-sidebar-collapsed";
 
 let collapsed = false; // desktop
 let mobileOpen = false; // mobile drawer

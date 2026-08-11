@@ -1,4 +1,4 @@
-export const CREATE_MODAL_EVENT = "upnova:open-create";
+export const CREATE_MODAL_EVENT = "mavyn:open-create";
 
 export function openCreateModal(kind?: string) {
   if (typeof window === "undefined") return;

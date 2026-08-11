@@ -199,9 +199,9 @@ export default function SimulationPage() {
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lime-400/20 bg-gradient-to-b from-lime-400/10 to-transparent px-5 py-4">
           <div>
-            <p className="text-[15px] font-bold tracking-tight text-lime-300">Full UpNova System Test</p>
+            <p className="text-[15px] font-bold tracking-tight text-lime-300">Full Mavyn System Test</p>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-400">
-              Plays UpNova as three real people (rachel · lena · Harbor &amp; Oak), each with their own
+              Plays Mavyn as three real people (rachel · lena · Harbor &amp; Oak), each with their own
               authenticated session, over real HTTP: message ↔ reply, booking ↔ both sides, test
               payment held → released, full project lifecycle with a revision, review, provider
               progress updates ↔ ETA changes ↔ extension approval, the private Preferred Clients

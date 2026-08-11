@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     // EXPLICIT credentials only: the demo sticky-session fallback must
     // never turn a phone LOGIN into a phone-verify for someone else.
-    const hasExplicitCreds = !!req.headers.get("authorization") || !!cookies().get("upnova_session");
+    const hasExplicitCreds = !!req.headers.get("authorization") || !!cookies().get("mavyn_session");
     const sessionUser = hasExplicitCreds ? getSessionUser() : null;
     const purpose = sessionUser ? "verify" : "login";
     const code = String(randomInt(100000, 1000000)); // 6 digits, CSPRNG
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     // persisted in plaintext) — only when the number belongs to someone
     const owner = db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
     if (owner)
-      deliver(owner.id, "sms", phone, "UpNova: your sign-in code was sent to this number. It expires in 5 minutes. Never share it.", "otp");
+      deliver(owner.id, "sms", phone, "Mavyn: your sign-in code was sent to this number. It expires in 5 minutes. Never share it.", "otp");
 
     return {
       ok: true,

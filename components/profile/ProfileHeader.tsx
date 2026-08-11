@@ -170,7 +170,7 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
               <Link
                 href={`/schools/${user.campus.slug}`}
                 className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 text-[11px] font-bold text-violet-300 transition hover:bg-violet-400/20"
-                title="Platform-verified school affiliation. Tap to see everyone at this school on UpNova. Manage in Settings → School & Education."
+                title="Platform-verified school affiliation. Tap to see everyone at this school on Mavyn. Manage in Settings → School & Education."
               >
                 <GraduationCap className="h-3.5 w-3.5" />
                 {user.campus.name}

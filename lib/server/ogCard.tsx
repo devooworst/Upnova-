@@ -1,8 +1,8 @@
 /* ------------------------------------------------------------------ */
 /*  Social preview card — one clean generator for every shareable      */
 /*  type. Rendered server-side (next/og) when a link is unfurled by    */
-/*  X/WhatsApp/iMessage/etc. Dark UpNova frame, type overline, title,  */
-/*  creator, location/price where relevant, and the UpNova CTA.        */
+/*  X/WhatsApp/iMessage/etc. Dark Mavyn frame, type overline, title,  */
+/*  creator, location/price where relevant, and the Mavyn CTA.        */
 /* ------------------------------------------------------------------ */
 
 import { ImageResponse } from "next/og";
@@ -14,7 +14,7 @@ export function ogCard(input: {
   title: string;
   creator: string;
   meta?: string; // "Baltimore, MD · From $60"
-  cta: string; // "Book on UpNova"
+  cta: string; // "Book on Mavyn"
 }) {
   return new ImageResponse(
     (
@@ -47,7 +47,7 @@ export function ogCard(input: {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, display: "flex" }}>UpNova</div>
+          <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, display: "flex" }}>Mavyn</div>
           <div
             style={{
               fontSize: 30,

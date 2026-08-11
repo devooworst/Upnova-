@@ -69,7 +69,7 @@ export interface SessionUser {
   onboarding?: { completed: boolean; skipped: boolean };
 }
 
-export const SESSION_EVENT = "upnova:session-changed";
+export const SESSION_EVENT = "mavyn:session-changed";
 
 /* ---------------- demo fallback transport (cookie-blocked iframes) ----------------
    If the browser refuses the session cookie (embedded previews), the login
@@ -77,7 +77,7 @@ export const SESSION_EVENT = "upnova:session-changed";
    carries it as Authorization: Bearer. The server validates it against the
    same sessions table. Cleared on logout. When cookies work, this never
    activates. */
-const TOKEN_KEY = "upnova-session-token";
+const TOKEN_KEY = "mavyn-session-token";
 
 /* memory first: some embedded views block localStorage/sessionStorage
    entirely. The in-memory copy keeps the session alive across ALL
@@ -111,12 +111,12 @@ const storageLayers: { get: () => string | null; set: (v: string | null) => void
     // subject to storage/cookie blocking — the layer of last resort.
     // Demo-only: cleared on sign-out with everything else.
     get: () => {
-      const m = /^upnova-token:([A-Za-z0-9_.-]+)$/.exec(window.name || "");
+      const m = /^mavyn-token:([A-Za-z0-9_.-]+)$/.exec(window.name || "");
       return m ? m[1] : null;
     },
     set: (v) => {
-      if (v) window.name = `upnova-token:${v}`;
-      else if (/^upnova-token:/.test(window.name || "")) window.name = "";
+      if (v) window.name = `mavyn-token:${v}`;
+      else if (/^mavyn-token:/.test(window.name || "")) window.name = "";
     },
   },
 ];
@@ -149,20 +149,20 @@ export function setFallbackToken(token: string | null) {
   }
 }
 
-if (typeof window !== "undefined" && !(window as unknown as { __upnovaDiag?: boolean }).__upnovaDiag) {
-  (window as unknown as { __upnovaDiag?: boolean }).__upnovaDiag = true;
+if (typeof window !== "undefined" && !(window as unknown as { __mavynDiag?: boolean }).__mavynDiag) {
+  (window as unknown as { __mavynDiag?: boolean }).__mavynDiag = true;
   try {
     const diag: string[] = [];
     try { window.localStorage.setItem("__t", "1"); window.localStorage.removeItem("__t"); diag.push("localStorage:ok"); } catch { diag.push("localStorage:BLOCKED"); }
     try { window.sessionStorage.setItem("__t", "1"); window.sessionStorage.removeItem("__t"); diag.push("sessionStorage:ok"); } catch { diag.push("sessionStorage:BLOCKED"); }
     try { document.cookie = "__t=1; path=/; SameSite=None; Secure"; diag.push(document.cookie.includes("__t=1") ? "jsCookie:ok" : "jsCookie:BLOCKED"); document.cookie = "__t=; path=/; max-age=0; SameSite=None; Secure"; } catch { diag.push("jsCookie:BLOCKED"); }
     // eslint-disable-next-line no-console
-    console.info("[upnova] session persistence layers →", diag.join(" · "));
+    console.info("[mavyn] session persistence layers →", diag.join(" · "));
   } catch {}
 }
 
-if (typeof window !== "undefined" && !(window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim) {
-  (window as unknown as { __upnovaFetchShim?: boolean }).__upnovaFetchShim = true;
+if (typeof window !== "undefined" && !(window as unknown as { __mavynFetchShim?: boolean }).__mavynFetchShim) {
+  (window as unknown as { __mavynFetchShim?: boolean }).__mavynFetchShim = true;
   const realFetch = window.fetch.bind(window);
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -190,7 +190,7 @@ let inflight: Promise<SessionUser | null> | null = null;
    The snapshot is display state only — every API request is still
    validated server-side; the background revalidation below corrects the
    snapshot the moment the server disagrees. */
-const USER_SNAPSHOT_KEY = "upnova-session-user";
+const USER_SNAPSHOT_KEY = "mavyn-session-user";
 
 function readUserSnapshot(): SessionUser | null {
   try {
@@ -290,7 +290,7 @@ export async function logout() {
   saveUserSnapshot(null); // explicit sign-out is what clears the saved account
   cached = null;
   // per-user client caches must not leak into the next session
-  for (const k of ["upnova-plan", "upnova-trust", "upnova-student-verified", "upnova-notif-read", "upnova-following"]) {
+  for (const k of ["mavyn-plan", "mavyn-trust", "mavyn-student-verified", "mavyn-notif-read", "mavyn-following"]) {
     try {
       window.localStorage.removeItem(k);
     } catch {}

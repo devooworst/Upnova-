@@ -14,12 +14,12 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     .get();
   if (!row) return { title: "Service" };
   const cfg = parseConfig(row.service.config);
-  const desc = `${row.profile.displayName} · ${priceLabel(cfg, row.service.price)}${row.profile.city && row.profile.locationVisibility !== "hidden" ? ` · ${row.profile.city}, ${row.profile.state}` : ""} — book through UpNova.`;
+  const desc = `${row.profile.displayName} · ${priceLabel(cfg, row.service.price)}${row.profile.city && row.profile.locationVisibility !== "hidden" ? ` · ${row.profile.city}, ${row.profile.state}` : ""} — book through Mavyn.`;
   return {
     title: row.service.title,
     description: desc,
-    openGraph: { title: `${row.service.title} • UpNova`, description: desc, type: "website" },
-    twitter: { card: "summary_large_image", title: `${row.service.title} • UpNova`, description: desc },
+    openGraph: { title: `${row.service.title} • Mavyn`, description: desc, type: "website" },
+    twitter: { card: "summary_large_image", title: `${row.service.title} • Mavyn`, description: desc },
   };
 }
 

@@ -59,9 +59,9 @@ export function ensureQaPersonas() {
       db.insert(tables.users)
         .values({
           id,
-          email: `${p.handle}@upnova.dev`,
+          email: `${p.handle}@mavyn.dev`,
           handle: p.handle,
-          passwordHash: hashPassword("upnova123"),
+          passwordHash: hashPassword("mavyn123"),
           accountType: p.accountType,
           testerMode: "demo",
           // QA personas never get the first-run tour sprung on a tester

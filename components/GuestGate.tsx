@@ -42,7 +42,7 @@ export type JoinAction =
   | "report"
   | "explore";
 
-const JOIN_EVENT = "upnova:join-prompt";
+const JOIN_EVENT = "mavyn:join-prompt";
 
 /**
  * Open the contextual sign-up prompt from anywhere.
@@ -59,7 +59,7 @@ export function promptJoin(action: JoinAction, next?: string) {
 const COPY: Record<JoinAction, { title: string; body: string }> = {
   book: {
     title: "Create an account to book",
-    body: "It's free to join UpNova — and you'll manage your bookings, messages, and payments in one place.",
+    body: "It's free to join Mavyn — and you'll manage your bookings, messages, and payments in one place.",
   },
   hire: {
     title: "Create an account to send a request",
@@ -67,7 +67,7 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
   },
   apply: {
     title: "Create an account to apply",
-    body: "Your UpNova profile becomes your application — you won't have to re-enter the same information every time.",
+    body: "Your Mavyn profile becomes your application — you won't have to re-enter the same information every time.",
   },
   like: {
     title: "Create an account to like posts",
@@ -90,7 +90,7 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
     body: "Messages, bookings, and payments live in one thread — that requires knowing who you are.",
   },
   create: {
-    title: "Join UpNova to create",
+    title: "Join Mavyn to create",
     body: "Create posts, offer services, publish opportunities, build your profile, and connect with people.",
   },
   buy: {
@@ -114,7 +114,7 @@ const COPY: Record<JoinAction, { title: string; body: string }> = {
     body: "Reports go to human review and need an accountable reporter — that protects the people being reported too.",
   },
   explore: {
-    title: "You're exploring UpNova as a guest",
+    title: "You're exploring Mavyn as a guest",
     body: "Create a free account to keep exploring, follow creators, save posts, message people, book services, and apply to opportunities.",
   },
 };
@@ -149,9 +149,9 @@ export default function GuestGate() {
       // NEVER a full-screen wall: browsing stays free. The browse meter
       // only powers ONE dismissible banner; the real "you've seen the
       // preview" gate lives INLINE at the end of the capped guest feed.
-      if (sessionStorage.getItem("upnova-guest-banner") === "done") return;
-      const n = Number(sessionStorage.getItem("upnova-guest-views") || "0") + 1;
-      sessionStorage.setItem("upnova-guest-views", String(n));
+      if (sessionStorage.getItem("mavyn-guest-banner") === "done") return;
+      const n = Number(sessionStorage.getItem("mavyn-guest-views") || "0") + 1;
+      sessionStorage.setItem("mavyn-guest-views", String(n));
       if (n >= BROWSE_BUDGET) setBanner(true);
     } catch {
       /* storage unavailable — never block browsing over it */
@@ -161,7 +161,7 @@ export default function GuestGate() {
   const dismissBanner = useCallback(() => {
     setBanner(false);
     try {
-      sessionStorage.setItem("upnova-guest-banner", "done");
+      sessionStorage.setItem("mavyn-guest-banner", "done");
     } catch {}
   }, []);
 
@@ -220,7 +220,7 @@ export default function GuestGate() {
         <div className="fixed inset-x-0 bottom-16 z-50 px-3 md:bottom-4">
           <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-4 shadow-card">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-zinc-100">You&apos;re exploring UpNova as a guest.</p>
+              <p className="text-sm font-bold text-zinc-100">You&apos;re exploring Mavyn as a guest.</p>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
                 Create a free account to keep exploring, follow creators, save posts, message people, book
                 services, and apply to opportunities.

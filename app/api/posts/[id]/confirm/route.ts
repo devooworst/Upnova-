@@ -20,7 +20,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (!post) throw new ApiError(404, "Post not found");
 
     const trust = postTrustMap([post], user.id).get(post.id)!;
-    if (!trust.verifiedWork) throw new ApiError(409, "This post isn't linked to a completed UpNova transaction");
+    if (!trust.verifiedWork) throw new ApiError(409, "This post isn't linked to a completed Mavyn transaction");
     if (post.clientConfirmed) return { confirmed: true };
     if (!trust.canConfirm) throw new ApiError(403, "Only the client on the linked transaction can confirm this work");
 

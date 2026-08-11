@@ -9,7 +9,7 @@
 /*  · Identity privacy: how revealed peers see you in communities       */
 /*                                                                      */
 /*  Anonymous to the crowd ≠ anonymous to everyone: reveals are         */
-/*  per-person and private; UpNova always retains the account for       */
+/*  per-person and private; Mavyn always retains the account for       */
 /*  moderation and safety.                                              */
 /* ------------------------------------------------------------------ */
 
@@ -401,7 +401,7 @@ function CommunitiesInner() {
         )}
         {data?.guest && (
           <p className="mt-3 flex items-center gap-1.5 px-1 text-xs text-zinc-600">
-            <Lock className="h-3 w-3" /> You&apos;re browsing as a guest — join UpNova to participate in communities.
+            <Lock className="h-3 w-3" /> You&apos;re browsing as a guest — join Mavyn to participate in communities.
           </p>
         )}
       </section>

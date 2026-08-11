@@ -13,9 +13,9 @@ export async function GET() {
     return {
       serverTime: new Date().toISOString(),
       sessionsInDb: db.select().from(tables.sessions).all().length,
-      stickyEnabled: process.env.UPNOVA_DEMO_STICKY_SESSION === "1",
+      stickyEnabled: process.env.MAVYN_DEMO_STICKY_SESSION === "1",
       stickyMarkerPresent: existsSync(join(process.cwd(), "db", ".demo-session")),
-      cookielessMode: process.env.UPNOVA_DISABLE_SESSION_COOKIES === "1",
+      cookielessMode: process.env.MAVYN_DISABLE_SESSION_COOKIES === "1",
       sandbox: process.env.E2B_SANDBOX_ID ?? null,
       serverBuildCommit: process.env.NEXT_PUBLIC_BUILD_COMMIT ?? "unknown",
     };

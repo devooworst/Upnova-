@@ -271,7 +271,7 @@ export default function MyWorldEditor() {
     setBusy(false);
   };
 
-  /* Default Layout = the ORIGINAL UpNova profile structure (one full-width
+  /* Default Layout = the ORIGINAL Mavyn profile structure (one full-width
      column, original order and spacing — the canonical DEFAULT_WORLD),
      applied to the SAVED profile, not just this editor. */
   const defaultLayout = async () => {
@@ -325,7 +325,7 @@ export default function MyWorldEditor() {
       <div className="mx-auto max-w-md pt-12 text-center">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10"><Paintbrush className="h-7 w-7 text-lime-400" /></span>
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">My World is Pro</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500">The full-screen world editor comes with UpNova Pro. Any design you saved before is preserved.</p>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500">The full-screen world editor comes with Mavyn Pro. Any design you saved before is preserved.</p>
         <Link href="/pro" className="btn-lime mt-5 inline-flex rounded-md px-6 py-2.5 text-sm">Upgrade to Pro</Link>
       </div>
     );
@@ -364,7 +364,7 @@ export default function MyWorldEditor() {
         >
           <Paintbrush className="h-3.5 w-3.5" /> Theme
         </button>
-        <button onClick={() => setDefaultOpen(true)} disabled={busy} className="icon-btn h-8 w-8 disabled:opacity-40" title="Default Layout — restore the original UpNova profile arrangement" aria-label="Default layout"><LayoutTemplate className="h-4 w-4" /></button>
+        <button onClick={() => setDefaultOpen(true)} disabled={busy} className="icon-btn h-8 w-8 disabled:opacity-40" title="Default Layout — restore the original Mavyn profile arrangement" aria-label="Default layout"><LayoutTemplate className="h-4 w-4" /></button>
         <span className="mx-1 h-5 w-px bg-line" />
         <button onClick={save} disabled={busy || !dirty} className="rounded-full bg-lime-400 px-4 py-1.5 text-xs font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-40">
           {busy ? "Saving…" : dirty ? "Save" : "Saved"}
@@ -453,7 +453,7 @@ export default function MyWorldEditor() {
             <p className="text-[15px] font-bold tracking-tight text-zinc-50">Restore default layout?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
               {device === "desktop"
-                ? "This resets your DESKTOP arrangement to the original UpNova profile — full-width sections in the original order and spacing. Tablet and phone layouts are untouched."
+                ? "This resets your DESKTOP arrangement to the original Mavyn profile — full-width sections in the original order and spacing. Tablet and phone layouts are untouched."
                 : device === "tablet"
                   ? "This removes your custom TABLET arrangement — tablet visitors go back to seeing your desktop design, scaled. Desktop and phone layouts are untouched."
                   : "This removes your custom PHONE arrangement — phone visitors go back to the clean stacked flow. Desktop and tablet layouts are untouched."}{" "}
@@ -518,7 +518,7 @@ export default function MyWorldEditor() {
             className="mt-1.5 w-full rounded-lg border border-line bg-card-raised px-3 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
           />
           <label className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] text-zinc-500">Show the headline (and the &quot;built on UpNova&quot; mark)</span>
+            <span className="text-[10px] text-zinc-500">Show the headline (and the &quot;built on Mavyn&quot; mark)</span>
             <input type="checkbox" checked={world.showTitle !== false} onChange={(e) => mutate((c) => ({ ...c, world: { ...(c.world ?? DEFAULT_WORLD), showTitle: e.target.checked } }))} className="h-4 w-4 accent-lime-400" />
           </label>
           <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">

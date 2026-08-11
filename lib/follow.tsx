@@ -9,7 +9,7 @@ import type { Creator } from "./data";
 /* auto-follows. One store, so follow state persists everywhere.       */
 /* ------------------------------------------------------------------ */
 
-const STORAGE_KEY = "upnova-following";
+const STORAGE_KEY = "mavyn-following";
 
 /** People you already follow when the demo starts. */
 const SEED: Record<string, boolean> = { jordan: true, ava: true, marcus: true };

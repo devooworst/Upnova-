@@ -273,7 +273,7 @@ function OrderCard({
                   )}
                   {step === "secured" && done && o.paymentStatus && (
                     <span className="ml-1.5 text-[10px] text-zinc-500">
-                      (funds {o.paymentStatus === "released" ? "released" : o.paymentStatus === "refunded" ? "refunded" : "held by UpNova"})
+                      (funds {o.paymentStatus === "released" ? "released" : o.paymentStatus === "refunded" ? "refunded" : "held by Mavyn"})
                     </span>
                   )}
                 </span>
@@ -334,7 +334,7 @@ function OrderCard({
               </button>
             )}
             {o.myRole === "buyer" && openDispute && o.dispute.status === "open" && (
-              <button onClick={() => disputeAct({ action: "escalate" })} className="btn-ghost px-3 py-1.5 text-[11px]">Send to UpNova review</button>
+              <button onClick={() => disputeAct({ action: "escalate" })} className="btn-ghost px-3 py-1.5 text-[11px]">Send to Mavyn review</button>
             )}
             {openDispute && o.dispute.openedByMe && (
               <button onClick={() => disputeAct({ action: "withdraw" })} className="rounded-full px-3 py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300">Withdraw</button>
@@ -421,7 +421,7 @@ function OrderCard({
       {showDetail && detail && (
         <div className="mt-3 rounded-xl border border-line bg-card-raised/50 p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">
-            Evidence timeline — private to you, {o.with.displayName.split(" ")[0]}, and UpNova review
+            Evidence timeline — private to you, {o.with.displayName.split(" ")[0]}, and Mavyn review
           </p>
           <ol className="mt-2 space-y-1">
             {detail.timeline.map((e, i) => (
@@ -528,7 +528,7 @@ function CaseModal({ order, kind, onClose, onDone }: { order: Order; kind: "prob
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
           Opening a case holds the funds and asks the {kind === "return" ? "seller" : "seller for their side"} —
-          nothing refunds or releases automatically. Contested cases go to UpNova review with both parties&apos; evidence.
+          nothing refunds or releases automatically. Contested cases go to Mavyn review with both parties&apos; evidence.
         </p>
         {error && <p className="mt-2 text-xs font-medium text-rose-300">{error}</p>}
         <button onClick={submit} disabled={busy} className="btn-lime mt-3 w-full justify-center py-2.5 text-sm disabled:opacity-40">

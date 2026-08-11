@@ -136,13 +136,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ensureAnonCode(c.id, user.id);
     }
 
-    // optional attached UpNova link → typed ref card (source preserved)
+    // optional attached Mavyn link → typed ref card (source preserved)
     let refType: string | null = null;
     let refId: string | null = null;
     if (body.refUrl) {
       const parsed = parseRefUrl(String(body.refUrl));
       if (!parsed || !resolveRef(parsed.refType, parsed.refId))
-        throw new ApiError(400, "That link doesn't point to an UpNova service, opportunity, product, work, event, or campus listing");
+        throw new ApiError(400, "That link doesn't point to an Mavyn service, opportunity, product, work, event, or campus listing");
       refType = parsed.refType;
       refId = parsed.refId;
     }

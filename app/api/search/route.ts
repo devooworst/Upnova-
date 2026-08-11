@@ -6,7 +6,7 @@ import { getSessionUser, guarded } from "@/lib/server/auth";
 export const dynamic = "force-dynamic";
 
 /* ------------------------------------------------------------------ */
-/*  GET /api/search?q=…  — UpNova global search.                       */
+/*  GET /api/search?q=…  — Mavyn global search.                       */
 /*                                                                     */
 /*  PEOPLE search the real users+profiles tables — every registered    */
 /*  account, nothing hardcoded: new signups are searchable the moment  */

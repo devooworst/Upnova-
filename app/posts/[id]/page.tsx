@@ -44,7 +44,7 @@ export default function PostPage() {
         <p className="min-w-0 flex-1 text-xs text-zinc-500">
           This is the post&apos;s permanent link — share it anywhere and people land right here.
         </p>
-        <ShareSheet path={`/posts/${post.id}`} title={`${post.author.displayName} on UpNova`} text={post.body.slice(0, 80)} compact />
+        <ShareSheet path={`/posts/${post.id}`} title={`${post.author.displayName} on Mavyn`} text={post.body.slice(0, 80)} compact />
       </div>
     </div>
   );

@@ -12,9 +12,9 @@
 /*  Non-destructive: no session wipes, no logouts of the tested user.   */
 /* ------------------------------------------------------------------ */
 
-const HOST = process.env.UPNOVA_HOST ?? "http://localhost:3000";
-const email = process.argv[2] ?? "devin@upnova.dev";
-const password = process.argv[3] ?? "upnova123";
+const HOST = process.env.MAVYN_HOST ?? "http://localhost:3000";
+const email = process.argv[2] ?? "devin@mavyn.dev";
+const password = process.argv[3] ?? "mavyn123";
 
 /* ---- minimal browser: persistent across "reloads", like a real one ---- */
 class Storage {
@@ -96,8 +96,8 @@ function ok(label: string, pass: boolean, detail = "") {
   // exactly what AuthForm does on success:
   s1.setFallbackToken(data.sessionToken);
   s1.primeSession(data);
-  ok("browser stores credential (localStorage)", persisted.localStorage.getItem("upnova-session-token") === data.sessionToken);
-  ok("browser stores user snapshot", !!persisted.localStorage.getItem("upnova-session-user"));
+  ok("browser stores credential (localStorage)", persisted.localStorage.getItem("mavyn-session-token") === data.sessionToken);
+  ok("browser stores user snapshot", !!persisted.localStorage.getItem("mavyn-session-user"));
   const me1 = await s1.fetchSession(true);
   ok("/api/auth/me validates immediately after login", me1?.handle === "devin" || me1?.email === email, me1 ? `@${me1.handle}` : "null");
 

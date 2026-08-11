@@ -116,12 +116,12 @@ export default function ProjectDrawer({
   onAmount,
   onDiscuss,
 }: ProjectDrawerProps) {
-  /* prefilled from the service — don't make the buyer retype what UpNova knows */
+  /* prefilled from the service — don't make the buyer retype what Mavyn knows */
   const [title, setTitle] = useState(service);
   const [date, setDate] = useState("September 15, 2026");
   const [location, setLocation] = useState("Baltimore, MD");
   const [scope, setScope] = useState(
-    `${service} delivered through UpNova — scope, files, and approval all recorded on the project.`
+    `${service} delivered through Mavyn — scope, files, and approval all recorded on the project.`
   );
   const [budget, setBudget] = useState(startingAt);
   const [myStars, setMyStars] = useState(0);
@@ -285,7 +285,7 @@ export default function ProjectDrawer({
               <Perforation className="mt-4" />
               <div className="mt-3.5 space-y-1.5 text-sm">
                 <p className="flex justify-between text-zinc-400"><span>Project</span><span className="font-bold tabular-nums text-zinc-100">{money(budget)}</span></p>
-                <p className="flex justify-between text-xs text-zinc-500"><span>UpNova service fee ({PLATFORM_FEE_RATE * 100}%)</span><span className="tabular-nums">{money(feeFor(budget))}</span></p>
+                <p className="flex justify-between text-xs text-zinc-500"><span>Mavyn service fee ({PLATFORM_FEE_RATE * 100}%)</span><span className="tabular-nums">{money(feeFor(budget))}</span></p>
                 <p className="flex justify-between border-t border-line-soft pt-2 text-zinc-300"><span className="text-xs">Total</span><span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">{money(totalFor(budget))}</span></p>
               </div>
               <div className="mt-5 flex gap-2">
@@ -356,14 +356,14 @@ export default function ProjectDrawer({
               </p>
               <div className="mt-4 space-y-1.5 text-sm">
                 <p className="flex justify-between text-zinc-400"><span>Agreed price</span><span className="font-bold tabular-nums text-zinc-100">${counter}</span></p>
-                <p className="flex justify-between text-xs text-zinc-500"><span>UpNova service fee ({PLATFORM_FEE_RATE * 100}%)</span><span className="tabular-nums">{money(feeFor(counter))}</span></p>
+                <p className="flex justify-between text-xs text-zinc-500"><span>Mavyn service fee ({PLATFORM_FEE_RATE * 100}%)</span><span className="tabular-nums">{money(feeFor(counter))}</span></p>
                 <p className="flex justify-between border-t border-line-soft pt-2 text-zinc-300"><span className="text-xs">Total</span><span className="text-lg font-extrabold tracking-tight tabular-nums text-lime-400">{money(totalFor(counter))}</span></p>
               </div>
               <button onClick={() => setStage("checkout")} className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm">
                 Pay {money(totalFor(counter))}
               </button>
               <p className="mt-2.5 flex items-center justify-center gap-1.5 font-mono text-[10px] font-medium text-zinc-500">
-                <Lock className="h-3 w-3" /> UpNova Payment Protection — held until completed &amp; approved
+                <Lock className="h-3 w-3" /> Mavyn Payment Protection — held until completed &amp; approved
               </p>
             </div>
           )}
@@ -371,11 +371,11 @@ export default function ProjectDrawer({
           {/* ---------------- checkout ---------------- */}
           {stage === "checkout" && (
             <div className="mt-5">
-              <p className="text-center font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">UpNova</p>
+              <p className="text-center font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-400">Mavyn</p>
               <Perforation className="mt-3" />
               <div className="mt-4 space-y-1.5 text-sm">
                 <p className="flex justify-between text-zinc-400"><span>{title}</span><span className="font-bold tabular-nums text-zinc-100">${counter}.00</span></p>
-                <p className="flex justify-between text-xs text-zinc-500"><span>UpNova service fee</span><span className="tabular-nums">{money(feeFor(counter))}</span></p>
+                <p className="flex justify-between text-xs text-zinc-500"><span>Mavyn service fee</span><span className="tabular-nums">{money(feeFor(counter))}</span></p>
               </div>
               <div className="mt-4 flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5 text-sm text-zinc-200">
                 <span className="font-mono font-medium">•••• 4242</span>
@@ -383,7 +383,7 @@ export default function ProjectDrawer({
               </div>
               <button
                 onClick={() => {
-                  onMessage("me", "Payment sent through UpNova. Locked in 🔒");
+                  onMessage("me", "Payment sent through Mavyn. Locked in 🔒");
                   setStage("paid");
                 }}
                 className="btn-lime mt-4 w-full rounded-md py-2.5 text-sm"
@@ -392,7 +392,7 @@ export default function ProjectDrawer({
               </button>
               <p className="mt-2.5 rounded-md border border-lime-400/25 bg-lime-400/5 p-2.5 text-center text-[10px] leading-relaxed text-zinc-400">
                 <ShieldCheck className="mr-1 inline h-3 w-3 text-lime-400" />
-                You&apos;re paying through UpNova. Payment and agreement are recorded — keep
+                You&apos;re paying through Mavyn. Payment and agreement are recorded — keep
                 communication and payment on the platform.
               </p>
             </div>
@@ -411,7 +411,7 @@ export default function ProjectDrawer({
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-zinc-500">
                   Approving officially moves the deadline. No penalty to {firstName}&apos;s record —
-                  this is exactly the communication UpNova rewards.
+                  this is exactly the communication Mavyn rewards.
                 </p>
               </div>
               <div className="mt-3 flex gap-2">
@@ -481,7 +481,7 @@ export default function ProjectDrawer({
                   <Perforation className="mt-4" />
                   <div className="mt-3 space-y-1 text-xs">
                     <p className="flex justify-between text-zinc-400"><span>{firstName}&apos;s payout</span><span className="font-bold tabular-nums text-lime-400">${counter}</span></p>
-                    <p className="flex justify-between text-zinc-500"><span>UpNova service fee (paid by you)</span><span className="font-medium tabular-nums">{money(feeFor(counter))}</span></p>
+                    <p className="flex justify-between text-zinc-500"><span>Mavyn service fee (paid by you)</span><span className="font-medium tabular-nums">{money(feeFor(counter))}</span></p>
                     <p className="flex justify-between text-zinc-500"><span>Payout status</span><span className={stage === "done" ? "font-semibold text-lime-400" : "text-amber-400"}>{stage === "done" ? "Released" : "Releasing…"}</span></p>
                   </div>
                 </>
@@ -491,7 +491,7 @@ export default function ProjectDrawer({
                 <div className="mt-4 border-t border-line-soft pt-4">
                   <p className="text-sm font-bold tracking-tight text-zinc-100">Rate {firstName}</p>
                   <p className="mt-0.5 text-[10px] text-zinc-500">
-                    Verified UpNova Project review · communication, quality, reliability,
+                    Verified Mavyn Project review · communication, quality, reliability,
                     professionalism, met deadline
                   </p>
                   <div className="mt-2"><Stars value={myStars} onChange={setMyStars} /></div>

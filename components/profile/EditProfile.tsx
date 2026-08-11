@@ -413,7 +413,7 @@ export default function EditProfile() {
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" />
         <p className="text-xs leading-relaxed text-zinc-400">
           You control your identity here. <span className="text-zinc-200">Verified badges</span> come from
-          UpNova verification, and <span className="text-zinc-200">performance metrics</span> are calculated
+          Mavyn verification, and <span className="text-zinc-200">performance metrics</span> are calculated
           from your completed projects — neither can be edited manually.
         </p>
       </div>
@@ -959,7 +959,7 @@ export default function EditProfile() {
 
             {/* portfolio from completed work */}
             <div className="mt-6 border-t border-line-soft pt-5">
-              <FieldLabel hint="Completed UpNova projects can automatically become portfolio entries — you choose which ones show.">
+              <FieldLabel hint="Completed Mavyn projects can automatically become portfolio entries — you choose which ones show.">
                 Portfolio
               </FieldLabel>
               <ul className="space-y-2">
@@ -1287,7 +1287,7 @@ export default function EditProfile() {
 
             {/* work preferences */}
             <div className="mt-6 border-t border-line-soft pt-5">
-              <FieldLabel hint="Tells UpNova what you're looking for — this feeds your For You feed and recommendations.">
+              <FieldLabel hint="Tells Mavyn what you're looking for — this feeds your For You feed and recommendations.">
                 Work preferences
               </FieldLabel>
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-zinc-400">Interested in</p>
@@ -1402,7 +1402,7 @@ export default function EditProfile() {
 
             {/* work performance — read-only */}
             <div className="mt-6 border-t border-line-soft pt-5">
-              <FieldLabel hint="Your reliability metrics are calculated from completed UpNova projects. They can't be edited — that's what makes them credible.">
+              <FieldLabel hint="Your reliability metrics are calculated from completed Mavyn projects. They can't be edited — that's what makes them credible.">
                 Work Performance
               </FieldLabel>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1465,7 +1465,7 @@ export default function EditProfile() {
                         {campus?.gradYear ? ` · Class of ${campus.gradYear}` : ""}
                         {campus?.affiliation === "alumni" ? " · Alumni" : ""}
                       </span>{" "}
-                      — verified through UpNova · manage in Settings → School &amp; Education
+                      — verified through Mavyn · manage in Settings → School &amp; Education
                     </p>
                   ) : (
                     <p className="mt-0.5 text-xs text-zinc-500">
@@ -1566,7 +1566,7 @@ export default function EditProfile() {
               {(
                 [
                   { v: "public", l: "Public", h: "Anyone can view your profile" },
-                  { v: "members", l: "UpNova members", h: "Only signed-in members" },
+                  { v: "members", l: "Mavyn members", h: "Only signed-in members" },
                   { v: "private", l: "Private", h: "Only people you approve" },
                 ] as const
               ).map((o) => (

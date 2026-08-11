@@ -73,7 +73,7 @@ export default function NewWorkPage() {
   if (user === null)
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <p className="text-sm font-semibold text-zinc-200">Join UpNova to license your work</p>
+        <p className="text-sm font-semibold text-zinc-200">Join Mavyn to license your work</p>
         <Link href="/signup?next=%2Fworks%2Fnew" className="btn-lime mt-4 inline-flex px-5 py-2 text-sm">Create free account</Link>
       </div>
     );

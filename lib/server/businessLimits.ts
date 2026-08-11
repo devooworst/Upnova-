@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------------ */
 /*  Business subscription capacity — the single authority.             */
 /*                                                                     */
-/*  PHILOSOPHY (same as the rest of UpNova — never a walking paywall): */
+/*  PHILOSOPHY (same as the rest of Mavyn — never a walking paywall): */
 /*  Business Free is a genuinely usable hiring account: find talent,   */
 /*  post, receive applications, hire, run projects, pay, review.       */
 /*  Business Pro buys SCALE, never basic access.                       */

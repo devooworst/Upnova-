@@ -8,7 +8,7 @@
 /*  die with "no such table: users" — masked as a generic 500. Now:    */
 /*    1. missing schema  → apply db/bootstrap.sql (committed snapshot) */
 /*    2. zero users      → run the demo seed (dev/demo only; disable   */
-/*                         with UPNOVA_AUTOSEED=0 — a Postgres prod    */
+/*                         with MAVYN_AUTOSEED=0 — a Postgres prod    */
 /*                         deployment never hits this path at all)     */
 /*                                                                     */
 /*  Schema drift guard (the "no such column: affiliation" fix):        */
@@ -32,10 +32,10 @@ import { readFileSync } from "fs";
 import path from "path";
 import * as schema from "./schema";
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "db", "upnova.dev.db");
+const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "db", "mavyn.dev.db");
 
 // survive Next.js hot-reload without leaking connections
-const globalForDb = globalThis as unknown as { __upnovaDb?: ReturnType<typeof create> };
+const globalForDb = globalThis as unknown as { __mavynDb?: ReturnType<typeof create> };
 
 /* split a CREATE TABLE body on top-level commas (paren- and quote-aware) */
 function splitColumns(body: string): string[] {
@@ -83,7 +83,7 @@ function healSchemaDrift(sqlite: Database.Database) {
     try {
       sqlite.exec(stmt + ";");
     } catch (err) {
-      console.warn("[upnova] drift guard: table statement failed:", (err as Error).message);
+      console.warn("[mavyn] drift guard: table statement failed:", (err as Error).message);
     }
   }
 
@@ -126,9 +126,9 @@ function healSchemaDrift(sqlite: Database.Database) {
       }
       if (added) {
         healed++;
-        console.warn(`[upnova] drift guard: added missing column ${table}.${col}`);
+        console.warn(`[mavyn] drift guard: added missing column ${table}.${col}`);
       } else {
-        console.warn(`[upnova] drift guard: could NOT add ${table}.${col} — queries on it will fail`);
+        console.warn(`[mavyn] drift guard: could NOT add ${table}.${col} — queries on it will fail`);
       }
     }
   }
@@ -144,7 +144,7 @@ function healSchemaDrift(sqlite: Database.Database) {
 
   if (healed > 0) {
     console.warn(
-      `[upnova] schema drift healed: ${healed} missing column(s) added from db/bootstrap.sql — no data was modified`
+      `[mavyn] schema drift healed: ${healed} missing column(s) added from db/bootstrap.sql — no data was modified`
     );
   }
 }
@@ -158,17 +158,17 @@ function create() {
     .prepare("select name from sqlite_master where type='table' and name='users'")
     .get();
   if (!hasSchema) {
-    console.warn(`[upnova] dev database missing at ${DB_PATH} — creating schema from db/bootstrap.sql`);
+    console.warn(`[mavyn] dev database missing at ${DB_PATH} — creating schema from db/bootstrap.sql`);
     sqlite.exec(readFileSync(path.join(process.cwd(), "db", "bootstrap.sql"), "utf8"));
   }
 
   // converge an OLDER db file to the schema this code expects (add-only)
   healSchemaDrift(sqlite);
 
-  if (process.env.UPNOVA_AUTOSEED !== "0") {
+  if (process.env.MAVYN_AUTOSEED !== "0") {
     const { c } = sqlite.prepare("select count(*) as c from users").get() as { c: number };
     if (c === 0) {
-      console.warn("[upnova] empty database — seeding the demo world (set UPNOVA_AUTOSEED=0 to disable)");
+      console.warn("[mavyn] empty database — seeding the demo world (set MAVYN_AUTOSEED=0 to disable)");
       // lazy import: only ever loaded on the empty-DB path
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       require("./seed").seed();
@@ -178,5 +178,5 @@ function create() {
   return drizzle(sqlite, { schema });
 }
 
-export const db = globalForDb.__upnovaDb ?? (globalForDb.__upnovaDb = create());
+export const db = globalForDb.__mavynDb ?? (globalForDb.__mavynDb = create());
 export * as tables from "./schema";

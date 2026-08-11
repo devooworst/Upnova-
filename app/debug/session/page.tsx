@@ -86,7 +86,7 @@ export default function SessionDebugPage() {
     } catch { out.push({ name: "JS cookies", ok: false, detail: "REFUSED" }); }
     out.push({ name: "embedded in iframe", ok: null, detail: window.top === window.self ? "no — first-party context" : "YES — third-party cookie rules apply" });
     out.push({ name: "session token (client copy)", ok: !!getFallbackToken(), detail: getFallbackToken() ? "present — ONE credential, multiple transports (not a second auth system)" : "none" });
-    out.push({ name: "saved user snapshot", ok: null, detail: (() => { try { return window.localStorage.getItem("upnova-session-user") ? "present" : "absent"; } catch { return "unreadable"; } })() });
+    out.push({ name: "saved user snapshot", ok: null, detail: (() => { try { return window.localStorage.getItem("mavyn-session-user") ? "present" : "absent"; } catch { return "unreadable"; } })() });
 
     // the server's answer — the source of truth
     fetch("/api/auth/me", { cache: "no-store" })
@@ -178,7 +178,7 @@ export default function SessionDebugPage() {
 
       <p className="text-xs text-zinc-500">
         Client state: {user === undefined ? "initializing…" : user ? `signed in as @${user.handle}` : "signed out"} ·{" "}
-        <Link href="/" className="text-lime-300 underline-offset-2 hover:underline">back to UpNova</Link>
+        <Link href="/" className="text-lime-300 underline-offset-2 hover:underline">back to Mavyn</Link>
       </p>
     </div>
   );

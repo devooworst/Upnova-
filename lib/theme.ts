@@ -2,8 +2,8 @@
 
 export type ThemeChoice = "dark" | "light" | "system";
 
-export const THEME_EVENT = "upnova:theme-changed";
-const KEY = "upnova-theme";
+export const THEME_EVENT = "mavyn:theme-changed";
+const KEY = "mavyn-theme";
 
 export function getTheme(): ThemeChoice {
   if (typeof window === "undefined") return "dark";

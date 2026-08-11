@@ -2,7 +2,7 @@
 
 /* ------------------------------------------------------------------ */
 /*  Profile → Portfolio: real portfolio_items records. Entries added   */
-/*  from completed UpNova projects carry the Verified badge; uploads   */
+/*  from completed Mavyn projects carry the Verified badge; uploads   */
 /*  and links render with typed placeholder tiles — never a broken     */
 /*  image.                                                             */
 /* ------------------------------------------------------------------ */
@@ -30,7 +30,7 @@ const KIND_ICON: Record<string, typeof FileImage> = {
   audio: Music,
   link: Link2,
   project: Briefcase,
-  upnova_project: BadgeCheck,
+  mavyn_project: BadgeCheck,
 };
 
 const KIND_TONE: Record<string, string> = {
@@ -39,7 +39,7 @@ const KIND_TONE: Record<string, string> = {
   audio: "from-lime-500/25 to-emerald-900/40 text-lime-300",
   link: "from-zinc-600/40 to-zinc-900/40 text-zinc-300",
   project: "from-lime-500/25 to-emerald-900/40 text-lime-300",
-  upnova_project: "from-lime-500/25 to-emerald-900/40 text-lime-300",
+  mavyn_project: "from-lime-500/25 to-emerald-900/40 text-lime-300",
 };
 
 export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
@@ -123,7 +123,7 @@ export default function PortfolioTab({ isOwner }: { isOwner: boolean }) {
                       <Icon className="h-8 w-8 opacity-80" />
                     </div>
                   )}
-                  {item.kind === "upnova_project" && (
+                  {item.kind === "mavyn_project" && (
                     <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-ink/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300 backdrop-blur">
                       <BadgeCheck className="h-3 w-3" /> Verified project
                     </span>

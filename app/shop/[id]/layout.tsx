@@ -10,12 +10,12 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     .where(eq(tables.products.id, params.id))
     .get();
   if (!row) return { title: "Product" };
-  const desc = `${row.profile.displayName} · $${row.product.price}${row.product.externalUrl ? " · external checkout" : " — funds held until delivery"} · UpNova Shop.`;
+  const desc = `${row.profile.displayName} · $${row.product.price}${row.product.externalUrl ? " · external checkout" : " — funds held until delivery"} · Mavyn Shop.`;
   return {
     title: row.product.title,
     description: desc,
-    openGraph: { title: `${row.product.title} • UpNova`, description: desc, type: "website" },
-    twitter: { card: "summary_large_image", title: `${row.product.title} • UpNova`, description: desc },
+    openGraph: { title: `${row.product.title} • Mavyn`, description: desc, type: "website" },
+    twitter: { card: "summary_large_image", title: `${row.product.title} • Mavyn`, description: desc },
   };
 }
 

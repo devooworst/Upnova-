@@ -59,7 +59,7 @@ export default function PosterBadge({
       return (
         <span
           className={`${base} border-sky-400/40 bg-sky-400/10 text-sky-300`}
-          title="This organization passed UpNova's business verification. Verification is earned — never included with a subscription."
+          title="This organization passed Mavyn's business verification. Verification is earned — never included with a subscription."
         >
           <BadgeCheck className={size === "md" ? "h-3.5 w-3.5" : "h-3 w-3"} /> Verified Business
         </span>
@@ -68,14 +68,14 @@ export default function PosterBadge({
       return (
         <span
           className={`${base} border-line text-zinc-400`}
-          title="Business account — UpNova verification not completed yet."
+          title="Business account — Mavyn verification not completed yet."
         >
           <Building2 className={size === "md" ? "h-3.5 w-3.5" : "h-3 w-3"} /> Business · Pending
         </span>
       );
     case "creator":
       return (
-        <span className={`${base} border-violet-400/30 text-violet-300/90`} title="Independent creator on UpNova">
+        <span className={`${base} border-violet-400/30 text-violet-300/90`} title="Independent creator on Mavyn">
           <User className={size === "md" ? "h-3.5 w-3.5" : "h-3 w-3"} /> Independent Creator
         </span>
       );

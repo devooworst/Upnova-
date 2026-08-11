@@ -16,11 +16,11 @@ export const metadata: Metadata = {
   // NEXT_PUBLIC_APP_URL to the public domain in production.
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   title: {
-    default: "UpNova · Find what's happening around you",
-    template: "%s • UpNova",
+    default: "Mavyn · Find what's happening around you",
+    template: "%s • Mavyn",
   },
   description:
-    "UpNova is a local-first platform where creators, businesses, and everyday people discover each other, find opportunities, offer services, build communities, attend events, collaborate, and make money.",
+    "Mavyn is a local-first platform where creators, businesses, and everyday people discover each other, find opportunities, offer services, build communities, attend events, collaborate, and make money.",
 };
 
 export const viewport: Viewport = {
@@ -36,7 +36,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('upnova-theme');var l=t==='light'||(t==='system'&&matchMedia('(prefers-color-scheme: light)').matches);if(l)document.documentElement.classList.add('light')}catch(e){}})()",
+              "(function(){try{var t=localStorage.getItem('mavyn-theme');var l=t==='light'||(t==='system'&&matchMedia('(prefers-color-scheme: light)').matches);if(l)document.documentElement.classList.add('light')}catch(e){}})()",
           }}
         />
       </head>

@@ -147,7 +147,7 @@ export default function AboutTab({ isOwner }: { isOwner: boolean }) {
           <p className="mt-1.5 text-xs text-zinc-500">
             {isOwner
               ? "This is what visitors can book. Prices, scope, and availability are yours to change in Edit Profile."
-              : "Hire me directly: agree on scope in messages, pay securely on UpNova."}
+              : "Hire me directly: agree on scope in messages, pay securely on Mavyn."}
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

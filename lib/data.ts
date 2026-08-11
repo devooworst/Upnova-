@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/*  UpNova — typed mock data                                           */
+/*  Mavyn — typed mock data                                           */
 /*  Every entity mirrors the future database model: User, Service,     */
 /*  Post, Opportunity, Community, Event, Application, Review…          */
 /* ------------------------------------------------------------------ */
@@ -509,13 +509,13 @@ export const opportunities: Opportunity[] = [
     id: "event-staff",
     studentFriendly: true,
     title: "Creator Meetup — Photo & Video Team",
-    poster: "UpNova Events",
+    poster: "Mavyn Events",
     posterInitials: "U",
     posterGradient: "from-lime-500 to-emerald-600",
     verifiedPoster: true,
     category: "Event Staff",
     description:
-      "Cover the UpNova Creator Meetup in Baltimore. 3 hours, recap reel due within 48 hours.",
+      "Cover the Mavyn Creator Meetup in Baltimore. 3 hours, recap reel due within 48 hours.",
     budget: "$350",
     deadline: "Aug 20",
     roles: "Photographer • Videographer",
@@ -652,7 +652,7 @@ export const feed: Post[] = [
     type: "post",
     creator: creators[2],
     time: "1d",
-    text: "Wrapped the color grade on this one at 2am. Client wanted \"warm but moody\" — I think we landed it. What do y'all think? #UpNovaCreate",
+    text: "Wrapped the color grade on this one at 2am. Client wanted \"warm but moody\" — I think we landed it. What do y'all think? #MavynCreate",
     image: "/images/portfolio-nike.jpg",
     imageAlt: "Behind the scenes of a brand campaign shoot",
     likes: 233,
@@ -660,7 +660,7 @@ export const feed: Post[] = [
     shares: 19,
     following: true,
     distanceMi: 18,
-    tags: ["#UpNovaCreate"],
+    tags: ["#MavynCreate"],
   },
   {
     id: "post-lena-covers",
@@ -728,7 +728,7 @@ export interface UpEvent {
 export const events: UpEvent[] = [
   {
     id: "meetup",
-    title: "UpNova Creator Meetup",
+    title: "Mavyn Creator Meetup",
     location: "Baltimore, MD",
     date: "Saturday, August 22",
     time: "7:00 PM",
@@ -740,7 +740,7 @@ export const events: UpEvent[] = [
     image: "/images/event-meetup.jpg",
     description: "Connect with creators in the DMV. Lightning talks, open networking, and free pizza.",
     reach: { location: "Baltimore, MD", reach: "City" },
-    host: "UpNova Events",
+    host: "Mavyn Events",
     category: "Networking",
     age: "all",
     registration: "rsvp",
@@ -1061,7 +1061,7 @@ export const communities: Community[] = [
 /* Trust scales with what the job involves. The question: does the
    customer trust the worker with a person, child, pet, home, property,
    vehicle, or private access while they're not present?
-   Verification runs through an identity-verification provider — UpNova
+   Verification runs through an identity-verification provider — Mavyn
    never stores licenses/passports, and profiles show status only,
    never legal name / ID number / DOB / address.                        */
 
@@ -1097,7 +1097,7 @@ export const trustLevelInfo: Record<TrustLevel, { dot: string; label: string; de
    clear starting prices. CTA is Hire Me. (Opportunities are the inverse.)  */
 
 /* ---- Creative Integrity ----
-   UpNova does not prohibit AI universally. UpNova prohibits
+   Mavyn does not prohibit AI universally. Mavyn prohibits
    misrepresentation. Every service and project carries an AI policy;
    disclosure is part of the agreement, and violations are disputable. */
 
@@ -1337,7 +1337,7 @@ export const communityContent: Record<string, CommunityContent> = {
         gradient: "from-sky-500 to-indigo-600",
         role: "Photographer",
         time: "5h",
-        text: "Shot three creators from this community last month. This is what UpNova is supposed to feel like. Book your slots for September now — August is gone.",
+        text: "Shot three creators from this community last month. This is what Mavyn is supposed to feel like. Book your slots for September now — August is gone.",
         likes: 87,
         comments: 21,
       },
@@ -1512,7 +1512,7 @@ export const communityContent: Record<string, CommunityContent> = {
    - Verified Organization ✓  = "this organization is legitimate"
    - Community Group          = unofficial, still useful
    Membership verification ("this person is a member") is V2 and is
-   approved by org admins — UpNova never guesses fraternity rosters.
+   approved by org admins — Mavyn never guesses fraternity rosters.
    Branding colors are just branding, not proof of membership.          */
 
 export interface CampusOrg {
@@ -1547,7 +1547,7 @@ export const campusOrgs: CampusOrg[] = [
     leadership: ["Toni Alvarez (President)", "Devon Price (Events)"],
     posts: [
       { id: "pc-1", author: "Toni Alvarez", time: "3h", text: "Critique night moved to Thursday — bring your three best from the quad shoot. 📷" },
-      { id: "pc-2", author: "Devon Price", time: "1d", text: "The bookstore promo gig went to two of our members. Paid work through UpNova — this is the point of the club." },
+      { id: "pc-2", author: "Devon Price", time: "1d", text: "The bookstore promo gig went to two of our members. Paid work through Mavyn — this is the point of the club." },
     ],
     orgEvents: [
       { id: "pce-1", title: "Photography Club Meetup", when: "Thursday · 6:00 PM", where: "Student Center", going: 31 },
@@ -1598,7 +1598,7 @@ export const campusOrgs: CampusOrg[] = [
 /* ------------------------------ work history -------------------------------- */
 /* Every paid job creates a completed work record. Portfolio = "look
    what I can create." Experience = "look what I've actually done" —
-   verified through UpNova, added to the public portfolio only with
+   verified through Mavyn, added to the public portfolio only with
    permission. Reviews only come from verified projects.               */
 
 export interface WorkRecord {
@@ -1711,7 +1711,7 @@ export const bookings: Booking[] = [
   },
   {
     id: "bk-meetup",
-    client: "UpNova Events",
+    client: "Mavyn Events",
     initials: "U",
     gradient: "from-lime-400 to-emerald-600",
     service: "Live set, Creator Meetup",
@@ -1727,7 +1727,7 @@ export const bookings: Booking[] = [
 /* ------------------------------ trending / follow ------------------------------ */
 
 export const trending = [
-  { tag: "#UpNovaCreate", posts: "12.4K posts" },
+  { tag: "#MavynCreate", posts: "12.4K posts" },
   { tag: "#CreatorsUnited", posts: "9.1K posts" },
   { tag: "#NewCollab", posts: "6.7K posts" },
   { tag: "#BehindTheShot", posts: "4.2K posts" },
@@ -1769,7 +1769,7 @@ export const conversations: Conversation[] = [
     unread: 2,
     online: true,
     messages: [
-      { from: "me", text: "Hey! Saw your photography service on UpNova 👀", time: "10:02 AM" },
+      { from: "me", text: "Hey! Saw your photography service on Mavyn 👀", time: "10:02 AM" },
       { from: "me", text: "We need coverage for the Creator Meetup on Aug 22. Interested?", time: "10:03 AM" },
       { from: "them", text: "Hey Devin! Yes, that sounds like a blast.", time: "10:15 AM" },
       { from: "them", text: "I can do the 22nd — sending the shot list tonight.", time: "10:16 AM" },
@@ -2011,7 +2011,7 @@ export const services: Service[] = [
 ];
 
 export const contact = {
-  email: "devin@upnova.app",
+  email: "devin@mavyn.app",
   location: "Baltimore, MD",
   responseTime: "Usually responds within 2 hours",
   joined: "Joined March 2024",

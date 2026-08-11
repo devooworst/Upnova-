@@ -196,7 +196,7 @@ high-trust opportunity
                   Complete High-Trust Verification
                 </button>
                 <p className="mt-2 text-center text-[10px] text-zinc-600">
-                  Runs through an identity-verification provider — UpNova never stores your ID.
+                  Runs through an identity-verification provider — Mavyn never stores your ID.
                 </p>
               </div>
             ) : (

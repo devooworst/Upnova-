@@ -2,7 +2,7 @@
 /*  Trust & Authenticity — SERVER half.                                */
 /*                                                                     */
 /*  · A "Verified Work" chip exists ONLY when this module validated    */
-/*    the link between a post and a completed UpNova transaction the   */
+/*    the link between a post and a completed Mavyn transaction the   */
 /*    poster actually participated in. The client sends ids; the       */
 /*    server decides what's verified.                                  */
 /*  · "Client Confirmed" is set only by the linked counterparty.       */
@@ -165,7 +165,7 @@ export function computeRiskSignals(targetType: string, targetId: string): string
 
       // unverified claims on the post itself — context only
       if (post.attested && !post.projectId && !post.bookingId)
-        signals.push("Post carries a creator attestation with no linked UpNova transaction (attestations are claims, not verification)");
+        signals.push("Post carries a creator attestation with no linked Mavyn transaction (attestations are claims, not verification)");
     }
   } catch {
     /* signals are best-effort — a failure here must never block a report */

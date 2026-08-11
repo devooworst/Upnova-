@@ -103,7 +103,7 @@ export async function GET() {
   });
 }
 
-/** POST /api/orders — place an order (UpNova checkout products only). */
+/** POST /api/orders — place an order (Mavyn checkout products only). */
 export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     if (!product || product.status === "archived") throw new ApiError(404, "Product not found");
     if (product.sellerId === user.id) throw new ApiError(400, "You can't buy your own listing");
     if (product.externalUrl)
-      throw new ApiError(409, "This product is sold on the seller's website — UpNova checkout doesn't apply");
+      throw new ApiError(409, "This product is sold on the seller's website — Mavyn checkout doesn't apply");
 
     const qty = Math.min(10, Math.max(1, Math.round(Number(body.qty) || 1)));
     const available = product.quantity - product.sold;

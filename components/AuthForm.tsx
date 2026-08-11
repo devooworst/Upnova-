@@ -133,7 +133,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center py-10">
       <p className="font-syne text-xl font-bold text-zinc-50">
-        UpNova <span className="text-lime-400">✦</span>
+        Mavyn <span className="text-lime-400">✦</span>
       </p>
       <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">
         {mfaStep ? "Two-factor code" : mode === "login" ? "Welcome back" : "Create your account"}
@@ -142,7 +142,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
         {mfaStep
           ? "Enter the 6-digit code from your authenticator app."
           : mode === "login"
-            ? "Sign in to your UpNova account."
+            ? "Sign in to your Mavyn account."
             : "Find what's happening around you — and the people who can make it happen."}
       </p>
 
@@ -186,7 +186,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 {accountType === "business" && (
                   <p className="text-[11px] leading-relaxed text-zinc-500">
                     Business accounts start unverified. The Verified Business badge comes from
-                    UpNova&apos;s verification process — it is never included with a subscription.
+                    Mavyn&apos;s verification process — it is never included with a subscription.
                   </p>
                 )}
                 <input
@@ -290,7 +290,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 <div className="rounded-lg border border-line bg-card-raised p-3">
                   <p className="text-[11px] font-semibold text-zinc-300">How would you like to receive important updates?</p>
                   <div className="mt-1.5 space-y-1 text-[11px] text-zinc-400">
-                    <label className="flex items-center gap-2"><input type="checkbox" checked disabled className="accent-lime-400" /> In UpNova</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked disabled className="accent-lime-400" /> In Mavyn</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked disabled className="accent-lime-400" /> Email</label>
                     <label className="flex items-center gap-2">
                       <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="accent-lime-400" /> SMS
@@ -381,8 +381,8 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
             devin (admin) · ava · nia · lena · marcusj · jordanmiles · maya · kofi · sofia · tj ·
             imani · darius · rachel · omar · nikecreative · harboroak — email{" "}
-            <span className="font-mono text-zinc-300">{"{name}"}@upnova.dev</span>, password{" "}
-            <span className="font-mono font-medium tracking-[0.08em] text-zinc-300">upnova123</span>
+            <span className="font-mono text-zinc-300">{"{name}"}@mavyn.dev</span>, password{" "}
+            <span className="font-mono font-medium tracking-[0.08em] text-zinc-300">mavyn123</span>
           </p>
         </div>
       )}
