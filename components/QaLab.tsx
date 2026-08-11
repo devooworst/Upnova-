@@ -500,7 +500,7 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
 
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               {iAmRole ? (
-                                <a href={brief.href} target="_blank" rel="noreferrer" className="btn-lime px-4 py-1.5 text-xs">Start task →</a>
+                                <a href={brief.href} className="btn-lime px-4 py-1.5 text-xs" title="Opens the page where this task happens — same tab, the Test Session bar follows you">Start task →</a>
                               ) : (
                                 <button
                                   disabled={busy === `switch:${brief.role}`}

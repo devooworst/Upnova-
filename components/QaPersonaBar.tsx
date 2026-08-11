@@ -23,9 +23,15 @@ export default function QaPersonaBar() {
      next checkpoint — no trips back to the Lab to find where you left off */
   const [nextTask, setNextTask] = useState<{ scenario: string; title: string; href: string; idx: number; total: number; mine: boolean; role: string; id: string; brief: MissionBriefing } | null>(null);
   /* the mission briefing follows the tester: it OPENS itself when a new
-     task becomes current (one time per task), and stays one tap away */
+     task becomes current (once per task, across navigations too), and
+     stays one tap away. START TASK = acknowledge + close — the ack is
+     remembered in sessionStorage so page loads never re-trap the user. */
+  const ACK_KEY = "mavyn-qa-brief-ack";
+  const readAck = () => { try { return sessionStorage.getItem(ACK_KEY); } catch { return null; } };
+  const writeAck = (v: string) => { try { sessionStorage.setItem(ACK_KEY, v); } catch {} };
   const [briefOpen, setBriefOpen] = useState(false);
   const [seenTask, setSeenTask] = useState<string | null>(null);
+  const [passedFlash, setPassedFlash] = useState(false);
 
   useEffect(() => {
     if (!user || !isQaHandle(user.handle)) return;
@@ -55,18 +61,26 @@ export default function QaPersonaBar() {
       } catch { /* the bar never breaks the page */ }
     };
     poll();
-    const t = setInterval(poll, 15000);
+    const t = setInterval(poll, 6000);
     // (auto-open handled below when the current task changes)
     const onFocus = () => poll();
     window.addEventListener("focus", onFocus);
     return () => { dead = true; clearInterval(t); window.removeEventListener("focus", onFocus); };
   }, [user?.handle]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // a NEW mission → its briefing presents itself, once
+  // a NEW mission → its briefing presents itself, once — and the moment
+  // the previous task verifies, the bar says so before moving on
   useEffect(() => {
     if (nextTask && nextTask.id !== seenTask) {
+      const ack = readAck();
+      // a previously-acknowledged task just gave way to a new one =
+      // the checkpoint VERIFIED → show the pass, then the new mission
+      if (seenTask !== null || (ack && ack !== nextTask.id)) {
+        setPassedFlash(true);
+        setTimeout(() => setPassedFlash(false), 6000);
+      }
       setSeenTask(nextTask.id);
-      if (nextTask.mine) setBriefOpen(true);
+      if (nextTask.mine && ack !== nextTask.id) setBriefOpen(true);
     }
     if (!nextTask) setBriefOpen(false);
   }, [nextTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -163,9 +177,30 @@ export default function QaPersonaBar() {
             </ol>
             <p className="mt-1.5 font-mono text-[9px] leading-relaxed text-lime-300/90">success: ✓ {nextTask.brief.success}</p>
             {user.handle === nextTask.brief.role && (
-              <a href={nextTask.brief.href} className="mt-2 inline-flex items-center gap-1 rounded-full border border-lime-400/50 bg-lime-400/10 px-3 py-1 text-[10px] font-bold text-lime-300 hover:bg-lime-400/20">
-                Start task <ArrowRight className="h-3 w-3" />
-              </a>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    // BEGIN: acknowledge this task's briefing and get out of
+                    // the way — no navigation, no new tab, no completion.
+                    // Verification happens only when the real action lands.
+                    writeAck(nextTask.id);
+                    setBriefOpen(false);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-lime-400/50 bg-lime-400/10 px-3 py-1 text-[10px] font-bold text-lime-300 hover:bg-lime-400/20"
+                >
+                  Start task <ArrowRight className="h-3 w-3" />
+                </button>
+                {pathname !== nextTask.brief.href.split("?")[0] && (
+                  <a
+                    href={nextTask.brief.href}
+                    onClick={() => writeAck(nextTask.id)}
+                    className="rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                    title="Optional: jump to the page where this task happens"
+                  >
+                    Take me there
+                  </a>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -174,6 +209,11 @@ export default function QaPersonaBar() {
         {nextTask && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-amber-400/15 pt-1.5">
             <p className="min-w-0 flex-1 truncate text-[10px] text-zinc-400">
+              {passedFlash && (
+                <span className="mr-1.5 animate-pulse rounded-full border border-lime-400/60 bg-lime-400/15 px-2 py-px font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-lime-300">
+                  ✓ Task passed
+                </span>
+              )}
               <span className="font-mono font-bold uppercase tracking-[0.1em] text-zinc-500">
                 {nextTask.scenario} · test {nextTask.idx}/{nextTask.total}
               </span>{" "}
