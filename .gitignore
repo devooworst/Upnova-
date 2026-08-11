@@ -47,3 +47,6 @@ db/.demo-signout.json
 db/.instance-id
 db/.demo-revoked.json
 db/.qa-runs.json
+db/upnova.dev.db
+db/upnova.dev.db-shm
+db/upnova.dev.db-wal
