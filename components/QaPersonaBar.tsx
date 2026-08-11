@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import { FlaskConical, LogOut, RefreshCw, ArrowRight } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { QA_HANDLES, QA_LABEL, isQaHandle, switchPersona, exitQa, stashedReturn } from "@/lib/qaLab";
+import { buildBriefing, type MissionBriefing } from "@/lib/qaBriefing";
 
 export default function QaPersonaBar() {
   const { user } = useSession();
@@ -20,7 +21,11 @@ export default function QaPersonaBar() {
   const [err, setErr] = useState<string | null>(null);
   /* the guided thread: while you act in the real UI, the bar knows your
      next checkpoint — no trips back to the Lab to find where you left off */
-  const [nextTask, setNextTask] = useState<{ scenario: string; title: string; href: string; idx: number; total: number; mine: boolean; role: string } | null>(null);
+  const [nextTask, setNextTask] = useState<{ scenario: string; title: string; href: string; idx: number; total: number; mine: boolean; role: string; id: string; brief: MissionBriefing } | null>(null);
+  /* the mission briefing follows the tester: it OPENS itself when a new
+     task becomes current (one time per task), and stays one tap away */
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [seenTask, setSeenTask] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !isQaHandle(user.handle)) return;
@@ -37,6 +42,7 @@ export default function QaPersonaBar() {
         const pick = mine ?? any;
         if (!dead)
           setNextTask(pick ? {
+            id: `${armed.id}:${pick.id}`,
             scenario: String(d.title ?? "").split(" — ")[0],
             title: pick.title,
             href: pick.href && pick.href !== "#" ? pick.href : "/simulation",
@@ -44,15 +50,26 @@ export default function QaPersonaBar() {
             total: steps.length,
             mine: !!mine,
             role: pick.role,
+            brief: buildBriefing(pick),
           } : null);
       } catch { /* the bar never breaks the page */ }
     };
     poll();
     const t = setInterval(poll, 15000);
+    // (auto-open handled below when the current task changes)
     const onFocus = () => poll();
     window.addEventListener("focus", onFocus);
     return () => { dead = true; clearInterval(t); window.removeEventListener("focus", onFocus); };
   }, [user?.handle]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a NEW mission → its briefing presents itself, once
+  useEffect(() => {
+    if (nextTask && nextTask.id !== seenTask) {
+      setSeenTask(nextTask.id);
+      if (nextTask.mine) setBriefOpen(true);
+    }
+    if (!nextTask) setBriefOpen(false);
+  }, [nextTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user || !user.demoTools || !isQaHandle(user.handle)) return null;
   if (pathname?.startsWith("/profile/studio/world")) return null; // full-screen editor stays clean
@@ -114,6 +131,45 @@ export default function QaPersonaBar() {
             </button>
           </div>
         </div>
+        {/* ---- THE MISSION BRIEFING — who am I · what do I do · where ·
+             what does success look like. Auto-opens on a new task. ---- */}
+        {nextTask && briefOpen && (
+          <div className="mb-2 rounded-xl border border-amber-400/30 bg-black/40 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                {nextTask.scenario} · Test {nextTask.idx} of {nextTask.total}
+              </p>
+              <button onClick={() => setBriefOpen(false)} className="font-mono text-[10px] text-zinc-500 hover:text-zinc-300" aria-label="Dismiss briefing">✕</button>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="rounded-md border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-violet-200">
+                {nextTask.brief.roleLabel}
+              </span>
+              {user.handle === nextTask.brief.role ? (
+                <span className="font-mono text-[9px] font-semibold text-lime-300">✓ you are testing as {nextTask.brief.roleLabel}</span>
+              ) : (
+                <button disabled={busy} onClick={() => go(nextTask.brief.role)} className="rounded-full border border-violet-400/50 px-2 py-0.5 text-[9px] font-bold text-violet-200 hover:bg-violet-400/15">
+                  Switch to {nextTask.brief.roleLabel} →
+                </button>
+              )}
+            </div>
+            <p className="mt-1.5 text-[11px] font-bold text-zinc-100">{nextTask.brief.objective}</p>
+            <ol className="mt-1 space-y-px">
+              {nextTask.brief.steps.map((line, i) => (
+                <li key={i} className="flex gap-1.5 text-[10px] leading-relaxed text-zinc-400">
+                  <span className="font-mono text-zinc-600">{i + 1}.</span> {line}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-1.5 font-mono text-[9px] leading-relaxed text-lime-300/90">success: ✓ {nextTask.brief.success}</p>
+            {user.handle === nextTask.brief.role && (
+              <a href={nextTask.brief.href} className="mt-2 inline-flex items-center gap-1 rounded-full border border-lime-400/50 bg-lime-400/10 px-3 py-1 text-[10px] font-bold text-lime-300 hover:bg-lime-400/20">
+                Start task <ArrowRight className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        )}
+
         {/* the next checkpoint, right where you're working */}
         {nextTask && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-amber-400/15 pt-1.5">
@@ -123,6 +179,13 @@ export default function QaPersonaBar() {
               </span>{" "}
               — {nextTask.mine ? nextTask.title : `waiting on ${QA_LABEL[nextTask.role] ?? nextTask.role}: ${nextTask.title}`}
             </p>
+            <button
+              onClick={() => setBriefOpen((v) => !v)}
+              className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-bold transition ${briefOpen ? "border-amber-400/60 bg-amber-400/15 text-amber-200" : "border-line text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"}`}
+              title="The mission briefing: role, objective, steps, success condition"
+            >
+              Briefing
+            </button>
             {nextTask.mine ? (
               <a href={nextTask.href} className="flex shrink-0 items-center gap-1 rounded-full border border-lime-400/50 bg-lime-400/10 px-2.5 py-0.5 text-[10px] font-bold text-lime-300 hover:bg-lime-400/20">
                 Next task <ArrowRight className="h-3 w-3" />

@@ -1427,6 +1427,16 @@ export async function POST(req: NextRequest) {
     for (const sc of QA_SCENARIOS) for (const st of sc.steps) { roles.add(st.role); if (!st.role) untagged++; }
     step(c, "every QA checkpoint is persona-tagged (testcustomer / testcreator / testbusiness / auto-check) — environments can't mix",
       untagged === 0 && ["testcustomer", "testcreator", "testbusiness", "check"].every((r) => roles.has(r)), { actual: Array.from(roles).join(",") });
+    // MISSION BRIEFINGS: every task carries its OWN role, objective,
+    // actionable instruction, and DB-worded success condition — the
+    // briefing UI derives from these, so none may be thin or generic
+    const thinBriefs = QA_SCENARIOS.flatMap((sc) =>
+      sc.steps
+        .filter((st) => !(st.title?.length >= 8 && st.instruction?.length >= 12 && st.expected?.length >= 12 && !!st.role))
+        .map((st) => `${sc.id}:${st.id}`)
+    );
+    step(c, "every task has a complete mission briefing: objective (title), what-to-do (instruction), and success condition (expected) — no generic text possible",
+      thinBriefs.length === 0, { actual: thinBriefs.length ? `THIN: ${thinBriefs.join(",")}` : `${QA_SCENARIOS.reduce((a, s) => a + s.steps.length, 0)} tasks, all complete` });
     const byPersona = (h: string) => QA_SCENARIOS.filter((s) => s.personas.includes(h)).map((s) => s.id);
     const cust = byPersona("testcustomer"), crea = byPersona("testcreator"), biz2 = byPersona("testbusiness");
     step(c, "each persona sees ONLY its own scenarios: customer never gets the hiring flow, creator never gets the customer-opportunity flow",

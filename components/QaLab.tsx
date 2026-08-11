@@ -15,6 +15,8 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildBriefing } from "@/lib/qaBriefing";
+import { UserRound as PersonaIcon, Scissors, Building2, Target, ListChecks, CheckCircle2 } from "lucide-react";
 import {
   Check,
   ChevronDown,
@@ -441,20 +443,74 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
                       const myDone = my.filter((x) => x.status === "done").length;
                       const overallIdx = firstPending ? d.steps.findIndex((x) => x.id === firstPending.id) : -1;
                       if (firstPendingMine) {
+                        /* ---- MISSION BRIEFING: who am I · what do I do ·
+                             where · what does success look like ---- */
+                        const brief = buildBriefing(firstPendingMine);
+                        const iAmRole = viewerHandle === brief.role;
+                        const RoleGlyph = brief.role === "testcreator" ? Scissors : brief.role === "testbusiness" ? Building2 : PersonaIcon;
                         return (
-                          <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/5 p-4">
+                          <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/5 p-4" data-tut="qa-briefing">
                             <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300">
-                              Test {d.steps.findIndex((x) => x.id === firstPendingMine.id) + 1} of {d.total} · your move
+                              {s.title.split(" — ")[0]} · Test {d.steps.findIndex((x) => x.id === firstPendingMine.id) + 1} of {d.total}
                             </p>
-                            <p className="mt-1 text-sm font-bold text-zinc-100">{firstPendingMine.title}</p>
-                            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">{firstPendingMine.instruction}</p>
-                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                              {firstPendingMine.href && firstPendingMine.href !== "#" && (
-                                <a href={firstPendingMine.href} target="_blank" rel="noreferrer" className="btn-lime px-4 py-1.5 text-xs">
-                                  Go to task →
-                                </a>
+
+                            {/* YOUR ROLE — prominent, with the switch built in */}
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="flex items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-400/10 px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-violet-200">
+                                <RoleGlyph className="h-3.5 w-3.5" /> {brief.roleLabel}
+                              </span>
+                              {iAmRole ? (
+                                <span className="flex items-center gap-1 font-mono text-[10px] font-semibold text-lime-300">
+                                  <Check className="h-3 w-3" /> You are currently testing as {brief.roleLabel}
+                                </span>
+                              ) : (
+                                <button
+                                  disabled={busy === `switch:${brief.role}`}
+                                  onClick={() => openAs(brief.role, brief.href)}
+                                  className="rounded-full border border-violet-400/50 bg-violet-400/10 px-3 py-1 text-[10px] font-bold text-violet-200 hover:bg-violet-400/20"
+                                >
+                                  Switch to {brief.roleLabel} →
+                                </button>
                               )}
-                              <span className="font-mono text-[10px] text-zinc-500">your side: {myDone}/{my.length} done · checkpoints verify automatically as you act</span>
+                            </div>
+
+                            {/* OBJECTIVE */}
+                            <p className="mt-3 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                              <Target className="h-3 w-3" /> Objective
+                            </p>
+                            <p className="mt-0.5 text-sm font-bold text-zinc-100">{brief.objective}</p>
+
+                            {/* WHAT TO DO */}
+                            <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                              <ListChecks className="h-3 w-3" /> What to do
+                            </p>
+                            <ol className="mt-1 space-y-0.5">
+                              {brief.steps.map((line, i) => (
+                                <li key={i} className="flex gap-2 text-[11px] leading-relaxed text-zinc-300">
+                                  <span className="font-mono text-[10px] text-zinc-600">{i + 1}.</span> {line}
+                                </li>
+                              ))}
+                            </ol>
+
+                            {/* SUCCESS CONDITION */}
+                            <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                              <CheckCircle2 className="h-3 w-3" /> Success condition
+                            </p>
+                            <p className="mt-0.5 font-mono text-[10px] leading-relaxed text-lime-300/90">✓ {brief.success}</p>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {iAmRole ? (
+                                <a href={brief.href} target="_blank" rel="noreferrer" className="btn-lime px-4 py-1.5 text-xs">Start task →</a>
+                              ) : (
+                                <button
+                                  disabled={busy === `switch:${brief.role}`}
+                                  onClick={() => openAs(brief.role, brief.href)}
+                                  className="btn-lime px-4 py-1.5 text-xs"
+                                >
+                                  Switch &amp; start task →
+                                </button>
+                              )}
+                              <span className="font-mono text-[10px] text-zinc-500">your side: {myDone}/{my.length} done</span>
                             </div>
                           </div>
                         );
