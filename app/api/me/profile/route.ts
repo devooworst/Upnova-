@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
 import { ownProfile } from "@/lib/server/serialize";
+import { resolveLocation } from "@/lib/server/geo";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,48 @@ export async function PATCH(req: NextRequest) {
     const b = (v: unknown, def: boolean) => (typeof v === "boolean" ? v : def);
     const p = user.profile;
 
+    /* ---------------- location: validated relationally ----------------
+       Preferred path: body.location = { countryCode, stateId, countyId,
+       cityId }. The chain is verified against the geo reference data —
+       Maryland → Fairfax County (Virginia) is REJECTED with a 400, no
+       matter what the client claims. Display text (city/county/state/
+       country) is derived server-side from the canonical rows.
+
+       Legacy path (no usable location object): free-text city/state/…
+       are stored as before, so older clients and existing profiles keep
+       working until they're normalized. Sending an empty location AND
+       empty text explicitly clears the location.                       */
+    const loc = body.location && typeof body.location === "object" ? body.location : null;
+    const wantsStructured = !!loc && !!String(loc.countryCode || "").trim();
+    const wantsClear =
+      !!loc && !String(loc.countryCode || "").trim() && ![body.city, body.county, body.state, body.country].some((t) => String(t || "").trim());
+    let locationCols: Record<string, unknown>;
+    if (wantsStructured || wantsClear) {
+      const r = resolveLocation(
+        wantsClear ? {} : { countryCode: loc.countryCode, stateId: loc.stateId, countyId: loc.countyId, cityId: loc.cityId }
+      ); // throws ApiError(400) on any invalid combination
+      locationCols = {
+        city: r.cityName,
+        county: r.countyName,
+        state: r.stateShort,
+        country: r.countryName,
+        countryCode: r.countryCode,
+        stateId: r.stateId,
+        countyId: r.countyId,
+        cityId: r.cityId,
+        // city centroid only — never an exact address; used for the
+        // server-side distance scoping that already existed
+        lat: r.lat,
+        lng: r.lng,
+      };
+    } else {
+      // legacy free-text path — if the text actually changed, the old
+      // ids no longer describe it, so drop them rather than lie
+      const next = { city: str(body.city, 60), state: str(body.state, 40), county: str(body.county, 60), country: str(body.country, 60) };
+      const textChanged = next.city !== p.city || next.state !== p.state || next.county !== p.county || next.country !== p.country;
+      locationCols = { ...next, ...(textChanged ? { countryCode: "", stateId: "", countyId: "", cityId: "" } : {}) };
+    }
+
     db.update(tables.profiles)
       .set({
         displayName: str(body.displayName, 50) || p.displayName,
@@ -29,10 +72,7 @@ export async function PATCH(req: NextRequest) {
         locationVisibility: ["city", "county", "state", "country", "hidden"].includes(body.locationVisibility)
           ? body.locationVisibility
           : p.locationVisibility,
-        city: str(body.city, 60),
-        state: str(body.state, 40),
-        county: str(body.county, 60),
-        country: str(body.country, 60),
+        ...locationCols,
         primaryRole: str(body.primaryRole, 60),
         additionalRoles: arr(body.additionalRoles),
         skills: arr(body.skills),

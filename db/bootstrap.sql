@@ -71,11 +71,12 @@ CREATE TABLE IF NOT EXISTS `business_team` (
 	`person_id` text NOT NULL,
 	`title` text DEFAULT '' NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
+	`is_admin` integer DEFAULT false NOT NULL,
 	`compensation` text DEFAULT '' NOT NULL,
 	`notes` text DEFAULT '' NOT NULL,
 	`added_at` integer NOT NULL,
 	`ended_at` integer,
-	`created_at` integer NOT NULL, `is_admin` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
 	FOREIGN KEY (`business_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`person_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -662,7 +663,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`show_availability` integer DEFAULT true NOT NULL,
 	`links` text DEFAULT '[]' NOT NULL,
 	`education` text DEFAULT '[]' NOT NULL,
-	`trust_level` text DEFAULT 'standard' NOT NULL,
+	`trust_level` text DEFAULT 'standard' NOT NULL, `country_code` text DEFAULT '' NOT NULL, `state_id` text DEFAULT '' NOT NULL, `county_id` text DEFAULT '' NOT NULL, `city_id` text DEFAULT '' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `progress_updates` (
@@ -775,6 +776,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`role` text DEFAULT 'user' NOT NULL,
 	`plan` text DEFAULT 'free' NOT NULL,
 	`tester_mode` text DEFAULT 'demo' NOT NULL,
+	`simulated` integer DEFAULT false NOT NULL,
 	`phone` text,
 	`phone_verified` integer DEFAULT false NOT NULL,
 	`sms_consent` integer DEFAULT false NOT NULL,
@@ -787,7 +789,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 	`onboarding` text DEFAULT '' NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
-, simulated integer not null default 0);
+);
 CREATE TABLE IF NOT EXISTS `works` (
 	`id` text PRIMARY KEY NOT NULL,
 	`creator_id` text NOT NULL,

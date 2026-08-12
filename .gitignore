@@ -50,5 +50,10 @@ db/.qa-runs.json
 db/upnova.dev.db
 db/upnova.dev.db-shm
 db/upnova.dev.db-wal
+
+# compiled geographic reference data — regenerate with: npm run geo:build
+db/geo.db
+db/geo.db-shm
+db/geo.db-wal
 public/uploads/
 db/.qa-guide-defects.json

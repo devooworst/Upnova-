@@ -132,6 +132,14 @@ export const profiles = sqliteTable("profiles", {
   state: text("state").notNull().default(""),
   county: text("county").notNull().default(""),
   country: text("country").notNull().default(""),
+  // normalized geographic ids (db/geo.db reference data) — the text
+  // columns above stay as canonical DISPLAY strings so nothing built on
+  // them breaks; these ids are what the server validates relationally
+  // (country → state → county → city, see lib/server/geo.ts).
+  countryCode: text("country_code").notNull().default(""), // ISO 3166-1, e.g. "US"
+  stateId: text("state_id").notNull().default(""),         // e.g. "US-MD"
+  countyId: text("county_id").notNull().default(""),       // e.g. "US-24033"
+  cityId: text("city_id").notNull().default(""),           // e.g. "g4346952"
   lat: real("lat"),
   lng: real("lng"),
 

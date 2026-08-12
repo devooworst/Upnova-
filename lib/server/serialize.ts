@@ -92,6 +92,11 @@ export function ownProfile(user: User, profile: Profile) {
       state: profile.state,
       county: profile.county,
       country: profile.country,
+      // normalized geo ids — drive the cascading pickers in Edit Profile
+      countryCode: profile.countryCode,
+      stateId: profile.stateId,
+      countyId: profile.countyId,
+      cityId: profile.cityId,
       locationVisibility: profile.locationVisibility,
       primaryRole: profile.primaryRole,
       additionalRoles: parse(profile.additionalRoles),

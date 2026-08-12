@@ -49,6 +49,12 @@ export interface ProfileData {
   state: string;
   county: string;
   country: string;
+  // normalized geo ids — the cascading pickers select these; the text
+  // fields above hold the canonical display names derived server-side
+  countryCode: string;
+  stateId: string;
+  countyId: string;
+  cityId: string;
   locationVisibility: string; // city | county | state | country | hidden
   serviceArea: string;
   serviceAreaCustom: string;
@@ -102,6 +108,10 @@ export const DEFAULT_PROFILE: ProfileData = {
   state: "",
   county: "",
   country: "",
+  countryCode: "",
+  stateId: "",
+  countyId: "",
+  cityId: "",
   locationVisibility: "city",
   serviceArea: "25 miles",
   serviceAreaCustom: "",
@@ -156,6 +166,10 @@ function fromApi(user: MeResponse): ProfileData {
     state: p.state,
     county: p.county,
     country: p.country,
+    countryCode: p.countryCode ?? "",
+    stateId: p.stateId ?? "",
+    countyId: p.countyId ?? "",
+    cityId: p.cityId ?? "",
     locationVisibility: p.locationVisibility,
     serviceArea: p.serviceArea,
     serviceAreaCustom: "",
@@ -217,6 +231,9 @@ function toApi(d: ProfileData) {
     state: d.state,
     county: d.county,
     country: d.country,
+    // structured location — the server validates the chain relationally
+    // and derives the canonical display text itself
+    location: { countryCode: d.countryCode, stateId: d.stateId, countyId: d.countyId, cityId: d.cityId },
     locationVisibility: d.locationVisibility,
     serviceArea: d.serviceArea,
     primaryRole: d.primaryRole,

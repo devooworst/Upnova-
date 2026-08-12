@@ -1,3 +1,4 @@
+import { resolveLocation } from "@/lib/server/geo";
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { asc, eq, isNull } from "drizzle-orm";
@@ -161,11 +162,31 @@ export async function POST(req: NextRequest) {
       city = `${campus.city}, ${campus.state}`;
       state = campus.state;
     } else {
-      city = String(body.city || "").trim().slice(0, 80);
-      state = String(body.state || "").trim().slice(0, 20);
-      if (!city) throw new ApiError(400, "What city is the event in?");
-      lat = user.profile.lat ?? null;
-      lng = user.profile.lng ?? null;
+      // preferred: a validated geo chain from the cascading picker —
+      // the server re-checks every parent/child relationship and derives
+      // the display strings itself (invalid combos are rejected with 400)
+      const geoIn = body.geo && typeof body.geo === "object" ? body.geo : null;
+      if (geoIn && String(geoIn.countryCode || "").trim()) {
+        const r = resolveLocation({
+          countryCode: geoIn.countryCode,
+          stateId: geoIn.stateId,
+          countyId: geoIn.countyId,
+          cityId: geoIn.cityId,
+        });
+        if (!r.cityName) throw new ApiError(400, "What city is the event in?");
+        city = r.cityName;
+        state = r.stateShort;
+        // city centroid for nearby discovery (never an exact address)
+        lat = r.lat ?? user.profile.lat ?? null;
+        lng = r.lng ?? user.profile.lng ?? null;
+      } else {
+        // legacy free-text path (older clients)
+        city = String(body.city || "").trim().slice(0, 80);
+        state = String(body.state || "").trim().slice(0, 20);
+        if (!city) throw new ApiError(400, "What city is the event in?");
+        lat = user.profile.lat ?? null;
+        lng = user.profile.lng ?? null;
+      }
     }
 
     const config = {

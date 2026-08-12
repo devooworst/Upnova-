@@ -1,3 +1,4 @@
+import { resolveLocation } from "@/lib/server/geo";
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { desc, eq } from "drizzle-orm";
@@ -173,7 +174,18 @@ export async function POST(req: NextRequest) {
         description: String(body.description || "").slice(0, 2000),
         budget: budgetNum ?? (totalComp > 0 ? totalComp : null),
         type: ["gig", "collab", "event", "campus"].includes(body.type) ? body.type : "gig",
-        location: String(body.location || "").slice(0, 80),
+        // location: a validated geo chain wins over free text — the
+        // server re-checks parent/child relationships (400 on mismatch)
+        // and derives the display string itself
+        location: (() => {
+          const g = body.geo && typeof body.geo === "object" ? body.geo : null;
+          if (g && String(g.countryCode || "").trim()) {
+            const r = resolveLocation({ countryCode: g.countryCode, stateId: g.stateId, countyId: g.countyId, cityId: g.cityId });
+            const tail = r.stateShort || r.stateName || r.countryName;
+            return r.cityName ? `${r.cityName}${tail ? `, ${tail}` : ""}` : tail;
+          }
+          return String(body.location || "").slice(0, 80);
+        })(),
         remote: !!body.remote,
         studentFriendly: !!body.studentFriendly,
         // WHO CAN APPLY — the poster's rule. my_school requires the poster

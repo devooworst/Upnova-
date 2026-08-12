@@ -19,6 +19,10 @@ export interface SessionProfile {
   state: string;
   county: string;
   country: string;
+  countryCode: string;
+  stateId: string;
+  countyId: string;
+  cityId: string;
   locationVisibility: string;
   primaryRole: string;
   additionalRoles: string[];

@@ -69,6 +69,7 @@ const PLANNED_CATEGORIES = [
   "PLAN LAB (REAL BOUNDARIES)",
   "QA LOOP REGRESSION",
   "QA SCENARIO WALKTHROUGHS",
+  "LOCATION SYSTEM (GEO CASCADE)",
   "FULL SITE ROUTE SWEEP",
   "DATABASE INTEGRITY",
 ];
@@ -2059,6 +2060,139 @@ export async function POST(req: NextRequest) {
         st.completed === true && st.done === st.total && invariantOk, { actual: stuck || `${st.done}/${st.total} completed=${st.completed}` });
       await asA(`/api/qa/scenarios/${sid}`, { method: "POST", body: { action: "reset" } });
     }
+  }
+
+  /* ================= LOCATION SYSTEM (GEO CASCADE) ================= */
+  /* One cascading location system: country → state/province → county/
+     district → city. These tests hit the REAL geo API endpoints and the
+     REAL profile save path — invalid parent/child combinations must be
+     rejected SERVER-SIDE, not just filtered by the dropdowns. Uses a
+     throwaway tonb* account only; never touches real profiles.        */
+  {
+    const c = cat("LOCATION SYSTEM (GEO CASCADE)");
+    type GeoItem = { id: string; code?: string; name: string; countyId?: string | null; countyName?: string | null; stateLabel?: string; hasStates?: boolean; hasCounties?: boolean };
+    const items = (r: { data: Record<string, unknown> }) => ((r.data as { items?: GeoItem[] }).items ?? []);
+
+    // -------- reference data: the hierarchy itself --------
+    const countries = await api(null, "/api/geo/countries?q=united");
+    const us = items(countries).find((x) => x.code === "US" || x.id === "US");
+    step(c, "countries endpoint is searchable and returns United States with level config", countries.status === 200 && !!us && us.hasStates === true && us.hasCounties === true && us.stateLabel === "State", { route: "/api/geo/countries" });
+
+    const mdStates = await api(null, "/api/geo/states?country=US&q=maryland");
+    const md = items(mdStates).find((x) => x.name === "Maryland");
+    step(c, "US states include Maryland (id US-MD)", mdStates.status === 200 && md?.id === "US-MD", { route: "/api/geo/states" });
+
+    const mdCounties = await api(null, "/api/geo/counties?country=US&state=US-MD");
+    const mdNames = items(mdCounties).map((x) => x.name);
+    step(c, "Maryland lists exactly its 24 county-equivalents — Prince George's County, Baltimore County AND Baltimore City all present",
+      mdCounties.status === 200 && mdNames.length === 24 && ["Prince George's County", "Baltimore County", "Baltimore City", "Anne Arundel County", "Montgomery County"].every((n) => mdNames.includes(n)),
+      { actual: `${mdNames.length} counties` });
+    step(c, "Maryland NEVER lists another state's counties (no Fairfax, no Philadelphia)", !mdNames.some((n) => /Fairfax|Philadelphia|Arlington/.test(n)));
+
+    const vaCounties = await api(null, "/api/geo/counties?country=US&state=US-VA&q=fairfax");
+    const fairfax = items(vaCounties).find((x) => x.name === "Fairfax County");
+    step(c, "Fairfax County lives under Virginia", !!fairfax, { record: fairfax?.id });
+
+    const pgCounty = items(mdCounties).find((x) => x.name === "Prince George's County");
+    const pgCities = await api(null, `/api/geo/cities?country=US&state=US-MD&county=${pgCounty?.id}`);
+    const pgAll: string[] = [];
+    for (const q of ["Accokeek", "Bowie", "College Park", "Greenbelt", "Hyattsville", "Laurel", "Upper Marlboro", "Suitland", "District Heights", "New Carrollton"]) {
+      const r = await api(null, `/api/geo/cities?country=US&state=US-MD&county=${pgCounty?.id}&q=${encodeURIComponent(q)}`);
+      if (items(r).some((x) => x.name === q)) pgAll.push(q);
+    }
+    step(c, "Prince George's County cities include Accokeek, Bowie, College Park, Greenbelt, Hyattsville, Laurel, Upper Marlboro, Suitland, District Heights, New Carrollton", pgAll.length === 10, { actual: `${pgAll.length}/10 found` });
+    step(c, "every city in the county list belongs to that county (spot check: first page)", pgCities.status === 200 && items(pgCities).length > 0 && items(pgCities).every((x) => x.countyId === pgCounty?.id));
+    const bethesda = await api(null, `/api/geo/cities?country=US&state=US-MD&county=${pgCounty?.id}&q=Bethesda`);
+    step(c, "a Montgomery County city (Bethesda) never appears under Prince George's", items(bethesda).length === 0);
+
+    // -------- lazy loading: never the whole dataset --------
+    const bigState = await api(null, "/api/geo/cities?country=US&state=US-CA");
+    step(c, "city lists are lazily filtered server-side (max 50 rows per response, never thousands)", items(bigState).length <= 50 && items(bigState).length > 0, { actual: `${items(bigState).length} rows for all of California` });
+
+    // -------- invalid combinations rejected at the API --------
+    const mismatch = await api(null, "/api/geo/cities?country=US&state=US-VA&county=" + pgCounty?.id);
+    step(c, "cities endpoint rejects a Maryland county under Virginia (400)", mismatch.status === 400, { actual: `HTTP ${mismatch.status}` });
+    const wrongCountry = await api(null, "/api/geo/states?country=XX");
+    step(c, "states endpoint rejects an unknown country with a clear 400 (error state has a message, not a crash)", wrongCountry.status === 400 && typeof wrongCountry.data.error === "string");
+    const emptySearch = await api(null, "/api/geo/countries?q=zzzzzzzz");
+    step(c, "empty search state: no matches returns 200 with an empty list (UI shows its empty state)", emptySearch.status === 200 && items(emptySearch).length === 0);
+
+    // -------- the real profile save path (throwaway account) --------
+    const su = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonbgeo.${runNonce()}@mavyn.dev`, password: "Geo-cascade-2026", handle: "tonbgeo", displayName: "Geo Tester" } });
+    tok.tonbgeo = (su.data as { sessionToken?: string }).sessionToken ?? "";
+    const geoProfile = async (): Promise<Record<string, string>> =>
+      (((await api("tonbgeo", "/api/auth/me")).data as { user?: { profile?: Record<string, string> } }).user?.profile ?? {});
+    const accokeek = items(await api(null, "/api/geo/cities?country=US&state=US-MD&county=" + pgCounty?.id + "&q=Accokeek"))[0];
+    const saveOk = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { displayName: "Geo Tester", location: { countryCode: "US", stateId: "US-MD", countyId: pgCounty?.id, cityId: accokeek?.id } } });
+    const me1 = { profile: await geoProfile() };
+    step(c, "profile saves United States → Maryland → Prince George's County → Accokeek and reads back canonical text + ids",
+      saveOk.status === 200 && me1.profile?.city === "Accokeek" && me1.profile?.county === "Prince George's County" && me1.profile?.state === "MD" && me1.profile?.country === "United States" && me1.profile?.cityId === accokeek?.id && me1.profile?.countyId === pgCounty?.id,
+      { actual: `${me1.profile?.city}, ${me1.profile?.county}, ${me1.profile?.state}, ${me1.profile?.country}` });
+
+    const fairfaxUnderMd = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "US", stateId: "US-MD", countyId: fairfax?.id } } });
+    step(c, "server REJECTS Maryland → Fairfax County (Virginia's county) with a 400 naming the real state", fairfaxUnderMd.status === 400 && /Virginia/.test(String(fairfaxUnderMd.data.error || "")), { actual: String(fairfaxUnderMd.data.error || `HTTP ${fairfaxUnderMd.status}`) });
+
+    const staleCity = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "US", stateId: "US-VA", cityId: accokeek?.id } } });
+    step(c, "server REJECTS a stale child: Virginia + Accokeek (the exact parent-change bug the cascade prevents)", staleCity.status === 400, { actual: String(staleCity.data.error || `HTTP ${staleCity.status}`) });
+    const me2 = { profile: await geoProfile() };
+    step(c, "the rejected save changed NOTHING — profile still Accokeek / Prince George's / MD", me2.profile?.city === "Accokeek" && me2.profile?.stateId === "US-MD");
+
+    const montgomery = items(mdCounties).find((x) => x.name === "Montgomery County");
+    const wrongCounty = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "US", stateId: "US-MD", countyId: montgomery?.id, cityId: accokeek?.id } } });
+    step(c, "server REJECTS a city under the wrong county (Montgomery County + Accokeek) naming the real county", wrongCounty.status === 400 && /Prince George/.test(String(wrongCounty.data.error || "")));
+
+    const bowie = items(await api(null, "/api/geo/cities?country=US&state=US-MD&q=Bowie"))[0];
+    const autoFill = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "US", stateId: "US-MD", cityId: bowie?.id } } });
+    const me3 = { profile: await geoProfile() };
+    step(c, "picking a city WITHOUT a county auto-fills the county from the data (Bowie → Prince George's County)", autoFill.status === 200 && me3.profile?.countyId === pgCounty?.id && me3.profile?.county === "Prince George's County");
+
+    // -------- countries beyond the United States --------
+    const caStates = await api(null, "/api/geo/states?country=CA&q=ontario");
+    const ontario = items(caStates).find((x) => x.name === "Ontario");
+    step(c, "Canada uses the 'Province' label and lists Ontario", (caStates.data as { stateLabel?: string }).stateLabel === "Province" && !!ontario);
+    const toronto = items(await api(null, "/api/geo/cities?country=CA&state=CA-ON&q=Toronto"))[0];
+    const caSave = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "CA", stateId: "CA-ON", cityId: toronto?.id } } });
+    const me4 = { profile: await geoProfile() };
+    step(c, "a Canadian chain saves: Canada → Ontario → Toronto (no fake County field — Canada has no county data)", caSave.status === 200 && me4.profile?.city === "Toronto" && me4.profile?.country === "Canada" && me4.profile?.countyId === "");
+    const caCounties = await api(null, "/api/geo/counties?country=CA&state=CA-ON");
+    step(c, "Canada's county level is empty server-side too (the UI hides the level entirely)", caCounties.status === 200 && items(caCounties).length === 0);
+    const jp = await api(null, "/api/geo/states?country=JP&q=tokyo");
+    step(c, "Japan uses the 'Prefecture' label", (jp.data as { stateLabel?: string }).stateLabel === "Prefecture" && items(jp).length > 0);
+    const prCities = await api(null, "/api/geo/cities?country=PR&q=San Juan");
+    step(c, "a country WITHOUT a state level (Puerto Rico) serves cities directly — the state level is skipped, not faked", items(prCities).some((x) => x.name === "San Juan"));
+
+    // -------- duplicate city names stay distinct --------
+    const spIL = items(await api(null, "/api/geo/cities?country=US&state=US-IL&q=Springfield")).find((x) => x.name === "Springfield");
+    const spMA = items(await api(null, "/api/geo/cities?country=US&state=US-MA&q=Springfield")).find((x) => x.name === "Springfield");
+    step(c, "duplicate city names are distinct records (Springfield IL ≠ Springfield MA)", !!spIL && !!spMA && spIL.id !== spMA.id);
+    const crossDup = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "US", stateId: "US-MA", cityId: spIL?.id } } });
+    step(c, "the Illinois Springfield cannot be saved under Massachusetts", crossDup.status === 400);
+
+    // -------- clearing --------
+    const clear = await api("tonbgeo", "/api/me/profile", { method: "PATCH", body: { location: { countryCode: "" }, city: "", county: "", state: "", country: "" } });
+    const me5 = { profile: await geoProfile() };
+    step(c, "clearing the country clears the whole chain (state, county, city and all ids)", clear.status === 200 && ["city", "county", "state", "country", "countryCode", "stateId", "countyId", "cityId"].every((k) => me5.profile?.[k] === ""));
+
+    // -------- existing data survived the migration --------
+    const devinProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, ids("devin").id)).get();
+    step(c, "existing profiles were normalized without data loss (devin still Baltimore / MD, now linked to real ids)",
+      devinProfile?.city === "Baltimore" && devinProfile?.state === "MD" && devinProfile?.countryCode === "US" && devinProfile?.countyId === "US-24510",
+      { actual: `${devinProfile?.city} → ${devinProfile?.cityId} / ${devinProfile?.countyId}` });
+
+    // -------- structural: the cascade reset really is in the component --------
+    const pickerSrc = fs.readFileSync(path.join(process.cwd(), "components", "LocationPicker.tsx"), "utf8");
+    step(c, "LocationPicker resets ALL children on country change and city+county on state change (source-verified)",
+      pickerSrc.includes("...EMPTY_GEO_LOCATION, // state, county, city all RESET") && (pickerSrc.match(/cityId: "", \/\/ RESET/g) || []).length >= 2);
+    const editSrc = fs.readFileSync(path.join(process.cwd(), "components", "profile", "EditProfile.tsx"), "utf8");
+    const oppSrc = fs.readFileSync(path.join(process.cwd(), "app", "opportunities", "new", "page.tsx"), "utf8");
+    const evtSrc = fs.readFileSync(path.join(process.cwd(), "app", "events", "create", "page.tsx"), "utf8");
+    step(c, "ONE location system everywhere: Edit Profile, opportunity posting and event creation all use LocationPicker (no free-text city/county/state inputs left)",
+      [editSrc, oppSrc, evtSrc].every((src) => src.includes("LocationPicker")) && !editSrc.includes('placeholder="County"') && !evtSrc.includes('placeholder="Baltimore, MD"'));
+    c.steps.push({
+      name: "keyboard navigation, mobile layout and dropdown visuals in a real browser",
+      status: "NOT_TESTED",
+      actual: "browser automation isn't available in this environment — interaction logic is verified structurally above; first task once real browser infrastructure exists",
+    });
   }
 
   /* ================= FULL SITE ROUTE SWEEP ================= */

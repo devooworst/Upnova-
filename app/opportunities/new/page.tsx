@@ -8,6 +8,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import LocationPicker, { EMPTY_GEO_LOCATION, GeoLocationValue } from "@/components/LocationPicker";
 import { sanitizeQuestions, applicationLength, QUESTION_TYPES, MAX_QUESTIONS, type AppQuestion } from "@/lib/applicationSpec";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,7 +25,8 @@ export default function NewOpportunityPage() {
   const [description, setDescription] = useState("");
   const [paid, setPaid] = useState(true);
   const [budget, setBudget] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(""); // legacy text fallback (QA fill / drafts)
+  const [geoLoc, setGeoLoc] = useState<GeoLocationValue>(EMPTY_GEO_LOCATION);
   const [remote, setRemote] = useState(false);
   const [eventDate, setEventDate] = useState("");
   const [applyBy, setApplyBy] = useState("");
@@ -41,7 +43,33 @@ export default function NewOpportunityPage() {
       if (typeof v.description === "string") setDescription(v.description);
       if (typeof v.paid === "boolean") setPaid(v.paid);
       if (v.budget != null) setBudget(String(v.budget));
-      if (typeof v.location === "string") setLocation(v.location);
+      if (typeof v.location === "string") {
+        setLocation(v.location);
+        // resolve "Bowie, MD" style text into REAL picker selections so
+        // the guided example uses the same validated path as a person
+        const m = v.location.match(/^(.+?),\s*([A-Za-z]{2})$/);
+        if (m) {
+          const stateId = `US-${m[2].toUpperCase()}`;
+          fetch(`/api/geo/cities?country=US&state=${stateId}&q=${encodeURIComponent(m[1])}`)
+            .then((r) => r.json())
+            .then((d) => {
+              const c = (d.items || []).find((x: { name: string }) => x.name.toLowerCase() === m[1].toLowerCase()) || d.items?.[0];
+              if (!c) return;
+              setGeoLoc({
+                ...EMPTY_GEO_LOCATION,
+                countryCode: "US",
+                countryName: "United States",
+                stateId,
+                stateName: m[2].toUpperCase(),
+                countyId: c.countyId || "",
+                countyName: c.countyName || "",
+                cityId: c.id,
+                cityName: c.name,
+              });
+            })
+            .catch(() => {});
+        }
+      }
       if (typeof v.remote === "boolean") setRemote(v.remote);
       if (typeof v.eventDate === "string") setEventDate(v.eventDate);
       if (typeof v.applyBy === "string") setApplyBy(v.applyBy);
@@ -153,7 +181,12 @@ export default function NewOpportunityPage() {
           interviewMode,
         },
         type: paid ? "gig" : "collab",
-        location,
+        // picker wins; free text only as legacy fallback. The server
+        // validates `geo` relationally and derives the display string.
+        location: geoLoc.cityId ? `${geoLoc.cityName}, ${geoLoc.stateId.split("-").pop() || geoLoc.stateName}` : location,
+        geo: geoLoc.countryCode
+          ? { countryCode: geoLoc.countryCode, stateId: geoLoc.stateId, countyId: geoLoc.countyId, cityId: geoLoc.cityId }
+          : undefined,
         remote,
         eventDate: eventDate || undefined,
         applyBy: applyBy || undefined,
@@ -214,13 +247,15 @@ export default function NewOpportunityPage() {
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location — e.g. Baltimore, MD" className={inputCls} disabled={remote} />
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input type="checkbox" checked={remote} onChange={(e) => setRemote(e.target.checked)} className="accent-lime-400" />
-            Remote
-          </label>
-        </div>
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input type="checkbox" checked={remote} onChange={(e) => setRemote(e.target.checked)} className="accent-lime-400" />
+          Remote — no on-site location
+        </label>
+        {!remote && (
+          <div data-guide="opportunity-location">
+            <LocationPicker value={geoLoc} onChange={setGeoLoc} showCounty={false} />
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">When (event/gig date, optional)</p>
