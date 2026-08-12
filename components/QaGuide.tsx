@@ -187,10 +187,14 @@ export default function QaGuide({
   // gone = the flow (wizard/panel) closed after being used. Either way
   // the checkpoint is the judge now — never a defect, never a restart.
   const verifying = targetGone && (acknowledged || (idx === steps.length - 1 && finalSeen.current));
+  // OPTIONAL target absent = expected situation (e.g. a conversation row
+  // before any thread exists) — show the instruction with its built-in
+  // alternative; never a spinner, never a defect
+  const optionalAbsent = targetGone && !verifying && !!step.optional;
   // gone briefly = still locating (hydration, data fetch) — neutral
-  const locating = targetGone && !acknowledged && !missingLong;
-  // gone for 5s+, never clicked = a genuine GUIDE DEFECT worth reporting
-  const missing = targetGone && !acknowledged && missingLong;
+  const locating = targetGone && !verifying && !step.optional && !missingLong;
+  // gone for 5s+, never clicked, not optional = a genuine GUIDE DEFECT
+  const missing = targetGone && !verifying && !step.optional && missingLong;
 
   // card placement: adjacent for pinpoint clicks, corner-docked for forms
   const below = rect ? rect.top + rect.height + 190 < window.innerHeight : false;
@@ -261,7 +265,20 @@ export default function QaGuide({
           {persona && <span className="ml-1.5 rounded border border-violet-400/40 bg-violet-400/10 px-1 py-px font-bold text-violet-300">You&apos;re testing as {persona.replace("TEST ", "")}</span>}
         </p>
 
-        {verifying ? (
+        {optionalAbsent ? (
+          <div className="mt-2">
+            {idx > 0 && (
+              <p className="flex items-center gap-1 font-mono text-[9px] font-semibold text-lime-300">
+                <Check className="h-3 w-3" /> Step {idx} complete
+              </p>
+            )}
+            <p className="mt-1.5 text-xs font-semibold leading-relaxed text-zinc-100">{step.text}</p>
+            <p className="mt-1.5 rounded-lg border border-line bg-black/30 px-2 py-1 text-[10px] leading-relaxed text-zinc-500">
+              &quot;{step.label}&quot; isn&apos;t in your list yet — that&apos;s normal before the first contact. Use the
+              alternative above; the moment it exists, the guide highlights it.
+            </p>
+          </div>
+        ) : verifying ? (
           /* ---- the control did its job and left — checkpoint's turn ---- */
           <div className="mt-2">
             <p className="flex items-center gap-1.5 text-xs font-bold text-lime-300">
@@ -289,17 +306,14 @@ export default function QaGuide({
                reportable so broken guidance never ships silently. ---- */
           <div className="mt-2">
             <p className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
-              <TriangleAlert className="h-3.5 w-3.5" /> Guide can&apos;t locate this control
+              <TriangleAlert className="h-3.5 w-3.5" /> Can&apos;t find &quot;{step.label}&quot; on this page
             </p>
             <p className="mt-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-rose-400/80">
-              Guide defect — not an application failure
+              Guide defect — Mavyn itself is fine and stays usable
             </p>
-            <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-zinc-400">
-              expected: <span className="text-zinc-200">{step.label}</span>
-              <br />
-              target: <span className="text-zinc-200">{step.target}</span>
-              <br />
-              current page: <span className="text-zinc-200">{pathname}</span>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-300">{step.text}</p>
+            <p className="mt-1.5 font-mono text-[9px] leading-relaxed text-zinc-600">
+              target: <span className="text-zinc-400">{step.target}</span> · page: <span className="text-zinc-400">{pathname}</span>
             </p>
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
               Possible causes: the state already moved past this step (the checkpoint clears this automatically when it

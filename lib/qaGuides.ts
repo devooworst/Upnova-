@@ -26,6 +26,10 @@ export interface GuideStep {
   text: string;
   /** interaction mode (defaults: intermediate steps behave as "click") */
   kind?: "click" | "form" | "visit";
+  /** the target may LEGITIMATELY not exist yet (e.g. a conversation row
+      before the first message) — the text explains the alternative, and
+      its absence is never reported as a guide defect */
+  optional?: boolean;
   /** when this step counts as reached (the guide advances):
       path = the URL now starts with this · visible = this anchor appeared.
       Omitted on the last step — the task's own checkpoint finishes it. */
@@ -50,8 +54,9 @@ const takeMeThere = (label: string, path: string): GuideStep => ({
 const openConvo = (handle: string, name: string): GuideStep => ({
   target: `conversation-${handle}`,
   label: name,
-  text: `Open the ${name} conversation (no conversation yet? press "Take me there" — it opens one)`,
+  text: `Open the ${name} conversation — click it in your list if it's there. First time talking? The row won't exist yet: press "Take me there" in the Test Session panel and the thread opens fresh.`,
   until: { visible: `chat-with-${handle}` },
+  optional: true,
 });
 const composer: GuideStep = { target: "chat-composer", label: "Send", text: "Type your message in the box at the bottom and send it", kind: "form" };
 const openProjectPanel = (untilAnchor: string): GuideStep => ({

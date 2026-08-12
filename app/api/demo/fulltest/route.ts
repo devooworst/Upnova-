@@ -138,6 +138,12 @@ export async function POST(req: NextRequest) {
       db.update(tables.users).set({ plan: "free", testerMode: "simulation" }).where(eq(tables.users.id, u.id)).run();
       db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, u.id)).run();
     }
+    // bookings the BUSINESS tester made AS A CLIENT (capacity/People
+    // probes) — previously leaked and accumulated across suite runs
+    for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all()) {
+      db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+      db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+    }
     // business test opportunity from prior runs
     for (const o of db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, biz.id)).all())
       if (o.title.startsWith("[TEST]")) {
@@ -1690,7 +1696,7 @@ export async function POST(req: NextRequest) {
 
     // 2) guides are PURE DATA — pointing only, no actions possible
     const flat = Object.values(QA_GUIDES).flat();
-    const badKeys = flat.filter((g) => Object.keys(g).some((k) => !["target", "label", "text", "until", "kind"].includes(k)));
+    const badKeys = flat.filter((g) => Object.keys(g).some((k) => !["target", "label", "text", "until", "kind", "optional"].includes(k)));
     const serializable = JSON.stringify(flat) === JSON.stringify(JSON.parse(JSON.stringify(flat)));
     step(c, "GUIDANCE · Show me where is declarative data only ({target,label,text,until,kind}) — it structurally CANNOT click, submit, fetch, or complete anything",
       badKeys.length === 0 && serializable && flat.every((g) => typeof g.text === "string" && typeof g.target === "string"),
@@ -1725,6 +1731,14 @@ export async function POST(req: NextRequest) {
     const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
     step(c, "GUIDANCE · every guide advance-condition is a real page prefix or a real anchor — the guide can always tell where the user is",
       badUntil.length === 0, { actual: badUntil.length ? JSON.stringify(badUntil[0]) : "all reach-conditions well-formed" });
+
+    // 4a2) MAY-NOT-EXIST-YET TARGETS — a conversation row only renders
+    // once a thread exists; on fresh scenarios it legitimately doesn't.
+    // Every such step must be marked optional (instruction + Take-me-there
+    // alternative, never a false GUIDE DEFECT for a row that can't exist)
+    const convoNotOptional = flat.filter((g) => g.target.startsWith("conversation-") && !(g as { optional?: boolean }).optional).length;
+    step(c, "GUIDANCE · every conversation-row target is marked optional — a thread that doesn't exist yet gives the Take-me-there alternative, never a false guide defect",
+      convoNotOptional === 0, { actual: convoNotOptional ? `${convoNotOptional} conversation steps not optional` : "all conversation steps optional" });
 
     // 4b) TARGET SYSTEM — every USER task has an AUTHORED guide whose
     // final step names a real control (or is an explicit page-visit).

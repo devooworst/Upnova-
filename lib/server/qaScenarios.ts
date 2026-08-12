@@ -1452,7 +1452,7 @@ const peopleScenario: QaScenario = {
       id: "hire-talent",
       role: "testbusiness",
       title: "Business hired the creator on a project",
-      instruction: "As TEST BUSINESS → open a project with Test Creator, run it to completion (offer → TEST pay → deliver → approve → complete). 'Do it for me' plays the whole chain through the real routes.",
+      instruction: "As TEST BUSINESS → Messages → open the Test Creator thread (Take me there opens it fresh) → Project button → Create draft → then run it to completion: Test Creator sends the offer → you accept + pay (TEST) → creator submits → you approve + release. This is the condensed version of the Business Hiring scenario — use 'Do it for me' to play the whole chain through the real routes, or run Business Hiring for the step-by-step.",
       expected: "A completed business→creator project with a released TEST payment.",
       href: () => "/messages?to=testcreator",
       verify: (ctx) => {
