@@ -109,11 +109,29 @@ async function optionRows(page, lvl) {
   );
 }
 async function clickOption(page, lvl, name) {
-  const idx = await page.$$eval(`${LVL(lvl)} [role=option] > span:first-child`, (els, n) => els.findIndex((e) => e.textContent === n), name);
-  if (idx < 0) throw new Error(`option "${name}" not in the ${lvl} list`);
-  const handles = await page.$$(`${LVL(lvl)} [role=option]`);
-  await handles[idx].click();
-  await new Promise((r) => setTimeout(r, 250));
+  // atomic: find the row by exact name AND fire its pointerdown in one
+  // evaluate — the list can re-render between calls on a fast server,
+  // which would make element handles stale
+  for (let i = 0; i < 6; i++) {
+    const ok = await page.evaluate(
+      (s, n) => {
+        const rows = Array.from(document.querySelectorAll(`${s} [role=option]`));
+        const row = rows.find((r) => r.querySelector("span")?.textContent === n);
+        if (!row) return false;
+        row.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+        row.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        return true;
+      },
+      LVL(lvl),
+      name
+    );
+    if (ok) {
+      await new Promise((r) => setTimeout(r, 250));
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  throw new Error(`option "${name}" not in the ${lvl} list`);
 }
 async function pickPath(page, lvl, q, name) {
   await openLevel(page, lvl);
