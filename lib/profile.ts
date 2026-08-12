@@ -231,9 +231,11 @@ function toApi(d: ProfileData) {
     state: d.state,
     county: d.county,
     country: d.country,
-    // structured location — the server validates the chain relationally
-    // and derives the canonical display text itself
-    location: { countryCode: d.countryCode, stateId: d.stateId, countyId: d.countyId, cityId: d.cityId },
+    // NOTE: the structured `location` id payload is intentionally NOT
+    // sent anymore — the UI is plain text fields again. The server's
+    // legacy path stores the text verbatim and clears stale geo ids
+    // only when the text actually changed. The geo system stays dormant
+    // for a future version.
     locationVisibility: d.locationVisibility,
     serviceArea: d.serviceArea,
     primaryRole: d.primaryRole,

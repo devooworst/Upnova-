@@ -1,4 +1,4 @@
-import { resolveLocation } from "@/lib/server/geo";
+import { resolveLocation, geoReady } from "@/lib/server/geo";
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { desc, eq } from "drizzle-orm";
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
         // and derives the display string itself
         location: (() => {
           const g = body.geo && typeof body.geo === "object" ? body.geo : null;
-          if (g && String(g.countryCode || "").trim()) {
+          if (g && String(g.countryCode || "").trim() && geoReady()) {
             const r = resolveLocation({ countryCode: g.countryCode, stateId: g.stateId, countyId: g.countyId, cityId: g.cityId });
             const tail = r.stateShort || r.stateName || r.countryName;
             return r.cityName ? `${r.cityName}${tail ? `, ${tail}` : ""}` : tail;

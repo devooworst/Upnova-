@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded } from "@/lib/server/auth";
 import { ownProfile } from "@/lib/server/serialize";
-import { resolveLocation } from "@/lib/server/geo";
+import { resolveLocation, geoReady } from "@/lib/server/geo";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,12 @@ export async function PATCH(req: NextRequest) {
     const wantsClear =
       !!loc && !String(loc.countryCode || "").trim() && ![body.city, body.county, body.state, body.country].some((t) => String(t || "").trim());
     let locationCols: Record<string, unknown>;
-    if (wantsStructured || wantsClear) {
+    // The structured path only runs when the geo reference DB is
+    // actually compiled on this instance. If it isn't, we fall through
+    // to the plain-text path — saving a profile must NEVER be blocked
+    // by a missing internal dataset, and "run npm run geo:build" is a
+    // developer note, not a user-facing error.
+    if ((wantsStructured && geoReady()) || wantsClear) {
       const r = resolveLocation(
         wantsClear ? {} : { countryCode: loc.countryCode, stateId: loc.stateId, countyId: loc.countyId, cityId: loc.cityId }
       ); // throws ApiError(400) on any invalid combination

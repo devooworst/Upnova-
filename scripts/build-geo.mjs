@@ -45,12 +45,28 @@ const t0 = Date.now();
 console.log("[geo] compiling", OUT);
 
 /* ------------------------- load source data ------------------------ */
-const { Country, State, City } = require("country-state-city");
-const usCounties = require("@nickgraffis/us-counties");
-const citiesTxt = readFileSync(
-  path.join(process.cwd(), "node_modules", "cities-1000-structured", "dist", "cities1000.txt"),
-  "utf8"
-);
+/* Missing data packages (e.g. a production install without dev deps)
+   must never break the seed chain — the geo system is OPTIONAL infra.
+   Without --if-missing (an explicit `npm run geo:build`) we still fail
+   loudly so a developer knows what to install. */
+let sources;
+try {
+  sources = {
+    csc: require("country-state-city"),
+    usCounties: require("@nickgraffis/us-counties"),
+    citiesTxt: readFileSync(path.join(process.cwd(), "node_modules", "cities-1000-structured", "dist", "cities1000.txt"), "utf8"),
+  };
+} catch (e) {
+  if (process.argv.includes("--if-missing")) {
+    console.log("[geo] data packages not installed — skipping the optional geo build (location entry works without it)");
+    process.exit(0);
+  }
+  console.error("[geo] missing data packages — run: npm install (devDependencies include the geo datasets)");
+  process.exit(1);
+}
+const { Country, State, City } = sources.csc;
+const usCounties = sources.usCounties;
+const citiesTxt = sources.citiesTxt;
 
 /* ---------------------- per-country level labels -------------------- */
 /* What the "state" level is CALLED in each country. Default:

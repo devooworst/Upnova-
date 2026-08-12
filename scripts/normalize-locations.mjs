@@ -20,7 +20,10 @@ const APP_DB = process.env.DATABASE_PATH || path.join(process.cwd(), "db", "mavy
 const GEO_DB = process.env.GEO_DATABASE_PATH || path.join(process.cwd(), "db", "geo.db");
 
 if (!existsSync(APP_DB)) { console.log("[normalize-locations] no app db — nothing to do"); process.exit(0); }
-if (!existsSync(GEO_DB)) { console.error("[normalize-locations] db/geo.db missing — run: npm run geo:build"); process.exit(1); }
+if (!existsSync(GEO_DB)) {
+  console.log("[normalize-locations] db/geo.db not compiled — skipping (optional; free-text locations work as-is). Build later with: npm run geo:build");
+  process.exit(0);
+}
 
 const app = new Database(APP_DB);
 const geo = new Database(GEO_DB, { readonly: true });

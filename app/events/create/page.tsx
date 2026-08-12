@@ -11,7 +11,6 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
-import LocationPicker, { EMPTY_GEO_LOCATION, GeoLocationValue } from "@/components/LocationPicker";
 import Link from "next/link";
 import { ArrowLeft, Check, PartyPopper, GraduationCap, Globe } from "lucide-react";
 import { useSession } from "@/lib/session";
@@ -31,9 +30,8 @@ export default function CreateEventPage() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("19:00");
   const [venue, setVenue] = useState("");
-  // one cascading location system (same picker as profiles) — the
-  // server validates the chain and derives the display strings
-  const [geoLoc, setGeoLoc] = useState<GeoLocationValue>(EMPTY_GEO_LOCATION);
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [age, setAge] = useState("all");
   const [paid, setPaid] = useState(false);
   const [price, setPrice] = useState(25);
@@ -77,11 +75,8 @@ export default function CreateEventPage() {
         category: cats.includes(category as never) ? category : "Other",
         startsAt: date && time ? `${date}T${time}` : "",
         venue,
-        // display strings derived from the picker; `geo` is the
-        // validated chain the server re-checks relationally
-        city: geoLoc.cityName,
-        state: geoLoc.stateName && /^[A-Z]{2,3}$/.test(geoLoc.stateId.split("-").pop() || "") ? geoLoc.stateId.split("-").pop() : geoLoc.stateName,
-        geo: { countryCode: geoLoc.countryCode, stateId: geoLoc.stateId, countyId: geoLoc.countyId, cityId: geoLoc.cityId },
+        city,
+        state,
         kind: effectiveReg,
         price: paid ? price : null,
         capacity: capacity || null,
@@ -208,9 +203,15 @@ export default function CreateEventPage() {
           <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder={scope === "campus" ? "Student Center Ballroom" : "The Assembly Room"} className={input} />
         </div>
         {scope === "public" && (
-          <div>
-            <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">WHERE — COUNTRY, STATE, CITY</label>
-            <LocationPicker value={geoLoc} onChange={setGeoLoc} showCounty={false} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">CITY</label>
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Baltimore, MD" aria-label="City" className={input} />
+            </div>
+            <div>
+              <label className="mb-1 block font-mono text-[10px] tracking-[0.14em] text-zinc-500">STATE</label>
+              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="MD" aria-label="State" className={input} />
+            </div>
           </div>
         )}
       </section>

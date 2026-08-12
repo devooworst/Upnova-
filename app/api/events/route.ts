@@ -1,4 +1,4 @@
-import { resolveLocation } from "@/lib/server/geo";
+import { resolveLocation, geoReady } from "@/lib/server/geo";
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { asc, eq, isNull } from "drizzle-orm";
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       // the server re-checks every parent/child relationship and derives
       // the display strings itself (invalid combos are rejected with 400)
       const geoIn = body.geo && typeof body.geo === "object" ? body.geo : null;
-      if (geoIn && String(geoIn.countryCode || "").trim()) {
+      if (geoIn && String(geoIn.countryCode || "").trim() && geoReady()) {
         const r = resolveLocation({
           countryCode: geoIn.countryCode,
           stateId: geoIn.stateId,
