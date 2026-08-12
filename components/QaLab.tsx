@@ -111,6 +111,10 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
     setScenarios((prev) =>
       prev ? prev.map((x) => (x.id === d.id ? { ...x, done: d.done, total: d.total, startedAt: d.startedAt, completed: d.completed } : x)) : prev
     );
+  /* GUIDE DEFECTS — reported from Show-me-where when a promised control
+     couldn't be located. A guide failure is not an app failure, but it
+     stays visible here until fixed or cleared — never silently ignored. */
+  const [guideDefects, setGuideDefects] = useState<{ task: string; expected: string; target: string; page: string; reportedAt: string }[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<ScenarioDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -126,6 +130,10 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
     setPersonas(d.personas);
     setScenarios(d.scenarios);
     setOverall(d.overall ?? null);
+    fetch("/api/qa/guide-defect", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { defects: [] }))
+      .then((g) => setGuideDefects(g.defects ?? []))
+      .catch(() => {});
   }, []);
 
   const loadDetail = useCallback(async (id: string) => {
@@ -288,6 +296,35 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
               Complete a stage and it stays complete — verified snapshots survive collapsing, refreshing, moving to the
               next stage, and redeploys. Only replaying a stage resets it.
+            </p>
+          </div>
+        )}
+
+        {/* ---- GUIDE DEFECTS — broken guidance never ships silently ---- */}
+        {guideDefects.length > 0 && (
+          <div className="rounded-xl border border-rose-400/40 bg-rose-400/5 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-rose-300">
+                Guide defects ({guideDefects.length}) — reported from Show-me-where
+              </p>
+              <button
+                onClick={async () => { await fetch("/api/qa/guide-defect", { method: "DELETE" }); setGuideDefects([]); }}
+                className="rounded-full border border-line px-2.5 py-0.5 text-[10px] font-bold text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+              >
+                Clear (fixed)
+              </button>
+            </div>
+            <div className="mt-2 space-y-1">
+              {guideDefects.map((d, i) => (
+                <p key={i} className="font-mono text-[10px] leading-relaxed text-zinc-400">
+                  <span className="text-rose-300">{d.task}</span> — expected <span className="text-zinc-200">{d.expected}</span> (target{" "}
+                  <span className="text-zinc-200">{d.target}</span>) on <span className="text-zinc-200">{d.page}</span>
+                </p>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+              A guide failure is a Test Center defect, not an application failure — the underlying checkpoints may still
+              pass. Fix the guidance (or the state), then clear the list.
             </p>
           </div>
         )}

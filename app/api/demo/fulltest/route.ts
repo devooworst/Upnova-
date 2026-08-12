@@ -1738,6 +1738,16 @@ export async function POST(req: NextRequest) {
       unauthored.length === 0 && pointless.length === 0 && badKind.length === 0,
       { actual: unauthored.length || pointless.length ? `unauthored:${unauthored.join(",")} targetless:${pointless.join(",")}` : `${QA_SCENARIOS.reduce((a, x) => a + x.steps.filter((y) => y.role !== "check").length, 0)} user tasks, all pointed` });
 
+    // 4c) GUIDE DEFECT LOG — a guide failure is NOT an app failure, but
+    // it must be reportable and visible until fixed, never silent
+    const rep = await asT(tokAdmin2, "/api/qa/guide-defect", { method: "POST", body: { task: "PROJECT · Test 10 of 12", expected: "Approve + release", target: "project-primary", page: "/projects/test" } });
+    const lst = await asT(tokAdmin2, "/api/qa/guide-defect");
+    const found = ((lst.data as any).defects ?? []).some((d: any) => d.target === "project-primary" && /Test 10/.test(d.task));
+    const clr = await asT(tokAdmin2, "/api/qa/guide-defect", { method: "DELETE" });
+    const empty = (((await asT(tokAdmin2, "/api/qa/guide-defect")).data as any).defects ?? []).length === 0;
+    step(c, "GUIDANCE · guide defects are reportable, listed in the Test Center until cleared, and clearable once fixed — broken guidance never ships silently",
+      rep.status === 200 && found && clr.status === 200 && empty, { actual: `report=${rep.status} listed=${found} cleared=${empty}` });
+
     // 5) GUIDED INPUTS — example data integrity: every example maps to a
     // real task, every field has a value, fills are pure data (populate,
     // never submit), and every form-heavy task HAS examples
@@ -1822,6 +1832,9 @@ export async function POST(req: NextRequest) {
       s1 === 403 && s2 === 403 && s3 === 403, { actual: `${s1}/${s2}/${s3}` });
     const s4 = await hit(tokNormal, "/api/qa/impersonate", { method: "POST", body: { handle: "testcustomer" } });
     step(c, "a normal account cannot impersonate a QA persona — persona switching is dev-only (403)", s4 === 403, { actual: String(s4) });
+    const s4b = await hit(tokNormal, "/api/qa/guide-defect");
+    const s4c = await hit(tokNormal, "/api/qa/guide-defect", { method: "POST", body: { task: "x", target: "y" } });
+    step(c, "the guide-defect log is operator-only too — a normal account can neither read nor write it (403)", s4b === 403 && s4c === 403, { actual: `${s4b}/${s4c}` });
     const s5 = await hit(tokNormal, "/api/demo/fulltest", { method: "POST" });
     const s6 = await hit(tokNormal, "/api/demo/reset", { method: "POST", body: { kind: "booking" } });
     const s7 = await hit(tokNormal, "/api/demo/clock", { method: "POST", body: { advanceMs: 1000 } });

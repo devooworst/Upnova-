@@ -51,3 +51,4 @@ db/upnova.dev.db
 db/upnova.dev.db-shm
 db/upnova.dev.db-wal
 public/uploads/
+db/.qa-guide-defects.json
