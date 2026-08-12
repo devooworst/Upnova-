@@ -391,7 +391,7 @@ export default function EditProfile() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl pb-28">
+    <div className="mx-auto max-w-5xl pb-48 lg:pb-28">
       {/* ------------------------------ header ------------------------------ */}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -1657,24 +1657,31 @@ export default function EditProfile() {
         </div>
       </div>
 
-      {/* ------------------------------ save bar ------------------------------ */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <p className="hidden text-xs text-zinc-500 sm:block">
+      {/* ------------------------------ save bar ------------------------------
+          MOBILE FIX: the bottom navigation is ALSO fixed at bottom-0 with
+          the same z-index and renders later in the DOM, so below lg it
+          painted directly on top of Cancel/Save — the controls existed
+          but were invisible and untappable. On touch layouts the bar now
+          docks immediately ABOVE the nav (its 3.5rem height + safe-area),
+          with full-width thumb-sized buttons. Desktop (lg+) is unchanged:
+          same bottom-0 bar, same compact right-aligned pair.            */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-line bg-ink/95 backdrop-blur lg:bottom-0 lg:bg-ink/90" data-guide="profile-save-bar">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2.5 lg:py-3">
+          <p className={`${dirty ? "block" : "hidden"} w-full text-center text-[11px] text-zinc-500 sm:block sm:w-auto sm:text-left sm:text-xs`}>
             {dirty
               ? usernameBlocked
                 ? "Fix your username before saving."
                 : "You have unsaved changes."
               : "All changes saved."}
           </p>
-          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-            <button onClick={() => router.push("/profile")} className="btn-ghost px-4 py-2 text-sm">
+          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
+            <button onClick={() => router.push("/profile")} className="btn-ghost h-11 flex-1 px-4 text-sm sm:flex-none lg:h-auto lg:py-2">
               Cancel
             </button>
             <button
               onClick={onSave}
               disabled={!canSave}
-              className="btn-lime px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-lime h-11 flex-1 px-5 text-sm disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none lg:h-auto lg:py-2"
             >
               Save Changes
             </button>
@@ -1684,7 +1691,7 @@ export default function EditProfile() {
 
       {/* ------------------------------- toast ------------------------------- */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full border border-lime-400/40 bg-card px-5 py-2.5 shadow-lg">
+        <div className="fixed bottom-44 left-1/2 z-50 -translate-x-1/2 rounded-full border border-lime-400/40 bg-card px-5 py-2.5 shadow-lg lg:bottom-20">
           <p className="flex items-center gap-2 text-sm font-semibold text-lime-300">
             <Check className="h-4 w-4" /> Changes saved
           </p>

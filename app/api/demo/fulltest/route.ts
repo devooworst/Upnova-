@@ -2318,7 +2318,7 @@ export async function POST(req: NextRequest) {
     const qaBar = read("components/QaPersonaBar.tsx");
 
     step(c, "bottom nav: persistent on phones AND tablets (lg:hidden), 5 items with the center + as primary create, 56px touch targets, safe-area padding",
-      nav.includes("lg:hidden") && nav.includes("min-h-[56px]") && nav.includes("safe-area-inset-bottom") && nav.includes("mobile-bottom-nav"));
+      nav.includes("lg:hidden") && nav.includes("h-16") && nav.includes("safe-area-inset-bottom") && nav.includes("mobile-bottom-nav"));
     step(c, "mobile header: compact single row — search is an expandable control (mobile-search-toggle), the permanent second row is gone",
       navbar.includes("mobile-search-toggle") && navbar.includes("mobileSearchOpen &&") && !navbar.includes('      {/* Mobile search — same live search */}'));
     step(c, "content clears the fixed chrome: single-row header padding (pt-20) and bottom-nav clearance until lg (pb-28 lg:pb-10)",
@@ -2334,6 +2334,9 @@ export async function POST(req: NextRequest) {
       communities.includes("useHydrated") && communities.includes("!hydrated || user === undefined") && !communities.includes("suppressHydrationWarning"));
     step(c, "the Test Center session pill sits ABOVE the bottom nav on touch layouts (bottom-20 → lg:bottom-3) — QA chrome never covers navigation",
       qaBar.includes("bottom-20") && qaBar.includes("lg:bottom-3"));
+    const editProfileSrc = read("components/profile/EditProfile.tsx");
+    step(c, "Edit Profile's Cancel/Save bar docks ABOVE the bottom nav on touch layouts (fixed 4rem offset matching the nav's deterministic height + safe area; bottom-0 again at lg) — the mobile-hidden-save-bar bug class is structurally locked out",
+      editProfileSrc.includes("bottom-[calc(4rem+env(safe-area-inset-bottom))]") && editProfileSrc.includes("lg:bottom-0") && nav.includes("h-16"));
 
     /* -------- REAL BROWSER LAYER: 6 viewport classes -------- */
     try {

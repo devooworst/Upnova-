@@ -33,7 +33,7 @@ export default function MobileNav() {
               <button
                 key={item.label}
                 onClick={() => (user ? openCreateModal() : promptJoin("create"))}
-                className="flex min-h-[56px] flex-col items-center justify-center gap-1 py-2"
+                className="flex h-16 flex-col items-center justify-center gap-1"
                 aria-label="Create"
                 data-guide="mobile-create"
               >
@@ -48,7 +48,7 @@ export default function MobileNav() {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+              className={`flex h-16 flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
                 active ? "text-zinc-50" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >

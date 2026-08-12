@@ -288,6 +288,121 @@ const ROUTES = ["/", "/discover", "/creator/devin", "/messages", "/opportunities
     await page.close();
   }
 
+  /* ============ 4b · EDIT-FORM SAVE BAR (the mobile bug class) ======= */
+  /* The save bar and the bottom nav are both fixed at the bottom edge —
+     this section permanently guards against the bar hiding UNDER the
+     nav again. Visibility at 320/375/390/430 + landscape, plus the full
+     save → persist → cancel → discard cycle at 390w.                  */
+  {
+    const widths = [[320, 690], [375, 812], [390, 844], [430, 932], [844, 390]];
+    const bad = [];
+    for (const [w, h] of widths) {
+      const page = await newPage(w, h);
+      await open(page, "/profile/edit");
+      await page.waitForSelector("[data-guide=profile-save-bar]", { timeout: 20000 });
+      const m = await page.evaluate(() => {
+        const bar = document.querySelector("[data-guide=profile-save-bar]");
+        const nav = document.querySelector("[data-guide=mobile-bottom-nav]");
+        const btns = Array.from(bar.querySelectorAll("button"));
+        const save = btns.find((b) => b.textContent?.includes("Save Changes"));
+        const cancel = btns.find((b) => b.textContent?.includes("Cancel"));
+        const rb = bar.getBoundingClientRect();
+        const rn = nav?.getBoundingClientRect();
+        const rs = save?.getBoundingClientRect();
+        const rc = cancel?.getBoundingClientRect();
+        const hit = (r) => { const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return bar.contains(el); };
+        return {
+          both: !!save && !!cancel,
+          onScreen: rs && rc && rs.bottom <= innerHeight && rc.bottom <= innerHeight && rs.top >= 0,
+          tappable: rs && rc && rs.height >= 44 && rc.height >= 44,
+          clearOfNav: !rn || rn.top >= rb.bottom - 1,
+          hittable: rs && rc && hit(rs) && hit(rc),
+        };
+      });
+      if (!(m.both && m.onScreen && m.tappable && m.clearOfNav && m.hittable)) bad.push(`${w}x${h}:${JSON.stringify(m)}`);
+      await page.close();
+    }
+    step("editforms", "Edit Profile save bar: Cancel + Save Changes visible, ≥44px, hit-testably ON TOP, and fully clear of the bottom nav at 320/375/390/430 + landscape 844×390", bad.length === 0, bad.join(" | ") || "all 5 viewports clean");
+
+    /* full functional cycle at 390w: change → save → persist → cancel → discard */
+    {
+      const page = await newPage(390, 844);
+      await open(page, "/profile/edit");
+      const BIO = "textarea";
+      await page.waitForSelector(BIO, { timeout: 20000 });
+      const stamp = `Mobile save check ${Date.now() % 100000}`;
+      for (let i = 0; i < 8; i++) {
+        await page.click(BIO).catch(() => {});
+        const focused = await page.evaluate(() => document.activeElement?.tagName === "TEXTAREA");
+        if (!focused) { await new Promise((r) => setTimeout(r, 400)); continue; }
+        await page.keyboard.down("Control"); await page.keyboard.press("KeyA"); await page.keyboard.up("Control");
+        await page.keyboard.press("Backspace");
+        await page.type(BIO, stamp, { delay: 8 });
+        await new Promise((r) => setTimeout(r, 150));
+        if ((await page.$eval(BIO, (e) => e.value)) === stamp) break;
+      }
+      const enabled = await page.evaluate(() => {
+        const b = Array.from(document.querySelectorAll("[data-guide=profile-save-bar] button")).find((x) => x.textContent?.includes("Save Changes"));
+        return b && !b.disabled;
+      });
+      await page.evaluate(() => {
+        Array.from(document.querySelectorAll("[data-guide=profile-save-bar] button")).find((x) => x.textContent?.includes("Save Changes"))?.click();
+      });
+      await new Promise((r) => setTimeout(r, 1500));
+      await open(page, "/profile/edit");
+      await page.waitForFunction((v) => document.querySelector("textarea")?.value === v, { timeout: 15000 }, stamp).catch(() => {});
+      const persisted = (await page.$eval(BIO, (e) => e.value)) === stamp;
+
+      // edit again, CANCEL — the unsaved change must be discarded
+      for (let i = 0; i < 8; i++) {
+        await page.click(BIO).catch(() => {});
+        if (await page.evaluate(() => document.activeElement?.tagName === "TEXTAREA")) break;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      await page.type(BIO, " DISCARD-ME", { delay: 8 });
+      await page.evaluate(() => {
+        Array.from(document.querySelectorAll("[data-guide=profile-save-bar] button")).find((x) => x.textContent?.trim() === "Cancel")?.click();
+      });
+      await page.waitForFunction(() => !location.pathname.includes("/profile/edit"), { timeout: 20000 }).catch(() => {});
+      const leftEdit = !(await page.evaluate(() => location.pathname)).includes("/profile/edit");
+      await open(page, "/profile/edit");
+      await page.waitForSelector(BIO, { timeout: 15000 });
+      await page.waitForFunction(() => (document.querySelector("textarea")?.value ?? "") !== "", { timeout: 15000 }).catch(() => {});
+      const discarded = (await page.$eval(BIO, (e) => e.value)) === stamp;
+      step("editforms", "full mobile cycle at 390w: change enables Save → save persists across reload → Cancel leaves the page and the unsaved edit is discarded", enabled && persisted && leftEdit && discarded, JSON.stringify({ enabled, persisted, leftEdit, discarded }));
+      await page.screenshot({ path: path.join(ART, "mobile-savebar-390.png") });
+      await page.close();
+    }
+
+    /* other editing forms: in-flow submit buttons must clear the nav */
+    {
+      const page = await newPage(320, 690);
+      const forms = [["/events/create", "Publish"], ["/opportunities/new", "Post"], ["/settings", "Save"]];
+      const blocked = [];
+      for (const [route, label] of forms) {
+        await open(page, route);
+        // the dismissible page-tour prompt may float over the corner — a
+        // user can close it, so the test closes it the same way
+        await page.evaluate(() => {
+          Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Not now")?.click();
+        });
+        await new Promise((r) => setTimeout(r, 400));
+        const ok = await page.evaluate((lbl) => {
+          const btns = Array.from(document.querySelectorAll("button")).filter((b) => b.textContent?.includes(lbl) && b.offsetParent);
+          if (btns.length === 0) return true; // form gated/absent for this account — nothing to cover
+          const b = btns[btns.length - 1];
+          b.scrollIntoView({ block: "center" });
+          const r = b.getBoundingClientRect();
+          const el = document.elementFromPoint(r.left + r.width / 2, Math.min(r.top + r.height / 2, innerHeight - 1));
+          return b.contains(el) || el === b;
+        }, label);
+        if (!ok) blocked.push(route);
+      }
+      step("editforms", "other editing forms at 320w (events, opportunities, settings): submit controls scroll clear of the nav and stay hittable", blocked.length === 0, blocked.join(", ") || "clean");
+      await page.close();
+    }
+  }
+
   /* ============ 5 · DESKTOP SAFETY (the hard requirement) =========== */
   for (const [w, h, label] of [[1024, 1366, "large tablet 1024w (lg boundary)"], [1440, 900, "desktop 1440w"]]) {
     const page = await newPage(w, h);
