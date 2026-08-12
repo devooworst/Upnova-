@@ -61,7 +61,7 @@ export default function SimulationPage() {
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [activity, setActivity] = useState<ActItem[] | null>(null);
   const [ftBusy, setFtBusy] = useState(false);
-  const [ft, setFt] = useState<{ summary: { passed: number; failed: number; blocked: number; notTested?: number; durationMs: number }; categories: { name: string; ok: boolean; passed?: number; failed?: number; blocked?: number; notTested?: number; steps: { name: string; status: string; expected?: string; actual?: string; route?: string; record?: string }[] }[] } | null>(null);
+  const [ft, setFt] = useState<{ summary: { passed: number; failed: number; blocked: number; notTested?: number; critical?: number; durationMs: number }; categories: { name: string; ok: boolean; passed?: number; failed?: number; blocked?: number; notTested?: number; steps: { name: string; status: string; expected?: string; actual?: string; route?: string; record?: string; severity?: string }[] }[] } | null>(null);
   const [ftOpen, setFtOpen] = useState<string | null>(null);
   const runFullTest = async () => {
     setFtBusy(true);
@@ -215,7 +215,7 @@ export default function SimulationPage() {
             </p>
           </div>
           <button onClick={runFullTest} disabled={ftBusy} className="btn-lime shrink-0 rounded-md px-5 py-2.5 text-sm disabled:opacity-50">
-            {ftBusy ? "Running…" : "Run Full Test"}
+            {ftBusy ? "Running…" : "Run Full Website QA"}
           </button>
         </div>
         {ft && (
@@ -225,6 +225,7 @@ export default function SimulationPage() {
               <span className={ft.summary.failed ? "text-red-300" : "text-zinc-600"}>FAILED {ft.summary.failed}</span>
               <span className={ft.summary.blocked ? "text-amber-300" : "text-zinc-600"}>BLOCKED {ft.summary.blocked}</span>
               <span className={ft.summary.notTested ? "text-zinc-300" : "text-zinc-600"}>NOT TESTED {ft.summary.notTested ?? 0}</span>
+              <span className={(ft.summary.critical ?? 0) > 0 ? "rounded bg-red-500/20 px-1.5 text-red-300" : "text-zinc-600"}>CRITICAL {ft.summary.critical ?? 0}</span>
               <span className="ml-auto font-mono text-[10px] font-medium text-zinc-500">{(ft.summary.durationMs / 1000).toFixed(1)}s</span>
             </p>
             <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
@@ -242,6 +243,9 @@ export default function SimulationPage() {
                         <li key={i} className="text-[11px]">
                           <span className={st.status === "PASSED" ? "text-lime-300" : st.status === "BLOCKED" ? "text-amber-300" : st.status === "NOT_TESTED" ? "text-zinc-500" : "text-red-300"}>{st.status === "PASSED" ? "✓" : st.status === "BLOCKED" ? "◌" : st.status === "NOT_TESTED" ? "·" : "✕"}</span>{" "}
                           <span className="text-zinc-300">{st.name}</span>
+                          {st.severity && st.status === "FAILED" && (
+                            <span className={`ml-1.5 rounded px-1 font-mono text-[8px] font-bold ${st.severity === "CRITICAL" ? "bg-red-500/20 text-red-300" : st.severity === "HIGH" ? "bg-amber-400/20 text-amber-300" : "bg-zinc-500/20 text-zinc-300"}`}>{st.severity}</span>
+                          )}
                           {st.status !== "PASSED" && (
                             <span className="block pl-4 text-[10px] text-zinc-500">
                               {st.expected && <>expected: <span className="text-zinc-300">{st.expected}</span> · </>}

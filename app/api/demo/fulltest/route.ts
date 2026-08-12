@@ -38,7 +38,7 @@ export const maxDuration = 120;
 /* reset deterministically at the start of every run.                  */
 /* ------------------------------------------------------------------ */
 
-type StepResult = { name: string; status: "PASSED" | "FAILED" | "BLOCKED" | "NOT_TESTED"; expected?: string; actual?: string; route?: string; record?: string };
+type StepResult = { name: string; status: "PASSED" | "FAILED" | "BLOCKED" | "NOT_TESTED"; expected?: string; actual?: string; route?: string; record?: string; severity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" };
 type Category = { name: string; steps: StepResult[] };
 
 /** every category the full test intends to run — anything that never
@@ -69,6 +69,7 @@ const PLANNED_CATEGORIES = [
   "PLAN LAB (REAL BOUNDARIES)",
   "QA LOOP REGRESSION",
   "QA SCENARIO WALKTHROUGHS",
+  "FULL SITE ROUTE SWEEP",
   "DATABASE INTEGRITY",
 ];
 
@@ -2060,6 +2061,102 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  /* ================= FULL SITE ROUTE SWEEP ================= */
+  /* Every major route, opened for real over HTTP as the RIGHT account
+     (and as a guest where public), with a hard timeout per page. Checks:
+     expected status · no server-rendered error markers · the page came
+     back at all. Severities: CRITICAL = 500/timeout/error-marker,
+     HIGH = unexpected 404/redirect-to-error. Payments stay TEST-only by
+     construction — no real rails exist in this environment. */
+  {
+    const c = cat("FULL SITE ROUTE SWEEP");
+    const sweepTok: Record<string, string> = {
+      customer: signDemoToken("testcustomer"),
+      creator: signDemoToken("testcreator"),
+      business: signDemoToken("testbusiness"),
+      admin: signDemoToken("devin"),
+    };
+    const fetchPage = async (pth: string, who: string | null): Promise<{ status: number; html: string; timedOut: boolean }> => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12_000);
+      try {
+        const res = await fetch(BASE + pth, {
+          redirect: "follow",
+          signal: ctrl.signal,
+          headers: who ? { Authorization: `Bearer ${sweepTok[who]}` } : {},
+        });
+        const html = await res.text();
+        return { status: res.status, html, timedOut: false };
+      } catch {
+        return { status: 0, html: "", timedOut: true };
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    const ERROR_MARKERS = ["Application error: a client-side exception", "Unhandled Runtime Error", "Internal Server Error", "__NEXT_ERROR__"];
+    const routes: { path: string; who: string | null; label: string }[] = [
+      { path: "/", who: null, label: "homepage (guest)" },
+      { path: "/opportunities", who: null, label: "opportunities (guest)" },
+      { path: "/services", who: null, label: "services (guest)" },
+      { path: "/plans", who: null, label: "plans (guest)" },
+      { path: "/login", who: null, label: "login" },
+      { path: "/signup", who: null, label: "signup" },
+      { path: "/creator/lena", who: null, label: "public profile (guest)" },
+      { path: "/", who: "customer", label: "home (customer)" },
+      { path: "/discover", who: "customer", label: "discover" },
+      { path: "/messages", who: "customer", label: "messages" },
+      { path: "/calendar", who: "customer", label: "bookings" },
+      { path: "/services", who: "creator", label: "services (creator)" },
+      { path: "/opportunities", who: "customer", label: "opportunities" },
+      { path: "/opportunities/new", who: "business", label: "post opportunity" },
+      { path: "/people", who: "business", label: "people" },
+      { path: "/people?tab=talent", who: "business", label: "people · talent tab" },
+      { path: "/hiring", who: "business", label: "hiring" },
+      { path: "/payments", who: "business", label: "payments" },
+      { path: "/activity", who: "customer", label: "activity" },
+      { path: "/notifications", who: "customer", label: "notifications" },
+      { path: "/settings", who: "customer", label: "settings" },
+      { path: "/profile/studio", who: "creator", label: "profile studio" },
+      { path: "/analytics", who: "creator", label: "analytics" },
+      { path: "/learn", who: "customer", label: "learn hub" },
+      { path: "/clients", who: "creator", label: "clients" },
+      { path: "/bookmarks", who: "customer", label: "bookmarks" },
+      { path: "/communities", who: "customer", label: "communities" },
+      { path: "/events", who: "customer", label: "events" },
+      { path: "/creator/testcreator", who: "customer", label: "QA creator profile" },
+      { path: "/simulation", who: "admin", label: "test center" },
+    ];
+    for (const r of routes) {
+      const res = await fetchPage(r.path, r.who);
+      const markers = ERROR_MARKERS.filter((m) => res.html.includes(m));
+      const ok = !res.timedOut && res.status === 200 && markers.length === 0;
+      const severity: StepResult["severity"] = res.timedOut || res.status >= 500 || markers.length ? "CRITICAL" : res.status === 404 ? "HIGH" : ok ? undefined : "HIGH";
+      step(c, `${r.label} — ${r.path}`, ok, {
+        route: r.path,
+        severity: ok ? undefined : severity,
+        actual: res.timedOut ? "TIMEOUT after 12s — marked and skipped, the sweep continued" : `HTTP ${res.status}${markers.length ? ` · error markers: ${markers.join("; ")}` : ""}`,
+      });
+    }
+
+    // DETECTOR SELF-CHECKS — prove the sweep catches what it claims to
+    const gone = await fetchPage("/definitely-not-a-route-qa-probe", "customer");
+    step(c, "detector self-check · a broken route IS caught (probe URL correctly classified as 404, severity HIGH)", gone.status === 404, {
+      severity: gone.status === 404 ? undefined : "CRITICAL",
+      actual: `probe returned HTTP ${gone.status}`,
+    });
+    const fakeErrorHtml = "<html><body><h2>Application error: a client-side exception has occurred</h2></body></html>";
+    step(c, "detector self-check · error markers ARE caught (synthetic crash page correctly flagged)", ERROR_MARKERS.some((m) => fakeErrorHtml.includes(m)), {
+      severity: "CRITICAL",
+    });
+
+    // honesty: what an HTTP sweep cannot see
+    c.steps.push({
+      name: "browser-level capture (console errors, live hydration mismatches, client-only exceptions) — requires a real browser runner (Playwright); this environment blocks browser downloads. SSR markers, statuses, and timeouts ARE checked above; hydration safety is regression-guarded by the deterministic-first-render pattern",
+      status: "NOT_TESTED",
+      actual: "run the sweep under Playwright on real infrastructure for the final browser layer",
+    });
+  }
+
   /* ================= DATABASE INTEGRITY ================= */
   {
     const c = cat("DATABASE INTEGRITY");
@@ -2097,6 +2194,7 @@ export async function POST(req: NextRequest) {
     failed: all.filter((s) => s.status === "FAILED").length,
     blocked: all.filter((s) => s.status === "BLOCKED").length,
     notTested: all.filter((s) => s.status === "NOT_TESTED").length,
+    critical: all.filter((s) => s.status === "FAILED" && s.severity === "CRITICAL").length,
     durationMs: Date.now() - started,
   };
   return Response.json({
