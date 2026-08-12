@@ -41,10 +41,12 @@ function findAnchor(name: string): HTMLElement | null {
 
 export default function QaGuide({
   taskLabel,
+  persona,
   steps,
   onExit,
 }: {
   taskLabel: string; // e.g. "PROJECT · TEST 1 OF 12"
+  persona?: string; // e.g. "TEST CUSTOMER" — who the tester must be
   steps: GuideStep[];
   onExit: () => void;
 }) {
@@ -241,7 +243,10 @@ export default function QaGuide({
             </button>
           </span>
         </div>
-        <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-zinc-600">{taskLabel}</p>
+        <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-zinc-600">
+          {taskLabel}
+          {persona && <span className="ml-1.5 rounded border border-violet-400/40 bg-violet-400/10 px-1 py-px font-bold text-violet-300">You&apos;re testing as {persona.replace("TEST ", "")}</span>}
+        </p>
 
         {verifying ? (
           /* ---- the control did its job and left — checkpoint's turn ---- */

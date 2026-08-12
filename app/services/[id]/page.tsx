@@ -270,7 +270,7 @@ export default function ServicePage() {
             </p>
           ) : (
             <>
-              <button onClick={book} className="btn-lime w-full justify-center py-2.5 text-sm">
+              <button onClick={book} data-guide={svc.owner?.handle === "testcreator" || svc.owner?.handle === "testbusiness" ? `qa-service-book-${svc.owner.handle}` : undefined} className="btn-lime w-full justify-center py-2.5 text-sm">
                 {svc.fulfillment === "appointment" ? <CalendarDays className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
                 {svc.fulfillment === "appointment" && pickedDate
                   ? `Book ${new Date(pickedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — pick a time`

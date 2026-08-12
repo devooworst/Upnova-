@@ -72,7 +72,7 @@ export const QA_GUIDES: Record<string, GuideStep[]> = {
   "booking:reply": [nav("messages", "Messages", "/messages"), openConvo("testcustomer", "Test Customer"), { ...composer, text: "Type a reply in the box at the bottom and send it", label: "Reply" }],
   "booking:book": [
     nav("services", "Services", "/services"),
-    { target: "qa-service-book-testcreator", label: "QA Test Session", text: 'Click Book on the "QA Test Session" service by Test Creator', until: { visible: "book-wizard" } },
+    { target: "qa-service-book-testcreator", label: "QA Test Session", text: 'Find "QA Test Session" by Test Creator and click the Book button — highlighted here (works from the list card or the service page)', until: { visible: "book-wizard" } },
     { target: "book-wizard", label: "Pick a time", text: "Pick any weekday date, choose an available time, and confirm the booking", kind: "form" },
   ],
   "booking:accept": [
@@ -230,7 +230,7 @@ export const QA_GUIDES: Record<string, GuideStep[]> = {
   "people:contact": [nav("messages", "Messages", "/messages"), openConvo("testcustomer", "Test Customer"), composer],
   "people:client-books": [
     nav("services", "Services", "/services"),
-    { target: "qa-service-book-testbusiness", label: "QA Studio Rental", text: 'Click Book on the "QA Studio Rental" service by Test Business', until: { visible: "book-wizard" } },
+    { target: "qa-service-book-testbusiness", label: "QA Studio Rental", text: 'Find "QA Studio Rental" by Test Business — pick an available date if you like, then click the Book button highlighted here (works from the list card or the service page)', until: { visible: "book-wizard" } },
     { target: "book-wizard", label: "Pick a time", text: "Pick a weekday date and an available time, then confirm — pay (TEST) after the business accepts", kind: "form" },
   ],
   "people:client-complete": [

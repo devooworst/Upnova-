@@ -193,7 +193,7 @@ export default function QaPersonaBar() {
   return (
     <>
       {guideSteps && nextTask && (
-        <QaGuide taskLabel={`${nextTask.scenario} · Test ${nextTask.idx} of ${nextTask.total}`} steps={guideSteps} onExit={stopGuide} />
+        <QaGuide taskLabel={`${nextTask.scenario} · Test ${nextTask.idx} of ${nextTask.total}`} persona={QA_LABEL[user.handle] ?? user.handle} steps={guideSteps} onExit={stopGuide} />
       )}
       {!panelOpen ? (
         /* ---- COLLAPSED (default): a tiny corner pill — the whole page

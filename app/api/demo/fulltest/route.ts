@@ -1710,9 +1710,15 @@ export async function POST(req: NextRequest) {
       (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !t.startsWith("plan-") && !t.startsWith("qa-service-book-") && !t.startsWith("account-state-") && !src.includes(`"${t}"`)
     );
     const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-", "data-guide={`plan-", "data-guide={`qa-service-book-", "data-guide={`account-state-"];
+    // BOTH booking surfaces must carry the service anchor — the task's
+    // href lands on the DETAIL page while browsing finds the LIST card;
+    // the guide must locate the control wherever the tester actually is
+    const svcList = fs.readFileSync(path.join(process.cwd(), "app/services/page.tsx"), "utf8");
+    const svcDetail = fs.readFileSync(path.join(process.cwd(), "app/services/[id]/page.tsx"), "utf8");
+    const bothSurfaces = svcList.includes("qa-service-book-") && svcDetail.includes("qa-service-book-");
     const missingDynamic = dynamicPatterns.filter((pat) => !src.includes(pat));
-    step(c, "GUIDANCE · every spotlight target is a real data-guide/data-tour anchor present in the interface source — instructions and visuals tell the same story",
-      missingAnchor.length === 0 && missingDynamic.length === 0, { actual: missingAnchor.length || missingDynamic.length ? `MISSING: ${[...missingAnchor, ...missingDynamic].join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified (+${dynamicPatterns.length} dynamic families)` });
+    step(c, "GUIDANCE · every spotlight target is a real data-guide/data-tour anchor present in the interface source — and the booking anchor exists on BOTH surfaces a tester can land on (list card AND service page)",
+      missingAnchor.length === 0 && missingDynamic.length === 0 && bothSurfaces, { actual: !bothSurfaces ? "qa-service-book- missing on a services surface" : missingAnchor.length || missingDynamic.length ? `MISSING: ${[...missingAnchor, ...missingDynamic].join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified (+${dynamicPatterns.length} dynamic families, both booking surfaces)` });
 
     // 4) location-aware guides: reach-conditions are well-formed (path prefix or anchor)
     const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
