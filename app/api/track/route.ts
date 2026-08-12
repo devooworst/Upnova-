@@ -17,7 +17,10 @@ export const dynamic = "force-dynamic";
  * follow, report) are recorded server-side by their own routes.
  */
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  // beacons fired during page unload can arrive with an EMPTY body —
+  // that's normal fire-and-forget analytics, not an error worth a 500
+  const body = await req.json().catch(() => null);
+  if (!body) return Response.json({ ok: true, recorded: 0 });
   return guarded(() => {
     const user = requireUser();
     const events = Array.isArray(body.events) ? body.events.slice(0, 25) : [body];
