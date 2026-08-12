@@ -2222,7 +2222,9 @@ export async function POST(req: NextRequest) {
     const rachelOpens = await api("rachel", `/api/live/${campusSid}`);
     step(c, "campus filtering: a verified member sees it under Campus; an unverified user gets the honest notice, an empty list AND a 403 on the direct link", (devinCampus.data as { items?: { id: string }[] }).items?.some((x) => x.id === campusSid) === true && ((rachelCampus.data as { items?: unknown[] }).items ?? []).length === 0 && typeof (rachelCampus.data as { note?: string }).note === "string" && rachelOpens.status === 403);
     const fakeClaim = await api("tonblive", "/api/live", { method: "POST", body: { title: "[TESTLIVE] fake campus", audience: "campus" } });
-    const wrongCampus = await api("imani", "/api/live", { method: "POST", body: { title: "[TESTLIVE] wrong campus", audience: "campus", campusId: "not-my-campus" } });
+    // devin is ALSO campus-verified and not currently live — the claim
+    // check must fire, not the one-live-at-a-time guard (imani is live)
+    const wrongCampus = await api("devin", "/api/live", { method: "POST", body: { title: "[TESTLIVE] wrong campus", audience: "campus", campusId: "not-my-campus" } });
     step(c, "unauthorized campus claims are impossible: unverified user → 403; a verified user naming a DIFFERENT campus → 403", fakeClaim.status === 403 && wrongCampus.status === 403,
       { actual: `unverified=${fakeClaim.status} (${String((fakeClaim.data as { error?: string }).error || "").slice(0, 60)}) · wrong-campus=${wrongCampus.status}` });
     await api("imani", `/api/live/${campusSid}`, { method: "PATCH", body: { action: "end" } });
