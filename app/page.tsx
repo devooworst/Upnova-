@@ -81,15 +81,10 @@ export default function Home() {
        below xl the rail drops away and the feed centers alone. */
     <div className="mx-auto flex w-full max-w-[984px] justify-center gap-6 2xl:max-w-[1040px]">
       <div className="w-full min-w-0 max-w-[640px] flex-1 space-y-4 2xl:max-w-[688px]">
-        {/* masthead — Home, always */}
+        {/* masthead — Home, always. No location/date banner: the page
+            opens with the title and the feed, content-first. */}
         <header className="pt-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-            {user?.profile.city
-              ? `${user.profile.city}, ${user.profile.state}`
-              : "Mavyn"}{" "}
-            · {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user === null ? "Discover" : "Home"}</h1>
 
             {/* feed scope — members only: scopes rank around YOUR location */}

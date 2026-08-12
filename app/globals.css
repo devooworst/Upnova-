@@ -106,7 +106,7 @@ body {
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-3 py-1 text-xs font-medium text-zinc-300 transition-colors;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-3 py-1 text-xs font-medium text-zinc-300 transition active:scale-[0.97];
   }
 
   .chip-active {
@@ -127,7 +127,7 @@ body {
   }
 
   .icon-btn {
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-400 transition hover:bg-card-raised hover:text-zinc-100;
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-400 transition hover:bg-card-raised hover:text-zinc-100 active:scale-95;
   }
 
   .input-dark {
@@ -183,7 +183,9 @@ body {
    events = ticket with date block                   */
 
 .card-money {
-  @apply rounded-md border border-line border-t-2 border-t-lime-400/70 bg-card shadow-card;
+  /* the lime top edge stays as the money signature — as an accent line,
+     not a glow wall when twelve cards share a grid */
+  @apply rounded-xl border border-line border-t-2 border-t-lime-400/35 bg-card shadow-card transition-colors hover:border-t-lime-400/60;
 }
 
 .card-people {

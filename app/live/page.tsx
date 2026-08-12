@@ -136,19 +136,19 @@ export default function LivePage() {
           <button
             onClick={() => setShowGoLive(true)}
             data-guide="live-golive-open"
-            className="flex items-center gap-2 rounded-full bg-red-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-400"
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-red-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-400 active:scale-[0.98]"
           >
             <Radio size={15} /> Go Live
           </button>
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-1.5" data-guide="live-filters">
+      <div className="no-scrollbar -mx-4 mt-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" data-guide="live-filters">
         {FILTERS.map(([v, l]) => (
           <button
             key={v}
             onClick={() => setFilter(v)}
-            className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+            className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition active:scale-[0.97] ${
               filter === v ? "border-red-400/50 bg-red-400/10 text-red-300" : "border-line text-zinc-400 hover:border-zinc-600"
             }`}
           >
@@ -156,12 +156,12 @@ export default function LivePage() {
           </button>
         ))}
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {CATS.map(([v, l]) => (
           <button
             key={v}
             onClick={() => setCat(v)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+            className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] transition active:scale-[0.97] ${
               cat === v ? "border-zinc-500 bg-card-raised text-zinc-200" : "border-line-soft text-zinc-500 hover:border-zinc-600"
             }`}
           >
