@@ -1913,7 +1913,209 @@ const plansScenario: QaScenario = {
   ],
 };
 
-export const QA_SCENARIOS: QaScenario[] = [bookingScenario, projectScenario, opportunityScenario, hiringScenario, peopleScenario, plansScenario];
+
+/* ============================ SCENARIO G ============================ */
+/* Mavyn Live — the full live lifecycle, both sides played by the      */
+/* tester: the creator goes live, the customer joins/chats/reacts,     */
+/* the creator pins, invites a guest, ends, and the replay saves.      */
+
+function qaLiveStream(ctx: QaContext) {
+  return db
+    .select()
+    .from(tables.liveStreams)
+    .where(eq(tables.liveStreams.hostId, ctx.creator))
+    .all()
+    .filter((l) => after(l.createdAt, ctx.startedAt))
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .pop();
+}
+
+const liveScenario: QaScenario = {
+  id: "live",
+  title: "Live — go live, watch, chat, react, pin, guest, end, replay",
+  personas: ["testcreator", "testcustomer"],
+  description:
+    "Play the creator: open Live and go live with a title, category and audience. Switch to the customer: open the stream, chat and react in real time. Back to the creator: pin the customer's message, invite them on stage, then end the stream and confirm the replay saved. Every checkpoint is verified in the database.",
+  steps: [
+    {
+      id: "golive",
+      role: "testcreator",
+      title: "Creator went live",
+      instruction: "As TEST CREATOR, open Live → Go Live. Title it, pick a category and audience (Everyone), then hit GO LIVE.",
+      expected: "A live_streams row with status live, created after this test became active.",
+      href: () => "/live",
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no live stream from the creator yet" };
+        if (!inTask(l.createdAt, ctx)) return { done: false, actual: `a stream ${REDO}`, record: l.id };
+        return { done: l.status === "live" || l.status === "ended", actual: `stream "${l.title}" · status=${l.status}`, record: l.id };
+      },
+      perform: async (_ctx, api) => {
+        await api("testcreator", "/api/live", { method: "POST", body: { title: "[QA] Live from the Test Center", category: "music", audience: "everyone" } });
+      },
+      ready: (ctx) => {
+        const active = db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, ctx.creator)).all()
+          .filter((l) => l.status === "live" && !inTask(l.createdAt, ctx));
+        return active.length
+          ? { ok: false, why: "The creator is already live from BEFORE this task — Mavyn allows one live at a time, so the Go Live button would be rejected. Restore ends the stale stream." }
+          : { ok: true, why: "" };
+      },
+      repair: (ctx) => {
+        let n = 0;
+        for (const l of db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, ctx.creator)).all())
+          if (l.status === "live" && !inTask(l.createdAt, ctx)) {
+            db.update(tables.liveStreams).set({ status: "ended", endedAt: new Date(), replayStatus: "none" }).where(eq(tables.liveStreams.id, l.id)).run();
+            n++;
+          }
+        return `ended ${n} stale live stream(s) — Go Live is available again`;
+      },
+    },
+    {
+      id: "discover",
+      role: "check",
+      title: "The stream shows in Live Now",
+      instruction: "Automatic cross-check.",
+      expected: "The stream is live and discoverable (status=live ⇒ it serves in /live and the For You LIVE NOW rail).",
+      href: () => "/live",
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        return { done: l.status === "live", actual: l.status === "live" ? "live — visible in Live Now discovery" : `status=${l.status}`, record: l.id };
+      },
+    },
+    {
+      id: "watch",
+      role: "testcustomer",
+      title: "Customer joined the live",
+      instruction: "As TEST CUSTOMER, open Live → the creator's stream. Just opening it counts you in (presence heartbeat).",
+      expected: "A live_viewers presence row for the customer on this stream.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        const v = db.select().from(tables.liveViewers).where(eq(tables.liveViewers.streamId, l.id)).all().find((x) => x.userId === ctx.customer);
+        return { done: !!v, actual: v ? "customer is in the room" : "the customer hasn't opened the stream yet", record: l.id };
+      },
+      perform: async (ctx, api) => {
+        const l = qaLiveStream(ctx);
+        if (l) await api("testcustomer", `/api/live/${l.id}/presence`, { method: "POST", body: {} });
+      },
+    },
+    {
+      id: "chat",
+      role: "testcustomer",
+      title: "Customer chatted in real time",
+      instruction: "As TEST CUSTOMER, send a message in the live chat.",
+      expected: "A live_messages row from the customer, created after this task became active.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        const msgs = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, l.id)).all()
+          .filter((m) => m.userId === ctx.customer && !m.deleted);
+        const fresh = msgs.find((m) => inTask(m.createdAt, ctx));
+        return { done: !!fresh, actual: fresh ? `"${fresh.body.slice(0, 40)}"` : msgs.length ? `a message ${REDO}` : "no chat message from the customer yet", record: fresh?.id };
+      },
+      perform: async (ctx, api) => {
+        const l = qaLiveStream(ctx);
+        if (l) await api("testcustomer", `/api/live/${l.id}/chat`, { method: "POST", body: { body: `[QA] This is real-time chat ${Date.now() % 1000}` } });
+      },
+    },
+    {
+      id: "react",
+      role: "testcustomer",
+      title: "Customer reacted",
+      instruction: "As TEST CUSTOMER, tap any reaction under the stage.",
+      expected: "A live_reactions row from the customer after this task became active.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        const rs = db.select().from(tables.liveReactions).where(eq(tables.liveReactions.streamId, l.id)).all().filter((r) => r.userId === ctx.customer);
+        const fresh = rs.find((r) => inTask(r.createdAt, ctx));
+        return { done: !!fresh, actual: fresh ? `reaction: ${fresh.type}` : rs.length ? `a reaction ${REDO}` : "no reaction from the customer yet", record: fresh?.id };
+      },
+      perform: async (ctx, api) => {
+        const l = qaLiveStream(ctx);
+        if (l) await api("testcustomer", `/api/live/${l.id}/react`, { method: "POST", body: { type: "fire" } });
+      },
+    },
+    {
+      id: "pin",
+      role: "testcreator",
+      title: "Creator pinned the customer's message",
+      instruction: "As TEST CREATOR, hover the customer's chat message and pin it.",
+      expected: "The stream's pinned message is one of the customer's messages.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        if (!l.pinnedMessageId) return { done: false, actual: "nothing pinned yet" };
+        const m = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.id, l.pinnedMessageId)).get();
+        return { done: !!m && m.userId === ctx.customer, actual: m ? `pinned: "${m.body.slice(0, 40)}"` : "pinned message missing", record: m?.id };
+      },
+      perform: async (ctx, api) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return;
+        const m = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, l.id)).all()
+          .filter((x) => x.userId === ctx.customer && !x.deleted).pop();
+        if (m) await api("testcreator", `/api/live/${l.id}`, { method: "PATCH", body: { action: "pin", messageId: m.id } });
+      },
+    },
+    {
+      id: "guest",
+      role: "testcreator",
+      title: "Creator invited the customer on stage",
+      instruction: "As TEST CREATOR, use your live controls → Invite a guest → @testcustomer.",
+      expected: "A live_guests row (invited or active) for the customer.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        const g = db.select().from(tables.liveGuests).where(eq(tables.liveGuests.streamId, l.id)).all()
+          .filter((x) => x.userId === ctx.customer && ["invited", "active"].includes(x.status)).pop();
+        const fresh = g && inTask(g.invitedAt, ctx);
+        return { done: !!fresh, actual: g ? (fresh ? `guest status: ${g.status}` : `an invite ${REDO}`) : "no guest invite yet", record: g?.id };
+      },
+      perform: async (ctx, api) => {
+        const l = qaLiveStream(ctx);
+        if (l) await api("testcreator", `/api/live/${l.id}/guests`, { method: "POST", body: { action: "invite", handle: "testcustomer" } });
+      },
+    },
+    {
+      id: "end",
+      role: "testcreator",
+      title: "Creator ended the stream",
+      instruction: "As TEST CREATOR, hit End stream in your live controls.",
+      expected: "The stream's status is ended with an endedAt timestamp.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        return { done: l.status === "ended" && !!l.endedAt, actual: `status=${l.status}`, record: l.id };
+      },
+      perform: async (ctx, api) => {
+        const l = qaLiveStream(ctx);
+        if (l && l.status === "live") await api("testcreator", `/api/live/${l.id}`, { method: "PATCH", body: { action: "end" } });
+      },
+    },
+    {
+      id: "replay",
+      role: "check",
+      title: "The replay saved",
+      instruction: "Automatic cross-check.",
+      expected: "replay_status=saved (Save replay was on), so the replay serves on the profile and in Live → Replays.",
+      href: (ctx) => { const l = qaLiveStream(ctx); return l ? `/live/${l.id}` : "/live"; },
+      verify: (ctx) => {
+        const l = qaLiveStream(ctx);
+        if (!l) return { done: false, actual: "no stream yet" };
+        return { done: l.status === "ended" && l.replayStatus === "saved", actual: `replay_status=${l.replayStatus}`, record: l.id };
+      },
+    },
+  ],
+};
+
+export const QA_SCENARIOS: QaScenario[] = [bookingScenario, projectScenario, opportunityScenario, hiringScenario, peopleScenario, plansScenario, liveScenario];
 
 export function getScenario(id: string) {
   return QA_SCENARIOS.find((s) => s.id === id) ?? null;

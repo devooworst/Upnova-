@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import GoLiveFlow from "@/components/GoLiveFlow";
 import Link from "next/link";
 import {
   Tag,
@@ -474,40 +475,9 @@ export default function CreateModal() {
 
         {/* ================= LIVE — "I'm going live right now" ================= */}
         {kind === "Live" && !published && (
-          <div className="space-y-4">
-            <input value={liveTitle} onChange={(e) => setLiveTitle(e.target.value)} placeholder="Making a beat from scratch 🎹" className="input-dark" autoFocus />
-            <div>
-              <p className={label}>Category</p>
-              <Chips
-                options={["Music", "Gaming", "Fashion", "Fitness", "Education", "Behind the Scenes", "Conversation", "Other"]}
-                value={liveCategory}
-                onChange={setLiveCategory}
-                accent="white"
-              />
-            </div>
-            <div>
-              <p className={label}>Who can watch?</p>
-              <Chips options={["Everyone", "Followers", "Community", "Nearby", "Campus"]} value={audience} onChange={setAudience} />
-            </div>
-            <div className="flex gap-2">
-              <label className="flex flex-1 cursor-pointer items-center justify-between rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">
-                Enable chat
-                <input type="checkbox" checked={liveChat} onChange={(e) => setLiveChat(e.target.checked)} className="accent-red-400" />
-              </label>
-              <label className="flex flex-1 cursor-pointer items-center justify-between rounded-md border border-line bg-card-raised px-3 py-2 text-xs text-zinc-300">
-                Allow reactions
-                <input type="checkbox" checked={liveReactions} onChange={(e) => setLiveReactions(e.target.checked)} className="accent-red-400" />
-              </label>
-            </div>
-            <p className="text-[10px] text-zinc-600">Gifts/tips come later with creator monetization.</p>
-            <button
-              onClick={() => setPublished(true)}
-              disabled={!liveTitle.trim()}
-              className={`w-full rounded-full py-2.5 text-sm font-bold transition ${liveTitle.trim() ? "bg-red-500 text-white hover:bg-red-400" : "cursor-not-allowed bg-card-raised text-zinc-600"}`}
-            >
-Go Live
-            </button>
-          </div>
+          /* the REAL Go Live flow — one shared component with the Live
+             page; creates an actual stream and routes to /live/[id] */
+          <GoLiveFlow onClose={() => setOpen(false)} />
         )}
       </div>
     </div>

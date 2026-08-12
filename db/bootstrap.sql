@@ -395,6 +395,90 @@ CREATE TABLE IF NOT EXISTS `likes` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
+CREATE TABLE IF NOT EXISTS `live_guests` (
+	`id` text PRIMARY KEY NOT NULL,
+	`stream_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`status` text DEFAULT 'invited' NOT NULL,
+	`invited_at` integer NOT NULL,
+	`joined_at` integer,
+	FOREIGN KEY (`stream_id`) REFERENCES `live_streams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `live_messages` (
+	`id` text PRIMARY KEY NOT NULL,
+	`stream_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`body` text NOT NULL,
+	`kind` text DEFAULT 'chat' NOT NULL,
+	`deleted` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`stream_id`) REFERENCES `live_streams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `live_moderators` (
+	`stream_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`added_at` integer NOT NULL,
+	PRIMARY KEY(`stream_id`, `user_id`),
+	FOREIGN KEY (`stream_id`) REFERENCES `live_streams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `live_reactions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`stream_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`type` text DEFAULT 'heart' NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`stream_id`) REFERENCES `live_streams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `live_restrictions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`stream_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`kind` text NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`stream_id`) REFERENCES `live_streams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE TABLE IF NOT EXISTS `live_streams` (
+	`id` text PRIMARY KEY NOT NULL,
+	`host_id` text NOT NULL,
+	`title` text NOT NULL,
+	`category` text DEFAULT 'other' NOT NULL,
+	`audience` text DEFAULT 'everyone' NOT NULL,
+	`campus_id` text,
+	`community_id` text,
+	`status` text DEFAULT 'live' NOT NULL,
+	`chat_enabled` integer DEFAULT true NOT NULL,
+	`reactions_enabled` integer DEFAULT true NOT NULL,
+	`sharing_enabled` integer DEFAULT true NOT NULL,
+	`guests_enabled` integer DEFAULT true NOT NULL,
+	`save_replay` integer DEFAULT true NOT NULL,
+	`pinned_message_id` text DEFAULT '' NOT NULL,
+	`replay_status` text DEFAULT 'none' NOT NULL,
+	`replay_highlight` integer DEFAULT false NOT NULL,
+	`lat` real,
+	`lng` real,
+	`peak_viewers` integer DEFAULT 0 NOT NULL,
+	`started_at` integer NOT NULL,
+	`ended_at` integer,
+	`is_seed` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`campus_id`) REFERENCES `campuses`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`community_id`) REFERENCES `communities`(`id`) ON UPDATE no action ON DELETE no action
+);
+CREATE TABLE IF NOT EXISTS `live_viewers` (
+	`stream_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`joined_at` integer NOT NULL,
+	`last_seen_at` integer NOT NULL,
+	PRIMARY KEY(`stream_id`, `user_id`),
+	FOREIGN KEY (`stream_id`) REFERENCES `live_streams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
 CREATE TABLE IF NOT EXISTS `loans` (
 	`id` text PRIMARY KEY NOT NULL,
 	`listing_id` text,
@@ -633,6 +717,10 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`state` text DEFAULT '' NOT NULL,
 	`county` text DEFAULT '' NOT NULL,
 	`country` text DEFAULT '' NOT NULL,
+	`country_code` text DEFAULT '' NOT NULL,
+	`state_id` text DEFAULT '' NOT NULL,
+	`county_id` text DEFAULT '' NOT NULL,
+	`city_id` text DEFAULT '' NOT NULL,
 	`lat` real,
 	`lng` real,
 	`primary_role` text DEFAULT '' NOT NULL,
@@ -663,7 +751,7 @@ CREATE TABLE IF NOT EXISTS `profiles` (
 	`show_availability` integer DEFAULT true NOT NULL,
 	`links` text DEFAULT '[]' NOT NULL,
 	`education` text DEFAULT '[]' NOT NULL,
-	`trust_level` text DEFAULT 'standard' NOT NULL, `country_code` text DEFAULT '' NOT NULL, `state_id` text DEFAULT '' NOT NULL, `county_id` text DEFAULT '' NOT NULL, `city_id` text DEFAULT '' NOT NULL,
+	`trust_level` text DEFAULT 'standard' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 CREATE TABLE IF NOT EXISTS `progress_updates` (

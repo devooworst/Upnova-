@@ -24,6 +24,7 @@ import {
   UserPlus,
   ContactRound,
   Wallet,
+  Radio,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
@@ -42,6 +43,7 @@ const navGroups: {
     label: null,
     items: [
       { href: "/", label: "Home", icon: Home, tour: "home" },
+      { href: "/live", label: "Live", icon: Radio, tour: "live" },
       { href: "/discover", label: "Discover", icon: Search, tour: "discover" },
       { href: "/messages", label: "Messages", icon: MessageSquare, badge: 3, tour: "messages" },
       { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },

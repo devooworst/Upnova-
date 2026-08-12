@@ -25,6 +25,20 @@ const in3d = (days: number) => {
 };
 
 export const QA_EXAMPLES: Record<string, TaskExamples> = {
+  /* ---------------- live ---------------- */
+  "live:golive": {
+    fields: [
+      { label: "Title", value: "Making a beat from scratch" },
+      { label: "Category", value: "Music" },
+      { label: "Audience", value: "Everyone" },
+    ],
+  },
+  "live:chat": {
+    fields: [{ label: "Message", value: "This chat updates in real time — hello from the Test Center" }],
+  },
+  "live:guest": {
+    fields: [{ label: "Guest username", value: "@testcustomer" }],
+  },
   /* ------------------------- booking scenario ------------------------- */
   "booking:message": {
     fields: [{ label: "Message", value: "Hi! I'd like to book your QA Test Session — is Thursday morning open?" }],

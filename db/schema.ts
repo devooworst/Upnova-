@@ -1455,3 +1455,135 @@ export const eventRsvps = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.eventId, t.userId] })]
 );
+
+/* ================================ LIVE ================================ */
+/* Mavyn Live — ONE universal live-streaming ecosystem for everyone      */
+/* (students, creators, musicians, gamers, businesses, educators…).      */
+/* "Campus" is an AUDIENCE/DISCOVERY layer inside Live, never a separate */
+/* product. Streams carry real state transitions (live → ended →         */
+/* replay saved/deleted), and every permission (audience gating,         */
+/* campus verification, mutes/blocks, moderator powers) is enforced      */
+/* SERVER-SIDE in lib/server/live.ts — the UI is never the security.     */
+/*                                                                       */
+/* Video transport note (honest): the sandbox has no RTMP/WebRTC media   */
+/* infrastructure, so the stage renders a live presence canvas; every    */
+/* OTHER part of the system (state, chat, reactions, presence,           */
+/* moderation, guests, replays, permissions) is real and DB-backed.      */
+
+export const liveStreams = sqliteTable("live_streams", {
+  id: id(),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  // music | gaming | fashion | fitness | education | business |
+  // conversation | behind_the_scenes | irl | creative | other
+  category: text("category").notNull().default("other"),
+  // everyone | followers | campus | nearby | community | invite
+  audience: text("audience").notNull().default("everyone"),
+  campusId: text("campus_id").references(() => campuses.id), // audience=campus → the host's VERIFIED campus only
+  communityId: text("community_id").references(() => communities.id), // audience=community → members only
+  status: text("status").notNull().default("live"), // live | ended
+  chatEnabled: bool("chat_enabled", true),
+  reactionsEnabled: bool("reactions_enabled", true),
+  sharingEnabled: bool("sharing_enabled", true),
+  guestsEnabled: bool("guests_enabled", true),
+  saveReplay: bool("save_replay", true),
+  pinnedMessageId: text("pinned_message_id").notNull().default(""),
+  // replay lifecycle after the stream ends: none | saved | deleted
+  replayStatus: text("replay_status").notNull().default("none"),
+  replayHighlight: bool("replay_highlight", false),
+  // host city centroid at start time — SERVER-SIDE nearby scoping only,
+  // never returned by any API (same privacy rule as profiles.lat/lng)
+  lat: real("lat"),
+  lng: real("lng"),
+  peakViewers: integer("peak_viewers").notNull().default(0),
+  startedAt: ts("started_at"),
+  endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+  isSeed: seed(),
+  createdAt: ts("created_at"),
+});
+
+export const liveMessages = sqliteTable("live_messages", {
+  id: id(),
+  streamId: text("stream_id")
+    .notNull()
+    .references(() => liveStreams.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  kind: text("kind").notNull().default("chat"), // chat | system
+  deleted: bool("deleted", false), // moderator-deleted — kept for audit, never served
+  createdAt: ts("created_at"),
+});
+
+/* named reaction types rendered as icons (heart | fire | clap | wow | laugh) */
+export const liveReactions = sqliteTable("live_reactions", {
+  id: id(),
+  streamId: text("stream_id")
+    .notNull()
+    .references(() => liveStreams.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull().default("heart"),
+  createdAt: ts("created_at"),
+});
+
+/* presence: heartbeat rows — viewerCount = lastSeenAt within the window */
+export const liveViewers = sqliteTable(
+  "live_viewers",
+  {
+    streamId: text("stream_id")
+      .notNull()
+      .references(() => liveStreams.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: ts("joined_at"),
+    lastSeenAt: ts("last_seen_at"),
+  },
+  (t) => [primaryKey({ columns: [t.streamId, t.userId] })]
+);
+
+/* guests / co-hosts: invited → active (split-screen) | declined | removed */
+export const liveGuests = sqliteTable("live_guests", {
+  id: id(),
+  streamId: text("stream_id")
+    .notNull()
+    .references(() => liveStreams.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("invited"), // invited | active | declined | removed | left
+  invitedAt: ts("invited_at"),
+  joinedAt: integer("joined_at", { mode: "timestamp_ms" }),
+});
+
+export const liveModerators = sqliteTable(
+  "live_moderators",
+  {
+    streamId: text("stream_id")
+      .notNull()
+      .references(() => liveStreams.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addedAt: ts("added_at"),
+  },
+  (t) => [primaryKey({ columns: [t.streamId, t.userId] })]
+);
+
+/* per-stream restrictions: mute = watch but not chat · block = no access */
+export const liveRestrictions = sqliteTable("live_restrictions", {
+  id: id(),
+  streamId: text("stream_id")
+    .notNull()
+    .references(() => liveStreams.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // mute | block
+  createdAt: ts("created_at"),
+});

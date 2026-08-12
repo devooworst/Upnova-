@@ -14,6 +14,7 @@ import OpportunityList from "./OpportunityList";
 import Avatar from "@/components/Avatar";
 import { Zap } from "lucide-react";
 import { useSession } from "@/lib/session";
+import LiveNowRail from "./LiveNowRail";
 import type { FeedScope } from "@/components/Feed";
 
 export type FeedTab = "For You" | "Following" | "Opportunities" | "Trending";
@@ -212,6 +213,9 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
           </Link>
         </div>
       )}
+
+      {/* LIVE NOW — currently active streams for this viewer */}
+      {!guest && tab === "For You" && <LiveNowRail />}
 
       {tab === "Opportunities" ? (
         <OpportunityList scope={scopeParam[scope]} compact />

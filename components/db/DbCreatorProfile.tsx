@@ -14,6 +14,7 @@ import Link from "next/link";
 import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck, GraduationCap } from "lucide-react";
 import { ACCOUNT_BADGES } from "@/lib/trust";
 import Avatar from "@/components/Avatar";
+import LiveReplaysSection from "@/components/LiveReplaysSection";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
 import PostsGrid from "@/components/db/PostsGrid";
@@ -1024,6 +1025,9 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
         const order = data.studio?.sections?.length ? data.studio.sections : [...SECTION_IDS];
         return <>{order.map((id) => sectionBlocks[id] ?? null)}</>;
       })()}
+
+      {/* saved live replays — one live ecosystem, surfaced on the profile */}
+      <LiveReplaysSection handle={handle} />
     </div>
   );
 }

@@ -68,6 +68,39 @@ const openProjectPanel = (untilAnchor: string): GuideStep => ({
 
 /** authored guides, keyed `${scenarioId}:${stepId}` */
 export const QA_GUIDES: Record<string, GuideStep[]> = {
+  /* ---------------- live: go live → watch → chat → react → pin → guest → end ---------------- */
+  "live:golive": [
+    nav("live", "Live", "/live"),
+    { target: "live-golive-open", label: "Go Live", text: "Click the red Go Live button at the top of the Live page", until: { visible: "golive-title" } },
+    { target: "golive-title", label: "What's happening?", text: "Give your live a title — the example values below work great", kind: "form" },
+    { target: "golive-start", label: "GO LIVE", text: "Pick a category and audience above if you like (Everyone is fine), then hit GO LIVE", kind: "click" },
+  ],
+  "live:watch": [
+    nav("live", "Live", "/live"),
+    { target: "live-card-testcreator", label: "The creator's stream", text: "Open Test Creator's live from the Live Now grid — just opening it counts you into the room", optional: true, until: { visible: "live-chat" } },
+  ],
+  "live:chat": [
+    takeMeThere("live stream", "/live"),
+    { target: "live-chat-input", label: "Say something", text: "Type a message in the live chat on the right and send it", kind: "form" },
+  ],
+  "live:react": [
+    takeMeThere("live stream", "/live"),
+    { target: "live-reactions", label: "React", text: "Tap any reaction under the stage — heart, fire, clap, wow or laugh", kind: "click" },
+  ],
+  "live:pin": [
+    takeMeThere("live stream", "/live"),
+    { target: "live-chat", label: "Pin from chat", text: "Hover the customer's message in chat and click the pin icon that appears (host-only moderation)", kind: "click" },
+  ],
+  "live:guest": [
+    takeMeThere("live stream", "/live"),
+    { target: "live-guest-invite", label: "Invite a guest", text: "In your live controls, click Invite a guest", until: { visible: "live-guest-handle" } },
+    { target: "live-guest-handle", label: "@testcustomer", text: "Type @testcustomer and send the invite — they get a notification and a join banner on the stream", kind: "form" },
+  ],
+  "live:end": [
+    takeMeThere("live stream", "/live"),
+    { target: "live-end", label: "End stream", text: "Hit End stream in your live controls — with Save replay on, the replay saves automatically", kind: "click" },
+  ],
+
   /* ------------------------- booking scenario ------------------------- */
   "booking:profile": [
     { target: "search", label: "Search", text: 'Click the search bar at the top and type "Test Creator"', until: { path: "/creator/testcreator" } },

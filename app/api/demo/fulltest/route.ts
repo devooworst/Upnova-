@@ -70,6 +70,7 @@ const PLANNED_CATEGORIES = [
   "PLAN LAB (REAL BOUNDARIES)",
   "QA LOOP REGRESSION",
   "QA SCENARIO WALKTHROUGHS",
+  "LIVE STREAMING",
   "LOCATION SYSTEM (GEO CASCADE)",
   "FULL SITE ROUTE SWEEP",
   "DATABASE INTEGRITY",
@@ -196,6 +197,14 @@ export async function POST(req: NextRequest) {
         db.delete(tables.payments).where(eq(tables.payments.payeeId, u.id)).run();
         db.delete(tables.payments).where(eq(tables.payments.payerId, u.id)).run();
         db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run();
+        for (const l of db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, u.id)).all())
+          db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+        db.delete(tables.liveViewers).where(eq(tables.liveViewers.userId, u.id)).run();
+        db.delete(tables.liveMessages).where(eq(tables.liveMessages.userId, u.id)).run();
+        db.delete(tables.liveReactions).where(eq(tables.liveReactions.userId, u.id)).run();
+        db.delete(tables.liveGuests).where(eq(tables.liveGuests.userId, u.id)).run();
+        db.delete(tables.liveModerators).where(eq(tables.liveModerators.userId, u.id)).run();
+        db.delete(tables.liveRestrictions).where(eq(tables.liveRestrictions.userId, u.id)).run();
         db.delete(tables.notifications).where(eq(tables.notifications.userId, u.id)).run();
         db.delete(tables.profiles).where(eq(tables.profiles.userId, u.id)).run();
         db.delete(tables.users).where(eq(tables.users.id, u.id)).run();
@@ -1717,9 +1726,9 @@ export async function POST(req: NextRequest) {
     };
     for (const d of srcDirs) walk(path.join(process.cwd(), d));
     const missingAnchor = Array.from(new Set(flat.map((g) => g.target).filter(Boolean))).filter(
-      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !t.startsWith("plan-") && !t.startsWith("qa-service-book-") && !t.startsWith("account-state-") && !src.includes(`"${t}"`)
+      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !t.startsWith("plan-") && !t.startsWith("qa-service-book-") && !t.startsWith("account-state-") && !t.startsWith("live-card-") && !src.includes(`"${t}"`)
     );
-    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-", "data-guide={`plan-", "data-guide={`qa-service-book-", "data-guide={`account-state-"];
+    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-", "data-guide={`plan-", "data-guide={`qa-service-book-", "data-guide={`account-state-", "data-guide={`live-card-"];
     // BOTH booking surfaces must carry the service anchor — the task's
     // href lands on the DETAIL page while browsing finds the LIST card;
     // the guide must locate the control wherever the tester actually is
@@ -2055,12 +2064,232 @@ export async function POST(req: NextRequest) {
       }
       return { st, invariantOk, stuck };
     };
-    for (const sid of ["opportunity", "hiring", "people", "plans"]) {
+    for (const sid of ["opportunity", "hiring", "people", "plans", "live"]) {
       const { st, invariantOk, stuck } = await walk(sid);
       step(c, `${sid} scenario walks START → FINISH strictly in order — one pending task, later tasks locked, done=verified-prefix at every step — and completes fully`,
         st.completed === true && st.done === st.total && invariantOk, { actual: stuck || `${st.done}/${st.total} completed=${st.completed}` });
       await asA(`/api/qa/scenarios/${sid}`, { method: "POST", body: { action: "reset" } });
     }
+  }
+
+  /* ================= LIVE STREAMING ================= */
+  /* The full Mavyn Live lifecycle over the REAL HTTP routes: create →
+     discover → watch → chat (two accounts, interleaved) → react →
+     follow → share → moderate → mute/block → guests → end → replay →
+     replay deletion — plus audience gating (campus/nearby/followers/
+     invite), location privacy, presence reconnect, and the browser
+     layer. Campus is an audience filter, never a separate product.   */
+  {
+    const c = cat("LIVE STREAMING");
+    const imani = ids("imani"), jordan = ids("jordanmiles"), devinU = ids("devin");
+    // login the extra actors this category needs
+    for (const h of ["imani", "jordanmiles", "devin"]) {
+      if (!tok[h]) {
+        const li = await api(null, "/api/auth/login", { method: "POST", body: { identifier: h, password: "mavyn123" } });
+        tok[h] = (li.data as { sessionToken?: string }).sessionToken ?? "";
+      }
+    }
+    // deterministic reset: remove [TESTLIVE] streams from prior runs
+    for (const l of db.select().from(tables.liveStreams).all())
+      if (l.title.startsWith("[TESTLIVE]")) db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+
+    /* ---- 1-5 · create: title, category, audience, start ---- */
+    const created = await api("lena", "/api/live", { method: "POST", body: { title: "[TESTLIVE] Rolling cuts — open studio", category: "music", audience: "everyone" } });
+    const sid = String((created.data as { id?: string }).id || "");
+    step(c, "GO LIVE creates a real stream: title + category + audience in ONE simple call, status live immediately", created.status === 200 && !!sid, { record: sid });
+    const dupe = await api("lena", "/api/live", { method: "POST", body: { title: "[TESTLIVE] second", category: "music", audience: "everyone" } });
+    step(c, "one live at a time — a second Go Live while live is rejected (409)", dupe.status === 409);
+    const det0 = await api("lena", `/api/live/${sid}`);
+    const st0 = (det0.data as { stream?: Record<string, unknown> }).stream ?? {};
+    step(c, "the stream carries its real state: category music, audience everyone, chat/reactions/sharing/guests/replay all on", st0.category === "music" && st0.audience === "everyone" && st0.chatEnabled === true && st0.reactionsEnabled === true && st0.sharingEnabled === true && st0.saveReplay === true);
+
+    /* ---- 6-8 · discovery + open from another account ---- */
+    const now = await api("rachel", "/api/live?filter=now");
+    step(c, "the stream appears in Live Now for another account", (now.data as { items?: { id: string }[] }).items?.some((x) => x.id === sid) === true, { route: "/api/live?filter=now" });
+    const fy = await api("rachel", "/api/live?filter=foryou");
+    const feedSrc = fs.readFileSync(path.join(process.cwd(), "components", "db", "DbFeed.tsx"), "utf8");
+    const railSrc = fs.readFileSync(path.join(process.cwd(), "components", "db", "LiveNowRail.tsx"), "utf8");
+    step(c, "the For You surface serves it: /api/live?filter=foryou lists it AND the feed renders the LIVE NOW rail with 'See all Live →'", (fy.data as { items?: { id: string }[] }).items?.some((x) => x.id === sid) === true && feedSrc.includes("LiveNowRail") && railSrc.includes("See all Live"));
+    const open2 = await api("rachel", `/api/live/${sid}`);
+    step(c, "a second account opens the stream (viewer payload: title, host, viewer count, my role)", open2.status === 200 && !!(open2.data as { me?: unknown }).me);
+
+    /* ---- 9 + 30 · real-time chat, two users interleaved ---- */
+    await api("rachel", `/api/live/${sid}/presence`, { method: "POST", body: {} });
+    const t0 = Date.now() - 1;
+    await api("rachel", `/api/live/${sid}/chat`, { method: "POST", body: { body: "[TESTLIVE] first from rachel" } });
+    await api("lena", `/api/live/${sid}/chat`, { method: "POST", body: { body: "[TESTLIVE] host replies" } });
+    await api("rachel", `/api/live/${sid}/chat`, { method: "POST", body: { body: "[TESTLIVE] rachel again" } });
+    await api("lena", `/api/live/${sid}/chat`, { method: "POST", body: { body: "[TESTLIVE] host closes" } });
+    const chatL = (await api("lena", `/api/live/${sid}/chat?after=0`)).data as { messages?: { body: string; handle: string }[] };
+    const chatR = (await api("rachel", `/api/live/${sid}/chat?after=${t0}`)).data as { messages?: { body: string }[] };
+    const order = (chatL.messages ?? []).filter((m) => m.body.startsWith("[TESTLIVE]")).map((m) => m.handle).join(",");
+    step(c, "REAL-TIME CHAT: two accounts chat simultaneously — both see all four messages, interleaved in exact order, via the incremental after= poll", order === "rachel,lena,rachel,lena" && (chatR.messages ?? []).filter((m) => m.body.startsWith("[TESTLIVE]")).length === 4, { actual: `order=${order}` });
+
+    /* ---- 10 · reactions ---- */
+    const r1 = await api("rachel", `/api/live/${sid}/react`, { method: "POST", body: { type: "fire" } });
+    const r2 = await api("rachel", `/api/live/${sid}/react`, { method: "POST", body: { type: "heart" } });
+    const counts = (r2.data as { counts?: Record<string, number> }).counts ?? {};
+    step(c, "reactions land and count (fire + heart)", r1.status === 200 && counts.fire === 1 && counts.heart === 1);
+
+    /* ---- 11 · follow from the live room ---- */
+    await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" }).catch(() => {});
+    const fRes = await api("rachel", `/api/follow/${lena.id}`, { method: "POST" });
+    const det1 = (await api("rachel", `/api/live/${sid}`)).data as { me?: { following?: boolean } };
+    step(c, "follow works from the live context and reflects in the payload", fRes.status === 200 && det1.me?.following === true);
+
+    /* ---- 12 · sharing toggle is enforced state ---- */
+    await api("lena", `/api/live/${sid}`, { method: "PATCH", body: { action: "toggle", key: "sharingEnabled", value: false } });
+    const det2 = (await api("rachel", `/api/live/${sid}`)).data as { stream?: { sharingEnabled?: boolean } };
+    await api("lena", `/api/live/${sid}`, { method: "PATCH", body: { action: "toggle", key: "sharingEnabled", value: true } });
+    step(c, "sharing is a real host control: toggling it off updates every viewer's payload (UI hides the button)", det2.stream?.sharingEnabled === false);
+
+    /* ---- 13 · moderation: delete, pin, moderators ---- */
+    const rachelMsg = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, sid)).all().find((m) => m.body === "[TESTLIVE] rachel again")!;
+    await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "delete_message", messageId: rachelMsg.id } });
+    const chatAfterDel = (await api("rachel", `/api/live/${sid}/chat?after=0`)).data as { messages?: { id: string }[] };
+    step(c, "host deletes a message — it disappears from the chat feed for everyone", (chatAfterDel.messages ?? []).every((m) => m.id !== rachelMsg.id));
+    const hostMsg = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, sid)).all().find((m) => m.body === "[TESTLIVE] host replies")!;
+    await api("lena", `/api/live/${sid}`, { method: "PATCH", body: { action: "pin", messageId: hostMsg.id } });
+    const det3 = (await api("rachel", `/api/live/${sid}`)).data as { pinnedMessage?: { id?: string } };
+    step(c, "host pins a message — every viewer sees the pin", det3.pinnedMessage?.id === hostMsg.id);
+    await api("rachel", `/api/live/${sid}/presence`, { method: "POST", body: {} });
+    const modAdd = await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "add_mod", userId: rachel.id } });
+    const modDel = await api("rachel", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "delete_message", messageId: hostMsg.id } });
+    await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "remove_mod", userId: rachel.id } });
+    const modDenied = await api("rachel", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "delete_message", messageId: hostMsg.id } });
+    step(c, "moderators: host promotes a viewer → they can delete messages; demoted → 403 immediately", modAdd.status === 200 && modDel.status === 200 && modDenied.status === 403);
+
+    /* ---- 14 · mute + block, enforced server-side ---- */
+    await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "mute", userId: rachel.id } });
+    const mutedPost = await api("rachel", `/api/live/${sid}/chat`, { method: "POST", body: { body: "[TESTLIVE] should be muted" } });
+    await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "unmute", userId: rachel.id } });
+    const unmutedPost = await api("rachel", `/api/live/${sid}/chat`, { method: "POST", body: { body: "[TESTLIVE] unmuted again" } });
+    step(c, "mute silences chat (403) but keeps watching; unmute restores it", mutedPost.status === 403 && unmutedPost.status === 200);
+    const su2 = await api(null, "/api/auth/signup", { method: "POST", body: { email: `tonblive.${runNonce()}@mavyn.dev`, password: "Live-lifecycle-2026", handle: "tonblive", displayName: "Live Probe" } });
+    tok.tonblive = (su2.data as { sessionToken?: string }).sessionToken ?? "";
+    if (!tok.tonblive) {
+      const re2 = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "tonblive", password: "Live-lifecycle-2026" } });
+      tok.tonblive = (re2.data as { sessionToken?: string }).sessionToken ?? "";
+    }
+    const tonbliveId = (db.select().from(tables.users).all().find((u) => u.handle === "tonblive"))!.id;
+    await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "block", userId: tonbliveId } });
+    const blockedView = await api("tonblive", `/api/live/${sid}`);
+    const blockedBeat = await api("tonblive", `/api/live/${sid}/presence`, { method: "POST", body: {} });
+    await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "unblock", userId: tonbliveId } });
+    const unblockedView = await api("tonblive", `/api/live/${sid}`);
+    step(c, "block removes ALL access (page 403 + presence 403); unblock restores it", blockedView.status === 403 && blockedBeat.status === 403 && unblockedView.status === 200);
+
+    /* ---- 15 · guests / co-hosts ---- */
+    const inv = await api("lena", `/api/live/${sid}/guests`, { method: "POST", body: { action: "invite", handle: "rachel" } });
+    const acc = await api("rachel", `/api/live/${sid}/guests`, { method: "POST", body: { action: "accept" } });
+    const det4 = (await api("lena", `/api/live/${sid}`)).data as { guests?: { handle: string; status: string }[] };
+    const onStage = det4.guests?.some((g) => g.handle === "rachel" && g.status === "active");
+    const rem = await api("lena", `/api/live/${sid}/guests`, { method: "POST", body: { action: "remove", userId: rachel.id } });
+    const det5 = (await api("lena", `/api/live/${sid}`)).data as { guests?: { handle: string }[] };
+    step(c, "guest lifecycle: invite → accept (split-screen stage) → remove — all real state", inv.status === 200 && acc.status === 200 && onStage === true && rem.status === 200 && !det5.guests?.some((g) => g.handle === "rachel"));
+
+    /* ---- 28-29 · refresh + disconnect/reconnect ---- */
+    const beat1 = await api("rachel", `/api/live/${sid}/presence`, { method: "POST", body: {} });
+    const count1 = (beat1.data as { viewerCount?: number }).viewerCount ?? 0;
+    db.update(tables.liveViewers).set({ lastSeenAt: new Date(Date.now() - 120_000) })
+      .where(and(eq(tables.liveViewers.streamId, sid), eq(tables.liveViewers.userId, rachel.id))).run();
+    const afterDrop = (await api("lena", `/api/live/${sid}`)).data as { stream?: { viewerCount?: number } };
+    const beat2 = await api("rachel", `/api/live/${sid}/presence`, { method: "POST", body: {} });
+    const count2 = (beat2.data as { viewerCount?: number }).viewerCount ?? 0;
+    step(c, "disconnect/reconnect: a stalled heartbeat ages out of the viewer count; one heartbeat later the viewer is back (refresh = same idempotent path)", (afterDrop.stream?.viewerCount ?? 99) < count1 && count2 >= count1, { actual: `present=${count1} → dropped=${afterDrop.stream?.viewerCount} → back=${count2}` });
+
+    /* ---- 16-18 · end + replay lifecycle ---- */
+    const end = await api("lena", `/api/live/${sid}`, { method: "PATCH", body: { action: "end" } });
+    const detE = (await api("lena", `/api/live/${sid}`)).data as { stream?: { status?: string; replayStatus?: string } };
+    step(c, "end stream: status → ended, and Save replay (on) makes replay_status=saved automatically", end.status === 200 && detE.stream?.status === "ended" && detE.stream?.replayStatus === "saved");
+    const replays = await api("rachel", "/api/live?filter=replays");
+    const profReplays = await api("rachel", "/api/live/replays?host=lena");
+    step(c, "the saved replay serves in Live → Replays AND on the host's profile", (replays.data as { items?: { id: string }[] }).items?.some((x) => x.id === sid) === true && (profReplays.data as { items?: { id: string }[] }).items?.some((x) => x.id === sid) === true);
+    await api("lena", `/api/live/${sid}/replay`, { method: "POST", body: { action: "delete" } });
+    const replays2 = await api("rachel", "/api/live?filter=replays");
+    const profReplays2 = await api("rachel", "/api/live/replays?host=lena");
+    const goneDetail = await api("rachel", `/api/live/${sid}`);
+    step(c, "deleting the replay removes it EVERYWHERE — discovery, profile, and the direct link 404s for viewers", !(replays2.data as { items?: { id: string }[] }).items?.some((x) => x.id === sid) && !(profReplays2.data as { items?: { id: string }[] }).items?.some((x) => x.id === sid) && goneDetail.status === 404);
+
+    /* ---- 19 + 24-26 · campus audience: verification is the law ---- */
+    const campusLive = await api("imani", "/api/live", { method: "POST", body: { title: "[TESTLIVE] Bowie State study session", category: "education", audience: "campus" } });
+    const campusSid = String((campusLive.data as { id?: string }).id || "");
+    const campusRow = db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, campusSid)).get();
+    const bowie = db.select().from(tables.campuses).all().find((x) => x.slug === "bowie-state");
+    step(c, "a VERIFIED student goes live to campus — the stream is bound to their verified school automatically", campusLive.status === 200 && campusRow?.campusId === bowie?.id, { actual: `campus=${campusRow?.campusId === bowie?.id ? "Bowie State University" : campusRow?.campusId}` });
+    const devinCampus = await api("devin", "/api/live?filter=campus");
+    const rachelCampus = await api("rachel", "/api/live?filter=campus");
+    const rachelOpens = await api("rachel", `/api/live/${campusSid}`);
+    step(c, "campus filtering: a verified member sees it under Campus; an unverified user gets the honest notice, an empty list AND a 403 on the direct link", (devinCampus.data as { items?: { id: string }[] }).items?.some((x) => x.id === campusSid) === true && ((rachelCampus.data as { items?: unknown[] }).items ?? []).length === 0 && typeof (rachelCampus.data as { note?: string }).note === "string" && rachelOpens.status === 403);
+    const fakeClaim = await api("tonblive", "/api/live", { method: "POST", body: { title: "[TESTLIVE] fake campus", audience: "campus" } });
+    const wrongCampus = await api("imani", "/api/live", { method: "POST", body: { title: "[TESTLIVE] wrong campus", audience: "campus", campusId: "not-my-campus" } });
+    step(c, "unauthorized campus claims are impossible: unverified user → 403; a verified user naming a DIFFERENT campus → 403", fakeClaim.status === 403 && wrongCampus.status === 403,
+      { actual: `unverified=${fakeClaim.status} (${String((fakeClaim.data as { error?: string }).error || "").slice(0, 60)}) · wrong-campus=${wrongCampus.status}` });
+    await api("imani", `/api/live/${campusSid}`, { method: "PATCH", body: { action: "end" } });
+
+    /* ---- 20 · nearby respects location privacy ---- */
+    const nearLive = await api("lena", "/api/live", { method: "POST", body: { title: "[TESTLIVE] Baltimore pop-up", category: "irl", audience: "nearby" } });
+    const nearSid = String((nearLive.data as { id?: string }).id || "");
+    const rachelNear = await api("rachel", "/api/live?filter=nearby");
+    const jordanNear = await api("jordanmiles", "/api/live?filter=nearby");
+    const jordanOpen = await api("jordanmiles", `/api/live/${nearSid}`);
+    const leak = JSON.stringify(rachelNear.data).match(/"lat"|"lng"|"latitude"|"longitude"/);
+    step(c, "nearby: a Baltimore viewer sees the Baltimore stream, an Atlanta viewer neither lists NOR opens it — and the payload contains ZERO coordinates", nearLive.status === 200 && (rachelNear.data as { items?: { id: string }[] }).items?.some((x) => x.id === nearSid) === true && !(jordanNear.data as { items?: { id: string }[] }).items?.some((x) => x.id === nearSid) && jordanOpen.status === 403 && !leak, { actual: leak ? `COORDINATE LEAK: ${leak[0]}` : "no lat/lng anywhere in the payload" });
+    await api("lena", `/api/live/${nearSid}`, { method: "PATCH", body: { action: "end" } });
+
+    /* ---- 21 · following filter ---- */
+    const folLive = await api("lena", "/api/live", { method: "POST", body: { title: "[TESTLIVE] followers check-in", audience: "everyone" } });
+    const folSid = String((folLive.data as { id?: string }).id || "");
+    const rachelFollowing = await api("rachel", "/api/live?filter=following"); // rachel follows lena (test 11)
+    const tonbFollowing = await api("tonblive", "/api/live?filter=following");
+    step(c, "Following filter: a follower sees the host's stream, a non-follower doesn't", (rachelFollowing.data as { items?: { id: string }[] }).items?.some((x) => x.id === folSid) === true && !(tonbFollowing.data as { items?: { id: string }[] }).items?.some((x) => x.id === folSid));
+    await api("lena", `/api/live/${folSid}`, { method: "PATCH", body: { action: "end" } });
+
+    /* ---- 22 · business + invite-only audience ---- */
+    const bizLive = await api("harboroak", "/api/live", { method: "POST", body: { title: "[TESTLIVE] Hiring event — meet the team", category: "business", audience: "everyone" } });
+    const bizSid = String((bizLive.data as { id?: string }).id || "");
+    step(c, "a BUSINESS goes live (hiring event) — same one ecosystem, no separate product", bizLive.status === 200);
+    await api("harboroak", `/api/live/${bizSid}`, { method: "PATCH", body: { action: "end" } });
+    const invLive = await api("tonblive", "/api/live", { method: "POST", body: { title: "[TESTLIVE] private rehearsal", audience: "invite" } });
+    const invSid = String((invLive.data as { id?: string }).id || "");
+    const rachelInv = await api("rachel", `/api/live/${invSid}`);
+    const rachelNow2 = await api("rachel", "/api/live?filter=now");
+    step(c, "invite-only: non-invited viewers can't open it (403) and never even see it listed", invLive.status === 200 && rachelInv.status === 403 && !(rachelNow2.data as { items?: { id: string }[] }).items?.some((x) => x.id === invSid));
+    await api("tonblive", `/api/live/${invSid}`, { method: "PATCH", body: { action: "end" } });
+
+    /* ---- reports + safety ---- */
+    const rep = await api("rachel", `/api/live/${sid}/report`, { method: "POST", body: { target: "stream", category: "privacy", details: "[TESTLIVE] probe" } });
+    const repRow = db.select().from(tables.reports).all().find((r) => r.targetId === sid && r.targetType === "live_stream");
+    step(c, "report stream files into the ONE shared reports system (human review, includes a location-privacy category)", rep.status === 200 && !!repRow, { record: repRow?.id });
+    if (repRow) db.delete(tables.reports).where(eq(tables.reports.id, repRow.id)).run();
+
+    /* ---- 27 · browser layer: mobile + desktop, real Chromium ---- */
+    try {
+      const { execFile } = await import("child_process");
+      const out = await new Promise<string>((resolve, reject) => {
+        execFile(
+          process.execPath,
+          [path.join(process.cwd(), "scripts", "browser-qa-live.mjs"), "--json", "--base", BASE],
+          { timeout: 300_000, maxBuffer: 10_000_000 },
+          (err, stdout) => (stdout && String(stdout).trim() ? resolve(String(stdout)) : reject(err ?? new Error("no output")))
+        );
+      });
+      const lines = out.trim().split("\n");
+      const rep2 = JSON.parse(lines[lines.length - 1]) as { steps: { category: string; name: string; status: "PASSED" | "FAILED"; detail?: string }[]; crash?: string };
+      for (const s2 of rep2.steps) c.steps.push({ name: `[browser:${s2.category}] ${s2.name}`, status: s2.status, actual: s2.detail || undefined, severity: s2.status === "FAILED" ? "HIGH" : undefined });
+      if (rep2.crash) c.steps.push({ name: "live browser pass crashed mid-run", status: "FAILED", actual: rep2.crash.slice(0, 200), severity: "HIGH" });
+    } catch (e) {
+      c.steps.push({
+        name: "real-browser layer for Live (Go Live UI, live room, mobile 375px)",
+        status: "NOT_TESTED",
+        actual: `Chromium could not launch here: ${e instanceof Error ? e.message.slice(0, 140) : String(e).slice(0, 140)} — run: node scripts/browser-qa-live.mjs`,
+      });
+    }
+
+    // cleanup: this category's streams disappear from the demo data
+    for (const l of db.select().from(tables.liveStreams).all())
+      if (l.title.startsWith("[TESTLIVE]")) db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+    await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" });
   }
 
   /* ================= LOCATION SYSTEM (GEO CASCADE) ================= */
@@ -2227,6 +2456,7 @@ export async function POST(req: NextRequest) {
       { path: "/calendar", who: "customer", label: "bookings" },
       { path: "/services", who: "creator", label: "services (creator)" },
       { path: "/opportunities", who: "customer", label: "opportunities" },
+      { path: "/live", who: "customer", label: "live discovery" },
       { path: "/opportunities/new", who: "business", label: "post opportunity" },
       { path: "/people", who: "business", label: "people" },
       { path: "/people?tab=talent", who: "business", label: "people · talent tab" },

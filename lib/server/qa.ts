@@ -184,6 +184,18 @@ export function resetQaData(): number {
       db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run(); // extensions/progress/reviews cascade
       removed++;
     }
+    // live streams hosted by a persona (chat/reactions/guests cascade)
+    for (const l of db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, id)).all()) {
+      db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+      removed++;
+    }
+    // presence/chat/restrictions a persona left in OTHER streams
+    db.delete(tables.liveViewers).where(eq(tables.liveViewers.userId, id)).run();
+    db.delete(tables.liveMessages).where(eq(tables.liveMessages.userId, id)).run();
+    db.delete(tables.liveReactions).where(eq(tables.liveReactions.userId, id)).run();
+    db.delete(tables.liveGuests).where(eq(tables.liveGuests.userId, id)).run();
+    db.delete(tables.liveModerators).where(eq(tables.liveModerators.userId, id)).run();
+    db.delete(tables.liveRestrictions).where(eq(tables.liveRestrictions.userId, id)).run();
     for (const o of db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, id)).all()) {
       db.delete(tables.applications).where(eq(tables.applications.opportunityId, o.id)).run();
       db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
