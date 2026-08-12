@@ -211,6 +211,31 @@ function projectRepair(getP: (ctx: QaContext) => typeof tables.projects.$inferSe
   };
 }
 
+/** CREATE-project steps: the create-draft form only renders while NO
+    active project is attached to the conversation. A project made before
+    the task activated (exploring ahead, or a legacy run) doesn't count
+    AND blocks the form — a hard wedge unless the Lab clears it. */
+function projectCreateReady(getP: (ctx: QaContext) => typeof tables.projects.$inferSelect | undefined) {
+  return (ctx: QaContext) => {
+    const p = getP(ctx);
+    if (!p || inTask(p.createdAt, ctx)) return { ok: true, why: "" };
+    return {
+      ok: false,
+      why: `an earlier project ("${p.title}", ${PROJECT_LABEL[p.state] ?? p.state}) is attached to this conversation from before this test became active — it doesn't count for the checkpoint AND it hides the create-draft form. Restore state to clear it and create the draft fresh`,
+    };
+  };
+}
+function projectCreateRepair(getP: (ctx: QaContext) => typeof tables.projects.$inferSelect | undefined) {
+  return (ctx: QaContext) => {
+    const p = getP(ctx);
+    if (!p) return "nothing to clear";
+    if (inTask(p.createdAt, ctx)) return "the current project already counts — nothing cleared";
+    db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+    db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run(); // extensions/progress/reviews cascade
+    return `cleared the stale project "${p.title}" — the create-draft form is back; create it fresh and it counts`;
+  };
+}
+
 function bookingReady(getB: (ctx: QaContext) => typeof tables.bookings.$inferSelect | undefined, allowed: string[], needLabel: string) {
   return (ctx: QaContext) => {
     const b = getB(ctx);
@@ -522,6 +547,8 @@ const projectScenario: QaScenario = {
       instruction: "As TEST CUSTOMER → Messages → open the Test Creator conversation → click the \"Project\" button (briefcase icon) at the top of the chat → fill in a title, an amount, and a deadline → click \"Create project draft\".",
       expected: "A project made while this test was active: client=testcustomer, creator=testcreator, state draft (no bot sends the offer — the creator must).",
       href: () => "/messages?to=testcreator",
+      ready: projectCreateReady(qaProject),
+      repair: projectCreateRepair(qaProject),
       verify: (ctx) => {
         const p = qaProject(ctx);
         if (!p) return { done: false, actual: "no project yet" };
@@ -1089,6 +1116,8 @@ const hiringScenario: QaScenario = {
       instruction: "As TEST BUSINESS → Messages → open the Test Creator conversation → click the \"Project\" button (briefcase icon) at the top of the chat → fill in a title, amount, and deadline → click \"Create project draft\".",
       expected: "A project row: client=testbusiness, creator=testcreator.",
       href: () => "/messages?to=testcreator",
+      ready: projectCreateReady(qaBizProject),
+      repair: projectCreateRepair(qaBizProject),
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no business→creator project yet" };
@@ -1455,6 +1484,8 @@ const peopleScenario: QaScenario = {
       instruction: "As TEST BUSINESS → Messages → open the Test Creator thread (Take me there opens it fresh) → click the briefcase button at the top of the chat → fill in a title, amount, and deadline → click \"Create project draft\". Creating the draft completes THIS test — sending the offer is the creator's move, next.",
       expected: "A project draft: client=testbusiness, creator=testcreator, made while this test was active. One action, one test.",
       href: () => "/messages?to=testcreator",
+      ready: projectCreateReady(qaBizProject),
+      repair: projectCreateRepair(qaBizProject),
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no business→creator project yet" };

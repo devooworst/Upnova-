@@ -48,6 +48,7 @@ type NextTask = {
   instruction: string;
   blocked: string | null;
   repairable: boolean;
+  actual: string;
 };
 
 const GUIDE_KEY = "mavyn-qa-guide"; // sessionStorage: task id the guide is active for
@@ -120,6 +121,7 @@ export default function QaPersonaBar() {
             instruction: pick.instruction,
             blocked: pick.blocked ?? null,
             repairable: !!pick.repairable,
+            actual: String(pick.actual ?? ""),
           } : null);
       } catch { /* the bar never breaks the page */ }
     };
@@ -368,6 +370,13 @@ export default function QaPersonaBar() {
                   </ol>
                   <QaExampleValues scenarioId={nextTask.sid} stepId={nextTask.stepId} compact />
                   <p className="mt-1.5 font-mono text-[9px] leading-relaxed text-lime-300/90">success: ✓ {nextTask.brief.success}</p>
+                  {/* THE LIVE CHECK — what the checkpoint sees RIGHT NOW.
+                      When something doesn't count (stale record, wrong
+                      state), this says so in plain sight — never a silent
+                      loop of "do it again" without the why. */}
+                  {nextTask.actual && (
+                    <p className="mt-1 font-mono text-[9px] leading-relaxed text-amber-300/90">live check: {nextTask.actual}</p>
+                  )}
                   {user.handle === nextTask.brief.role && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button

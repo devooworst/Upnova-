@@ -1991,6 +1991,29 @@ export async function POST(req: NextRequest) {
     const projCount = db.select().from(tables.projects).all().filter((pr) => pr.title === "[QA] People-scenario gig").length;
     step(c, "DRAFT LOOP FIX · exactly ONE project draft exists — repeated panel opens/rerenders created nothing",
       projCount === 1, { actual: `projects=${projCount}` });
+
+    // THE STALE-DRAFT WEDGE ("Cut Grass" incident): a project created
+    // BEFORE hire-draft activates doesn't count AND hides the create
+    // form. The Lab must flag it as blocked with a one-click restore —
+    // never a silent do-it-again loop with no exit.
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "reset" } });
+    for (const st5b of ["contact", "client-books", "client-accept", "client-pays"]) await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: st5b } });
+    const tokB4 = signDemoToken("testbusiness");
+    const conv4 = (await as4(tokB4, "/api/conversations", { method: "POST", body: { toHandle: "testcreator", firstMessage: "[QA] pre-wedge" } })).data as any;
+    await as4(tokB4, "/api/projects", { method: "POST", body: { creatorHandle: "testcreator", title: "Cut Grass", amount: 100, conversationId: conv4.id ?? conv4.conversationId } });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "client-complete" } });
+    let w = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
+    let wcur = w.steps[w.current];
+    step(c, "STALE-DRAFT WEDGE · a pre-activation project ('Cut Grass') marks hire-draft BLOCKED with the reason and a one-click restore — the user always has an exit",
+      wcur.id === "hire-draft" && !!wcur.blocked && wcur.repairable === true && /Cut Grass/.test(String(wcur.blocked)),
+      { actual: `current=${wcur.id} blocked="${String(wcur.blocked).slice(0, 70)}" repairable=${wcur.repairable}` });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "repair" } });
+    const gone = db.select().from(tables.projects).all().filter((pr) => pr.title === "Cut Grass").length;
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "hire-draft" } });
+    w = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
+    step(c, "STALE-DRAFT WEDGE · restore clears the stale project (create form returns), a FRESH draft counts, and the chain advances to the creator's offer",
+      gone === 0 && w.steps.find((x: any) => x.id === "hire-draft")?.status === "done" && w.steps[w.current]?.id === "hire-offer",
+      { actual: `stale-cleared=${gone === 0} hire-draft=${w.steps.find((x: any) => x.id === "hire-draft")?.status} current=${w.steps[w.current]?.id}` });
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "reset" } });
   }
 
