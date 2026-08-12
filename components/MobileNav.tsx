@@ -21,21 +21,24 @@ export default function MobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/90 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
       aria-label="Mobile navigation"
+      data-guide="mobile-bottom-nav"
     >
-      <div className="mx-auto grid max-w-md grid-cols-5">
+      {/* tablets get the same persistent touch nav, just wider */}
+      <div className="mx-auto grid max-w-md grid-cols-5 md:max-w-lg">
         {items.map((item) => {
           if (item.href === "__create__") {
             return (
               <button
                 key={item.label}
                 onClick={() => (user ? openCreateModal() : promptJoin("create"))}
-                className="flex flex-col items-center gap-1 py-2.5"
+                className="flex min-h-[56px] flex-col items-center justify-center gap-1 py-2"
                 aria-label="Create"
+                data-guide="mobile-create"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-lime-400 text-zinc-950 shadow-glow">
-                  <Plus className="h-5 w-5" strokeWidth={2.5} />
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-lime-400 text-zinc-950 shadow-glow">
+                  <Plus className="h-6 w-6" strokeWidth={2.5} />
                 </span>
               </button>
             );
@@ -45,7 +48,7 @@ export default function MobileNav() {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition ${
+              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
                 active ? "text-zinc-50" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >

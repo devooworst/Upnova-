@@ -207,7 +207,7 @@ export default function QaPersonaBar() {
              stays usable. Status at a glance, one click to open. ---- */
         <button
           onClick={() => setPanelOpen(true)}
-          className="fixed bottom-3 right-3 z-[90] flex items-center gap-2 rounded-full border border-amber-400/50 bg-[#141217]/95 px-3 py-1.5 shadow-2xl backdrop-blur transition hover:border-amber-300/70"
+          className="fixed bottom-20 right-3 z-[90] flex items-center gap-2 rounded-full border border-amber-400/50 lg:bottom-3 bg-[#141217]/95 px-3 py-1.5 shadow-2xl backdrop-blur transition hover:border-amber-300/70"
           title="Open the Test Session panel"
         >
           <FlaskConical className="h-3.5 w-3.5 text-amber-300" />
@@ -231,7 +231,7 @@ export default function QaPersonaBar() {
         /* ---- EXPANDED: a corner panel (bottom sheet on small screens),
              scrollable, with an explicit Minimize — and it auto-folds on
              any page interaction so it never blocks a control. ---- */
-        <div ref={panelRef} className="fixed bottom-2 right-2 z-[90] w-[calc(100vw-1rem)] sm:bottom-3 sm:right-3 sm:w-[min(30rem,calc(100vw-1.5rem))]">
+        <div ref={panelRef} className="fixed bottom-20 right-2 z-[90] w-[calc(100vw-1rem)] sm:right-3 sm:w-[min(30rem,calc(100vw-1.5rem))] lg:bottom-3">
           <div className="max-h-[70vh] overflow-y-auto rounded-2xl border border-amber-400/40 bg-[#141217]/95 px-3 py-2 shadow-2xl backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">

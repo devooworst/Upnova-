@@ -31,7 +31,7 @@ import { promptJoin } from "./GuestGate";
 /* audience/reach, community, tags.                                    */
 /* ------------------------------------------------------------------ */
 
-type Kind = "Post" | "Opportunity" | "Service" | "Poll" | "Event" | "Live" | "Product";
+type Kind = "Post" | "Opportunity" | "Service" | "Poll" | "Event" | "Live" | "Product" | "__community__";
 
 const menu: { group: string; items: { kind: Kind; icon: typeof ImageIcon; title: string; desc: string; tint: string }[] }[] = [
   {
@@ -54,6 +54,7 @@ const menu: { group: string; items: { kind: Kind; icon: typeof ImageIcon; title:
       { kind: "Poll", icon: BarChart2, title: "Poll", desc: "Ask your community.", tint: "text-violet-400" },
       { kind: "Event", icon: Calendar, title: "Event", desc: "Create something people can attend.", tint: "text-amber-400" },
       { kind: "Live", icon: Radio, title: "Live", desc: "Go live with your audience.", tint: "text-red-400" },
+      { kind: "__community__", icon: Users, title: "Community", desc: "Start a space for your people.", tint: "text-violet-300" },
     ],
   },
 ];
@@ -202,7 +203,13 @@ export default function CreateModal() {
                   {g.items.map((item) => (
                     <button
                       key={item.kind}
-                      onClick={() => setKind(item.kind)}
+                      onClick={() => {
+                        if ((item.kind as string) === "__community__") {
+                          window.location.href = "/communities/create";
+                          return;
+                        }
+                        setKind(item.kind);
+                      }}
                       className="flex w-full items-start gap-3 rounded-xl border border-line p-3 text-left transition hover:border-zinc-600 hover:bg-card-raised"
                     >
                       <item.icon className={`mt-0.5 h-5 w-5 shrink-0 ${item.tint}`} />

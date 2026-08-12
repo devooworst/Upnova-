@@ -72,7 +72,9 @@ export default function DiscoverClient() {
         ))}
       </div>
 
-      <div className="flex items-start gap-6">
+      {/* phones/tablets: filters STACK above results (the old side-by-side
+          row gave the results column zero width — desktop lg+ unchanged) */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* filters */}
         <aside className="w-full shrink-0 lg:w-56">
           <button

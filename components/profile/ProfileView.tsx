@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Eye, Wrench, Palette, Sparkles } from "lucide-react";
 import ProfileHeader from "./ProfileHeader";
 import ProfileTabs from "./ProfileTabs";
-import DbCreatorProfile from "@/components/db/DbCreatorProfile";
+import ResponsiveProfile from "@/components/ResponsiveProfile";
 import { useSession } from "@/lib/session";
 import { type StudioConfig } from "@/lib/profileStudio";
 
@@ -87,7 +87,7 @@ export default function ProfileView() {
       ) : user ? (
         /* THE profile — the same component, same API, same saved
            customization every visitor renders */
-        <DbCreatorProfile handle={user.handle} />
+        <ResponsiveProfile handle={user.handle} />
       ) : (
         <>
           <ProfileHeader isOwner={true} />

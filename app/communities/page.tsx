@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Users, Lock, Mail, Search, ShieldCheck, Eye, UserRound, Check, X, Ban } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import { useSession } from "@/lib/session";
+import { useSession, useHydrated } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
 import { REVEAL_IDENTITY_MODES, identityModeLabel } from "@/lib/communityIdentity";
 
@@ -67,6 +67,7 @@ const ACCESS_BADGE: Record<string, { label: string; cls: string }> = {
 
 function CommunitiesInner() {
   const { user } = useSession();
+  const hydrated = useHydrated();
   const router = useRouter();
   const params = useSearchParams();
   const [data, setData] = useState<{ guest: boolean; mine: CommunityCard[]; discover: CommunityCard[]; categories: string[] } | null>(null);
@@ -207,6 +208,14 @@ function CommunitiesInner() {
       </div>
     );
   };
+
+  if (!hydrated || user === undefined)
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="h-24 animate-pulse rounded-2xl bg-card" />
+        <div className="h-48 animate-pulse rounded-2xl bg-card" />
+      </div>
+    );
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

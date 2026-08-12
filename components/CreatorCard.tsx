@@ -16,7 +16,7 @@ const availabilityStyle: Record<Creator["availability"], string> = {
 
 export default function CreatorCard({ creator }: { creator: Creator }) {
   return (
-    <article className="card-people card-lift flex flex-col p-5 hover:border-zinc-600">
+    <article className="card-people card-lift flex min-w-0 flex-col p-5 hover:border-zinc-600">
       <div className="flex items-start gap-3">
         <Avatar src={creator.avatar} initials={creator.initials} gradient={creator.gradient} size="lg" />
         <div className="min-w-0 flex-1">
@@ -59,17 +59,17 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
         <FollowButton id={creator.id} size="xs" className="w-full !py-1.5" />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2">
-        <Link href={`/creator/${creator.id}`} className="btn-ghost px-2 py-2 text-xs">
+        <Link href={`/creator/${creator.id}`} className="btn-ghost min-w-0 truncate px-2 py-2 text-xs">
           View Profile
         </Link>
         <Link
           href={`/messages?to=${creator.handle}`}
-          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-violet-400/40 px-2 py-2 text-xs font-medium text-violet-300 transition hover:bg-violet-400/10"
+          className="inline-flex min-w-0 items-center justify-center gap-1.5 truncate rounded-full border border-violet-400/40 px-2 py-2 text-xs font-medium text-violet-300 transition hover:bg-violet-400/10"
         >
           <MessageSquare className="h-3.5 w-3.5" />
           Message
         </Link>
-        <Link href={`/messages?to=${creator.handle}`} className="btn-lime px-2 py-2 text-xs">
+        <Link href={`/messages?to=${creator.handle}`} className="btn-lime min-w-0 truncate px-2 py-2 text-xs">
           <Zap className="h-3.5 w-3.5" />
           Hire
         </Link>

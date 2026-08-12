@@ -48,6 +48,11 @@ export default function Navbar() {
   const plan = user?.plan ?? "free";
   const planLabel = plan === "pro" ? "Pro" : plan === "college" ? "College+" : "Free";
 
+  /* MOBILE HEADER: compact single row — search expands on demand
+     instead of permanently costing 3.5rem of vertical space. Desktop
+     (md+) keeps the always-visible GlobalSearch, unchanged. */
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-3 px-3 sm:gap-4 sm:px-4 lg:px-6">
@@ -106,6 +111,17 @@ export default function Navbar() {
             title={lightMode ? "Dark mode" : "Light mode"}
           >
             {lightMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          </button>
+
+          {/* mobile: search is a 44px control that expands, not a fixed bar */}
+          <button
+            onClick={() => setMobileSearchOpen((v) => !v)}
+            className="icon-btn inline-flex md:hidden"
+            aria-label={mobileSearchOpen ? "Close search" : "Search"}
+            aria-expanded={mobileSearchOpen}
+            data-guide="mobile-search-toggle"
+          >
+            <Search className="h-5 w-5" />
           </button>
 
           <span data-tour="notifications" className="inline-flex">
@@ -232,10 +248,13 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Mobile search — same live search */}
-      <div className="px-3 pb-3 md:hidden">
-        <GlobalSearch variant="mobile" />
-      </div>
+      {/* Mobile search — SAME live search, but expandable: zero height
+          until the search button is tapped, so the header stays compact */}
+      {mobileSearchOpen && (
+        <div className="px-3 pb-3 md:hidden" data-guide="mobile-search-row">
+          <GlobalSearch variant="mobile" />
+        </div>
+      )}
     </header>
   );
 }

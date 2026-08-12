@@ -43,7 +43,7 @@ export default function RootLayout({
       <body className="min-h-screen font-sans">
         <FollowProvider>
         <Navbar />
-        <div className="mx-auto flex w-full max-w-[1440px] gap-6 px-3 pb-24 pt-[8rem] transition-all duration-300 sm:px-4 md:pb-10 md:pt-20 lg:px-6 2xl:max-w-[1560px]">
+        <div className="mx-auto flex w-full max-w-[1440px] gap-6 px-3 pb-28 pt-20 transition-all duration-300 sm:px-4 lg:pb-10 lg:px-6 2xl:max-w-[1560px]">
           <SidebarShell />
           <main className="min-w-0 flex-1">{children}</main>
         </div>

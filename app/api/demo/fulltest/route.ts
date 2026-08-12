@@ -71,6 +71,7 @@ const PLANNED_CATEGORIES = [
   "QA LOOP REGRESSION",
   "QA SCENARIO WALKTHROUGHS",
   "LIVE STREAMING",
+  "MOBILE & TABLET EXPERIENCE",
   "LOCATION SYSTEM (GEO CASCADE)",
   "FULL SITE ROUTE SWEEP",
   "DATABASE INTEGRITY",
@@ -2292,6 +2293,70 @@ export async function POST(req: NextRequest) {
     for (const l of db.select().from(tables.liveStreams).all())
       if (l.title.startsWith("[TESTLIVE]")) db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
     await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" });
+  }
+
+  /* ================= MOBILE & TABLET EXPERIENCE ================= */
+  /* The three-way responsive contract:
+       < lg  = intentional touch experience (compact expandable-search
+               header, persistent 5-item bottom nav with a 48px+ create
+               button, redesigned mobile profile with tabs, bottom-sheet
+               create menu)
+       ≥ lg  = the ESTABLISHED DESKTOP EXPERIENCE — unchanged.
+     Structural checks prove the architecture; the real-Chromium pass
+     proves the pixels at 360/414/844×390/768/1024/1440.              */
+  {
+    const c = cat("MOBILE & TABLET EXPERIENCE");
+    const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), "utf8");
+    const nav = read("components/MobileNav.tsx");
+    const navbar = read("components/Navbar.tsx");
+    const layoutSrc = read("app/layout.tsx");
+    const respProfile = read("components/ResponsiveProfile.tsx");
+    const mobileProfile = read("components/MobileProfile.tsx");
+    const creatorPage = read("app/creator/[id]/page.tsx");
+    const profileView = read("components/profile/ProfileView.tsx");
+    const communities = read("app/communities/page.tsx");
+    const qaBar = read("components/QaPersonaBar.tsx");
+
+    step(c, "bottom nav: persistent on phones AND tablets (lg:hidden), 5 items with the center + as primary create, 56px touch targets, safe-area padding",
+      nav.includes("lg:hidden") && nav.includes("min-h-[56px]") && nav.includes("safe-area-inset-bottom") && nav.includes("mobile-bottom-nav"));
+    step(c, "mobile header: compact single row — search is an expandable control (mobile-search-toggle), the permanent second row is gone",
+      navbar.includes("mobile-search-toggle") && navbar.includes("mobileSearchOpen &&") && !navbar.includes('      {/* Mobile search — same live search */}'));
+    step(c, "content clears the fixed chrome: single-row header padding (pt-20) and bottom-nav clearance until lg (pb-28 lg:pb-10)",
+      layoutSrc.includes("pb-28 pt-20") && layoutSrc.includes("lg:pb-10"));
+    step(c, "profile: ONE decision point (ResponsiveProfile, matchMedia at lg) — desktop renders DbCreatorProfile untouched, phones/tablets render MobileProfile; both /creator/[id] and /profile use it",
+      respProfile.includes("min-width: 1024px") && respProfile.includes("DbCreatorProfile") && respProfile.includes("MobileProfile") &&
+      creatorPage.includes("ResponsiveProfile") && profileView.includes("ResponsiveProfile") && !creatorPage.includes("DbCreatorProfile"));
+    step(c, "mobile profile implements the required hierarchy: cover → avatar → name/badge → roles → Open to work → campus/class → location/service area → actions → bio → Posts|Services|Portfolio|About tabs with grouped About cards",
+      ["mobile-profile-tabs", "Open to work", "Class of", "Serves", "Edit Profile", '"Posts", "Services", "Portfolio", "About"', "Verification", "never shown"].every((m) => mobileProfile.includes(m)));
+    step(c, "discovered & fixed by this pass: Discover's filter rail stacked OFF-CANVAS on phones (results had zero width) — now flex-col below lg, identical row at lg+",
+      read("components/DiscoverClient.tsx").includes("flex-col gap-6 lg:flex-row"));
+    step(c, "discovered & fixed by this pass: /communities hydration mismatch under its Suspense boundary — the deterministic useHydrated gate (same fix as the People page), no suppression anywhere",
+      communities.includes("useHydrated") && communities.includes("!hydrated || user === undefined") && !communities.includes("suppressHydrationWarning"));
+    step(c, "the Test Center session pill sits ABOVE the bottom nav on touch layouts (bottom-20 → lg:bottom-3) — QA chrome never covers navigation",
+      qaBar.includes("bottom-20") && qaBar.includes("lg:bottom-3"));
+
+    /* -------- REAL BROWSER LAYER: 6 viewport classes -------- */
+    try {
+      const { execFile } = await import("child_process");
+      const out = await new Promise<string>((resolve, reject) => {
+        execFile(
+          process.execPath,
+          [path.join(process.cwd(), "scripts", "browser-qa-mobile.mjs"), "--json", "--base", BASE],
+          { timeout: 300_000, maxBuffer: 10_000_000 },
+          (err, stdout) => (stdout && String(stdout).trim() ? resolve(String(stdout)) : reject(err ?? new Error("no output")))
+        );
+      });
+      const lines = out.trim().split("\n");
+      const rep = JSON.parse(lines[lines.length - 1]) as { steps: { category: string; name: string; status: "PASSED" | "FAILED"; detail?: string }[]; crash?: string };
+      for (const s2 of rep.steps) c.steps.push({ name: `[browser:${s2.category}] ${s2.name}`, status: s2.status, actual: s2.detail || undefined, severity: s2.status === "FAILED" ? "HIGH" : undefined });
+      if (rep.crash) c.steps.push({ name: "responsive browser pass crashed mid-run", status: "FAILED", actual: rep.crash.slice(0, 200), severity: "HIGH" });
+    } catch (e) {
+      c.steps.push({
+        name: "real-browser responsive layer (phones, landscape, tablets, desktop-safety)",
+        status: "NOT_TESTED",
+        actual: `Chromium could not launch here: ${e instanceof Error ? e.message.slice(0, 140) : String(e).slice(0, 140)} — run: node scripts/browser-qa-mobile.mjs`,
+      });
+    }
   }
 
   /* ================= LOCATION SYSTEM (GEO CASCADE) ================= */
