@@ -111,7 +111,7 @@ export default function ShopPage() {
           [0, 1, 2, 3].map((i) => <div key={i} className="card-money h-52 animate-pulse" aria-hidden />)
         ) : (
           filtered.map((p) => (
-            <article key={p.id} className={`card-money flex flex-col p-4 ${p.soldOut ? "opacity-60" : ""}`}>
+            <article key={p.id} className={`card-money flex min-w-0 flex-col break-words p-4 ${p.soldOut ? "opacity-60" : ""}`}>
               {p.media[0] && (
                 <Link href={`/shop/${p.id}`} className="relative mb-3 block aspect-[4/3] overflow-hidden rounded-xl border border-line">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

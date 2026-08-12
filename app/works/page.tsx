@@ -128,7 +128,7 @@ export default function WorksPage() {
               filtered.map((w) => {
                 const from = w.options.filter((o) => o.price != null && o.price > 0).sort((a, b) => a.price! - b.price!)[0];
                 return (
-                  <article key={w.id} className={`card-money flex flex-col p-4 ${w.exclusivelyLicensed ? "opacity-70" : ""}`}>
+                  <article key={w.id} className={`card-money flex min-w-0 flex-col break-words p-4 ${w.exclusivelyLicensed ? "opacity-70" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{kindLabel(w.kind)}</p>

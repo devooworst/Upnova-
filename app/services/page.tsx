@@ -209,7 +209,7 @@ export default function ServicesPage() {
           [0, 1, 2, 3].map((i) => <div key={i} className="card-money h-44 animate-pulse" aria-hidden />)
         ) : (
           filtered.map((s) => (
-            <article key={s.id} className="card-money flex flex-col p-4">
+            <article key={s.id} className="card-money flex min-w-0 flex-col break-words p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   {s.promoted && (

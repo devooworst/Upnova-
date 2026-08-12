@@ -775,7 +775,7 @@ function CampusGroups() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((g) => (
-            <article key={g.id} className="card-people flex flex-col gap-2.5 p-4">
+            <article key={g.id} className="card-people flex min-w-0 flex-col break-words gap-2.5 p-4">
               <div className="flex items-start justify-between gap-2">
                 <a href={`/communities/${g.slug}`} className="min-w-0">
                   <h3 className="truncate text-[15px] font-bold text-zinc-100 hover:text-violet-300">{g.name}</h3>
