@@ -2188,11 +2188,35 @@ export async function POST(req: NextRequest) {
     const evtSrc = fs.readFileSync(path.join(process.cwd(), "app", "events", "create", "page.tsx"), "utf8");
     step(c, "ONE location system everywhere: Edit Profile, opportunity posting and event creation all use LocationPicker (no free-text city/county/state inputs left)",
       [editSrc, oppSrc, evtSrc].every((src) => src.includes("LocationPicker")) && !editSrc.includes('placeholder="County"') && !evtSrc.includes('placeholder="Baltimore, MD"'));
-    c.steps.push({
-      name: "keyboard navigation, mobile layout and dropdown visuals in a real browser",
-      status: "NOT_TESTED",
-      actual: "browser automation isn't available in this environment — interaction logic is verified structurally above; first task once real browser infrastructure exists",
-    });
+    /* -------- REAL BROWSER LAYER — headless Chromium ---------------
+       scripts/browser-qa-location.mjs drives an actual bundled
+       Chromium against THIS server: full cascade flows, keyboard
+       navigation, loading/empty/error/Retry states, 375px mobile
+       hit-testing, the Test Center overlay, axe-core accessibility and
+       the opportunity/event forms. Zero source-inspection shortcuts —
+       every step below clicked real pixels. Falls back to an honest
+       NOT_TESTED only if Chromium cannot launch in the environment. */
+    try {
+      const { execFile } = await import("child_process");
+      const out = await new Promise<string>((resolve, reject) => {
+        execFile(
+          process.execPath,
+          [path.join(process.cwd(), "scripts", "browser-qa-location.mjs"), "--json", "--base", BASE],
+          { timeout: 300_000, maxBuffer: 10_000_000 },
+          (err, stdout) => (stdout && String(stdout).trim() ? resolve(String(stdout)) : reject(err ?? new Error("no output")))
+        );
+      });
+      const lines = out.trim().split("\n");
+      const rep = JSON.parse(lines[lines.length - 1]) as { steps: { category: string; name: string; status: "PASSED" | "FAILED"; detail?: string }[]; crash?: string };
+      for (const s of rep.steps) c.steps.push({ name: `[browser:${s.category}] ${s.name}`, status: s.status, actual: s.detail || undefined, severity: s.status === "FAILED" ? "HIGH" : undefined });
+      if (rep.crash) c.steps.push({ name: "browser pass crashed mid-run", status: "FAILED", actual: rep.crash.slice(0, 200), severity: "HIGH" });
+    } catch (e) {
+      c.steps.push({
+        name: "real-browser layer (headless Chromium: cascade, keyboard, states, mobile, overlay, axe)",
+        status: "NOT_TESTED",
+        actual: `Chromium could not launch in this environment: ${e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160)} — run: node scripts/browser-qa-location.mjs`,
+      });
+    }
   }
 
   /* ================= FULL SITE ROUTE SWEEP ================= */
@@ -2287,7 +2311,7 @@ export async function POST(req: NextRequest) {
     c.steps.push({
       name: "browser-level capture (console errors, live hydration mismatches, client-only exceptions) — requires a real browser runner (Playwright); this environment blocks browser downloads. SSR markers, statuses, and timeouts ARE checked above; hydration safety is regression-guarded by the deterministic-first-render pattern",
       status: "NOT_TESTED",
-      actual: "run the sweep under Playwright on real infrastructure for the final browser layer",
+      actual: "a bundled headless Chromium NOW runs the location-system browser pass (see LOCATION SYSTEM category); extending live console capture to all 30 sweep routes is queued — SSR markers, statuses and timeouts ARE checked here",
     });
   }
 

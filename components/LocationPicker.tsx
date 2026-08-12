@@ -71,7 +71,9 @@ export default function LocationPicker({
   const stateLabel = value.stateLabel || "State / Province";
   const countyLabel = value.countyLabel || "County / District";
   const countryHasStates = value.countryCode ? value.hasStates !== false : true;
-  const countryHasCounties = value.countryCode ? value.hasCounties === true : false;
+  // a saved countyId is proof enough that the county level exists — don't
+  // hide a real saved value while the country metadata is still loading
+  const countryHasCounties = value.countryCode ? value.hasCounties === true || !!value.countyId : false;
 
   /* rehydrate country metadata (labels + which levels exist) when a
      saved value arrives with ids only — e.g. loading Edit Profile */

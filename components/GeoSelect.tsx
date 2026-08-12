@@ -9,11 +9,17 @@
 /*  downloads the full 145k-city dataset.                              */
 /*                                                                     */
 /*  Supports: type-to-search, full keyboard navigation (↑ ↓ Enter      */
-/*  Escape), clear button, loading / empty / error states with retry.  */
+/*  Escape Tab), clear button, loading / empty / error states with     */
+/*  retry. Focus is never dropped: closing via Enter/Escape returns    */
+/*  focus to the toggle, so Tab order stays intact.                    */
+/*                                                                     */
+/*  ARIA: APG combobox pattern — the text input carries               */
+/*  role="combobox" + aria-expanded + aria-controls +                  */
+/*  aria-activedescendant; options are real role="option" rows.        */
 /* ------------------------------------------------------------------ */
 
 import { ChevronDown, Loader2, RotateCw, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 export interface GeoOption {
   id: string;
@@ -55,7 +61,9 @@ export default function GeoSelect({
   const [retryTick, setRetryTick] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const listId = useId();
 
   /* close on outside pointerdown */
   useEffect(() => {
@@ -92,19 +100,27 @@ export default function GeoSelect({
     };
   }, [open, query, retryTick, fetchOptions]);
 
+  /* focus is never lost: when the dropdown closes, focus returns to the
+     collapsed toggle button (unless the user clicked somewhere else) */
+  const close = useCallback((refocus: boolean) => {
+    setOpen(false);
+    setQuery("");
+    if (refocus) setTimeout(() => toggleRef.current?.focus(), 0);
+  }, []);
+
   const pick = useCallback(
-    (o: GeoOption) => {
+    (o: GeoOption, viaKeyboard: boolean) => {
       onChange(o);
-      setOpen(false);
-      setQuery("");
+      close(viaKeyboard);
     },
-    [onChange]
+    [onChange, close]
   );
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!open && (e.key === "ArrowDown" || e.key === "Enter")) {
       e.preventDefault();
       setOpen(true);
+      setTimeout(() => inputRef.current?.focus(), 0);
       return;
     }
     if (!open) return;
@@ -116,10 +132,14 @@ export default function GeoSelect({
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (options[active]) pick(options[active]);
+      if (options[active]) pick(options[active], true);
     } else if (e.key === "Escape") {
       e.preventDefault();
+      close(true);
+    } else if (e.key === "Tab") {
+      // let focus move naturally, but never leave a stale dropdown open
       setOpen(false);
+      setQuery("");
     }
   };
 
@@ -147,10 +167,6 @@ export default function GeoSelect({
               ? "border-lime-400/50 bg-card-raised text-zinc-100"
               : "cursor-pointer border-line bg-card-raised text-zinc-100 hover:border-zinc-600"
         }`}
-        role="combobox"
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-label={label}
         onClick={() => {
           if (disabled) return;
           setOpen(true);
@@ -160,6 +176,12 @@ export default function GeoSelect({
         {open ? (
           <input
             ref={inputRef}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={options[active] ? `${listId}-opt-${active}` : undefined}
+            aria-label={label}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
@@ -169,9 +191,12 @@ export default function GeoSelect({
           />
         ) : (
           <button
+            ref={toggleRef}
             type="button"
+            aria-haspopup="listbox"
+            aria-expanded={false}
+            aria-label={`${label}: ${value ? value.name : "none selected"}`}
             onKeyDown={onKeyDown}
-            onFocus={() => !disabled && setOpen(true)}
             className="w-full truncate bg-transparent text-left outline-none"
             disabled={disabled}
           >
@@ -179,7 +204,7 @@ export default function GeoSelect({
           </button>
         )}
         {loading && open ? (
-          <Loader2 size={14} className="shrink-0 animate-spin text-zinc-500" />
+          <Loader2 size={14} className="shrink-0 animate-spin text-zinc-500" data-geo-loading />
         ) : value && !disabled ? (
           <button
             type="button"
@@ -201,7 +226,7 @@ export default function GeoSelect({
       {open && (
         <div className="absolute left-0 right-0 z-40 mt-1.5 overflow-hidden rounded-xl border border-line bg-card shadow-xl shadow-black/40">
           {error ? (
-            <div className="px-3.5 py-3 text-xs">
+            <div className="px-3.5 py-3 text-xs" data-geo-error>
               <p className="text-rose-300">{error}</p>
               <button
                 type="button"
@@ -212,21 +237,24 @@ export default function GeoSelect({
               </button>
             </div>
           ) : loading && options.length === 0 ? (
-            <div className="flex items-center gap-2 px-3.5 py-3 text-xs text-zinc-500">
+            <div className="flex items-center gap-2 px-3.5 py-3 text-xs text-zinc-500" data-geo-loading-row>
               <Loader2 size={13} className="animate-spin" /> Loading…
             </div>
           ) : options.length === 0 ? (
-            <p className="px-3.5 py-3 text-xs text-zinc-500">{emptyText}</p>
+            <p className="px-3.5 py-3 text-xs text-zinc-500" data-geo-empty>
+              {emptyText}
+            </p>
           ) : (
-            <ul ref={listRef} role="listbox" className="max-h-56 overflow-y-auto py-1">
+            <ul ref={listRef} id={listId} role="listbox" aria-label={`${label} options`} className="max-h-56 overflow-y-auto py-1">
               {options.map((o, i) => (
                 <li
                   key={o.id}
+                  id={`${listId}-opt-${i}`}
                   role="option"
                   aria-selected={value?.id === o.id}
                   onPointerDown={(e) => {
                     e.preventDefault(); // don't blur before we pick
-                    pick(o);
+                    pick(o, false);
                   }}
                   onMouseEnter={() => setActive(i)}
                   className={`flex cursor-pointer items-baseline justify-between gap-3 px-3.5 py-2 text-sm transition ${

@@ -57,3 +57,4 @@ db/geo.db-shm
 db/geo.db-wal
 public/uploads/
 db/.qa-guide-defects.json
+qa-artifacts/
