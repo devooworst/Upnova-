@@ -306,6 +306,7 @@ export default function SettingsPage() {
           {sections.filter((s) => !("demoToolsOnly" in s) || user?.demoTools).map((s) => (
             <button
               key={s.id}
+              data-guide={s.id === "demo" ? "settings-demo" : undefined}
               onClick={() => setSection(s.id)}
               className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition lg:w-full ${
                 section === s.id
@@ -952,6 +953,7 @@ export default function SettingsPage() {
                       return (
                         <button
                           key={s2.id}
+                          data-guide={`account-state-${s2.id}`}
                           onClick={() => setAccountState(s2.id)}
                           disabled={demoBusy || active}
                           className={`rounded-lg border p-3 text-left transition disabled:cursor-default ${

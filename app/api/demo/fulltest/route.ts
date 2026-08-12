@@ -1648,9 +1648,9 @@ export async function POST(req: NextRequest) {
 
     // 2) guides are PURE DATA — pointing only, no actions possible
     const flat = Object.values(QA_GUIDES).flat();
-    const badKeys = flat.filter((g) => Object.keys(g).some((k) => !["target", "label", "text", "until"].includes(k)));
+    const badKeys = flat.filter((g) => Object.keys(g).some((k) => !["target", "label", "text", "until", "kind"].includes(k)));
     const serializable = JSON.stringify(flat) === JSON.stringify(JSON.parse(JSON.stringify(flat)));
-    step(c, "GUIDANCE · Show me where is declarative data only ({target,label,text,until}) — it structurally CANNOT click, submit, fetch, or complete anything",
+    step(c, "GUIDANCE · Show me where is declarative data only ({target,label,text,until,kind}) — it structurally CANNOT click, submit, fetch, or complete anything",
       badKeys.length === 0 && serializable && flat.every((g) => typeof g.text === "string" && typeof g.target === "string"),
       { actual: `${flat.length} guide steps, keys clean=${badKeys.length === 0}` });
 
@@ -1666,9 +1666,9 @@ export async function POST(req: NextRequest) {
     };
     for (const d of srcDirs) walk(path.join(process.cwd(), d));
     const missingAnchor = Array.from(new Set(flat.map((g) => g.target).filter(Boolean))).filter(
-      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !t.startsWith("plan-") && !src.includes(`"${t}"`)
+      (t) => !t.startsWith("conversation-") && !t.startsWith("chat-with-") && !t.startsWith("booking-card-") && !t.startsWith("plan-") && !t.startsWith("qa-service-book-") && !t.startsWith("account-state-") && !src.includes(`"${t}"`)
     );
-    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-", "data-guide={`plan-"];
+    const dynamicPatterns = ["data-guide={`conversation-", "data-guide={`chat-with-", "data-guide={`booking-card-", "data-guide={`plan-", "data-guide={`qa-service-book-", "data-guide={`account-state-"];
     const missingDynamic = dynamicPatterns.filter((pat) => !src.includes(pat));
     step(c, "GUIDANCE · every spotlight target is a real data-guide/data-tour anchor present in the interface source — instructions and visuals tell the same story",
       missingAnchor.length === 0 && missingDynamic.length === 0, { actual: missingAnchor.length || missingDynamic.length ? `MISSING: ${[...missingAnchor, ...missingDynamic].join(",")}` : `${new Set(flat.map((g) => g.target).filter(Boolean)).size} anchors verified (+${dynamicPatterns.length} dynamic families)` });
@@ -1677,6 +1677,25 @@ export async function POST(req: NextRequest) {
     const badUntil = flat.filter((g) => g.until && !(typeof g.until.path === "string" && g.until.path.startsWith("/")) && !(typeof g.until.visible === "string" && g.until.visible.length > 0));
     step(c, "GUIDANCE · every guide advance-condition is a real page prefix or a real anchor — the guide can always tell where the user is",
       badUntil.length === 0, { actual: badUntil.length ? JSON.stringify(badUntil[0]) : "all reach-conditions well-formed" });
+
+    // 4b) TARGET SYSTEM — every USER task has an AUTHORED guide whose
+    // final step names a real control (or is an explicit page-visit).
+    // "Instructions without a pointer" can no longer ship.
+    const unauthored: string[] = [];
+    const pointless: string[] = [];
+    const badKind: string[] = [];
+    for (const sc of QA_SCENARIOS)
+      for (const st of sc.steps) {
+        if (st.role === "check") continue;
+        const g = QA_GUIDES[`${sc.id}:${st.id}`];
+        if (!g) { unauthored.push(`${sc.id}:${st.id}`); continue; }
+        const fin = g[g.length - 1];
+        if (!fin.target && fin.kind !== "visit") pointless.push(`${sc.id}:${st.id}`);
+        for (const gs of g) if (gs.kind && !["click", "form", "visit"].includes(gs.kind)) badKind.push(`${sc.id}:${st.id}`);
+      }
+    step(c, "TARGET SYSTEM · every user task has an authored Show-me-where guide that ends ON a real control (click/form) or an explicit page-visit — no instruction ever lacks a visual pointer",
+      unauthored.length === 0 && pointless.length === 0 && badKind.length === 0,
+      { actual: unauthored.length || pointless.length ? `unauthored:${unauthored.join(",")} targetless:${pointless.join(",")}` : `${QA_SCENARIOS.reduce((a, x) => a + x.steps.filter((y) => y.role !== "check").length, 0)} user tasks, all pointed` });
 
     // 5) GUIDED INPUTS — example data integrity: every example maps to a
     // real task, every field has a value, fills are pure data (populate,

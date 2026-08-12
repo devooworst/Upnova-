@@ -265,17 +265,18 @@ export default function ApplicantsPage() {
           {a.status === "submitted" && (
             <button
               onClick={() => act(a.id, { action: "shortlist" })}
+              data-guide="applicant-shortlist"
               className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 px-3.5 py-1.5 text-xs font-semibold text-violet-300 transition hover:bg-violet-400/10"
             >
               <Star className="h-3.5 w-3.5" /> Shortlist
             </button>
           )}
           {opportunity.engagement ? (
-            <button onClick={() => setOfferFor(a)} className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
+            <button onClick={() => setOfferFor(a)} data-guide="applicant-select" className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
               <FileText className="h-3.5 w-3.5" /> Send offer
             </button>
           ) : (
-            <button onClick={() => act(a.id, { action: "select" })} className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
+            <button onClick={() => act(a.id, { action: "select" })} data-guide="applicant-select" className="btn-lime inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs">
               <Check className="h-3.5 w-3.5" /> {hasRoles ? "Select — send offer" : "Select — create project"}
             </button>
           )}

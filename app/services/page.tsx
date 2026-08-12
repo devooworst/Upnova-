@@ -276,7 +276,7 @@ export default function ServicesPage() {
                     >
                       <Bookmark className={`h-3.5 w-3.5 ${saved.has(s.id) ? "fill-violet-300" : ""}`} />
                     </button>
-                    <button onClick={() => hire(s)} data-guide={s.owner.handle === "testcreator" || s.owner.handle === "testbusiness" ? "qa-service-book" : undefined} className="btn-lime px-3.5 py-1.5 text-xs">
+                    <button onClick={() => hire(s)} data-guide={s.owner.handle === "testcreator" || s.owner.handle === "testbusiness" ? `qa-service-book-${s.owner.handle}` : undefined} className="btn-lime px-3.5 py-1.5 text-xs">
                       {s.fulfillment === "appointment" ? (
                         <CalendarDays className="h-3.5 w-3.5" />
                       ) : (

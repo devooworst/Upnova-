@@ -521,7 +521,7 @@ export default function NewOpportunityPage() {
 
       <div className="flex justify-end gap-2 pb-8">
         <Link href="/opportunities" className="btn-ghost px-4 py-2 text-sm">Cancel</Link>
-        <button onClick={submit} disabled={busy || overBudget} className="btn-lime px-5 py-2 text-sm disabled:opacity-50" title={overBudget ? "Over budget — fix compensation first" : undefined}>
+        <button onClick={submit} disabled={busy || overBudget} data-guide="opportunity-submit" className="btn-lime px-5 py-2 text-sm disabled:opacity-50" title={overBudget ? "Over budget — fix compensation first" : undefined}>
           {busy ? "Posting…" : overBudget ? "Over budget" : "Post opportunity"}
         </button>
       </div>

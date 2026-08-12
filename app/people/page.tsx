@@ -172,7 +172,7 @@ function PeopleInner() {
                   <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100"><Users className="h-4 w-4 text-sky-300" /> Team / Employees</h2>
                   <p className="mt-0.5 text-[11px] text-zinc-500">Only people you explicitly add. Compensation notes are private to you.</p>
                 </div>
-                <button onClick={() => setAdding(true)} className="btn-lime px-3.5 py-1.5 text-xs">
+                <button onClick={() => setAdding(true)} data-guide="team-add-button" className="btn-lime px-3.5 py-1.5 text-xs">
                   <UserPlus className="h-3.5 w-3.5" /> Add team member
                 </button>
               </div>
@@ -211,6 +211,7 @@ function PeopleInner() {
                               const res = await fetch(`/api/business/team/${t.rowId}`, { method: "DELETE" });
                               if (res.ok) { setNotice(`${t.displayName}'s team record is now inactive — the history is kept.`); load(); }
                             }}
+                            data-guide="team-end-button"
                             className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-zinc-500 hover:border-rose-400/40 hover:text-rose-300"
                           >
                             <UserMinus className="mr-1 inline h-3 w-3 align-[-2px]" /> End
@@ -442,7 +443,7 @@ function TeamModal({ row, onClose, onSaved }: { row: TeamRow | null; onClose: ()
           )}
         </div>
         {err && <p className="mt-3 text-xs font-medium text-rose-300">{err}</p>}
-        <button disabled={busy} onClick={save} className="btn-lime mt-4 w-full justify-center py-2.5 text-sm">
+        <button disabled={busy} onClick={save} data-guide="team-add-save" className="btn-lime mt-4 w-full justify-center py-2.5 text-sm">
           {row ? "Save changes" : "Add to team"}
         </button>
       </div>

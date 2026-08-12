@@ -102,7 +102,7 @@ export default function OpportunitiesPage() {
           <p className="text-sm text-zinc-400">Paid work and collaborations from real posters. Apply Now — never pitch.</p>
         </div>
         <Link href="/opportunities/new" className="btn-lime shrink-0 px-4 py-1.5 text-xs sm:text-sm">
-          <Plus className="h-4 w-4" /> Post opportunity
+          <Plus className="h-4 w-4" /><span data-guide="opportunity-new"> Post opportunity</span>
         </Link>
       </div>
 

@@ -250,7 +250,7 @@ export default function OpportunityPage() {
             </p>
           ) : (
             <>
-              <button onClick={apply} className="btn-lime w-full justify-center py-2.5 text-sm">
+              <button data-guide="opportunity-apply" onClick={apply} className="btn-lime w-full justify-center py-2.5 text-sm">
                 {opp.budget == null ? "Express Interest" : "Apply to Opportunity"}
               </button>
               {opp.viewerEligibility && !opp.viewerEligibility.eligible && (

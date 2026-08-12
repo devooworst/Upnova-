@@ -122,7 +122,7 @@ export default function DemoModeSwitch() {
               </span>
             </span>
           </button>
-          <button
+          <button data-guide="demo-mode-simulation"
             onClick={() => setMode("simulation")}
             disabled={busy}
             className={`mt-1 flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition ${
