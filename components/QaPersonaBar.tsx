@@ -26,7 +26,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { FlaskConical, LogOut, RefreshCw, ArrowRight, Check, LifeBuoy, Crosshair, BookOpen, Target as TargetIcon, XCircle } from "lucide-react";
-import { useSession } from "@/lib/session";
+import { useSession, useHydrated } from "@/lib/session";
 import { QA_HANDLES, QA_LABEL, isQaHandle, switchPersona, exitQa, stashedReturn } from "@/lib/qaLab";
 import { buildBriefing, type MissionBriefing } from "@/lib/qaBriefing";
 import { guideFor, guideBreadcrumb, type GuideStep } from "@/lib/qaGuides";
@@ -55,6 +55,7 @@ const GUIDE_KEY = "mavyn-qa-guide"; // sessionStorage: task id the guide is acti
 
 export default function QaPersonaBar() {
   const { user } = useSession();
+  const hydrated = useHydrated();
   const pathname = usePathname();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -161,6 +162,10 @@ export default function QaPersonaBar() {
     prevTask.current = nextTask;
   }, [nextTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // hydration-safe: render nothing until mounted — the server renders
+  // null, so the first client render must too, no matter how fast the
+  // session cache filled (selective hydration can run late)
+  if (!hydrated) return null;
   if (!user || !user.demoTools || !isQaHandle(user.handle)) return null;
   if (pathname?.startsWith("/profile/studio/world")) return null; // full-screen editor stays clean
 

@@ -312,6 +312,18 @@ export async function logout() {
 }
 
 /** Live session hook. `user === undefined` while loading, null when logged out. */
+/** HYDRATION SAFETY — true only after the component mounted on the
+    client. React hydrates Suspense boundaries LATE (selective
+    hydration): by the time a boundary hydrates, the session cache may
+    already hold a user while the server rendered the signed-out state.
+    Any component whose STRUCTURE branches on auth must render one
+    deterministic shell until this flips — then branch freely. */
+export function useHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated;
+}
+
 export function useSession(): { user: SessionUser | null | undefined; refresh: () => void } {
   // IMPORTANT for hydration: the initial state is whatever the module
   // cache holds — undefined (auth initializing) on a fresh page load,

@@ -31,7 +31,7 @@ import {
   X,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import { useSession } from "@/lib/session";
+import { useSession, useHydrated } from "@/lib/session";
 
 interface BasePerson {
   id: string;
@@ -93,6 +93,7 @@ const fmtShort = (iso: string) => new Date(iso).toLocaleDateString("en-US", { mo
 
 function PeopleInner() {
   const { user } = useSession();
+  const hydrated = useHydrated();
   const params = useSearchParams();
   const [tab, setTab] = useState<string>(params.get("tab") && TABS.some((t) => t.id === params.get("tab")) ? params.get("tab")! : "team");
   const [data, setData] = useState<Payload | null>(null);
@@ -109,6 +110,20 @@ function PeopleInner() {
   useEffect(() => {
     if (user) load();
   }, [!!user, load]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // HYDRATION-SAFE: this component lives inside a Suspense boundary,
+  // which React can hydrate AFTER the session cache fills. The first
+  // render must be structurally identical on server and client — one
+  // deterministic skeleton until mounted AND auth state is known. Only
+  // then branch into signed-out vs the real page (a state update after
+  // hydration, never a mismatch).
+  if (!hydrated || user === undefined)
+    return (
+      <div className="mx-auto max-w-4xl space-y-4" aria-busy="true">
+        <div className="h-24 animate-pulse rounded-2xl bg-card-raised" />
+        <div className="h-64 animate-pulse rounded-2xl bg-card-raised" />
+      </div>
+    );
 
   if (!user)
     return (
