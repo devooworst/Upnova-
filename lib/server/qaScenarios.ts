@@ -1348,7 +1348,7 @@ const peopleScenario: QaScenario = {
   title: "Business People — team, clients, talent, contacts stay separate",
   personas: ["testbusiness", "testcustomer", "testcreator"],
   description:
-    "Message someone → they're a CONTACT. They book and pay you → they become a CLIENT. You hire a creator → they're TALENT, never staff. You explicitly add staff → TEAM. This scenario proves every categorization from the real records — nobody is ever mislabeled an employee because of one gig.",
+    "Message someone → they're a CONTACT. They request, you accept, they pay → they become a CLIENT. You hire a creator → they're TALENT, never staff. You explicitly add staff → TEAM. This scenario proves every categorization from the real records — nobody is ever mislabeled an employee because of one gig.",
   steps: [
     {
       id: "contact",
@@ -1375,24 +1375,56 @@ const peopleScenario: QaScenario = {
     {
       id: "client-books",
       role: "testcustomer",
-      title: "Customer booked + paid the business (TEST)",
-      instruction: "Switch to TEST CUSTOMER → book the QA Studio Rental → after the business accepts, pay (TEST).",
-      expected: "A booking client=testcustomer, provider=testbusiness with a held/released TEST payment.",
+      title: "Customer requested the studio booking",
+      instruction: "Switch to TEST CUSTOMER → Services → open the QA Studio Rental → pick a weekday date and an available time → confirm the request. That's ALL for this test — the business accepts next.",
+      expected: "A booking request: client=testcustomer, provider=testbusiness, status pending. One action, one test — acceptance and payment are the NEXT two tests.",
       href: (ctx) => `/services/${ctx.businessServiceId}`,
       verify: (ctx) => {
         const b = qaBizBooking(ctx);
         if (!b) return { done: false, actual: "no customer→business booking yet" };
         if (!inTask(b.createdAt, ctx)) return { done: false, actual: `a booking ${REDO}`, record: b.id };
-        const pay = payFor("bookingId", b.id);
-        return { done: !!pay, actual: `booking status=${b.status}; payment=${pay ? `${pay.status} (TEST)` : "none — pay after the business accepts"}`, record: b.id };
+        return { done: true, actual: `booking ${b.id.slice(0, 8)}… status=${b.status} — request landed, the business's move is next`, record: b.id };
       },
       perform: async (ctx, api) => {
-        let b = qaBizBooking(ctx);
-        if (!b) {
-          await api("testcustomer", "/api/bookings", { method: "POST", body: { serviceId: ctx.businessServiceId, startsAt: nextWeekday(13, 3).toISOString(), durationMin: 60 } });
-          b = qaBizBooking(ctx);
-        }
+        await api("testcustomer", "/api/bookings", { method: "POST", body: { serviceId: ctx.businessServiceId, startsAt: nextWeekday(13, 3).toISOString(), durationMin: 60 } });
+      },
+    },
+    {
+      id: "client-accept",
+      role: "testbusiness",
+      title: "Business accepted the booking request",
+      instruction: "Switch to TEST BUSINESS → Bookings → find the pending QA Studio Rental request → click Accept.",
+      expected: "Booking status pending → accepted; the customer is told they can now pay.",
+      href: () => "/calendar",
+      ready: bookingReady(qaBizBooking, ["pending", "accepted", "confirmed", "completed"], "a live request (not cancelled)"),
+      repair: bookingRepair(qaBizBooking, "pending"),
+      verify: (ctx) => {
+        const b = qaBizBooking(ctx);
+        if (!b) return { done: false, actual: "no booking yet — finish the previous test" };
+        return { done: b.status !== "pending", actual: `booking status=${b.status}`, record: b.id };
+      },
+      perform: async (ctx, api) => {
+        const b = qaBizBooking(ctx);
         if (b && b.status === "pending") await api("testbusiness", `/api/bookings/${b.id}`, { method: "PATCH", body: { action: "accept" } });
+      },
+    },
+    {
+      id: "client-pays",
+      role: "testcustomer",
+      title: "Customer paid — TEST payment secured",
+      instruction: "Switch back to TEST CUSTOMER → Bookings → open the accepted QA Studio Rental booking → click Pay (TEST — no real money exists here).",
+      expected: "A payment row in HELD state (secured) on the booking — this is what turns a contact into a paying CLIENT.",
+      href: () => "/calendar",
+      ready: bookingReady(qaBizBooking, ["accepted", "confirmed", "completed"], "ACCEPTED so the Pay button exists"),
+      repair: bookingRepair(qaBizBooking, "accepted"),
+      verify: (ctx) => {
+        const b = qaBizBooking(ctx);
+        if (!b) return { done: false, actual: "no booking yet" };
+        const pay = payFor("bookingId", b.id);
+        return { done: !!pay && ["held", "released"].includes(pay.status), actual: `booking status=${b.status}; payment=${pay ? `${pay.status} $${(pay.amountCents / 100).toFixed(2)} (TEST)` : "none yet"}`, record: b.id };
+      },
+      perform: async (ctx, api) => {
+        const b = qaBizBooking(ctx);
         if (b) await api("testcustomer", `/api/bookings/${b.id}`, { method: "PATCH", body: { action: "pay" } });
       },
     },
@@ -1403,6 +1435,8 @@ const peopleScenario: QaScenario = {
       instruction: "As TEST BUSINESS → Bookings → mark the studio rental completed.",
       expected: "Booking completed + payment released; People now categorizes Test Customer under CLIENTS (and no longer CONTACTS).",
       href: () => "/calendar",
+      ready: bookingReady(qaBizBooking, ["confirmed", "completed"], "CONFIRMED (paid) so Mark-completed exists"),
+      repair: bookingRepair(qaBizBooking, "confirmed"),
       verify: (ctx) => {
         const b = qaBizBooking(ctx);
         if (!b) return { done: false, actual: "no booking yet" };

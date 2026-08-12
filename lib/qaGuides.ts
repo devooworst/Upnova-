@@ -233,6 +233,15 @@ export const QA_GUIDES: Record<string, GuideStep[]> = {
     { target: "qa-service-book-testbusiness", label: "QA Studio Rental", text: 'Find "QA Studio Rental" by Test Business — pick an available date if you like, then click the Book button highlighted here (works from the list card or the service page)', until: { visible: "book-wizard" } },
     { target: "book-wizard", label: "Pick a time", text: "Pick a weekday date and an available time, then confirm — pay (TEST) after the business accepts", kind: "form" },
   ],
+  "people:client-accept": [
+    nav("calendar", "Bookings", "/calendar"),
+    { target: "booking-accept", label: "Accept", text: "Click Accept here on Test Customer's pending QA Studio Rental request", kind: "click" },
+  ],
+  "people:client-pays": [
+    nav("calendar", "Bookings", "/calendar"),
+    { target: "booking-card-testbusiness", label: "Open booking", text: "Click the QA Studio Rental booking in the Upcoming list to open it", until: { visible: "booking-pay" } },
+    { target: "booking-pay", label: "Pay (TEST)", text: "Click Pay here — it's a TEST payment, no real money exists in this environment", kind: "click" },
+  ],
   "people:client-complete": [
     nav("calendar", "Bookings", "/calendar"),
     { target: "booking-card-testcustomer", label: "Open booking", text: "Click the QA Studio Rental booking to open it", until: { visible: "booking-complete" } },

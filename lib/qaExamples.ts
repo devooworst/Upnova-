@@ -195,6 +195,12 @@ export const QA_EXAMPLES: Record<string, TaskExamples> = {
   "people:contact": {
     fields: [{ label: "Message", value: "Thanks for your interest — our studio calendar is open if you'd like to book time." }],
   },
+  "people:client-books": {
+    fields: [
+      { label: "Date", value: "any weekday next week" },
+      { label: "Time", value: "any available slot (e.g. 1:00 PM)" },
+    ],
+  },
   "people:team-add": {
     fields: [
       { label: "Handle", value: "testcreator" },

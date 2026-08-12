@@ -67,8 +67,18 @@ export default function QaGuide({
   const missingSince = useRef<number | null>(null);
   const [missingLong, setMissingLong] = useState(false);
   const [reported, setReported] = useState(false);
+  /* STICKY PROGRESS — a reach-condition that was TRUE once stays
+     satisfied for this task. Modals close and panels collapse after
+     they've served their purpose; the guide must never walk the user
+     BACKWARDS through steps they already did (the infinite-rebooking
+     loop). Forward-only, like the scenario itself. */
+  const reached = useRef<Set<number>>(new Set());
+  /* the final step's target was on screen at some point — if it's gone
+     now, the flow most likely closed after the action (wizard confirmed),
+     never a reason to restart or report a defect */
+  const finalSeen = useRef(false);
 
-  useEffect(() => { setMinimized(false); setClickedOk(null); missingSince.current = null; setMissingLong(false); setReported(false); }, [taskLabel]);
+  useEffect(() => { setMinimized(false); setClickedOk(null); missingSince.current = null; setMissingLong(false); setReported(false); reached.current = new Set(); finalSeen.current = false; }, [taskLabel]);
   useEffect(() => { missingSince.current = null; setMissingLong(false); setReported(false); }, [idx]);
 
   const compute = useCallback(() => {
@@ -77,17 +87,19 @@ export default function QaGuide({
     let active = steps.length - 1;
     for (let i = 0; i < steps.length; i++) {
       const u = steps[i].until;
-      const reached = u?.path
+      const nowTrue = u?.path
         ? (pathname ?? "").startsWith(u.path)
         : u?.visible
           ? !!findAnchor(u.visible)
           : false;
-      if (!reached) {
+      if (nowTrue) reached.current.add(i); // sticky — never regress
+      if (!reached.current.has(i) && !nowTrue) {
         active = i;
         break;
       }
     }
     setIdx(active);
+    if (active === steps.length - 1 && findAnchor(steps[active]?.target ?? "")) finalSeen.current = true;
     const el = findAnchor(steps[active]?.target ?? "");
     if (!el) {
       if (steps[active]?.target) {
@@ -171,9 +183,10 @@ export default function QaGuide({
     );
 
   const targetGone = !!step.target && !rect && mode !== "visit";
-  // ACKNOWLEDGED + gone = the control did its job and left — the
-  // checkpoint is the judge now. Never a defect.
-  const verifying = targetGone && acknowledged;
+  // ACKNOWLEDGED + gone = the control did its job and left. FINAL-SEEN +
+  // gone = the flow (wizard/panel) closed after being used. Either way
+  // the checkpoint is the judge now — never a defect, never a restart.
+  const verifying = targetGone && (acknowledged || (idx === steps.length - 1 && finalSeen.current));
   // gone briefly = still locating (hydration, data fetch) — neutral
   const locating = targetGone && !acknowledged && !missingLong;
   // gone for 5s+, never clicked = a genuine GUIDE DEFECT worth reporting
@@ -255,8 +268,9 @@ export default function QaGuide({
               <Check className="h-3.5 w-3.5" /> Action performed — the control has done its job
             </p>
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
-              &quot;{step.label}&quot; is gone because the state moved forward. The database checkpoint is verifying now —
-              this closes by itself the moment the task passes.
+              &quot;{step.label}&quot; closed after doing its job. If you completed the action, the database checkpoint is
+              verifying now — this closes by itself the moment the task passes. If you backed out without finishing,
+              reopen the flow the same way; nothing was lost and nothing restarts.
             </p>
           </div>
         ) : locating ? (

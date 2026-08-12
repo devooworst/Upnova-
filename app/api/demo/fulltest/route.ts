@@ -67,6 +67,7 @@ const PLANNED_CATEGORIES = [
   "QA STATE REPAIR",
   "QA ACCESS CONTROL",
   "PLAN LAB (REAL BOUNDARIES)",
+  "QA LOOP REGRESSION",
   "QA SCENARIO WALKTHROUGHS",
   "DATABASE INTEGRITY",
 ];
@@ -1922,6 +1923,46 @@ export async function POST(req: NextRequest) {
     const after = ["testcreator", "testbusiness", "testcustomer"].map((h) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()!);
     step(c, "ISOLATION: plan testing touched ONLY the QA personas, and the scenario reset restores all of them to Free/Demo/unverified baseline",
       after.every((u) => u.plan === "free" && u.testerMode === "demo"), { actual: after.map((u) => `${u.handle}=${u.plan}/${u.testerMode}`).join(" ") });
+  }
+
+  /* ================= QA LOOP REGRESSION (PEOPLE TEST 2) ================= */
+  /* The infinite-rebooking incident: one checkpoint used to demand
+     book + accept(other persona!) + pay — unpassable by the customer
+     alone, while the guide walked them backwards into rebooking. Now:
+     one persona, one action, one checkpoint — forever. */
+  {
+    const c = cat("QA LOOP REGRESSION");
+    const tokA4 = signDemoToken("devin");
+    const tokC4 = signDemoToken("testcustomer");
+    const as4 = async (tok: string, pth: string, init?: { method?: string; body?: unknown }) => {
+      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      let data: any = {}; try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    };
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "reset" } });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "contact" } });
+    // the customer does EXACTLY what a customer can do alone: request the booking
+    const svcRow = db.select().from(tables.services).all().find((x) => x.title === "QA Studio Rental" && x.active)!;
+    const day4 = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); t.setHours(13, 0, 0, 0); return t; })();
+    const bk4 = await as4(tokC4, "/api/bookings", { method: "POST", body: { serviceId: svcRow.id, startsAt: day4.toISOString(), durationMin: 60 } });
+    let st4 = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
+    const idxBooks = st4.steps.findIndex((x: any) => x.id === "client-books");
+    step(c, "LOOP FIX · the customer's booking REQUEST alone passes their test — no payment demanded from a persona that cannot pay yet",
+      bk4.status === 200 && st4.steps[idxBooks].status === "done" && st4.steps[st4.current].id === "client-accept" && st4.steps[st4.current].role === "testbusiness",
+      { actual: `bk=${bk4.status} client-books=${st4.steps[idxBooks].status} current=${st4.steps[st4.current]?.id} (${st4.steps[st4.current]?.role})` });
+    step(c, "LOOP FIX · the handoff is explicit: the current task now BELONGS to Test Business (accept), then back to the customer (pay) — three checkpoints, three single actions, in order",
+      st4.steps.map((x: any) => x.id).join(",").includes("client-books,client-accept,client-pays"),
+      { actual: st4.steps.map((x: any) => x.id).slice(1, 4).join(" → ") });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "client-accept" } });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "client-pays" } });
+    st4 = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
+    const bkRow = db.select().from(tables.bookings).all().filter((b) => b.providerId === svcRow.ownerId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).pop()!;
+    const pays = db.select().from(tables.payments).all().filter((x) => x.bookingId === bkRow.id);
+    const allBk = db.select().from(tables.bookings).all().filter((b) => b.providerId === svcRow.ownerId && b.createdAt.getTime() > Date.now() - 120000);
+    step(c, "LOOP FIX · accept → pay completes the chain with ONE booking and ONE payment — no duplicates from repeating the flow, checkpoint verified from the database",
+      st4.steps.find((x: any) => x.id === "client-pays")?.status === "done" && pays.length === 1 && allBk.length === 1,
+      { actual: `client-pays=${st4.steps.find((x: any) => x.id === "client-pays")?.status} bookings=${allBk.length} payments=${pays.length}` });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "reset" } });
   }
 
   /* ================= QA SCENARIO WALKTHROUGHS ================= */
