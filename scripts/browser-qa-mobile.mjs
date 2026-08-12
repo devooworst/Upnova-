@@ -186,6 +186,39 @@ const ROUTES = ["/", "/discover", "/creator/devin", "/messages", "/opportunities
       return !!above && !nav.contains(above);
     });
     step("profile", "content scrolls fully clear of the bottom nav (nothing trapped underneath)", navClear);
+
+    /* CONTENT-FIRST CONTRACT: less header, more content — measured */
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await new Promise((r) => setTimeout(r, 400));
+    const fold = await page.evaluate(() => {
+      const banner = document.querySelector("[data-guide=mobile-profile] > div");
+      const avatarImg = document.querySelector("[data-guide=mobile-profile] span.ring-4 > span, [data-guide=mobile-profile] span.ring-4 img, [data-guide=mobile-profile] span.ring-4");
+      const tabs = document.querySelector("[data-guide=mobile-profile-tabs]");
+      return {
+        bannerH: banner ? Math.round(banner.getBoundingClientRect().height) : 999,
+        avatarH: avatarImg ? Math.round(avatarImg.getBoundingClientRect().height) : 999,
+        tabsTop: tabs ? Math.round(tabs.getBoundingClientRect().top) : 9999,
+        vh: window.innerHeight,
+      };
+    });
+    step("profile", "COMPACT header contract: banner ≤140px, avatar ≤90px, and the content TABS are visible inside the FIRST viewport (content one short swipe away, not screens below)",
+      fold.bannerH <= 140 && fold.avatarH <= 90 && fold.tabsTop < fold.vh,
+      `banner=${fold.bannerH}px avatar=${fold.avatarH}px tabsTop=${fold.tabsTop}px (viewport ${fold.vh}px)`);
+
+    /* VISITOR view: compact Follow | Message pair */
+    await open(page, "/creator/lena");
+    await page.waitForSelector("[data-guide=mobile-profile-actions]", { timeout: 15000 });
+    const visitor = await page.evaluate(() => {
+      const actions = Array.from(document.querySelector("[data-guide=mobile-profile-actions]")?.querySelectorAll("a,button") ?? []);
+      const labels = actions.map((a) => a.textContent?.trim());
+      const rects = actions.map((a) => a.getBoundingClientRect());
+      return {
+        followMessage: labels.some((l) => l === "Follow" || l === "Following") && labels.some((l) => l?.includes("Message")),
+        sameRow: rects.length >= 2 && Math.abs(rects[0].top - rects[1].top) < 4,
+        tappable: rects.every((r) => r.height >= 40 && r.height <= 56),
+      };
+    });
+    step("profile", "VISITOR view: compact Follow | Message pair on one row, 40–56px tall — prominent but never dominating the screen", visitor.followMessage && visitor.sameRow && visitor.tappable, JSON.stringify(visitor));
     await page.screenshot({ path: path.join(ART, "mobile-profile-360.png"), fullPage: false });
     await page.close();
   }

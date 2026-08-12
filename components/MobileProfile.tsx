@@ -55,6 +55,7 @@ export default function MobileProfile({ handle }: { handle: string }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Posts");
   const [menuOpen, setMenuOpen] = useState(false);
   const [shared, setShared] = useState(false);
+  const [bioOpen, setBioOpen] = useState(false);
 
   const load = () =>
     fetch(`/api/users/${handle}`)
@@ -94,12 +95,13 @@ export default function MobileProfile({ handle }: { handle: string }) {
   };
 
   /* 48px-minimum touch targets throughout */
-  const btn = "flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition";
+  const btn = "flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-semibold transition";
 
   return (
     <div className="mx-auto max-w-2xl" data-guide="mobile-profile">
-      {/* 1 · cover */}
-      <div className="relative h-36 overflow-hidden rounded-2xl border border-line bg-card sm:h-44 md:h-52">
+      {/* 1 · cover — a compact visual accent (~112px phones), never the
+          main event. object-cover crops from the center-safe area. */}
+      <div className="relative h-28 overflow-hidden rounded-2xl border border-line bg-card sm:h-32 md:h-36">
         {user.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={user.coverUrl} alt="" className="h-full w-full object-cover" style={{ objectPosition: `center ${user.coverPos}%` }} />
@@ -110,15 +112,15 @@ export default function MobileProfile({ handle }: { handle: string }) {
 
       {/* 2-7 · identity block */}
       <div className="px-4">
-        <div className="-mt-10 mb-3 flex items-end justify-between">
+        <div className="-mt-9 mb-2 flex items-end justify-between">
           <span className="inline-block rounded-full ring-4 ring-ink">
-            <Avatar initials={user.displayName.slice(0, 1)} src={user.avatarUrl ?? undefined} size="xl" className="!h-20 !w-20 text-xl" />
+            <Avatar initials={user.displayName.slice(0, 1)} src={user.avatarUrl ?? undefined} size="xl" className="!h-[72px] !w-[72px] text-lg sm:!h-20 sm:!w-20" />
           </span>
           {/* 8 · secondary actions live in "…" — the header stays calm */}
           <div className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-zinc-400 transition hover:text-zinc-200"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-card text-zinc-400 transition hover:text-zinc-200"
               aria-label="More options"
               data-guide="mobile-profile-more"
             >
@@ -149,25 +151,25 @@ export default function MobileProfile({ handle }: { handle: string }) {
         </div>
 
         {/* 3 · name + verification */}
-        <h1 className="flex items-center gap-1.5 text-xl font-bold text-zinc-50">
+        <h1 className="flex items-center gap-1.5 text-lg font-bold leading-tight text-zinc-50">
           {user.displayName}
           {user.verified && <BadgeCheck size={18} className="shrink-0 text-sky-400" aria-label="Verified" />}
           {user.businessVerified && <Building2 size={16} className="shrink-0 text-sky-300" aria-label="Verified business" />}
         </h1>
-        <p className="text-sm text-zinc-500">@{user.handle}</p>
+        <p className="text-[13px] leading-snug text-zinc-500">@{user.handle}</p>
 
         {/* 4 · roles */}
-        {user.roleLine && <p className="mt-1.5 text-sm font-medium text-zinc-300">{user.roleLine}</p>}
+        {user.roleLine && <p className="mt-0.5 text-[13px] font-medium leading-snug text-zinc-300">{user.roleLine}</p>}
 
         {/* 5 · open to work */}
         {user.openToWork && (
-          <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-lime-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Open to work
+          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime-300">
+            <span className="h-1 w-1 rounded-full bg-lime-400" /> Open to work
           </span>
         )}
 
         {/* 6 · campus + location — public labels only, privacy-respecting */}
-        <div className="mt-2.5 space-y-1 text-[13px] text-zinc-400">
+        <div className="mt-2 space-y-0.5 text-xs leading-relaxed text-zinc-400">
           {data.academic && (
             <p className="flex items-center gap-1.5">
               <GraduationCap size={14} className="shrink-0 text-violet-300" />
@@ -186,19 +188,19 @@ export default function MobileProfile({ handle }: { handle: string }) {
           )}
         </div>
 
-        {/* stats strip */}
-        <div className="mt-3 flex gap-5 text-sm">
-          <span className="text-zinc-300"><b className="text-zinc-100">{data.stats.followers}</b> followers</span>
-          <span className="text-zinc-300"><b className="text-zinc-100">{data.stats.following}</b> following</span>
+        {/* stats strip — compact single row */}
+        <div className="mt-2 flex items-center gap-4 text-[13px] leading-snug">
+          <span className="text-zinc-400"><b className="font-semibold text-zinc-100">{data.stats.followers}</b> followers</span>
+          <span className="text-zinc-400"><b className="font-semibold text-zinc-100">{data.stats.following}</b> following</span>
           {data.stats.reviewsCount > 0 && (
-            <span className="flex items-center gap-1 text-zinc-300">
-              <Star size={13} className="text-amber-300" /> {data.stats.avgRating ?? "—"} ({data.stats.reviewsCount})
+            <span className="flex items-center gap-1 text-zinc-400">
+              <Star size={12} className="text-amber-300" /> {data.stats.avgRating ?? "—"} ({data.stats.reviewsCount})
             </span>
           )}
         </div>
 
         {/* 8 · primary actions */}
-        <div className="mt-4 flex gap-2" data-guide="mobile-profile-actions">
+        <div className="mt-3 flex gap-2" data-guide="mobile-profile-actions">
           {isOwner ? (
             <>
               <Link href="/profile/edit" className={`${btn} bg-lime-400 text-zinc-950 hover:bg-lime-300`} data-guide="mobile-edit-profile">
@@ -224,18 +226,27 @@ export default function MobileProfile({ handle }: { handle: string }) {
           )}
         </div>
 
-        {/* 9 · bio */}
-        {user.bio && <p className="mt-4 text-sm leading-relaxed text-zinc-300">{user.bio}</p>}
+        {/* 9 · bio — compact, expandable instead of pushing content down */}
+        {user.bio && (
+          <div className="mt-3">
+            <p className={`text-[13px] leading-relaxed text-zinc-300 ${bioOpen ? "" : "line-clamp-2"}`}>{user.bio}</p>
+            {user.bio.length > 110 && (
+              <button onClick={() => setBioOpen((v) => !v)} className="mt-0.5 text-xs font-semibold text-zinc-500 transition hover:text-zinc-300">
+                {bioOpen ? "Less" : "More"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 10 · content tabs — one section at a time, never everything at once */}
-      <div className="sticky top-16 z-20 mt-5 border-b border-line bg-ink/95 backdrop-blur-xl" data-guide="mobile-profile-tabs">
+      <div className="sticky top-16 z-20 mt-4 border-b border-line bg-ink/95 backdrop-blur-xl" data-guide="mobile-profile-tabs">
         <div className="flex">
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`min-h-[48px] flex-1 border-b-2 text-sm font-semibold transition ${
+              className={`min-h-[44px] flex-1 border-b-2 text-[13px] font-semibold transition ${
                 tab === t ? "border-lime-400 text-zinc-50" : "border-transparent text-zinc-500"
               }`}
             >
