@@ -62,7 +62,7 @@ const composer: GuideStep = { target: "chat-composer", label: "Send", text: "Typ
 const openProjectPanel = (untilAnchor: string): GuideStep => ({
   target: "chat-project",
   label: "Project",
-  text: 'Click the "Project" button (briefcase icon) at the top of the chat',
+  text: 'Click the briefcase button at the top of the chat — it says "Project", or the project\'s current status (like "Draft" or "Offer sent") once one exists',
   until: { visible: untilAnchor },
 });
 
@@ -252,11 +252,29 @@ export const QA_GUIDES: Record<string, GuideStep[]> = {
     { target: "booking-card-testcustomer", label: "Open booking", text: "Click the QA Studio Rental booking to open it", until: { visible: "booking-complete" } },
     { target: "booking-complete", label: "Mark completed", text: 'Click "Mark completed — release $ to me" here', kind: "click" },
   ],
-  "people:hire-talent": [
+  "people:hire-draft": [
     nav("messages", "Messages", "/messages"),
     openConvo("testcreator", "Test Creator"),
     openProjectPanel("project-create-draft"),
-    { target: "project-create-draft", label: "Create draft", text: 'Create the project draft here — then run it to completion (offer → TEST pay → deliver → approve → complete). "Do it for me" in the Test Center plays the whole chain', kind: "form" },
+    { target: "project-create-draft", label: "Create draft", text: 'Fill in a title, amount, and deadline, then click "Create project draft" — creating the draft completes this test', kind: "form" },
+  ],
+  "people:hire-offer": [
+    nav("messages", "Messages", "/messages"),
+    openConvo("testbusiness", "Test Business"),
+    openProjectPanel("project-send-offer"),
+    { target: "project-send-offer", label: "Send offer", text: 'Click "Send offer" here', kind: "click" },
+  ],
+  "people:hire-fund": [
+    takeMeThere("project page", "/projects/"),
+    { target: "project-primary", label: "Accept + pay", text: 'Click "Accept offer" here — then the pay button that replaces it (TEST PAYMENT, no real money)', kind: "click" },
+  ],
+  "people:hire-deliver": [
+    takeMeThere("project page", "/projects/"),
+    { target: "project-primary", label: "Submit work", text: 'Click "Submit work for review" here', kind: "click" },
+  ],
+  "people:hire-release": [
+    takeMeThere("project page", "/projects/"),
+    { target: "project-primary", label: "Approve + release", text: 'Click "Approve the delivery" here — then "Release $ — complete project" (the TEST payment releases to the talent)', kind: "click" },
   ],
   "people:team-add": [
     nav("people", "People", "/people"),

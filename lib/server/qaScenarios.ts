@@ -1449,30 +1449,105 @@ const peopleScenario: QaScenario = {
       },
     },
     {
-      id: "hire-talent",
+      id: "hire-draft",
       role: "testbusiness",
-      title: "Business hired the creator on a project",
-      instruction: "As TEST BUSINESS → Messages → open the Test Creator thread (Take me there opens it fresh) → Project button → Create draft → then run it to completion: Test Creator sends the offer → you accept + pay (TEST) → creator submits → you approve + release. This is the condensed version of the Business Hiring scenario — use 'Do it for me' to play the whole chain through the real routes, or run Business Hiring for the step-by-step.",
-      expected: "A completed business→creator project with a released TEST payment.",
+      title: "Business opened a project draft with the creator",
+      instruction: "As TEST BUSINESS → Messages → open the Test Creator thread (Take me there opens it fresh) → click the briefcase button at the top of the chat → fill in a title, amount, and deadline → click \"Create project draft\". Creating the draft completes THIS test — sending the offer is the creator's move, next.",
+      expected: "A project draft: client=testbusiness, creator=testcreator, made while this test was active. One action, one test.",
       href: () => "/messages?to=testcreator",
       verify: (ctx) => {
         const p = qaBizProject(ctx);
         if (!p) return { done: false, actual: "no business→creator project yet" };
         if (!inTask(p.createdAt, ctx)) return { done: false, actual: `a project ${REDO}`, record: p.id };
+        return { done: true, actual: `project "${p.title}" state=${p.state} — draft landed, the creator's offer is next`, record: p.id };
+      },
+      perform: async (ctx, api) => {
+        await api("testbusiness", "/api/projects", { method: "POST", body: { creatorHandle: "testcreator", title: "[QA] People-scenario gig", amount: 90, brief: "One deliverable.", conversationId: pairConversation(ctx.business, ctx.creator) } });
+      },
+    },
+    {
+      id: "hire-offer",
+      role: "testcreator",
+      title: "Creator sent the offer",
+      instruction: "Switch to TEST CREATOR → Messages → open the Test Business conversation → click the briefcase button (it shows the project's status, e.g. \"Draft\") → click \"Send offer\".",
+      expected: "Project state draft → offer_sent.",
+      href: () => "/messages?to=testbusiness",
+      ready: projectReady(qaBizProject, ["draft", "offer_sent", "accepted", "in_progress", "extension_requested", "submitted", "approved", "completed", "reviewed"], "alive"),
+      repair: projectRepair(qaBizProject),
+      verify: (ctx) => {
+        const p = qaBizProject(ctx);
+        if (!p) return { done: false, actual: "no project yet — finish the previous test" };
+        return { done: p.state !== "draft", actual: `state=${p.state}`, record: p.id };
+      },
+      perform: async (ctx, api) => {
+        const p = qaBizProject(ctx);
+        if (p && p.state === "draft") await api("testcreator", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "send_offer" } });
+      },
+    },
+    {
+      id: "hire-fund",
+      role: "testbusiness",
+      title: "Business accepted + secured the TEST payment",
+      instruction: "Switch back to TEST BUSINESS → open the project page (Take me there) → click \"Accept offer\" → then the pay button that replaces it (TEST PAYMENT — no real money).",
+      expected: "State in_progress + a HELD payment row, payer = the business.",
+      href: (ctx) => {
+        const p = qaBizProject(ctx);
+        return p ? `/projects/${p.id}` : "/messages?to=testcreator";
+      },
+      verify: (ctx) => {
+        const p = qaBizProject(ctx);
+        if (!p) return { done: false, actual: "no project yet" };
+        const pay = payFor("projectId", p.id);
+        return { done: !["draft", "offer_sent", "accepted"].includes(p.state) && !!pay && pay.payerId === ctx.business, actual: `state=${p.state}; payment=${pay ? `${pay.status} (TEST)` : "none"}`, record: p.id };
+      },
+      perform: async (ctx, api) => {
+        const p = qaBizProject(ctx);
+        if (!p) return;
+        await api("testbusiness", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "accept_offer", expectedAmount: p.amount } });
+        await api("testbusiness", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "start", expectedAmount: p.amount } });
+      },
+    },
+    {
+      id: "hire-deliver",
+      role: "testcreator",
+      title: "Creator delivered the work",
+      instruction: "Switch to TEST CREATOR → open the project page (Take me there) → click \"Submit work for review\".",
+      expected: "Project state → submitted; the business is notified to review.",
+      href: (ctx) => {
+        const p = qaBizProject(ctx);
+        return p ? `/projects/${p.id}` : "/calendar";
+      },
+      ready: projectReady(qaBizProject, ["in_progress", "extension_requested", "submitted", "approved", "completed", "reviewed"], "IN PROGRESS so Submit-work exists"),
+      repair: projectRepair(qaBizProject),
+      verify: (ctx) => {
+        const p = qaBizProject(ctx);
+        if (!p) return { done: false, actual: "no project yet" };
+        return { done: ["submitted", "approved", "completed", "reviewed"].includes(p.state), actual: `state=${p.state}`, record: p.id };
+      },
+      perform: async (ctx, api) => {
+        const p = qaBizProject(ctx);
+        if (p) await api("testcreator", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "submit" } });
+      },
+    },
+    {
+      id: "hire-release",
+      role: "testbusiness",
+      title: "Business approved — TEST payment RELEASED to the talent",
+      instruction: "Switch back to TEST BUSINESS → project page → click \"Approve the delivery\" → then \"Release $ — complete project\".",
+      expected: "State completed + the held TEST payment flips to RELEASED. This completed hire is what makes Test Creator TALENT in your People view.",
+      href: (ctx) => {
+        const p = qaBizProject(ctx);
+        return p ? `/projects/${p.id}` : "/calendar";
+      },
+      verify: (ctx) => {
+        const p = qaBizProject(ctx);
+        if (!p) return { done: false, actual: "no project yet" };
         const pay = payFor("projectId", p.id);
         return { done: ["completed", "reviewed"].includes(p.state) && pay?.status === "released", actual: `state=${p.state}; payment=${pay?.status ?? "none"}`, record: p.id };
       },
       perform: async (ctx, api) => {
-        let p = qaBizProject(ctx);
-        if (!p) {
-          await api("testbusiness", "/api/projects", { method: "POST", body: { creatorHandle: "testcreator", title: "[QA] People-scenario gig", amount: 90, brief: "One deliverable.", conversationId: pairConversation(ctx.business, ctx.creator) } });
-          p = qaBizProject(ctx);
-        }
+        const p = qaBizProject(ctx);
         if (!p) return;
-        if (p.state === "draft") await api("testcreator", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "send_offer" } });
-        await api("testbusiness", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "accept_offer", expectedAmount: p.amount } });
-        await api("testbusiness", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "start", expectedAmount: p.amount } });
-        await api("testcreator", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "submit" } });
         await api("testbusiness", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "approve" } });
         await api("testbusiness", `/api/projects/${p.id}`, { method: "PATCH", body: { action: "complete" } });
       },

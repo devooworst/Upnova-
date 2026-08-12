@@ -201,6 +201,18 @@ export const QA_EXAMPLES: Record<string, TaskExamples> = {
       { label: "Time", value: "any available slot (e.g. 1:00 PM)" },
     ],
   },
+  "people:hire-draft": {
+    fields: [
+      { label: "Project title", value: "Cut grass — studio front lot" },
+      { label: "Amount", value: "90" },
+      { label: "Brief", value: "One deliverable: trim and edge the front lot before the weekend shoot." },
+      { label: "Deadline", value: in3d(5) },
+    ],
+    fill: {
+      form: "project-draft",
+      values: { title: "Cut grass — studio front lot", amount: "90", brief: "One deliverable: trim and edge the front lot before the weekend shoot.", deadline: in3d(5) },
+    },
+  },
   "people:team-add": {
     fields: [
       { label: "Handle", value: "testcreator" },

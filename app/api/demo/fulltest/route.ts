@@ -1976,6 +1976,21 @@ export async function POST(req: NextRequest) {
     step(c, "LOOP FIX · accept → pay completes the chain with ONE booking and ONE payment — no duplicates from repeating the flow, checkpoint verified from the database",
       st4.steps.find((x: any) => x.id === "client-pays")?.status === "done" && pays.length === 1 && allBk.length === 1,
       { actual: `client-pays=${st4.steps.find((x: any) => x.id === "client-pays")?.status} bookings=${allBk.length} payments=${pays.length}` });
+    // THE DRAFT LOOP (Test 6 incident): creating the project draft ALONE
+    // must pass its test and hand off to the creator — never re-request
+    // the same open/create action
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "client-complete" } });
+    await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "hire-draft" } });
+    let st5 = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
+    step(c, "DRAFT LOOP FIX · creating the project draft ALONE passes hire-draft and hands off to the CREATOR (send offer) — the guide can never re-request the draft",
+      st5.steps.find((x: any) => x.id === "hire-draft")?.status === "done" && st5.steps[st5.current]?.id === "hire-offer" && st5.steps[st5.current]?.role === "testcreator",
+      { actual: `hire-draft=${st5.steps.find((x: any) => x.id === "hire-draft")?.status} current=${st5.steps[st5.current]?.id} (${st5.steps[st5.current]?.role})` });
+    const chain = st5.steps.map((x: any) => x.id).join(",");
+    step(c, "DRAFT LOOP FIX · the hire chain is five single-persona checkpoints in strict order: draft → offer → fund → deliver → release",
+      chain.includes("hire-draft,hire-offer,hire-fund,hire-deliver,hire-release"), { actual: chain.split(",").slice(5, 10).join(" → ") });
+    const projCount = db.select().from(tables.projects).all().filter((pr) => pr.title === "[QA] People-scenario gig").length;
+    step(c, "DRAFT LOOP FIX · exactly ONE project draft exists — repeated panel opens/rerenders created nothing",
+      projCount === 1, { actual: `projects=${projCount}` });
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "reset" } });
   }
 
