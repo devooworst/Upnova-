@@ -121,7 +121,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         { status: 409 }
       );
 
-    // authenticated persona calls against the REAL public routes
+    // authenticated persona calls against the REAL public routes.
+    // Failed calls are COLLECTED and surfaced — a swallowed 429/500 used
+    // to leave the checkpoint looking like a data wedge ("exists from
+    // BEFORE this test") when the truth was "the action never happened".
+    const performFailures: string[] = [];
     const api: QaApi = async (handle, path, init) => {
       const res = await fetch(origin + path, {
         method: init?.method ?? "GET",
@@ -134,6 +138,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       } catch {
         /* non-json */
       }
+      if (res.status >= 400 && (init?.method ?? "GET") !== "GET")
+        performFailures.push(`${init?.method} ${path} → ${res.status}${data.error ? ` (${String(data.error).slice(0, 80)})` : ""}`);
       return { status: res.status, data };
     };
 
@@ -142,6 +148,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       await step.perform(ctx, api);
     } catch (e) {
       return Response.json({ error: `Step execution failed: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 });
+    }
+    if (performFailures.length) {
+      // benign sub-call failures happen (e.g. re-running an idempotent
+      // PATCH) — only surface them when the checkpoint ALSO failed to
+      // verify, i.e. when the failure is the actual reason it's stuck
+      const after = scenarioProgress(scenario, readRuns());
+      const nowState = after.steps[idx]?.status;
+      if (nowState !== "done")
+        return Response.json({ error: `The step's real API call failed: ${performFailures.join("; ")}`, ...(scenarioState(scenario.id) as object) }, { status: 502 });
     }
     return Response.json(scenarioState(scenario.id));
   }

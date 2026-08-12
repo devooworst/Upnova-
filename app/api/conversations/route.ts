@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { requireUser, guarded, ApiError, isQaOperator, isDemoMode } from "@/lib/server/auth";
 import { rateLimit } from "@/lib/server/ratelimit";
 import { canMessage } from "@/lib/server/authz";
 import { blockedEitherWay } from "@/lib/server/communities";
@@ -93,9 +93,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   return guarded(() => {
     const user = requireUser();
-    // anti-spam: 30 new-conversation attempts per 15 min per account
-    const rl = rateLimit(`conv:${user.id}`, 30, 15 * 60_000);
-    if (!rl.ok) throw new ApiError(429, `Slow down — try again in ${Math.ceil(rl.retryAfterSec / 60)} min`);
+    // anti-spam: 30 new-conversation attempts per 15 min per account.
+    // QA operators (admin + the three test personas) are exempt IN DEMO
+    // MODE ONLY — the Test Center and Full Website QA legitimately open
+    // the same threads dozens of times per hour, and a silently-eaten
+    // 429 here surfaced as a phantom "conversation exists from BEFORE
+    // this test" wedge in the scenario walkthroughs. Real accounts keep
+    // the limit; production (non-demo) keeps it for everyone.
+    if (!(isDemoMode() && isQaOperator(user))) {
+      const rl = rateLimit(`conv:${user.id}`, 30, 15 * 60_000);
+      if (!rl.ok) throw new ApiError(429, `Slow down — try again in ${Math.ceil(rl.retryAfterSec / 60)} min`);
+    }
     const handle = String(body.toHandle || "").trim().toLowerCase();
     if (!handle) throw new ApiError(400, "toHandle is required");
 
