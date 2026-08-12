@@ -7,6 +7,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useState } from "react";
+import { sanitizeQuestions, validateAnswers, type AppQuestion } from "@/lib/applicationSpec";
 import Link from "next/link";
 import { MapPin, Users, X, Bookmark, GraduationCap, Lock } from "lucide-react";
 import Avatar from "@/components/Avatar";
@@ -30,7 +31,7 @@ export interface OpportunityItem {
   trustRequired: string;
   applyBy: string | null;
   eventDate: string | null;
-  applyConfig?: { requireMessage?: boolean; question?: string };
+  applyConfig?: { requireMessage?: boolean; question?: string; questions?: AppQuestion[] };
   roles?: { id: string; title: string; count: number; pay: number | null; description?: string; open: number }[];
   engagement?: EngagementConfig | null;
   posterType?: PosterType;
@@ -286,6 +287,12 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
   );
   const [questionAnswer, setQuestionAnswer] = useState("");
   const [extra, setExtra] = useState("");
+  /* CUSTOM QUESTIONS — the poster's set, rendered with structured
+     controls (radios, dropdowns, pickers) and validated by the same
+     shared spec the server enforces */
+  const customQs = sanitizeQuestions(opp.applyConfig?.questions);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const setAns = (id: string, v: string) => setAnswers((a) => ({ ...a, [id]: v }));
   const [showExtra, setShowExtra] = useState(false);
   const [profileMeta, setProfileMeta] = useState<{ skills: number; portfolio: number; rating: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -332,6 +339,11 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
       setError("Confirm your availability for the date");
       return;
     }
+    const av = validateAnswers(customQs, answers);
+    if (!av.ok) {
+      setError(av.error!);
+      return;
+    }
     if (question && !questionAnswer.trim()) {
       setError("Answer the poster's question");
       return;
@@ -340,7 +352,7 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
     const res = await fetch(`/api/opportunities/${opp.id}/applications`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, availability, questionAnswer, extra, roleId }),
+      body: JSON.stringify({ message, availability, questionAnswer, extra, roleId, answers }),
     });
     const data = await res.json();
     setBusy(false);
@@ -461,6 +473,49 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
               placeholder="Short answer"
               className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
             />
+          </div>
+        )}
+
+        {/* 3b · the poster's custom questions — structured controls */}
+        {customQs.length > 0 && (
+          <div className="mt-3 space-y-3" data-guide="apply-questions">
+            {customQs.map((q) => (
+              <div key={q.id}>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+                  {q.label} {!q.required && <span className="font-normal normal-case text-zinc-600">(optional)</span>}
+                </p>
+                {q.type === "yesno" ? (
+                  <div className="mt-1.5 flex gap-2">
+                    {["yes", "no"].map((v) => (
+                      <button key={v} onClick={() => setAns(q.id, v)} className={`rounded-full border px-4 py-1.5 text-xs font-medium capitalize transition ${answers[q.id] === v ? (v === "yes" ? "border-lime-400/50 bg-lime-400/10 text-lime-300" : "border-rose-400/50 bg-rose-400/10 text-rose-300") : "border-line text-zinc-400"}`}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                ) : q.type === "choice" ? (
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {(q.options ?? []).map((o) => (
+                      <button key={o} onClick={() => setAns(q.id, o)} className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${answers[q.id] === o ? "border-violet-400/50 bg-violet-400/10 text-violet-300" : "border-line text-zinc-400"}`}>
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                ) : q.type === "dropdown" ? (
+                  <select value={answers[q.id] ?? ""} onChange={(e) => setAns(q.id, e.target.value)} className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50">
+                    <option value="">Choose…</option>
+                    {(q.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : q.type === "date" ? (
+                  <input type="date" value={answers[q.id] ?? ""} onChange={(e) => setAns(q.id, e.target.value)} className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50" />
+                ) : q.type === "number" ? (
+                  <input type="number" inputMode="numeric" value={answers[q.id] ?? ""} onChange={(e) => setAns(q.id, e.target.value)} placeholder="0" className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+                ) : q.type === "long" ? (
+                  <textarea rows={3} value={answers[q.id] ?? ""} onChange={(e) => setAns(q.id, e.target.value)} className="mt-1.5 w-full resize-none rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-lime-400/50" />
+                ) : (
+                  <input value={answers[q.id] ?? ""} onChange={(e) => setAns(q.id, e.target.value)} placeholder={q.type === "link" ? "https://…" : "Short answer"} className="mt-1.5 w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50" />
+                )}
+              </div>
+            ))}
           </div>
         )}
 

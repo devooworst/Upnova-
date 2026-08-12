@@ -794,26 +794,32 @@ const opportunityScenario: QaScenario = {
     {
       id: "post",
       role: "testbusiness",
-      title: "Business posted the opportunity",
-      instruction: "As TEST BUSINESS → Opportunities → Post an opportunity (any paid gig).",
-      expected: "An opportunities row posted by Test Business after the scenario started.",
+      title: "Business posted the opportunity — with a custom application question",
+      instruction: "As TEST BUSINESS → Opportunities → Post opportunity → fill the basics (example values in the briefing) → under Application questions click \"+ Add application question\" → add \"Are you available September 15?\" as Yes/No, Required → Post opportunity.",
+      expected: "An opportunities row by Test Business with at least one custom application question stored in its config — the poster decides what to ask; the server enforces it at application time.",
       href: () => "/opportunities/new",
       verify: (ctx) => {
         const o = qaOpportunity(ctx);
         if (!o) return { done: false, actual: "no opportunity yet" };
         if (!inTask(o.createdAt, ctx)) return { done: false, actual: `an opportunity ${REDO}`, record: o.id };
-        return { done: true, actual: `"${o.title}" (${o.status})`, record: o.id };
+        let qs: unknown[] = [];
+        try { qs = (JSON.parse(o.applyConfig).questions as unknown[]) ?? []; } catch {}
+        return {
+          done: qs.length > 0,
+          actual: qs.length ? `"${o.title}" — ${qs.length} custom application question(s) configured` : `"${o.title}" posted, but no custom application question yet — add one and repost (or use Do it for me)`,
+          record: o.id,
+        };
       },
       perform: async (_ctx, api) => {
-        await api("testbusiness", "/api/opportunities", { method: "POST", body: { title: "[QA] Event photographer — test gig", description: "QA scenario opportunity.", budget: 250, type: "gig", location: "Baltimore, MD", remote: true } });
+        await api("testbusiness", "/api/opportunities", { method: "POST", body: { title: "[QA] Event photographer — test gig", description: "QA scenario opportunity.", budget: 250, type: "gig", location: "Baltimore, MD", remote: true, questions: [{ label: "Are you available September 15?", type: "yesno", required: true }] } });
       },
     },
     {
       id: "apply",
       role: "testcustomer",
-      title: "Applicant discovered it and applied",
-      instruction: "Switch to TEST CUSTOMER → Opportunities → open the QA gig → Apply.",
-      expected: "An applications row: applicant=testcustomer on the QA opportunity.",
+      title: "Applicant applied — profile attached, questions answered",
+      instruction: "Switch to TEST CUSTOMER → Opportunities → open the QA gig → Apply → your profile attaches automatically → answer the poster's Yes/No question → Submit application.",
+      expected: "An applications row by Test Customer with the custom question ANSWERED — required questions are enforced server-side; an application missing them is refused with a clear reason.",
       href: (ctx) => {
         const o = qaOpportunity(ctx);
         return o ? `/opportunities/${o.id}` : "/opportunities";
@@ -824,11 +830,24 @@ const opportunityScenario: QaScenario = {
         const a = db.select().from(tables.applications).where(and(eq(tables.applications.opportunityId, o.id), eq(tables.applications.applicantId, ctx.customer))).get();
         if (!a) return { done: false, actual: "no application yet" };
         if (!inTask(a.createdAt, ctx)) return { done: false, actual: `an application ${REDO}`, record: a.id };
-        return { done: true, actual: `application status=${a.status}`, record: a.id };
+        let custom: { label: string; answer: string }[] = [];
+        try { custom = (JSON.parse(a.answers).custom as typeof custom) ?? []; } catch {}
+        return {
+          done: custom.length > 0,
+          actual: custom.length ? `applied — "${custom[0].label}" → "${custom[0].answer}" (profile attached automatically)` : "applied, but the poster's question wasn't answered — the server should have refused this",
+          record: a.id,
+        };
       },
       perform: async (ctx, api) => {
         const o = qaOpportunity(ctx);
-        if (o) await api("testcustomer", `/api/opportunities/${o.id}/applications`, { method: "POST", body: { message: "[QA] I'd love this test gig." } });
+        if (!o) return;
+        // answer every configured question by type — through the real route
+        let qs: { id: string; type: string; options?: string[] }[] = [];
+        try { qs = (JSON.parse(o.applyConfig).questions as typeof qs) ?? []; } catch {}
+        const answers: Record<string, string> = {};
+        for (const q of qs)
+          answers[q.id] = q.type === "yesno" ? "yes" : q.type === "choice" || q.type === "dropdown" ? (q.options?.[0] ?? "") : q.type === "number" ? "2" : q.type === "date" ? new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10) : q.type === "link" ? "https://mavyn.dev/qa" : "[QA] answer";
+        await api("testcustomer", `/api/opportunities/${o.id}/applications`, { method: "POST", body: { message: "[QA] I'd love this test gig.", answers } });
       },
     },
     {

@@ -564,6 +564,47 @@ export async function POST(req: NextRequest) {
   /* ================= OPPORTUNITIES + APPLICATIONS (business ↔ creator) ================= */
   {
     const c = cat("OPPORTUNITIES & APPLICATIONS");
+
+    /* ---- CUSTOM APPLICATION QUESTIONS — poster-defined, server-enforced ---- */
+    const qOpp = await api("harboroak", "/api/opportunities", { method: "POST", body: {
+      title: "[TESTQ] Studio assistant — question probe", description: "Custom-question validation probe.", budget: 120, type: "gig", location: "Baltimore, MD", remote: true,
+      questions: [
+        { id: "avail", label: "Are you available September 15?", type: "yesno", required: true },
+        { id: "exp", label: "Experience level", type: "dropdown", required: true, options: ["Beginner", "Intermediate", "Advanced", "Expert"] },
+        { id: "reel", label: "Portfolio link", type: "link", required: false },
+      ],
+    } });
+    const qOppId = (qOpp.data as any).id;
+    const storedQ = (() => { const r = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, qOppId)).get(); try { return JSON.parse(r!.applyConfig).questions ?? []; } catch { return []; } })();
+    step(c, "poster-defined application questions are stored SANITIZED on the opportunity (types, options, required flags)",
+      qOpp.status === 200 && storedQ.length === 3 && storedQ[1].options?.length === 4, { record: qOppId, actual: `${storedQ.length} questions, dropdown options=${storedQ[1]?.options?.length}` });
+
+    const missing = await api("rachel", `/api/opportunities/${qOppId}/applications`, { method: "POST", body: { message: "probe", answers: { avail: "yes" } } });
+    step(c, "SERVER-SIDE: an application missing a REQUIRED question is refused with the exact field named — hiding fields client-side could never bypass this",
+      missing.status === 400 && /Experience level/.test(String((missing.data as any).error)), { route: "POST applications", actual: `${missing.status} "${String((missing.data as any).error).slice(0, 60)}"` });
+
+    const badChoice = await api("rachel", `/api/opportunities/${qOppId}/applications`, { method: "POST", body: { message: "probe", answers: { avail: "yes", exp: "Galactic" } } });
+    step(c, "SERVER-SIDE: an answer outside the listed options is refused — answer types are validated, not trusted",
+      badChoice.status === 400 && /listed options/.test(String((badChoice.data as any).error)), { actual: `${badChoice.status} "${String((badChoice.data as any).error).slice(0, 60)}"` });
+
+    const goodApply = await api("rachel", `/api/opportunities/${qOppId}/applications`, { method: "POST", body: { message: "Profile does the heavy lifting.", answers: { avail: "yes", exp: "Advanced", reel: "https://mavyn.dev/reel" } } });
+    const appRow = db.select().from(tables.applications).all().find((a) => a.opportunityId === qOppId);
+    const storedA = (() => { try { return JSON.parse(appRow!.answers).custom ?? []; } catch { return []; } })();
+    step(c, "a valid application stores every typed answer WITH its question — the poster reviews real structured data, profile attached automatically",
+      goodApply.status === 200 && storedA.length === 3 && storedA[0].answer === "yes" && storedA[1].answer === "Advanced",
+      { record: appRow?.id, actual: storedA.map((x: any) => `${x.label}→${x.answer}`).join(" · ").slice(0, 90) });
+
+    /* ---- SEND OFFER — essentials → review → send, verified in the DB ---- */
+    const offerRes = await api("harboroak", `/api/applications/${appRow!.id}`, { method: "PATCH", body: { action: "offer", title: "Campaign content creator — fall launch", amount: 300, compModel: "per_project", startDate: new Date(Date.now() + 20 * 86400e3).toISOString().slice(0, 10), note: "Three deliverables for the fall campaign." } });
+    const offerRow = db.select().from(tables.applications).where(eq(tables.applications.id, appRow!.id)).get()!;
+    const storedOffer = (() => { try { return JSON.parse(offerRow.offer); } catch { return {}; } })();
+    step(c, "SEND OFFER: the essentials-only payload (what for · $300 per project · deadline · note) creates the real offer — terms stored exactly as reviewed (seed applicants may auto-accept: selected→confirmed is the real flow)",
+      offerRes.status === 200 && ["selected", "confirmed", "active"].includes(offerRow.status) && storedOffer.amount === 300 && storedOffer.compModel === "per_project" && /fall launch/.test(storedOffer.title ?? ""),
+      { record: appRow?.id, actual: `status=${offerRow.status} offer=$${storedOffer.amount} ${storedOffer.compModel} "${String(storedOffer.title).slice(0, 40)}"` });
+
+    // cleanup: close the probe opportunity so counts stay predictable
+    await api("harboroak", `/api/opportunities/${qOppId}`, { method: "PATCH", body: { action: "close" } });
+
     const opp = await api("harboroak", "/api/opportunities", { method: "POST", body: { title: "[TEST] Content photographer — fall campaign", description: "Three shoots, paid.", budget: 350, type: "gig", location: "Baltimore, MD", remote: true } });
     const oppId = String((opp.data as any).id ?? "");
     step(c, "business posted the opportunity", opp.status === 200 && !!oppId, { record: oppId });

@@ -13,6 +13,7 @@ import { FeedScope, inScope, viewerContext, verifiedCampusMap } from "@/lib/serv
 import { ELIGIBILITIES, eligibilityLabel, checkApplicantEligibility } from "@/lib/server/eligibility";
 import { campusVerification } from "@/lib/server/campus";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
+import { sanitizeQuestions } from "@/lib/applicationSpec";
 
 export const dynamic = "force-dynamic";
 
@@ -196,6 +197,9 @@ export async function POST(req: NextRequest) {
         applyConfig: JSON.stringify({
           requireMessage: body.requireMessage !== false,
           question: String(body.question || "").slice(0, 160) || undefined,
+          // CUSTOM APPLICATION QUESTIONS — the poster decides what to ask;
+          // sanitized here, ENFORCED at application time with the same module
+          questions: (() => { const qs = sanitizeQuestions(body.questions); return qs.length ? qs : undefined; })(),
           // manual selection is the default; unselected applicants get the
           // professional update on close unless the poster opts out
           selection: ["manual", "shortlist"].includes(body.selection) ? body.selection : "manual",

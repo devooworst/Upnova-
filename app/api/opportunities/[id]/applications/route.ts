@@ -9,6 +9,7 @@ import { notify } from "@/lib/server/notify";
 import { recordInteraction } from "@/lib/server/recsys";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 import { checkApplicantEligibility } from "@/lib/server/eligibility";
+import { sanitizeQuestions, validateAnswers, answersForStorage } from "@/lib/applicationSpec";
 
 export const dynamic = "force-dynamic";
 
@@ -87,10 +88,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (existing) throw new ApiError(409, "You already applied to this opportunity");
 
     // adaptive requirements — the POSTER decided what's required
-    let config: { requireMessage?: boolean; question?: string } = {};
+    let config: { requireMessage?: boolean; question?: string; questions?: unknown } = {};
     try {
       config = JSON.parse(opp.applyConfig);
     } catch {}
+    // CUSTOM QUESTIONS — validated server-side with the shared spec:
+    // required answered, types respected, choices within the listed options
+    const customQs = sanitizeQuestions(config.questions);
+    const givenAnswers = (typeof body.answers === "object" && body.answers !== null ? body.answers : {}) as Record<string, unknown>;
+    const answerCheck = validateAnswers(customQs, givenAnswers);
+    if (!answerCheck.ok) throw new ApiError(400, answerCheck.error!);
 
     const message = String(body.message || "").trim().slice(0, 1000);
     if (config.requireMessage !== false && !message)
@@ -132,6 +139,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         availability,
         answers: JSON.stringify({
           ...(config.question ? { question: config.question, answer: questionAnswer } : {}),
+          ...(customQs.length ? { custom: answersForStorage(customQs, givenAnswers) } : {}),
           ...(body.extra ? { extra: String(body.extra).trim().slice(0, 500) } : {}),
         }),
       })

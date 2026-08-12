@@ -222,6 +222,16 @@ export default function ApplicantsPage() {
           {a.answers?.extra && (
             <p className="mt-1.5 text-xs italic leading-relaxed text-zinc-400">&ldquo;{a.answers.extra}&rdquo;</p>
           )}
+          {Array.isArray((a.answers as Record<string, unknown>).custom) && (
+            <div className="mt-1.5 space-y-0.5">
+              {((a.answers as { custom: { id: string; label: string; answer: string }[] }).custom).map((qa) => (
+                <p key={qa.id} className="text-xs leading-relaxed">
+                  <span className="text-zinc-500">{qa.label}</span>{" "}
+                  <span className="text-zinc-300">— {qa.answer}</span>
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -484,6 +494,11 @@ function OfferModal({
   const [duration, setDuration] = useState(engagement?.duration ?? "");
   const [note, setNote] = useState("");
   const classification = engagement?.classification ?? "mavyn_freelance";
+  /* SEND OFFER ≠ AN APPLICATION: essentials only, advanced details on
+     request, and an explicit REVIEW step — no intermediate button can
+     accidentally send an offer. */
+  const [showDetails, setShowDetails] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const inputCls =
     "w-full rounded-xl border border-line bg-card-raised px-3.5 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50";
 
@@ -497,39 +512,90 @@ function OfferModal({
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200"><X className="h-4 w-4" /></button>
         </div>
-        <div className="mt-4 space-y-3">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Role / position" className={inputCls} maxLength={80} />
-          <div className="grid grid-cols-2 gap-2">
-            <select value={engagementType} onChange={(e) => setEngagementType(e.target.value as typeof engagementType)} className={inputCls}>
-              {ENGAGEMENT_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-            <select value={compModel} onChange={(e) => setCompModel(e.target.value as typeof compModel)} className={inputCls}>
-              {COMP_MODELS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+        {!reviewing ? (
+          /* ---- STEP 1 · ESSENTIALS — an offer is not a contract form ---- */
+          <div className="mt-4 space-y-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">What are you hiring them for?</p>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Campaign content creator — fall launch" className={`${inputCls} mt-1.5`} maxLength={80} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Payment</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-zinc-400">
+                  $<input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="300" className={inputCls} />
+                </label>
+                <select value={compModel} onChange={(e) => setCompModel(e.target.value as typeof compModel)} className={`${inputCls} w-auto shrink-0`}>
+                  {COMP_MODELS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Start / deadline <span className="font-normal normal-case text-zinc-600">(optional)</span></p>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={`${inputCls} mt-1.5`} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Message / brief <span className="font-normal normal-case text-zinc-600">(optional)</span></p>
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="A line about the work — details can live in the project brief." className={`${inputCls} mt-1.5 resize-none`} />
+            </div>
+
+            {/* PROGRESSIVE DISCLOSURE — advanced terms only when wanted */}
+            {!showDetails ? (
+              <button onClick={() => setShowDetails(true)} className="text-xs font-medium text-zinc-500 hover:text-zinc-300">
+                + Add details (engagement type, duration, schedule)
+              </button>
+            ) : (
+              <div className="space-y-2 rounded-xl border border-line-soft bg-card-raised/50 p-3">
+                <select value={engagementType} onChange={(e) => setEngagementType(e.target.value as typeof engagementType)} className={inputCls}>
+                  {ENGAGEMENT_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+                <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Duration — e.g. 3 months" className={inputCls} maxLength={60} />
+                <input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Schedule — e.g. 2 videos/week" className={inputCls} maxLength={120} />
+              </div>
+            )}
+
+            <button
+              onClick={() => setReviewing(true)}
+              disabled={!title.trim() || !amount}
+              data-guide="offer-review"
+              className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40"
+            >
+              Review offer →
+            </button>
           </div>
-          <label className="flex items-center gap-2 text-sm text-zinc-400">
-            $<input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Amount" className={inputCls} />
-            <span className="shrink-0 text-xs text-zinc-500">per {cycleLabel(compModel)}</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
-            <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Duration — e.g. 3 months" className={inputCls} maxLength={60} />
+        ) : (
+          /* ---- STEP 2 · REVIEW — nothing sends until you say so ---- */
+          <div className="mt-4 space-y-3">
+            <div className="rounded-xl border border-lime-400/30 bg-lime-400/5 p-4">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-lime-300">You&apos;re offering</p>
+              <p className="mt-1.5 font-mono text-xl font-bold tracking-tight text-lime-300">${amount}</p>
+              <p className="text-xs text-zinc-400">per {cycleLabel(compModel)}</p>
+              <div className="mt-2 space-y-0.5 border-t border-line-soft pt-2 text-xs text-zinc-300">
+                <p><span className="text-zinc-500">For:</span> {title}</p>
+                <p><span className="text-zinc-500">To:</span> {applicant.applicant.displayName}</p>
+                {startDate && <p><span className="text-zinc-500">Start / deadline:</span> {new Date(startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>}
+                {duration && <p><span className="text-zinc-500">Duration:</span> {duration}</p>}
+                {schedule && <p><span className="text-zinc-500">Schedule:</span> {schedule}</p>}
+                {note && <p><span className="text-zinc-500">Note:</span> {note}</p>}
+              </div>
+            </div>
+            <p className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${classification === "external_employment" ? "border-sky-400/25 bg-sky-400/5 text-sky-200" : "border-lime-400/25 bg-lime-400/5 text-zinc-300"}`}>
+              {classification === "external_employment"
+                ? "External employment — payroll and classification are handled by the employer OUTSIDE Mavyn. No Mavyn payment workflow."
+                : "Freelance / contract through Mavyn — each cycle is secured up front and released on completion. Buyer pays the 5% fee on top."}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setReviewing(false)} className="btn-ghost flex-1 justify-center py-2.5 text-sm">← Back</button>
+              <button
+                onClick={() => onSend({ title, engagementType, compModel, amount: Number(amount) || 0, schedule, startDate: startDate || undefined, duration, note, classification })}
+                data-guide="offer-send"
+                className="btn-lime flex-1 justify-center py-2.5 text-sm"
+              >
+                Send offer
+              </button>
+            </div>
           </div>
-          <input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Schedule — e.g. 2 videos/week" className={inputCls} maxLength={120} />
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Other agreed terms (optional)" className={`${inputCls} resize-none`} />
-          <p className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${classification === "external_employment" ? "border-sky-400/25 bg-sky-400/5 text-sky-200" : "border-lime-400/25 bg-lime-400/5 text-zinc-300"}`}>
-            {classification === "external_employment"
-              ? "External employment — payroll and classification are handled by the employer OUTSIDE Mavyn. No Mavyn payment workflow."
-              : "Freelance / contract through Mavyn — each cycle is secured up front and released on completion. Buyer pays the 5% fee on top."}
-          </p>
-          <button
-            onClick={() => onSend({ title, engagementType, compModel, amount: Number(amount) || 0, schedule, startDate: startDate || undefined, duration, note, classification })}
-            disabled={!title.trim() || !amount}
-            className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40"
-          >
-            Send offer{amount ? ` — $${amount} per ${cycleLabel(compModel)}` : ""}
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import { sanitizeQuestions, applicationLength, QUESTION_TYPES, MAX_QUESTIONS, type AppQuestion } from "@/lib/applicationSpec";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Briefcase, Plus, X, Users } from "lucide-react";
@@ -46,6 +47,7 @@ export default function NewOpportunityPage() {
       if (typeof v.applyBy === "string") setApplyBy(v.applyBy);
       if (typeof v.studentFriendly === "boolean") setStudentFriendly(v.studentFriendly);
       if (typeof v.eligibility === "string") setEligibility(v.eligibility);
+      if (Array.isArray(v.questions)) setAppQuestions(sanitizeQuestions(v.questions));
     };
     window.addEventListener("mavyn:qa-fill", onFill);
     return () => window.removeEventListener("mavyn:qa-fill", onFill);
@@ -53,6 +55,24 @@ export default function NewOpportunityPage() {
   // applicant requirements — poster-controlled
   const [requireMessage, setRequireMessage] = useState(true);
   const [question, setQuestion] = useState("");
+  /* APPLICATION BUILDER — the poster decides what to ask. Simple types,
+     required toggles, reorder, preview. Simple by default: zero custom
+     questions is a perfectly good application. */
+  const [appQuestions, setAppQuestions] = useState<AppQuestion[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const addQuestion = () =>
+    setAppQuestions((q) => (q.length >= MAX_QUESTIONS ? q : [...q, { id: `q${Date.now().toString(36)}`, label: "", type: "short", required: true }]));
+  const patchQuestion = (i: number, patch: Partial<AppQuestion>) =>
+    setAppQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
+  const moveQuestion = (i: number, dir: -1 | 1) =>
+    setAppQuestions((qs) => {
+      const j = i + dir;
+      if (j < 0 || j >= qs.length) return qs;
+      const next = qs.slice();
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  const appLen = applicationLength(sanitizeQuestions(appQuestions), requireMessage);
   // TEAM & OPENINGS — roles are configuration, not a separate system.
   // Form rows keep count/pay as STRINGS so the inputs behave like real
   // text fields (clearable, retypable); they're sanitized on submit.
@@ -141,6 +161,7 @@ export default function NewOpportunityPage() {
         eligibility,
         requireMessage,
         question: question.trim() || undefined,
+        questions: sanitizeQuestions(appQuestions),
       }),
     });
     const data = await res.json();
@@ -493,15 +514,66 @@ export default function NewOpportunityPage() {
               <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">auto</span>
             </div>
           )}
-          <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
-            <p className="text-sm text-zinc-200">One extra question <span className="text-xs text-zinc-500">(optional)</span></p>
-            <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder='e.g. "Do you own a licensed drone?"'
-              className={`${inputCls} mt-1.5 py-2 text-xs`}
-              maxLength={160}
-            />
+          {/* ---- APPLICATION QUESTIONS — add only what you need ---- */}
+          <div data-guide="app-questions" className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-zinc-200">Application questions <span className="text-xs text-zinc-500">(optional)</span></p>
+              <span className={`rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em] ${appLen.label === "Long" ? "border-amber-400/50 text-amber-300" : "border-line text-zinc-500"}`}>
+                Application length: {appLen.label}
+              </span>
+            </div>
+            {appLen.advice && <p className="mt-1.5 rounded-lg border border-amber-400/30 bg-amber-400/5 px-2.5 py-1.5 text-[11px] text-amber-200">{appLen.advice}</p>}
+            <div className="mt-2 space-y-2">
+              {appQuestions.map((q, i) => (
+                <div key={q.id} className="rounded-lg border border-line bg-card px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <input
+                        value={q.label}
+                        onChange={(e) => patchQuestion(i, { label: e.target.value })}
+                        placeholder='Question — e.g. "Are you available September 15?"'
+                        className={`${inputCls} py-1.5 text-xs`}
+                        maxLength={140}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={q.type}
+                          onChange={(e) => patchQuestion(i, { type: e.target.value as AppQuestion["type"] })}
+                          className={`${inputCls} w-auto py-1.5 text-xs`}
+                        >
+                          {QUESTION_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                        </select>
+                        <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                          <input type="checkbox" checked={q.required} onChange={(e) => patchQuestion(i, { required: e.target.checked })} className="accent-lime-400" />
+                          Required
+                        </label>
+                        <span className="ml-auto flex items-center gap-1">
+                          <button type="button" onClick={() => moveQuestion(i, -1)} disabled={i === 0} className="rounded border border-line px-1.5 text-xs text-zinc-500 disabled:opacity-30 hover:text-zinc-200">↑</button>
+                          <button type="button" onClick={() => moveQuestion(i, 1)} disabled={i === appQuestions.length - 1} className="rounded border border-line px-1.5 text-xs text-zinc-500 disabled:opacity-30 hover:text-zinc-200">↓</button>
+                          <button type="button" onClick={() => setAppQuestions((qs) => qs.filter((_, j) => j !== i))} className="rounded border border-line px-1.5 text-xs text-zinc-500 hover:border-rose-400/40 hover:text-rose-300">✕</button>
+                        </span>
+                      </div>
+                      {(q.type === "choice" || q.type === "dropdown") && (
+                        <input
+                          value={(q.options ?? []).join(", ")}
+                          onChange={(e) => patchQuestion(i, { options: e.target.value.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8) })}
+                          placeholder="Options, comma-separated — e.g. Beginner, Intermediate, Advanced, Expert"
+                          className={`${inputCls} py-1.5 text-xs`}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" data-guide="app-question-add" onClick={addQuestion} disabled={appQuestions.length >= MAX_QUESTIONS} className="btn-ghost px-3 py-1.5 text-xs disabled:opacity-40">
+                + Add application question
+              </button>
+              <button type="button" data-guide="app-preview" onClick={() => setShowPreview(true)} className="btn-ghost px-3 py-1.5 text-xs">
+                Preview application
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2.5 opacity-80">
             <span className="text-sm text-zinc-400">
@@ -525,6 +597,54 @@ export default function NewOpportunityPage() {
           {busy ? "Posting…" : overBudget ? "Over budget" : "Post opportunity"}
         </button>
       </div>
+
+      {/* ---- APPLICANT PREVIEW — exactly what applicants will see ---- */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowPreview(false)}>
+          <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Applicant preview</p>
+                <h3 className="mt-1 text-sm font-bold text-zinc-100">Apply for {title.trim() || "your opportunity"}</h3>
+              </div>
+              <button onClick={() => setShowPreview(false)} className="rounded-md p-1 text-zinc-500 hover:text-zinc-200">✕</button>
+            </div>
+            <div className="mt-4 space-y-2.5">
+              <div className="flex items-center gap-2.5 rounded-xl border border-violet-400/25 bg-violet-400/5 px-3.5 py-2.5">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+                <p className="text-xs text-zinc-400"><span className="font-semibold text-zinc-300">Their Mavyn profile will be included</span> — photo, bio, skills, portfolio, reviews, verification. Never re-typed.</p>
+              </div>
+              {eventDate && (
+                <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Are you available on {new Date(eventDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}?</p>
+                  <p className="mt-1 text-xs text-zinc-600">Yes · No · Need to confirm</p>
+                </div>
+              )}
+              {requireMessage && (
+                <div className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">Why are you a good fit?</p>
+                  <p className="mt-1 text-xs italic text-zinc-600">Short answer — their profile does the heavy lifting.</p>
+                </div>
+              )}
+              {sanitizeQuestions(appQuestions).map((q) => (
+                <div key={q.id} className="rounded-xl border border-line bg-card-raised px-3.5 py-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+                    {q.label} {!q.required && <span className="font-normal normal-case text-zinc-600">(optional)</span>}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    {q.type === "yesno" ? "Yes · No" : q.type === "choice" || q.type === "dropdown" ? (q.options ?? []).join(" · ") : QUESTION_TYPES.find((t) => t.id === q.type)?.hint}
+                  </p>
+                </div>
+              ))}
+              <div className="rounded-xl border border-line-soft bg-card-raised/50 px-3.5 py-2.5">
+                <p className="text-xs text-zinc-500">Anything else? <span className="text-zinc-600">(optional)</span></p>
+              </div>
+              <div className="rounded-xl bg-lime-400/10 px-3.5 py-2.5 text-center text-xs font-bold text-lime-300">Submit application</div>
+              <p className="text-center font-mono text-[9px] uppercase tracking-[0.12em] text-zinc-600">Application length: {appLen.label}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

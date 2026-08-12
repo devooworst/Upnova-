@@ -100,6 +100,9 @@ export const QA_EXAMPLES: Record<string, TaskExamples> = {
       { label: "Apply by", value: in3d(25) },
       { label: "Student-friendly", value: "ON" },
       { label: "Who can apply", value: "Anyone on Mavyn" },
+      { label: "+ Add application question", value: "Are you available September 15?" },
+      { label: "Answer type", value: "Yes / No" },
+      { label: "Required", value: "ON" },
     ],
     fill: {
       form: "opportunity",
@@ -114,11 +117,15 @@ export const QA_EXAMPLES: Record<string, TaskExamples> = {
         applyBy: in3d(25),
         studentFriendly: true,
         eligibility: "anyone",
+        questions: [{ id: "q-sept15", label: "Are you available September 15?", type: "yesno", required: true }],
       },
     },
   },
   "opportunity:apply": {
-    fields: [{ label: "Application message", value: "I use Mavyn daily and love finding edge cases — I'd be a thorough QA tester for this." }],
+    fields: [
+      { label: "Why are you a good fit?", value: "I use Mavyn daily and love finding edge cases — I'd be a thorough QA tester for this." },
+      { label: "Are you available September 15?", value: "Yes" },
+    ],
   },
   "opportunity:connect": {
     fields: [{ label: "Message", value: "You're selected! Let's plan the first testing session — what days work for you?" }],
