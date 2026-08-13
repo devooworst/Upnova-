@@ -18,6 +18,14 @@ const nextConfig = {
     NEXT_PUBLIC_BUILD_COMMIT: buildCommit,
   },
   reactStrictMode: true,
+  // Uploaded images live on Vercel Blob in production — absolute URLs on
+  // the store's subdomain. next/image REJECTS remote hostnames that
+  // aren't allow-listed (the optimizer 400s, <img> onError fires, and
+  // avatars silently fall back to initials — "my photo didn't save").
+  // Local disk uploads are relative /uploads/… paths and need no entry.
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "*.public.blob.vercel-storage.com" }],
+  },
   // demo: HTML must never be cached by browsers/proxies — a stale login
   // page from a previous build caused ghost bugs. Hashed static assets
   // keep their own immutable caching.
