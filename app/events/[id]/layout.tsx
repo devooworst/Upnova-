@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 
-export function generateMetadata({ params }: { params: { id: string } }): Metadata {
-  const e = db
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const e = await db
     .select()
     .from(tables.events)
     .where(or(eq(tables.events.id, params.id), eq(tables.events.slug, params.id)))

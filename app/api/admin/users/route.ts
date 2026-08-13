@@ -6,9 +6,9 @@ import { requireAdmin, guarded, ApiError } from "@/lib/server/auth";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return guarded(() => {
-    requireAdmin();
-    const rows = db
+  return guarded(async () => {
+    await requireAdmin();
+    const rows = await db
       .select({ user: tables.users, profile: tables.profiles })
       .from(tables.users)
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
@@ -35,24 +35,24 @@ export async function GET() {
 /** PATCH { userId, action: suspend | activate } — moderation actions. */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const admin = requireAdmin();
-    const target = db.select().from(tables.users).where(eq(tables.users.id, String(body.userId))).get();
+  return guarded(async () => {
+    const admin = await requireAdmin();
+    const target = await db.select().from(tables.users).where(eq(tables.users.id, String(body.userId))).get();
     if (!target) throw new ApiError(404, "User not found");
     if (target.id === admin.id) throw new ApiError(400, "You can't moderate yourself");
 
     const action = String(body.action);
     if (action === "suspend") {
-      db.update(tables.users).set({ status: "suspended" }).where(eq(tables.users.id, target.id)).run();
+      await db.update(tables.users).set({ status: "suspended" }).where(eq(tables.users.id, target.id)).run();
       // suspended users lose their sessions immediately
-      db.delete(tables.sessions).where(eq(tables.sessions.userId, target.id)).run();
+      await db.delete(tables.sessions).where(eq(tables.sessions.userId, target.id)).run();
     } else if (action === "activate") {
-      db.update(tables.users).set({ status: "active" }).where(eq(tables.users.id, target.id)).run();
+      await db.update(tables.users).set({ status: "active" }).where(eq(tables.users.id, target.id)).run();
     } else if (action === "verify_business") {
       if (target.accountType !== "business") throw new ApiError(400, "Not a business account");
-      db.update(tables.users).set({ businessVerified: true }).where(eq(tables.users.id, target.id)).run();
+      await db.update(tables.users).set({ businessVerified: true }).where(eq(tables.users.id, target.id)).run();
     } else if (action === "revoke_business") {
-      db.update(tables.users).set({ businessVerified: false }).where(eq(tables.users.id, target.id)).run();
+      await db.update(tables.users).set({ businessVerified: false }).where(eq(tables.users.id, target.id)).run();
     } else {
       throw new ApiError(400, "Unknown action");
     }

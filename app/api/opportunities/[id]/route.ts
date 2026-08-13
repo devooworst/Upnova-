@@ -20,24 +20,24 @@ export const dynamic = "force-dynamic";
  * to everywhere else: locationLabel only, never coordinates.
  */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const row = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const row = await db
       .select({ opp: tables.opportunities, user: tables.users, profile: tables.profiles })
       .from(tables.opportunities)
       .innerJoin(tables.users, eq(tables.opportunities.posterId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.opportunities.id, params.id))
       .get();
-    if (!row || row.user.status !== "active") throw new ApiError(404, "Opportunity not found");
-    const { opp, user, profile } = row;
+    if (!row || row!.user.status !== "active") throw new ApiError(404, "Opportunity not found");
+    const { opp, user, profile } = await row;
 
-    const hasServices = !!db.select().from(tables.services).where(eq(tables.services.ownerId, user.id)).get();
-    const completed = db
+    const hasServices = !!await db.select().from(tables.services).where(eq(tables.services.ownerId, user.id)).get();
+    const completed = (await db
       .select()
       .from(tables.projects)
       .where(eq(tables.projects.creatorId, user.id))
-      .all()
+      .all())
       .filter((p) => ["completed", "reviewed"].includes(p.state)).length;
     const posterType =
       user.accountType === "business"
@@ -49,13 +49,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           : "community";
 
     const applied = viewer
-      ? !!db
+      ? !!(await db
           .select()
           .from(tables.applications)
           .where(and(eq(tables.applications.opportunityId, opp.id), eq(tables.applications.applicantId, viewer.id)))
-          .get()
+          .get())
       : false;
-    const apps = db
+    const apps = await db
       .select()
       .from(tables.applications)
       .where(eq(tables.applications.opportunityId, opp.id))
@@ -77,8 +77,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         remote: opp.remote,
         studentFriendly: opp.studentFriendly,
         eligibility: opp.eligibility,
-        eligibilityLabel: eligibilityLabel(opp.eligibility, opp.eligibilityCampusId),
-        viewerEligibility: viewer ? checkApplicantEligibility(opp, viewer.id) : null,
+        eligibilityLabel: await eligibilityLabel(opp.eligibility, opp.eligibilityCampusId),
+        viewerEligibility: viewer ? await checkApplicantEligibility(opp, viewer.id) : null,
         trustRequired: opp.trustRequired,
         applyBy: opp.applyBy?.toISOString() ?? null,
         eventDate: opp.eventDate?.toISOString() ?? null,
@@ -104,30 +104,30 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const opp = requireOpportunityPoster(params.id, user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const opp = await requireOpportunityPoster(params.id, user.id);
     const action = String(body.action);
     if (action === "reopen") {
-      db.update(tables.opportunities).set({ status: "open" }).where(eq(tables.opportunities.id, opp.id)).run();
+      await db.update(tables.opportunities).set({ status: "open" }).where(eq(tables.opportunities.id, opp.id)).run();
       return { status: "open" };
     }
     if (action !== "close") throw new ApiError(400, "Unknown action");
-    db.update(tables.opportunities).set({ status: "closed" }).where(eq(tables.opportunities.id, opp.id)).run();
+    await db.update(tables.opportunities).set({ status: "closed" }).where(eq(tables.opportunities.id, opp.id)).run();
 
     let cfg: { notifyUnselected?: boolean } = {};
     try { cfg = JSON.parse(opp.applyConfig); } catch {}
     let notified = 0;
     if (cfg.notifyUnselected !== false) {
-      const pending = db
+      const pending = (await db
         .select()
         .from(tables.applications)
         .where(eq(tables.applications.opportunityId, opp.id))
-        .all()
+        .all())
         .filter((a) => ["submitted", "shortlisted"].includes(a.status));
       for (const a of pending) {
-        db.update(tables.applications).set({ status: "declined" }).where(eq(tables.applications.id, a.id)).run();
-        notify({
+        await db.update(tables.applications).set({ status: "declined" }).where(eq(tables.applications.id, a.id)).run();
+        await notify({
           userId: a.applicantId,
           actorId: user.id,
           type: "application",

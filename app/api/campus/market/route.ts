@@ -14,38 +14,38 @@ export const dynamic = "force-dynamic";
  *  slice for guests/unverified users: enough to see the value, no meet
  *  spots, capped count. */
 export async function GET() {
-  return guarded(() => {
-    const viewer = getSessionUser();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
     // marketplace membership = CURRENT STUDENTS. Alumni/faculty browse the
     // same limited public slice as everyone else — their campus, alumni
     // communities, and events stay open elsewhere.
     const verif = viewer
-      ? db
+      ? (await db
           .select()
           .from(tables.campusVerifications)
           .where(and(eq(tables.campusVerifications.userId, viewer.id), eq(tables.campusVerifications.status, "verified")))
-          .get() ?? null
+          .get()) ?? null
       : null;
     let myCampus = verif && verif.affiliation === "current_student" ? verif.campusId : null;
     // DEMO MODE: unrestricted tester browses without verification;
     // SIMULATION MODE / production: the real gate applies
-    if (!myCampus && viewer && unrestrictedTester(viewer.id)) myCampus = demoCampusId();
+    if (!myCampus && viewer && (await unrestrictedTester(viewer.id))) myCampus = await demoCampusId();
 
-    const campuses = new Map(db.select().from(tables.campuses).all().map((c) => [c.id, c.name]));
-    let rows = db
+    const campuses = new Map((await db.select().from(tables.campuses).all()).map((c) => [c.id, c.name]));
+    let rows = (await db
       .select({ l: tables.campusListings, user: tables.users, profile: tables.profiles })
       .from(tables.campusListings)
       .innerJoin(tables.users, eq(tables.campusListings.sellerId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.campusListings.createdAt))
-      .all()
+      .all())
       .filter((r) => r.user.status === "active" && !["archived"].includes(r.l.status));
 
     // lazy expiry + auction endings handled at read time
     const now = Date.now();
     for (const r of rows) {
       if (r.l.status === "active" && r.l.expiresAt && r.l.expiresAt.getTime() < now) {
-        db.update(tables.campusListings).set({ status: "expired" }).where(eq(tables.campusListings.id, r.l.id)).run();
+        await db.update(tables.campusListings).set({ status: "expired" }).where(eq(tables.campusListings.id, r.l.id)).run();
         r.l.status = "expired";
       }
     }
@@ -57,7 +57,7 @@ export async function GET() {
     if (!member) return { member: false, verifyRequired: true, campusName: null, listings: [] };
     rows = rows.filter((r) => r.l.campusId === myCampus);
 
-    const allBids = db.select().from(tables.bids).all();
+    const allBids = await db.select().from(tables.bids).all();
     return {
       member,
       campusName: myCampus ? campuses.get(myCampus) ?? null : null,
@@ -88,9 +88,9 @@ export async function GET() {
 /** POST — create a listing (verified campus members only). */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const campusId = requireCurrentStudent(user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const campusId = await requireCurrentStudent(user.id);
 
     const title = String(body.title || "").trim().slice(0, 80);
     if (!title) throw new ApiError(400, "Give it a title");
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       throw new ApiError(400, type === "auction" ? "Set the starting price" : "Set the price");
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.campusListings)
+    await db.insert(tables.campusListings)
       .values({
         id,
         sellerId: user.id,
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
     // one canonical listing + one linked feed post (profile + For You)
     if (body.shareToFeed !== false) {
       const label = LISTING_TYPES.find((t) => t.id === type)!.label;
-      createLinkedPost({
+      await createLinkedPost({
         userId: user.id,
         refType: "campus",
         refId: id,

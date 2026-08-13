@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
  *  are attached as advisory context only. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const targetType = String(body.targetType || "");
     const category = String(body.category || "");
     if (!["user", "post", "message", "service", "opportunity", "community", "project", "order", "product", "work", "license", "campus_listing", "loan", "community_post", "community_comment"].includes(targetType))
@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
       throw new ApiError(400, "Invalid category");
 
     // advisory signals for the moderator — never proof, never automatic action
-    const signals = computeRiskSignals(targetType, String(body.targetId || ""));
+    const signals = await computeRiskSignals(targetType, String(body.targetId || ""));
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.reports)
+    await db.insert(tables.reports)
       .values({
         id,
         reporterId: user.id,
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       })
       .run();
     if (TARGET_TYPES.includes(targetType as TargetType) && body.targetId)
-      recordInteraction(user.id, targetType as TargetType, String(body.targetId), "report");
+      await recordInteraction(user.id, targetType as TargetType, String(body.targetId), "report");
     return { id };
   });
 }

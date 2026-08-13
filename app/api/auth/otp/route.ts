@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     const phone = normalizePhone(body.phone);
     if (!phone) throw new ApiError(400, "Enter a valid phone number");
 
@@ -32,11 +32,11 @@ export async function POST(req: NextRequest) {
     // EXPLICIT credentials only: the demo sticky-session fallback must
     // never turn a phone LOGIN into a phone-verify for someone else.
     const hasExplicitCreds = !!req.headers.get("authorization") || !!cookies().get("mavyn_session");
-    const sessionUser = hasExplicitCreds ? getSessionUser() : null;
+    const sessionUser = hasExplicitCreds ? await getSessionUser() : null;
     const purpose = sessionUser ? "verify" : "login";
     const code = String(randomInt(100000, 1000000)); // 6 digits, CSPRNG
 
-    db.insert(tables.otpCodes)
+    await db.insert(tables.otpCodes)
       .values({
         id: randomBytes(12).toString("hex"),
         phone,
@@ -48,9 +48,9 @@ export async function POST(req: NextRequest) {
 
     // delivery note in the outbox WITHOUT the code (codes are never
     // persisted in plaintext) — only when the number belongs to someone
-    const owner = db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
+    const owner = await db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
     if (owner)
-      deliver(owner.id, "sms", phone, "Mavyn: your sign-in code was sent to this number. It expires in 5 minutes. Never share it.", "otp");
+      await deliver(owner.id, "sms", phone, "Mavyn: your sign-in code was sent to this number. It expires in 5 minutes. Never share it.", "otp");
 
     return {
       ok: true,

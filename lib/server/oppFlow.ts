@@ -17,21 +17,21 @@ import { parseOffer, cycleLabel, type EngagementOffer } from "@/lib/engagement";
 const rid = () => randomBytes(12).toString("hex");
 
 /** Find (or create) the direct conversation between two users. */
-export function conversationBetween(a: string, b: string): string {
-  const mine = db
+export async function conversationBetween(a: string, b: string): Promise<string> {
+  const mine = (await db
     .select()
     .from(tables.conversationMembers)
     .where(eq(tables.conversationMembers.userId, a))
-    .all()
+    .all())
     .map((m) => m.conversationId);
   if (mine.length) {
-    const shared = db
+    const shared = await db
       .select()
       .from(tables.conversationMembers)
       .where(inArray(tables.conversationMembers.conversationId, mine))
       .all();
     const byConv = new Map<string, string[]>();
-    for (const m of shared) {
+    for (const m of await shared) {
       if (!byConv.has(m.conversationId)) byConv.set(m.conversationId, []);
       byConv.get(m.conversationId)!.push(m.userId);
     }
@@ -39,8 +39,8 @@ export function conversationBetween(a: string, b: string): string {
       if (members.length === 2 && members.includes(b)) return convId;
   }
   const convId = rid();
-  db.insert(tables.conversations).values({ id: convId }).run();
-  db.insert(tables.conversationMembers)
+  await db.insert(tables.conversations).values({ id: convId }).run();
+  await db.insert(tables.conversationMembers)
     .values([{ conversationId: convId, userId: a }, { conversationId: convId, userId: b }])
     .run();
   return convId;
@@ -51,11 +51,11 @@ export function conversationBetween(a: string, b: string): string {
  * a booking in "accepted" state (participant confirmed — the poster's
  * payment locks it in), linked to the shared conversation.
  */
-export function acceptRoleOffer(applicationId: string) {
-  const app = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+export async function acceptRoleOffer(applicationId: string) {
+  const app = await db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
   if (!app) throw new ApiError(404, "Application not found");
   if (app.status !== "selected") throw new ApiError(409, `Nothing to accept from "${app.status}"`);
-  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get()!;
+  const opp = (await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get())!;
 
   // engagement offers (configurable terms) take precedence over role offers
   const engOffer = parseOffer(app.offer);
@@ -64,16 +64,16 @@ export function acceptRoleOffer(applicationId: string) {
   const role = parseRoles(opp.roles).find((r) => r.id === app.roleId);
   if (!role) throw new ApiError(409, "This offer isn't tied to a role");
 
-  db.update(tables.applications).set({ status: "confirmed" }).where(eq(tables.applications.id, app.id)).run();
+  await db.update(tables.applications).set({ status: "confirmed" }).where(eq(tables.applications.id, app.id)).run();
 
-  const convId = conversationBetween(opp.posterId, app.applicantId);
+  const convId = await conversationBetween(opp.posterId, app.applicantId);
   // schedule: the opportunity's event date (afternoon default) or a week out
   const base = opp.eventDate ?? new Date(Date.now() + 7 * 86400_000);
   const startsAt = new Date(base);
   if (startsAt.getHours() === 0) startsAt.setHours(14, 0, 0, 0);
 
   const bookingId = rid();
-  db.insert(tables.bookings)
+  await db.insert(tables.bookings)
     .values({
       id: bookingId,
       serviceId: null,
@@ -90,8 +90,8 @@ export function acceptRoleOffer(applicationId: string) {
     })
     .run();
 
-  const applicant = db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get();
-  db.insert(tables.messages)
+  const applicant = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get();
+  await db.insert(tables.messages)
     .values({
       id: rid(),
       conversationId: convId,
@@ -100,9 +100,9 @@ export function acceptRoleOffer(applicationId: string) {
       body: `${applicant?.displayName ?? "Participant"} accepted the ${role.title} role for "${opp.title}" — ${startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" })}${role.pay ? ` · $${role.pay}` : ""}. Payment secures the booking.`,
     })
     .run();
-  db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+  await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
 
-  notify({
+  await notify({
     userId: opp.posterId,
     actorId: app.applicantId,
     type: "booking",
@@ -115,15 +115,15 @@ export function acceptRoleOffer(applicationId: string) {
 }
 
 /** The applicant turns the offer down — the opening frees up. */
-export function declineRoleOffer(applicationId: string, userId: string) {
-  const app = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+export async function declineRoleOffer(applicationId: string, userId: string) {
+  const app = await db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
   if (!app) throw new ApiError(404, "Application not found");
   if (app.applicantId !== userId) throw new ApiError(403, "Not your application");
   if (app.status !== "selected") throw new ApiError(409, `Nothing to decline from "${app.status}"`);
-  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get()!;
-  db.update(tables.applications).set({ status: "offer_declined" }).where(eq(tables.applications.id, app.id)).run();
-  const applicant = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
-  notify({
+  const opp = (await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get())!;
+  await db.update(tables.applications).set({ status: "offer_declined" }).where(eq(tables.applications.id, app.id)).run();
+  const applicant = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
+  await notify({
     userId: opp.posterId,
     actorId: userId,
     type: "application",
@@ -145,25 +145,25 @@ export function declineRoleOffer(applicationId: string, userId: string) {
  * · mavyn_freelance ongoing → ACTIVE + the first paid CYCLE as a booking;
  *   each cycle runs secured → completed → released, visibly.
  */
-function acceptEngagementOffer(
+async function acceptEngagementOffer(
   app: typeof tables.applications.$inferSelect,
   opp: typeof tables.opportunities.$inferSelect,
   offer: EngagementOffer
 ) {
-  const convId = conversationBetween(opp.posterId, app.applicantId);
-  const applicant = db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get();
+  const convId = await conversationBetween(opp.posterId, app.applicantId);
+  const applicant = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get();
   const name = applicant?.displayName ?? "Applicant";
 
   if (offer.classification === "external_employment") {
-    db.update(tables.applications).set({ status: "active" }).where(eq(tables.applications.id, app.id)).run();
-    db.insert(tables.messages)
+    await db.update(tables.applications).set({ status: "active" }).where(eq(tables.applications.id, app.id)).run();
+    await db.insert(tables.messages)
       .values({
         id: rid(), conversationId: convId, senderId: app.applicantId, kind: "system",
         body: `${name} accepted the ${offer.title} offer — external employment: compensation and payroll are handled by the employer OUTSIDE Mavyn.`,
       })
       .run();
-    db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
-    notify({
+    await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+    await notify({
       userId: opp.posterId, actorId: app.applicantId, type: "application",
       title: `${name} accepted — ${offer.title}`,
       body: "External employment — handled outside Mavyn.",
@@ -177,7 +177,7 @@ function acceptEngagementOffer(
     const startsAt = offer.startDate ? new Date(offer.startDate) : new Date(Date.now() + 7 * 86400_000);
     if (startsAt.getHours() === 0) startsAt.setHours(14, 0, 0, 0);
     const bookingId = rid();
-    db.insert(tables.bookings)
+    await db.insert(tables.bookings)
       .values({
         id: bookingId, serviceId: null, clientId: opp.posterId, providerId: app.applicantId,
         title: `${offer.title} — ${opp.title}`, startsAt, durationMin: 240, price: offer.amount,
@@ -185,26 +185,26 @@ function acceptEngagementOffer(
         location: opp.remote ? "Remote" : opp.location, status: "accepted", conversationId: convId,
       })
       .run();
-    db.update(tables.applications).set({ status: "confirmed" }).where(eq(tables.applications.id, app.id)).run();
-    db.insert(tables.messages)
+    await db.update(tables.applications).set({ status: "confirmed" }).where(eq(tables.applications.id, app.id)).run();
+    await db.insert(tables.messages)
       .values({ id: rid(), conversationId: convId, senderId: app.applicantId, kind: "system",
         body: `${name} accepted the ${offer.title} offer — $${offer.amount}. Payment secures the engagement.` })
       .run();
-    db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
-    notify({ userId: opp.posterId, actorId: app.applicantId, type: "booking",
+    await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+    await notify({ userId: opp.posterId, actorId: app.applicantId, type: "booking",
       title: `${name} accepted — ${offer.title}`, body: `$${offer.amount} — pay to secure`, href: "/calendar" });
     return { status: "confirmed", bookingId, conversationId: convId };
   }
 
   // ongoing: ACTIVE + first paid cycle
-  db.update(tables.applications).set({ status: "active" }).where(eq(tables.applications.id, app.id)).run();
-  const { bookingId } = startEngagementCycle(app.id);
-  db.insert(tables.messages)
+  await db.update(tables.applications).set({ status: "active" }).where(eq(tables.applications.id, app.id)).run();
+  const { bookingId } = await startEngagementCycle(app.id);
+  await db.insert(tables.messages)
     .values({ id: rid(), conversationId: convId, senderId: app.applicantId, kind: "system",
       body: `${name} accepted the ${offer.title} offer — ${offer.engagementType.replace("_", "-")} · $${offer.amount} per ${cycleLabel(offer.compModel)}. Cycle 1 is ready — payment secures it.` })
     .run();
-  db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
-  notify({ userId: opp.posterId, actorId: app.applicantId, type: "booking",
+  await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+  await notify({ userId: opp.posterId, actorId: app.applicantId, type: "booking",
     title: `${name} accepted — ${offer.title}`,
     body: `Ongoing engagement active · $${offer.amount} per ${cycleLabel(offer.compModel)} — secure cycle 1`, href: "/calendar" });
   return { status: "active", bookingId, conversationId: convId };
@@ -214,24 +214,24 @@ function acceptEngagementOffer(
  * Start the next paid cycle of an ACTIVE engagement: one booking per cycle,
  * each with its own secured → completed → released payment. Poster-driven.
  */
-export function startEngagementCycle(applicationId: string) {
-  const app = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+export async function startEngagementCycle(applicationId: string) {
+  const app = await db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
   if (!app) throw new ApiError(404, "Application not found");
   if (app.status !== "active") throw new ApiError(409, "Engagement isn't active");
   const offer = parseOffer(app.offer);
   if (!offer) throw new ApiError(409, "No offer terms on file");
   if (offer.classification === "external_employment")
     throw new ApiError(409, "External employment — compensation is handled outside Mavyn");
-  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get()!;
+  const opp = (await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, app.opportunityId)).get())!;
 
   const n = (offer.cycles ?? 0) + 1;
-  const convId = conversationBetween(opp.posterId, app.applicantId);
+  const convId = await conversationBetween(opp.posterId, app.applicantId);
   const startsAt =
     n === 1 && offer.startDate ? new Date(offer.startDate) : new Date(Date.now() + 2 * 86400_000);
   if (startsAt.getHours() === 0) startsAt.setHours(10, 0, 0, 0);
 
   const bookingId = rid();
-  db.insert(tables.bookings)
+  await db.insert(tables.bookings)
     .values({
       id: bookingId, serviceId: null, clientId: opp.posterId, providerId: app.applicantId,
       title: `${offer.title} — ${cycleLabel(offer.compModel)} ${n}`,
@@ -240,7 +240,7 @@ export function startEngagementCycle(applicationId: string) {
       location: opp.remote ? "Remote" : opp.location, status: "accepted", conversationId: convId,
     })
     .run();
-  db.update(tables.applications)
+  await db.update(tables.applications)
     .set({ offer: JSON.stringify({ ...offer, cycles: n }) })
     .where(eq(tables.applications.id, app.id))
     .run();

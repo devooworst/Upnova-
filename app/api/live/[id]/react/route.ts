@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 /** POST /api/live/[id]/react { type: heart|fire|clap|wow|laugh } */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const stream = getStream(params.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const stream = await getStream(params.id);
     if (stream.status !== "live") throw new ApiError(409, "This live has ended");
-    assertCanWatch(stream, user.id);
+    await assertCanWatch(stream, user.id);
     if (!stream.reactionsEnabled) throw new ApiError(403, "The host turned reactions off for this live");
 
     const type = REACTION_TYPES.includes(body.type) ? body.type : "heart";
@@ -23,13 +23,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const rl = rateLimit(`livereact:${user.id}:${stream.id}`, 30, 30_000);
       if (!rl.ok) throw new ApiError(429, "Easy on the reactions — short cooldown");
     }
-    db.insert(tables.liveReactions)
+    await db.insert(tables.liveReactions)
       .values({ id: randomBytes(12).toString("hex"), streamId: stream.id, userId: user.id, type })
       .run();
 
     const counts: Record<string, number> = {};
     for (const t of REACTION_TYPES) counts[t] = 0;
-    for (const r of db.select().from(tables.liveReactions).where(eq(tables.liveReactions.streamId, stream.id)).all())
+    for (const r of (await db.select().from(tables.liveReactions).where(eq(tables.liveReactions.streamId, stream.id)).all()))
       counts[r.type] = (counts[r.type] ?? 0) + 1;
     return { ok: true, counts };
   });

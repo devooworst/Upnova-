@@ -13,25 +13,25 @@ export const dynamic = "force-dynamic";
 
 /** GET — full project detail for a party. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const p = getProjectForParty(params.id, user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const p = await getProjectForParty(params.id, user.id);
 
     const otherId = p.clientId === user.id ? p.creatorId : p.clientId;
-    const otherUser = db.select().from(tables.users).where(eq(tables.users.id, otherId)).get()!;
-    const otherProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get()!;
-    const extensions = db
+    const otherUser = (await db.select().from(tables.users).where(eq(tables.users.id, otherId)).get())!;
+    const otherProfile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get())!;
+    const extensions = await db
       .select()
       .from(tables.extensionRequests)
       .where(eq(tables.extensionRequests.projectId, p.id))
       .all();
-    const milestones = db
+    const milestones = await db
       .select()
       .from(tables.projectMilestones)
       .where(eq(tables.projectMilestones.projectId, p.id))
       .all();
-    const paymentRows = db.select().from(tables.payments).where(eq(tables.payments.projectId, p.id)).all();
-    const reviewRows = db.select().from(tables.reviews).where(eq(tables.reviews.projectId, p.id)).all();
+    const paymentRows = await db.select().from(tables.payments).where(eq(tables.payments.projectId, p.id)).all();
+    const reviewRows = await db.select().from(tables.reviews).where(eq(tables.reviews.projectId, p.id)).all();
 
     return {
       project: {
@@ -62,8 +62,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         })),
         reviews: reviewRows.map((r) => ({ rating: r.rating, body: r.body, mine: r.authorId === user.id })),
         // real progress history + the timeline generated from real records
-        progress: progressPayload("project", p.id, user.id),
-        timeline: projectTimeline(p.id, user.id),
+        progress: await progressPayload("project", p.id, user.id),
+        timeline: await projectTimeline(p.id, user.id),
       },
     };
   });
@@ -72,19 +72,19 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /** PATCH { action } — run a state transition (see lib/server/projects.ts). */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     if (body.action === "update_terms") {
-      const p = updateTerms(params.id, user.id, { amount: body.amount, deadline: body.deadline });
+      const p = await updateTerms(params.id, user.id, { amount: body.amount, deadline: body.deadline });
       return { state: p.state, amount: p.amount };
     }
-    transition(params.id, String(body.action), user.id, {
+    await transition(params.id, String(body.action), user.id, {
       expectedAmount: body.expectedAmount != null ? Number(body.expectedAmount) : null,
       note: body.note != null ? String(body.note) : undefined,
     });
     // dev demo: after funding, the seed creator starts (and asks for +2 days once)
-    if (body.action === "start") seedStartsWork(params.id);
-    const fresh = db.select().from(tables.projects).where(eq(tables.projects.id, params.id)).get()!;
+    if (body.action === "start") await seedStartsWork(params.id);
+    const fresh = (await db.select().from(tables.projects).where(eq(tables.projects.id, params.id)).get())!;
     return { state: fresh.state, amount: fresh.amount };
   });
 }

@@ -78,9 +78,9 @@ const PLANNED_CATEGORIES = [
 ];
 
 export async function POST(req: NextRequest) {
-  const gate = await guarded(() => {
+  const gate = await guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const runner = requireUser();
+    const runner = await requireUser();
     if (runner.role !== "admin") throw new ApiError(403, "The full system test is an admin operator tool");
     return { ok: true };
   });
@@ -112,54 +112,54 @@ export async function POST(req: NextRequest) {
   const blocked = (c: Category, name: string, why: string) => c.steps.push({ name, status: "BLOCKED", actual: why });
 
   /* ---------------- deterministic reset of designated test records ---------------- */
-  const ids = (h: string) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()!;
-  const rachel = ids("rachel"), lena = ids("lena"), biz = ids("harboroak");
-  const resetTestData = () => {
+  const ids = async (h: string) => (await db.select().from(tables.users).where(eq(tables.users.handle, h)).get())!;
+  const rachel = await ids("rachel"), lena = await ids("lena"), biz = await ids("harboroak");
+  const resetTestData = async () => {
     for (const u of [rachel]) {
-      for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, u.id)).all()) {
-        db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
-        db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+      for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.clientId, u.id)).all()) {
+        await db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+        await db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
       }
-      for (const p of db.select().from(tables.projects).where(eq(tables.projects.clientId, u.id)).all()) {
-        db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
-        db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+      for (const p of await db.select().from(tables.projects).where(eq(tables.projects.clientId, u.id)).all()) {
+        await db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+        await db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
       }
       // projects where the test persona is the CREATOR (progress scenario)
-      for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
-        db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
-        db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+      for (const p of await db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
+        await db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+        await db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
       }
       // preferred-client relationships involving the test persona
-      db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
-      db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
+      await db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
+      await db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
       // business-team rows involving the test persona (prior runs)
-      db.delete(tables.businessTeam).where(eq(tables.businessTeam.personId, u.id)).run();
-      db.delete(tables.businessTeam).where(eq(tables.businessTeam.businessId, u.id)).run();
-      db.delete(tables.applications).where(eq(tables.applications.applicantId, u.id)).run();
-      for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
-        db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
-      db.delete(tables.notifications).where(eq(tables.notifications.userId, u.id)).run();
-      db.delete(tables.follows).where(eq(tables.follows.followerId, u.id)).run();
-      db.update(tables.users).set({ plan: "free", testerMode: "simulation" }).where(eq(tables.users.id, u.id)).run();
-      db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, u.id)).run();
+      await db.delete(tables.businessTeam).where(eq(tables.businessTeam.personId, u.id)).run();
+      await db.delete(tables.businessTeam).where(eq(tables.businessTeam.businessId, u.id)).run();
+      await db.delete(tables.applications).where(eq(tables.applications.applicantId, u.id)).run();
+      for (const m of await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
+        await db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
+      await db.delete(tables.notifications).where(eq(tables.notifications.userId, u.id)).run();
+      await db.delete(tables.follows).where(eq(tables.follows.followerId, u.id)).run();
+      await db.update(tables.users).set({ plan: "free", testerMode: "simulation" }).where(eq(tables.users.id, u.id)).run();
+      await db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, u.id)).run();
     }
     // bookings the BUSINESS tester made AS A CLIENT (capacity/People
     // probes) — previously leaked and accumulated across suite runs
-    for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all()) {
-      db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
-      db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+    for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all()) {
+      await db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+      await db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
     }
     // business test opportunity from prior runs
-    for (const o of db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, biz.id)).all())
+    for (const o of await db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, biz.id)).all())
       if (o.title.startsWith("[TEST]")) {
-        db.delete(tables.applications).where(eq(tables.applications.opportunityId, o.id)).run();
-        db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
+        await db.delete(tables.applications).where(eq(tables.applications.opportunityId, o.id)).run();
+        await db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
       }
-    db.delete(tables.notifications).where(eq(tables.notifications.userId, lena.id)).run();
+    await db.delete(tables.notifications).where(eq(tables.notifications.userId, lena.id)).run();
     // Preferred Early Access state from prior runs: window + slot caps +
     // any drop bookings by the designated non-preferred tester (harboroak)
-    for (const s of db.select().from(tables.services).where(eq(tables.services.ownerId, lena.id)).all()) {
-      if (s.preferredUntil) db.update(tables.services).set({ preferredUntil: null }).where(eq(tables.services.id, s.id)).run();
+    for (const s of await db.select().from(tables.services).where(eq(tables.services.ownerId, lena.id)).all()) {
+      if (s.preferredUntil) await db.update(tables.services).set({ preferredUntil: null }).where(eq(tables.services.id, s.id)).run();
       let cfg = s.config;
       if (readEarlyAccess(cfg)) cfg = writeEarlyAccess(cfg, null);
       if (readRelease(cfg)) cfg = writeRelease(cfg, null);
@@ -167,51 +167,51 @@ export async function POST(req: NextRequest) {
         const o = JSON.parse(cfg || "{}");
         if (o?.scheduling?.releaseMode === "scheduled") { o.scheduling.releaseMode = "rolling"; cfg = JSON.stringify(o); }
       } catch {}
-      if (cfg !== s.config) db.update(tables.services).set({ config: cfg }).where(eq(tables.services.id, s.id)).run();
+      if (cfg !== s.config) await db.update(tables.services).set({ config: cfg }).where(eq(tables.services.id, s.id)).run();
     }
-    for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all())
+    for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.clientId, biz.id)).all())
       if (b.providerId === lena.id) {
-        db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
-        db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+        await db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+        await db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
       }
     // onboarding/progress test accounts from prior runs (handle prefix "tonb")
-    for (const u of db.select().from(tables.users).all())
+    for (const u of await db.select().from(tables.users).all())
       if (u.handle.startsWith("tonb")) {
-        for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
-          db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
-        for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
-          db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
-          db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+        for (const m of await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, u.id)).all())
+          await db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
+        for (const p of await db.select().from(tables.projects).where(eq(tables.projects.creatorId, u.id)).all()) {
+          await db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+          await db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
         }
-        for (const p of db.select().from(tables.projects).where(eq(tables.projects.clientId, u.id)).all()) {
-          db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
-          db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
+        for (const p of await db.select().from(tables.projects).where(eq(tables.projects.clientId, u.id)).all()) {
+          await db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+          await db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run();
         }
         // bookings in either role (the early-access drop books as tonbpc)
-        for (const b of db.select().from(tables.bookings).all())
+        for (const b of await db.select().from(tables.bookings).all())
           if (b.clientId === u.id || b.providerId === u.id) {
-            db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
-            db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
+            await db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+            await db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run();
           }
-        db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
-        db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
-        db.delete(tables.payments).where(eq(tables.payments.payeeId, u.id)).run();
-        db.delete(tables.payments).where(eq(tables.payments.payerId, u.id)).run();
-        db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run();
-        for (const l of db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, u.id)).all())
-          db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
-        db.delete(tables.liveViewers).where(eq(tables.liveViewers.userId, u.id)).run();
-        db.delete(tables.liveMessages).where(eq(tables.liveMessages.userId, u.id)).run();
-        db.delete(tables.liveReactions).where(eq(tables.liveReactions.userId, u.id)).run();
-        db.delete(tables.liveGuests).where(eq(tables.liveGuests.userId, u.id)).run();
-        db.delete(tables.liveModerators).where(eq(tables.liveModerators.userId, u.id)).run();
-        db.delete(tables.liveRestrictions).where(eq(tables.liveRestrictions.userId, u.id)).run();
-        db.delete(tables.notifications).where(eq(tables.notifications.userId, u.id)).run();
-        db.delete(tables.profiles).where(eq(tables.profiles.userId, u.id)).run();
-        db.delete(tables.users).where(eq(tables.users.id, u.id)).run();
+        await db.delete(tables.preferredClients).where(eq(tables.preferredClients.clientId, u.id)).run();
+        await db.delete(tables.preferredClients).where(eq(tables.preferredClients.providerId, u.id)).run();
+        await db.delete(tables.payments).where(eq(tables.payments.payeeId, u.id)).run();
+        await db.delete(tables.payments).where(eq(tables.payments.payerId, u.id)).run();
+        await db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run();
+        for (const l of await db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, u.id)).all())
+          await db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+        await db.delete(tables.liveViewers).where(eq(tables.liveViewers.userId, u.id)).run();
+        await db.delete(tables.liveMessages).where(eq(tables.liveMessages.userId, u.id)).run();
+        await db.delete(tables.liveReactions).where(eq(tables.liveReactions.userId, u.id)).run();
+        await db.delete(tables.liveGuests).where(eq(tables.liveGuests.userId, u.id)).run();
+        await db.delete(tables.liveModerators).where(eq(tables.liveModerators.userId, u.id)).run();
+        await db.delete(tables.liveRestrictions).where(eq(tables.liveRestrictions.userId, u.id)).run();
+        await db.delete(tables.notifications).where(eq(tables.notifications.userId, u.id)).run();
+        await db.delete(tables.profiles).where(eq(tables.profiles.userId, u.id)).run();
+        await db.delete(tables.users).where(eq(tables.users.id, u.id)).run();
       }
   };
-  resetTestData();
+  await resetTestData();
 
   try {
   /* ================= AUTHENTICATION ================= */
@@ -237,8 +237,8 @@ export async function POST(req: NextRequest) {
     // TWO DEVELOPMENT/ADMIN ACCOUNTS — completely separate users: own
     // ids, own credentials, own sessions; both admins, both REAL
     // (simulated=false → automation can never message or act as them).
-    const devinRow = db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get();
-    const jaylinRow = db.select().from(tables.users).where(eq(tables.users.handle, "jaylin")).get();
+    const devinRow = await db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get();
+    const jaylinRow = await db.select().from(tables.users).where(eq(tables.users.handle, "jaylin")).get();
     const jl = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "jaylin@mavyn.dev", password: "mavyn123" } });
     tok.jaylin = (jl.data as { sessionToken?: string }).sessionToken ?? "";
     const jme = (await api("jaylin", "/api/auth/me")).data as any;
@@ -324,7 +324,7 @@ export async function POST(req: NextRequest) {
         re.status === 200 && String((re.data as any).id) === idBefore && meBack.user?.profile?.displayName === "Persisted Name" && /must survive/.test(String(meBack.user?.profile?.bio ?? "")), {
         expected: "same id + 'Persisted Name' + edited bio",
         actual: `id=${String((re.data as any).id) === idBefore ? "same" : "DIFFERENT"} name=${meBack.user?.profile?.displayName} bio=${String(meBack.user?.profile?.bio ?? "").slice(0, 30)}` });
-      const dupes = db.select().from(tables.users).all().filter((u) => u.handle === "tonbkeep").length;
+      const dupes = (await db.select().from(tables.users).all()).filter((u) => u.handle === "tonbkeep").length;
       step(c, "exactly ONE database row carries this account — logins load it, they never recreate it", dupes === 1, { actual: `${dupes} rows` });
 
       // REBRAND CONTINUITY: a session issued under the old UpNova cookie
@@ -379,21 +379,21 @@ export async function POST(req: NextRequest) {
       const px = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
       const post = await api("rachel", "/api/posts", { method: "POST", body: { body: "[TEST] image storage check", imageUrl: px } });
       const postId = String((post.data as any).id ?? "");
-      const row = postId ? db.select().from(tables.posts).all().find((x) => x.id === postId) : null;
+      const row = postId ? (await db.select().from(tables.posts).all()).find((x) => x.id === postId) : null;
       const onDisk = row?.imageUrl?.startsWith("/uploads/") ? fs.existsSync(path.join(process.cwd(), "public", row.imageUrl)) : false;
       step(c, "uploaded post image is written to DISK — the database stores only the small /uploads path (no base64 bloat)",
         !!row && !!row.imageUrl && row.imageUrl.startsWith("/uploads/") && !row.imageUrl.startsWith("data:") && onDisk, {
         actual: `stored=${row?.imageUrl?.slice(0, 40)} onDisk=${onDisk}` });
-      const prevAvatar = db.select().from(tables.profiles).all().find((x) => x.userId === rachel.id)?.avatarUrl ?? null;
+      const prevAvatar = (await db.select().from(tables.profiles).all()).find((x) => x.userId === rachel.id)?.avatarUrl ?? null;
       await api("rachel", "/api/me/profile", { method: "PATCH", body: { avatarUrl: px } });
-      const avatarNow = db.select().from(tables.profiles).all().find((x) => x.userId === rachel.id)?.avatarUrl ?? "";
+      const avatarNow = (await db.select().from(tables.profiles).all()).find((x) => x.userId === rachel.id)?.avatarUrl ?? "";
       step(c, "avatar upload takes the same disk path — full backward compatibility for existing URL/path values",
         avatarNow.startsWith("/uploads/") && fs.existsSync(path.join(process.cwd(), "public", avatarNow)), { actual: avatarNow.slice(0, 40) });
       // stage clean: remove the test post + restore rachel's avatar
       if (row?.imageUrl) { try { fs.unlinkSync(path.join(process.cwd(), "public", row.imageUrl)); } catch {} }
-      if (postId) db.delete(tables.posts).where(eq(tables.posts.id, postId)).run();
+      if (postId) await db.delete(tables.posts).where(eq(tables.posts.id, postId)).run();
       if (avatarNow.startsWith("/uploads/")) { try { fs.unlinkSync(path.join(process.cwd(), "public", avatarNow)); } catch {} }
-      db.update(tables.profiles).set({ avatarUrl: prevAvatar }).where(eq(tables.profiles.userId, rachel.id)).run();
+      await db.update(tables.profiles).set({ avatarUrl: prevAvatar }).where(eq(tables.profiles.userId, rachel.id)).run();
     }
   }
 
@@ -436,7 +436,7 @@ export async function POST(req: NextRequest) {
     step(c, "REAL → REAL: the manual reply (and ONLY it) arrives back", abAfter.length === 2 && /What's up/.test(abAfter[1]?.body), { expected: "2 messages total", actual: `${abAfter.length} messages` });
 
     // real → @devin (the ADMIN/PERSONAL account): received, NEVER auto-answered
-    const devinRow = db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get()!;
+    const devinRow = (await db.select().from(tables.users).where(eq(tables.users.handle, "devin")).get())!;
     step(c, "@devin is classified REAL (simulated=false) — by the account flag, not the username", devinRow.role === "admin" && !devinRow.simulated, { expected: "simulated=false", actual: `role=${devinRow.role} simulated=${!!devinRow.simulated}` });
     const cAD = String(((await api("tonbm1", "/api/conversations", { method: "POST", body: { toHandle: "devin", firstMessage: "[TEST] Hey Devin" } })).data as any).conversationId ?? "");
     const adMsgs = await plainMsgs("tonbm1", cAD);
@@ -448,8 +448,8 @@ export async function POST(req: NextRequest) {
     const adAfter = await plainMsgs("tonbm1", cAD);
     step(c, "devin's MANUAL reply arrives — and it's the only reply that ever will", adAfter.length === 2 && /What's up/.test(adAfter[1]?.body) && !adAfter[1]?.mine, { expected: "2 messages, second from devin", actual: `${adAfter.length} messages` });
     // clean devin's inbox: this was a test conversation
-    db.delete(tables.conversations).where(eq(tables.conversations.id, cAD)).run();
-    db.delete(tables.notifications).where(eq(tables.notifications.userId, devinRow.id)).run();
+    await db.delete(tables.conversations).where(eq(tables.conversations.id, cAD)).run();
+    await db.delete(tables.notifications).where(eq(tables.notifications.userId, devinRow.id)).run();
 
     // real → SIMULATED demo character: the scripted counterpart still works
     const cAL = String(((await api("tonbm1", "/api/conversations", { method: "POST", body: { toHandle: "lena", firstMessage: "[TEST] Hi Lena!" } })).data as any).conversationId ?? "");
@@ -521,11 +521,11 @@ export async function POST(req: NextRequest) {
     const held = both.map((r) => ((r.data as any).bookings.find((b: any) => b.id === bookingId) ?? {}).paymentStatus);
     step(c, "both parties see payment HELD", held[0] === "held" && held[1] === "held", { expected: "held/held", actual: held.join("/") });
     // TIME SIMULATION: pull the appointment near, then into the slot — no waiting
-    db.update(tables.bookings).set({ startsAt: new Date(Date.now() + 2 * 3600e3) }).where(eq(tables.bookings.id, bookingId)).run();
+    await db.update(tables.bookings).set({ startsAt: new Date(Date.now() + 2 * 3600e3) }).where(eq(tables.bookings.id, bookingId)).run();
     await api("rachel", "/api/bookings");
-    db.update(tables.bookings).set({ startsAt: new Date(Date.now() - 5 * 60e3) }).where(eq(tables.bookings.id, bookingId)).run();
+    await db.update(tables.bookings).set({ startsAt: new Date(Date.now() - 5 * 60e3) }).where(eq(tables.bookings.id, bookingId)).run();
     await api("rachel", "/api/bookings");
-    db.update(tables.bookings).set({ startsAt: new Date(Date.now() - 2 * 3600e3), durationMin: 60 }).where(eq(tables.bookings.id, bookingId)).run();
+    await db.update(tables.bookings).set({ startsAt: new Date(Date.now() - 2 * 3600e3), durationMin: 60 }).where(eq(tables.bookings.id, bookingId)).run();
     const after = await api("rachel", "/api/bookings");
     const fin = ((after.data as any).bookings ?? []).find((b: any) => b.id === bookingId);
     step(c, "time simulation: preparing → in progress → completed + payout RELEASED", fin?.status === "completed" && fin?.paymentStatus === "released", { expected: "completed/released", actual: `${fin?.status}/${fin?.paymentStatus}` });
@@ -568,7 +568,7 @@ export async function POST(req: NextRequest) {
     await api("rachel", `/api/projects/${projectId}`, { method: "PATCH", body: { action: "approve" } });
     await api("rachel", `/api/projects/${projectId}`, { method: "PATCH", body: { action: "complete" } });
     step(c, "resubmit → approve → COMPLETED", (await st()) === "completed", { expected: "completed", actual: await st() });
-    const pay = db.select().from(tables.payments).where(eq(tables.payments.projectId, projectId)).get();
+    const pay = await db.select().from(tables.payments).where(eq(tables.payments.projectId, projectId)).get();
     step(c, "project payment released on approval (TEST)", pay?.status === "released", { expected: "released", actual: pay?.status });
   }
 
@@ -595,7 +595,7 @@ export async function POST(req: NextRequest) {
       ],
     } });
     const qOppId = (qOpp.data as any).id;
-    const storedQ = (() => { const r = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, qOppId)).get(); try { return JSON.parse(r!.applyConfig).questions ?? []; } catch { return []; } })();
+    const storedQ = await (async () => { const r = await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, qOppId)).get(); try { return JSON.parse(r!.applyConfig).questions ?? []; } catch { return []; } })();
     step(c, "poster-defined application questions are stored SANITIZED on the opportunity (types, options, required flags)",
       qOpp.status === 200 && storedQ.length === 3 && storedQ[1].options?.length === 4, { record: qOppId, actual: `${storedQ.length} questions, dropdown options=${storedQ[1]?.options?.length}` });
 
@@ -608,7 +608,7 @@ export async function POST(req: NextRequest) {
       badChoice.status === 400 && /listed options/.test(String((badChoice.data as any).error)), { actual: `${badChoice.status} "${String((badChoice.data as any).error).slice(0, 60)}"` });
 
     const goodApply = await api("rachel", `/api/opportunities/${qOppId}/applications`, { method: "POST", body: { message: "Profile does the heavy lifting.", answers: { avail: "yes", exp: "Advanced", reel: "https://mavyn.dev/reel" } } });
-    const appRow = db.select().from(tables.applications).all().find((a) => a.opportunityId === qOppId);
+    const appRow = (await db.select().from(tables.applications).all()).find((a) => a.opportunityId === qOppId);
     const storedA = (() => { try { return JSON.parse(appRow!.answers).custom ?? []; } catch { return []; } })();
     step(c, "a valid application stores every typed answer WITH its question — the poster reviews real structured data, profile attached automatically",
       goodApply.status === 200 && storedA.length === 3 && storedA[0].answer === "yes" && storedA[1].answer === "Advanced",
@@ -616,7 +616,7 @@ export async function POST(req: NextRequest) {
 
     /* ---- SEND OFFER — essentials → review → send, verified in the DB ---- */
     const offerRes = await api("harboroak", `/api/applications/${appRow!.id}`, { method: "PATCH", body: { action: "offer", title: "Campaign content creator — fall launch", amount: 300, compModel: "per_project", startDate: new Date(Date.now() + 20 * 86400e3).toISOString().slice(0, 10), note: "Three deliverables for the fall campaign." } });
-    const offerRow = db.select().from(tables.applications).where(eq(tables.applications.id, appRow!.id)).get()!;
+    const offerRow = (await db.select().from(tables.applications).where(eq(tables.applications.id, appRow!.id)).get())!;
     const storedOffer = (() => { try { return JSON.parse(offerRow.offer); } catch { return {}; } })();
     step(c, "SEND OFFER: the essentials-only payload (what for · $300 per project · deadline · note) creates the real offer — terms stored exactly as reviewed (seed applicants may auto-accept: selected→confirmed is the real flow)",
       offerRes.status === 200 && ["selected", "confirmed", "active"].includes(offerRow.status) && storedOffer.amount === 300 && storedOffer.compModel === "per_project" && /fall launch/.test(storedOffer.title ?? ""),
@@ -752,7 +752,7 @@ export async function POST(req: NextRequest) {
     await api("lena", `/api/projects/${pid}`, { method: "PATCH", body: { action: "approve" } });
     await api("lena", `/api/projects/${pid}`, { method: "PATCH", body: { action: "complete" } });
     const done = ((await api("lena", `/api/projects/${pid}`)).data as any).project;
-    const payRow = db.select().from(tables.payments).where(eq(tables.payments.projectId, pid)).get();
+    const payRow = await db.select().from(tables.payments).where(eq(tables.payments.projectId, pid)).get();
     step(c, "approve → complete: project COMPLETED, payment RELEASED (TEST)", done?.state === "completed" && payRow?.status === "released", { expected: "completed/released", actual: `${done?.state}/${payRow?.status}` });
     const rv = await api("lena", `/api/projects/${pid}/review`, { method: "POST", body: { rating: 5, body: "[TEST] Great communication throughout." } });
     step(c, "review became available after completion", rv.status === 200, { route: "POST review" });
@@ -910,7 +910,7 @@ export async function POST(req: NextRequest) {
     const rebook = await api("harboroak", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: at(15), durationMin: 60 } });
     step(c, "cancellation frees its slot → the same time rebooks cleanly (no duplicate, no ghost hold)", cancel.status === 200 && rebook.status === 200, { actual: `cancel=${cancel.status} rebook=${rebook.status}` });
 
-    const dropActive = db.select().from(tables.bookings).where(eq(tables.bookings.serviceId, svc.id)).all()
+    const dropActive = (await db.select().from(tables.bookings).where(eq(tables.bookings.serviceId, svc.id)).all())
       .filter((b) => ["pending", "accepted", "confirmed", "reschedule_requested"].includes(b.status));
     const uniqueIds = new Set(dropActive.map((b) => b.id));
     step(c, "INTEGRITY: exactly 3 active bookings hold slots — no overbooking, no duplicate reservations",
@@ -1135,7 +1135,7 @@ export async function POST(req: NextRequest) {
     const mkU = async (handle: string, extra: Record<string, unknown> = {}) => {
       const r = await api(null, "/api/auth/signup", { method: "POST", body: { email: `${handle}.${runNonce()}@mavyn.dev`, password: "Tour-walkthrough-99", handle, displayName: `Cap ${handle}`, ...extra } });
       tok[handle] = (r.data as { sessionToken?: string }).sessionToken ?? "";
-      db.update(tables.users).set({ testerMode: "simulation" }).where(eq(tables.users.handle, handle)).run();
+      await db.update(tables.users).set({ testerMode: "simulation" }).where(eq(tables.users.handle, handle)).run();
       return r;
     };
     await mkU("tonbz", { accountType: "business" });
@@ -1154,7 +1154,7 @@ export async function POST(req: NextRequest) {
     await api("tonbz", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "approve" } });
     await api("tonbz", `/api/projects/${pid1}`, { method: "PATCH", body: { action: "complete" } });
     const rv1 = await api("tonbz", `/api/projects/${pid1}/review`, { method: "POST", body: { rating: 5, body: "[TEST] Free tier works." } });
-    const pay1 = db.select().from(tables.payments).all().find((p) => p.projectId === pid1);
+    const pay1 = (await db.select().from(tables.payments).all()).find((p) => p.projectId === pid1);
     const st1 = ((await api("tonbz", `/api/projects/${pid1}`)).data as any).project;
     step(c, "BUSINESS FREE runs the whole loop: message → post → hire → progress → TEST pay → complete → review", opp1.status === 200 && st1?.state === "completed" && pay1?.status === "released" && rv1.status === 200, {
       expected: "everything 200, payment released — Free is never a paywall", actual: `opp=${opp1.status} project=${st1?.state} payment=${pay1?.status} review=${rv1.status}`,
@@ -1235,7 +1235,7 @@ export async function POST(req: NextRequest) {
     const rOpp = await api("rachel", "/api/opportunities", { method: "POST", body: { title: "[TEST] rachel is not a business", description: "x", type: "gig", location: "Remote", remote: true } });
     step(c, "capacity gates apply to business accounts ONLY — individuals unaffected", rOpp.status === 200, { actual: String(rOpp.status) });
     if (rOpp.status === 200) {
-      db.delete(tables.opportunities).where(eq(tables.opportunities.id, String((rOpp.data as any).id))).run();
+      await db.delete(tables.opportunities).where(eq(tables.opportunities.id, String((rOpp.data as any).id))).run();
     }
   }
 
@@ -1250,7 +1250,7 @@ export async function POST(req: NextRequest) {
         if (!n.href || n.href === "#") dead++;
         else if (String(n.href).startsWith("/messages?c=")) {
           const cid = String(n.href).split("c=")[1].split("&")[0];
-          const exists = db.select().from(tables.conversations).where(eq(tables.conversations.id, cid)).get();
+          const exists = await db.select().from(tables.conversations).where(eq(tables.conversations.id, cid)).get();
           if (!exists) dead++;
         }
       }
@@ -1265,9 +1265,9 @@ export async function POST(req: NextRequest) {
        alerts fire from a scheduler tick — verified against real rows,
        idempotent by construction (ticking twice never double-sends). */
     {
-      const notifRows = (userId: string, type: string, hrefLike: string) =>
-        db.select().from(tables.notifications).all().filter((n) => n.userId === userId && n.type === type && n.href.includes(hrefLike));
-      const tonbbU = db.select().from(tables.users).all().find((u) => u.handle === "tonbb")!;
+      const notifRows = async (userId: string, type: string, hrefLike: string) =>
+        (await db.select().from(tables.notifications).all()).filter((n) => n.userId === userId && n.type === type && n.href.includes(hrefLike));
+      const tonbbU = (await db.select().from(tables.users).all()).find((u) => u.handle === "tonbb")!;
       const svcJ = ((await api("rachel", "/api/services")).data as any).services.find((s: any) => s.owner?.handle === "lena");
 
       // 1 · appointment reminder: booking ~20h out (moved there directly — the
@@ -1276,40 +1276,40 @@ export async function POST(req: NextRequest) {
       const bkJ = await api("tonbb", "/api/bookings", { method: "POST", body: { serviceId: svcJ.id, startsAt: wkJ.toISOString(), durationMin: 60 } });
       const bkJId = String((bkJ.data as any).id ?? "");
       await api("lena", `/api/bookings/${bkJId}`, { method: "PATCH", body: { action: "accept" } });
-      db.update(tables.bookings).set({ startsAt: new Date(Date.now() + 20 * 3600e3) }).where(eq(tables.bookings.id, bkJId)).run();
-      let tick = runJobsTick();
+      await db.update(tables.bookings).set({ startsAt: new Date(Date.now() + 20 * 3600e3) }).where(eq(tables.bookings.id, bkJId)).run();
+      let tick = await runJobsTick();
       step(c, "JOBS · 24h appointment reminder reaches BOTH sides (client and provider), from the real booking row",
-        notifRows(tonbbU.id, "booking_reminder", bkJId).length === 1 && notifRows(lena.id, "booking_reminder", bkJId).length === 1, {
-        actual: `client=${notifRows(tonbbU.id, "booking_reminder", bkJId).length} provider=${notifRows(lena.id, "booking_reminder", bkJId).length} tickReminders=${tick.reminders}` });
+        (await notifRows(tonbbU.id, "booking_reminder", bkJId)).length === 1 && (await notifRows(lena.id, "booking_reminder", bkJId)).length === 1, {
+        actual: `client=${(await notifRows(tonbbU.id, "booking_reminder", bkJId)).length} provider=${(await notifRows(lena.id, "booking_reminder", bkJId)).length} tickReminders=${tick.reminders}` });
 
       // 2 · rebooking nudge: same pair, last completed ~25 days ago, nothing upcoming
-      db.update(tables.bookings).set({ status: "completed", startsAt: new Date(Date.now() - 25 * 86400e3) }).where(eq(tables.bookings.id, bkJId)).run();
-      tick = runJobsTick();
-      const rebook = notifRows(tonbbU.id, "rebook_nudge", `rebook=${bkJId}`);
+      await db.update(tables.bookings).set({ status: "completed", startsAt: new Date(Date.now() - 25 * 86400e3) }).where(eq(tables.bookings.id, bkJId)).run();
+      tick = await runJobsTick();
+      const rebook = await notifRows(tonbbU.id, "rebook_nudge", `rebook=${bkJId}`);
       step(c, "JOBS · the REBOOKING loop: ~3 weeks after a completed booking with nothing upcoming, the client gets a personal nudge",
         rebook.length === 1 && /rebook/i.test(rebook[0]?.title ?? ""), { actual: `sent=${rebook.length} title=${rebook[0]?.title?.slice(0, 50)}` });
 
       // 3 · review nudge: a completed-but-unreviewed project
-      const projJ = db.select().from(tables.projects).all().find((pr) => pr.clientId === rachel.id && pr.state === "reviewed");
-      if (projJ) db.update(tables.projects).set({ state: "completed", updatedAt: new Date() }).where(eq(tables.projects.id, projJ.id)).run();
-      tick = runJobsTick();
-      const revN = projJ ? notifRows(rachel.id, "review_nudge", projJ.id) : [];
+      const projJ = (await db.select().from(tables.projects).all()).find((pr) => pr.clientId === rachel.id && pr.state === "reviewed");
+      if (projJ) await db.update(tables.projects).set({ state: "completed", updatedAt: new Date() }).where(eq(tables.projects.id, projJ.id)).run();
+      tick = await runJobsTick();
+      const revN = projJ ? await notifRows(rachel.id, "review_nudge", projJ.id) : [];
       step(c, "JOBS · completed work without a review earns ONE gentle review ask (never repeated)",
         !!projJ && revN.length === 1, { actual: `sent=${revN.length}` });
-      if (projJ) db.update(tables.projects).set({ state: "reviewed" }).where(eq(tables.projects.id, projJ.id)).run();
+      if (projJ) await db.update(tables.projects).set({ state: "reviewed" }).where(eq(tables.projects.id, projJ.id)).run();
 
       // 4 · release-open alert: scheduled release opened 10 minutes ago
       await api("lena", "/api/preferred-clients", { method: "POST", body: { clientId: rachel.id, benefits: [{ key: "priority_booking" }] } });
       await api("lena", `/api/services/${svcJ.id}/release`, { method: "POST", body: { releaseAt: new Date(Date.now() - 10 * 60e3).toISOString(), coversUntil: new Date(Date.now() + 30 * 86400e3).toISOString(), earlyAccessHours: 24 } });
-      tick = runJobsTick();
-      const relN = notifRows(rachel.id, "release_open", svcJ.id).filter((n) => /OPEN/i.test(n.title));
+      tick = await runJobsTick();
+      const relN = (await notifRows(rachel.id, "release_open", svcJ.id)).filter((n) => /OPEN/i.test(n.title));
       step(c, "JOBS · the MOMENT a scheduled release opens, Preferred Clients get 'early access is OPEN — you book first'",
         relN.length === 1, { actual: `sent=${relN.length} releaseAlerts=${tick.releaseAlerts}` });
 
       // 5 · idempotency: a second tick sends NOTHING new for any of the above
-      const tick2 = runJobsTick();
+      const tick2 = await runJobsTick();
       step(c, "JOBS · idempotent by construction: a second tick re-sends none of it (restart-safe, duplicate-proof)",
-        notifRows(tonbbU.id, "booking_reminder", bkJId).length === 1 && rebook.length === 1 && relN.length === 1 && tick2.releaseAlerts === 0 && tick2.rebookNudges === 0, {
+        (await notifRows(tonbbU.id, "booking_reminder", bkJId)).length === 1 && (await rebook).length === 1 && relN.length === 1 && tick2.releaseAlerts === 0 && tick2.rebookNudges === 0, {
         actual: JSON.stringify(tick2) });
 
       // 6 · authz: the manual tick endpoint is admin-only
@@ -1533,7 +1533,7 @@ export async function POST(req: NextRequest) {
     const postProg = qaBk ? await asTok(tokCreator, `/api/bookings/${qaBk.id}/progress`, { method: "POST", body: { kind: "update", status: "in_progress", percent: 60, message: "[QA] suite-verified update", etaAt: null } }) : { status: 0, data: {} };
     step(c, "Test Creator sees the booking (provider role) and posts a progress update through the real panel route",
       !!qaBk && postProg.status === 200 && !!(postProg.data as any).id, { actual: `booking=${!!qaBk} post=${postProg.status}` });
-    const rowInDb = qaBk ? db.select().from(tables.progressUpdates).all().find((r) => r.bookingId === qaBk.id && r.message.includes("suite-verified")) : null;
+    const rowInDb = qaBk ? (await db.select().from(tables.progressUpdates).all()).find((r) => r.bookingId === qaBk.id && r.message.includes("suite-verified")) : null;
     const custView = qaBk ? await asTok(tokCustomer, `/api/bookings/${qaBk.id}/progress`) : { status: 0, data: {} };
     const custSees = ((custView.data as any).progress?.updates ?? []).some((u: any) => u.message?.includes("suite-verified"));
     step(c, "the update EXISTS in the database and the Test Customer sees the very same row — state verified, not button clicks",
@@ -1631,7 +1631,7 @@ export async function POST(req: NextRequest) {
     // create a REAL booking (Test 5's database condition) while Test 1 is current
     const ids = qaIds();
     const staleDay = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); t.setHours(10, 0, 0, 0); return t; })();
-    const staleBk = await asT(tokCust2, "/api/bookings", { method: "POST", body: { serviceId: ids.serviceId, startsAt: staleDay.toISOString(), durationMin: 60 } });
+    const staleBk = await asT(tokCust2, "/api/bookings", { method: "POST", body: { serviceId: (await ids).serviceId, startsAt: staleDay.toISOString(), durationMin: 60 } });
     const afterStale = await getB();
     step(c, "A STALE DATABASE CHECKPOINT CANNOT JUMP THE SCENARIO FORWARD: a real booking exists (Test 5's condition) yet the current task is STILL Test 1 and Test 5 stays LOCKED — the 'reset lands on Test 4' bug cannot recur",
       staleBk.status === 200 && afterStale.current === 0 && afterStale.done === 0 && afterStale.steps.find((x: any) => x.id === "book")?.status === "locked",
@@ -1670,7 +1670,7 @@ export async function POST(req: NextRequest) {
 
     // performing the action AGAIN — during the task — passes it
     const redoDay = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); t.setHours(13, 0, 0, 0); return t; })();
-    const redoBk = await asT(tokCust2, "/api/bookings", { method: "POST", body: { serviceId: ids.serviceId, startsAt: redoDay.toISOString(), durationMin: 60 } });
+    const redoBk = await asT(tokCust2, "/api/bookings", { method: "POST", body: { serviceId: (await ids).serviceId, startsAt: redoDay.toISOString(), durationMin: 60 } });
     const afterRedo = await getB();
     step(c, "REDOING THE ACTION DURING THE TASK PASSES IT: a booking made while the task is active verifies, and exactly the next task unlocks",
       redoBk.status === 200 && afterRedo.done === 5 && afterRedo.current === 5 && afterRedo.steps[4].status === "done",
@@ -1822,7 +1822,7 @@ export async function POST(req: NextRequest) {
 
     // EXPLORE AHEAD: the creator legitimately submits the work early (a
     // Test-9 action) — the product allows it; the extension button dies
-    const projRow = db.select().from(tables.projects).all().filter((x) => x.title === "[QA] Test project").sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).pop();
+    const projRow = (await db.select().from(tables.projects).all()).filter((x) => x.title === "[QA] Test project").sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).pop();
     const early = await as3(tokCrea3, `/api/projects/${projRow!.id}`, { method: "PATCH", body: { action: "submit" } });
     pr = (await as3(tokA3, "/api/qa/scenarios/project")).data as any;
     const extStep = pr.steps[extIdx];
@@ -1833,7 +1833,7 @@ export async function POST(req: NextRequest) {
     // one-click restore: rewinds ONLY the QA records, credits nothing
     const rep = await as3(tokA3, "/api/qa/scenarios/project", { method: "POST", body: { action: "repair" } });
     const after = rep.data as any;
-    const projAfter = db.select().from(tables.projects).where(eq(tables.projects.id, projRow!.id)).get();
+    const projAfter = await db.select().from(tables.projects).where(eq(tables.projects.id, projRow!.id)).get();
     step(c, "RESTORE REQUIRED STATE: the project rewinds to IN PROGRESS, the block clears, nothing is marked passed, and the cursor stays on the same test",
       rep.status === 200 && projAfter?.state === "in_progress" && after.current === extIdx && !after.steps[extIdx].blocked && after.done === extIdx,
       { actual: `state=${projAfter?.state} current=${after.current} done=${after.done} blocked=${after.steps[extIdx].blocked ?? "none"}` });
@@ -1909,8 +1909,8 @@ export async function POST(req: NextRequest) {
       denied.status === 403 && /pro/i.test(String(denied.data.error)), { actual: `${denied.status} "${String(denied.data.error).slice(0, 80)}"` });
     const up = await px(tCrea, "/api/me/plan", { method: "PATCH", body: { plan: "pro" } });
     const nowOk = await px(tCrea, "/api/me/studio", { method: "PATCH", body: { studio: { accent: "lime" } } });
-    const creaRow = db.select().from(tables.users).where(eq(tables.users.handle, "testcreator")).get()!;
-    const studioRow = db.select().from(tables.profiles).where(eq(tables.profiles.userId, creaRow.id)).get()!;
+    const creaRow = (await db.select().from(tables.users).where(eq(tables.users.handle, "testcreator")).get())!;
+    const studioRow = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, creaRow.id)).get())!;
     step(c, "upgrade to PRO (TEST) → the same save succeeds IMMEDIATELY and the customization is really in the database",
       up.status === 200 && nowOk.status === 200 && creaRow.plan === "pro" && (studioRow.studio ?? "").length > 2,
       { actual: `plan=${creaRow.plan} save=${nowOk.status} studio=${(studioRow.studio ?? "").length} bytes` });
@@ -1925,7 +1925,7 @@ export async function POST(req: NextRequest) {
       { actual: `creates=${r1.status},${r2.status},${r3.status} then ${r4.status} "${String(r4.data.error).slice(0, 70)}"` });
     await px(tBiz, "/api/me/plan", { method: "PATCH", body: { plan: "business_pro" } });
     const r5 = await mk(5);
-    const bizRow = db.select().from(tables.users).where(eq(tables.users.handle, "testbusiness")).get()!;
+    const bizRow = (await db.select().from(tables.users).where(eq(tables.users.handle, "testbusiness")).get())!;
     step(c, "upgrade to BUSINESS PRO (TEST) → the very next post succeeds; capacity is read live from the database row",
       bizRow.plan === "business_pro" && r5.status === 200, { actual: `plan=${bizRow.plan} post4th=${r5.status}` });
 
@@ -1947,7 +1947,7 @@ export async function POST(req: NextRequest) {
 
     // isolation: only QA personas were touched; reset restores their baseline
     await px(tAdm, "/api/qa/scenarios/plans", { method: "POST", body: { action: "reset" } });
-    const after = ["testcreator", "testbusiness", "testcustomer"].map((h) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()!);
+    const after = await Promise.all(["testcreator", "testbusiness", "testcustomer"].map(async (h) => (await db.select().from(tables.users).where(eq(tables.users.handle, h)).get())!));
     step(c, "ISOLATION: plan testing touched ONLY the QA personas, and the scenario reset restores all of them to Free/Demo/unverified baseline",
       after.every((u) => u.plan === "free" && u.testerMode === "demo"), { actual: after.map((u) => `${u.handle}=${u.plan}/${u.testerMode}`).join(" ") });
   }
@@ -1969,7 +1969,7 @@ export async function POST(req: NextRequest) {
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "reset" } });
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "contact" } });
     // the customer does EXACTLY what a customer can do alone: request the booking
-    const svcRow = db.select().from(tables.services).all().find((x) => x.title === "QA Studio Rental" && x.active)!;
+    const svcRow = (await db.select().from(tables.services).all()).find((x) => x.title === "QA Studio Rental" && x.active)!;
     const day4 = (() => { let t = new Date(Date.now() + 4 * 86400e3); while (t.getDay() === 0 || t.getDay() === 6) t = new Date(t.getTime() + 86400e3); t.setHours(13, 0, 0, 0); return t; })();
     const bk4 = await as4(tokC4, "/api/bookings", { method: "POST", body: { serviceId: svcRow.id, startsAt: day4.toISOString(), durationMin: 60 } });
     let st4 = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
@@ -1983,9 +1983,9 @@ export async function POST(req: NextRequest) {
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "client-accept" } });
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "client-pays" } });
     st4 = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
-    const bkRow = db.select().from(tables.bookings).all().filter((b) => b.providerId === svcRow.ownerId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).pop()!;
-    const pays = db.select().from(tables.payments).all().filter((x) => x.bookingId === bkRow.id);
-    const allBk = db.select().from(tables.bookings).all().filter((b) => b.providerId === svcRow.ownerId && b.createdAt.getTime() > Date.now() - 120000);
+    const bkRow = (await db.select().from(tables.bookings).all()).filter((b) => b.providerId === svcRow.ownerId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).pop()!;
+    const pays = (await db.select().from(tables.payments).all()).filter((x) => x.bookingId === bkRow.id);
+    const allBk = (await db.select().from(tables.bookings).all()).filter((b) => b.providerId === svcRow.ownerId && b.createdAt.getTime() > Date.now() - 120000);
     step(c, "LOOP FIX · accept → pay completes the chain with ONE booking and ONE payment — no duplicates from repeating the flow, checkpoint verified from the database",
       st4.steps.find((x: any) => x.id === "client-pays")?.status === "done" && pays.length === 1 && allBk.length === 1,
       { actual: `client-pays=${st4.steps.find((x: any) => x.id === "client-pays")?.status} bookings=${allBk.length} payments=${pays.length}` });
@@ -2001,7 +2001,7 @@ export async function POST(req: NextRequest) {
     const chain = st5.steps.map((x: any) => x.id).join(",");
     step(c, "DRAFT LOOP FIX · the hire chain is five single-persona checkpoints in strict order: draft → offer → fund → deliver → release",
       chain.includes("hire-draft,hire-offer,hire-fund,hire-deliver,hire-release"), { actual: chain.split(",").slice(5, 10).join(" → ") });
-    const projCount = db.select().from(tables.projects).all().filter((pr) => pr.title === "[QA] People-scenario gig").length;
+    const projCount = (await db.select().from(tables.projects).all()).filter((pr) => pr.title === "[QA] People-scenario gig").length;
     step(c, "DRAFT LOOP FIX · exactly ONE project draft exists — repeated panel opens/rerenders created nothing",
       projCount === 1, { actual: `projects=${projCount}` });
 
@@ -2021,7 +2021,7 @@ export async function POST(req: NextRequest) {
       wcur.id === "hire-draft" && !!wcur.blocked && wcur.repairable === true && /Cut Grass/.test(String(wcur.blocked)),
       { actual: `current=${wcur.id} blocked="${String(wcur.blocked).slice(0, 70)}" repairable=${wcur.repairable}` });
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "repair" } });
-    const gone = db.select().from(tables.projects).all().filter((pr) => pr.title === "Cut Grass").length;
+    const gone = (await db.select().from(tables.projects).all()).filter((pr) => pr.title === "Cut Grass").length;
     await as4(tokA4, "/api/qa/scenarios/people", { method: "POST", body: { action: "auto", step: "hire-draft" } });
     w = (await as4(tokA4, "/api/qa/scenarios/people")).data as any;
     step(c, "STALE-DRAFT WEDGE · restore clears the stale project (create form returns), a FRESH draft counts, and the chain advances to the creator's offer",
@@ -2091,8 +2091,8 @@ export async function POST(req: NextRequest) {
       }
     }
     // deterministic reset: remove [TESTLIVE] streams from prior runs
-    for (const l of db.select().from(tables.liveStreams).all())
-      if (l.title.startsWith("[TESTLIVE]")) db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+    for (const l of await db.select().from(tables.liveStreams).all())
+      if (l.title.startsWith("[TESTLIVE]")) await db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
 
     /* ---- 1-5 · create: title, category, audience, start ---- */
     const created = await api("lena", "/api/live", { method: "POST", body: { title: "[TESTLIVE] Rolling cuts — open studio", category: "music", audience: "everyone" } });
@@ -2145,11 +2145,11 @@ export async function POST(req: NextRequest) {
     step(c, "sharing is a real host control: toggling it off updates every viewer's payload (UI hides the button)", det2.stream?.sharingEnabled === false);
 
     /* ---- 13 · moderation: delete, pin, moderators ---- */
-    const rachelMsg = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, sid)).all().find((m) => m.body === "[TESTLIVE] rachel again")!;
+    const rachelMsg = (await db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, sid)).all()).find((m) => m.body === "[TESTLIVE] rachel again")!;
     await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "delete_message", messageId: rachelMsg.id } });
     const chatAfterDel = (await api("rachel", `/api/live/${sid}/chat?after=0`)).data as { messages?: { id: string }[] };
     step(c, "host deletes a message — it disappears from the chat feed for everyone", (chatAfterDel.messages ?? []).every((m) => m.id !== rachelMsg.id));
-    const hostMsg = db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, sid)).all().find((m) => m.body === "[TESTLIVE] host replies")!;
+    const hostMsg = (await db.select().from(tables.liveMessages).where(eq(tables.liveMessages.streamId, sid)).all()).find((m) => m.body === "[TESTLIVE] host replies")!;
     await api("lena", `/api/live/${sid}`, { method: "PATCH", body: { action: "pin", messageId: hostMsg.id } });
     const det3 = (await api("rachel", `/api/live/${sid}`)).data as { pinnedMessage?: { id?: string } };
     step(c, "host pins a message — every viewer sees the pin", det3.pinnedMessage?.id === hostMsg.id);
@@ -2172,7 +2172,7 @@ export async function POST(req: NextRequest) {
       const re2 = await api(null, "/api/auth/login", { method: "POST", body: { identifier: "tonblive", password: "Live-lifecycle-2026" } });
       tok.tonblive = (re2.data as { sessionToken?: string }).sessionToken ?? "";
     }
-    const tonbliveId = (db.select().from(tables.users).all().find((u) => u.handle === "tonblive"))!.id;
+    const tonbliveId = ((await db.select().from(tables.users).all()).find((u) => u.handle === "tonblive"))!.id;
     await api("lena", `/api/live/${sid}/moderate`, { method: "POST", body: { action: "block", userId: tonbliveId } });
     const blockedView = await api("tonblive", `/api/live/${sid}`);
     const blockedBeat = await api("tonblive", `/api/live/${sid}/presence`, { method: "POST", body: {} });
@@ -2192,7 +2192,7 @@ export async function POST(req: NextRequest) {
     /* ---- 28-29 · refresh + disconnect/reconnect ---- */
     const beat1 = await api("rachel", `/api/live/${sid}/presence`, { method: "POST", body: {} });
     const count1 = (beat1.data as { viewerCount?: number }).viewerCount ?? 0;
-    db.update(tables.liveViewers).set({ lastSeenAt: new Date(Date.now() - 120_000) })
+    await db.update(tables.liveViewers).set({ lastSeenAt: new Date(Date.now() - 120_000) })
       .where(and(eq(tables.liveViewers.streamId, sid), eq(tables.liveViewers.userId, rachel.id))).run();
     const afterDrop = (await api("lena", `/api/live/${sid}`)).data as { stream?: { viewerCount?: number } };
     const beat2 = await api("rachel", `/api/live/${sid}/presence`, { method: "POST", body: {} });
@@ -2215,8 +2215,8 @@ export async function POST(req: NextRequest) {
     /* ---- 19 + 24-26 · campus audience: verification is the law ---- */
     const campusLive = await api("imani", "/api/live", { method: "POST", body: { title: "[TESTLIVE] Bowie State study session", category: "education", audience: "campus" } });
     const campusSid = String((campusLive.data as { id?: string }).id || "");
-    const campusRow = db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, campusSid)).get();
-    const bowie = db.select().from(tables.campuses).all().find((x) => x.slug === "bowie-state");
+    const campusRow = await db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, campusSid)).get();
+    const bowie = (await db.select().from(tables.campuses).all()).find((x) => x.slug === "bowie-state");
     step(c, "a VERIFIED student goes live to campus — the stream is bound to their verified school automatically", campusLive.status === 200 && campusRow?.campusId === bowie?.id, { actual: `campus=${campusRow?.campusId === bowie?.id ? "Bowie State University" : campusRow?.campusId}` });
     const devinCampus = await api("devin", "/api/live?filter=campus");
     const rachelCampus = await api("rachel", "/api/live?filter=campus");
@@ -2262,9 +2262,9 @@ export async function POST(req: NextRequest) {
 
     /* ---- reports + safety ---- */
     const rep = await api("rachel", `/api/live/${sid}/report`, { method: "POST", body: { target: "stream", category: "privacy", details: "[TESTLIVE] probe" } });
-    const repRow = db.select().from(tables.reports).all().find((r) => r.targetId === sid && r.targetType === "live_stream");
+    const repRow = (await db.select().from(tables.reports).all()).find((r) => r.targetId === sid && r.targetType === "live_stream");
     step(c, "report stream files into the ONE shared reports system (human review, includes a location-privacy category)", rep.status === 200 && !!repRow, { record: repRow?.id });
-    if (repRow) db.delete(tables.reports).where(eq(tables.reports.id, repRow.id)).run();
+    if (repRow) await db.delete(tables.reports).where(eq(tables.reports.id, repRow.id)).run();
 
     /* ---- 27 · browser layer: mobile + desktop, real Chromium ---- */
     try {
@@ -2290,8 +2290,8 @@ export async function POST(req: NextRequest) {
     }
 
     // cleanup: this category's streams disappear from the demo data
-    for (const l of db.select().from(tables.liveStreams).all())
-      if (l.title.startsWith("[TESTLIVE]")) db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+    for (const l of await db.select().from(tables.liveStreams).all())
+      if (l.title.startsWith("[TESTLIVE]")) await db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
     await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" });
   }
 
@@ -2333,7 +2333,7 @@ export async function POST(req: NextRequest) {
     step(c, "discovered & fixed by this pass: /communities hydration mismatch under its Suspense boundary — the deterministic useHydrated gate (same fix as the People page), no suppression anywhere",
       communities.includes("useHydrated") && communities.includes("!hydrated || user === undefined") && !communities.includes("suppressHydrationWarning"));
     step(c, "the Test Center session pill sits ABOVE the bottom nav on touch layouts (bottom-20 → lg:bottom-3) — QA chrome never covers navigation",
-      qaBar.includes("bottom-20") && qaBar.includes("lg:bottom-3"));
+      qaBar.includes("bottom-36") && qaBar.includes("lg:bottom-3"));
     const editProfileSrc = read("components/profile/EditProfile.tsx");
     step(c, "Edit Profile's Cancel/Save bar docks ABOVE the bottom nav on touch layouts (fixed 4rem offset matching the nav's deterministic height + safe area; bottom-0 again at lg) — the mobile-hidden-save-bar bug class is structurally locked out",
       editProfileSrc.includes("bottom-[calc(4rem+env(safe-area-inset-bottom))]") && editProfileSrc.includes("lg:bottom-0") && nav.includes("h-16"));
@@ -2408,7 +2408,7 @@ export async function POST(req: NextRequest) {
       fs.existsSync(path.join(process.cwd(), "components", "LocationPicker.tsx")) && fs.existsSync(path.join(process.cwd(), "components", "GeoSelect.tsx")));
 
     /* existing data preserved — the rollback destroyed nothing */
-    const devinProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, ids("devin").id)).get();
+    const devinProfile = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, (await ids("devin")).id)).get();
     step(c, "existing profile location text is preserved exactly (devin still Baltimore / MD / United States)",
       devinProfile?.city === "Baltimore" && devinProfile?.state === "MD" && devinProfile?.country === "United States",
       { actual: `${devinProfile?.city}, ${devinProfile?.county}, ${devinProfile?.state}, ${devinProfile?.country}` });
@@ -2579,16 +2579,17 @@ export async function POST(req: NextRequest) {
   /* ================= DATABASE INTEGRITY ================= */
   {
     const c = cat("DATABASE INTEGRITY");
-    const bk = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+    const bk = await db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
     const members = bk?.conversationId
-      ? db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.conversationId, bk.conversationId)).all().map((m) => m.userId).sort()
+      ? (await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.conversationId, bk.conversationId)).all()).map((m) => m.userId).sort()
       : [];
     step(c, "booking → conversation → participants chain is exact", !!bk && members.length === 2 && members.includes(rachel.id) && members.includes(lena.id), { record: bookingId });
-    const pays = db.select().from(tables.payments).all().filter((p) => p.bookingId === bookingId || p.projectId === projectId);
+    const pays = (await db.select().from(tables.payments).all()).filter((p) => p.bookingId === bookingId || p.projectId === projectId);
     step(c, "payments reference their real records with correct parties", pays.length === 2 && pays.every((p) => p.payerId === rachel.id && p.payeeId === lena.id), { actual: `${pays.length} payments` });
-    const orphanMembers = db.select().from(tables.conversationMembers).all().filter((m) => !db.select().from(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).get()).length;
+    const convIdSet = new Set((await db.select().from(tables.conversations).all()).map((cv) => cv.id));
+    const orphanMembers = (await db.select().from(tables.conversationMembers).all()).filter((m) => !convIdSet.has(m.conversationId)).length;
     step(c, "no orphaned conversation members", orphanMembers === 0, { actual: String(orphanMembers) });
-    const dupBookings = db.select().from(tables.bookings).where(and(eq(tables.bookings.clientId, rachel.id), eq(tables.bookings.providerId, lena.id))).all().length;
+    const dupBookings = (await db.select().from(tables.bookings).where(and(eq(tables.bookings.clientId, rachel.id), eq(tables.bookings.providerId, lena.id))).all()).length;
     step(c, "exact booking count from the run (1 flow + 3 loyalty + 1 window + 1 drop + 2 horizon + 1 slot-proof)", dupBookings === 9, { expected: "9", actual: String(dupBookings) });
   }
 

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const row = db
+  const row = await db
     .select({ post: tables.posts, profile: tables.profiles })
     .from(tables.posts)
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.posts.authorId))

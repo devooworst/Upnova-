@@ -58,3 +58,6 @@ db/geo.db-wal
 public/uploads/
 db/.qa-guide-defects.json
 qa-artifacts/
+
+# PGlite local Postgres data directory (dev/sandbox only)
+db/pgdata/

@@ -26,27 +26,27 @@ const id = () => randomBytes(12).toString("hex");
  *  undeliverable — no signal a harasser can farm. */
 export async function POST(req: NextRequest) {
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser();
     const body = await req.json().catch(() => ({}));
     const communityRef = String(body.communityId || "");
-    const c = findCommunity(communityRef);
+    const c = await findCommunity(communityRef);
     if (!c) throw new ApiError(404, "Community not found");
-    const myMembership = requireActiveMember(c.id, user.id);
+    const myMembership = await requireActiveMember(c!.id, user.id);
 
     // resolve the masked author from the content id
     let authorId: string | null = null;
     let authorIdentity = "";
     if (body.postId) {
-      const p = db
+      const p = await db
         .select()
         .from(tables.communityPosts)
-        .where(and(eq(tables.communityPosts.id, String(body.postId)), eq(tables.communityPosts.communityId, c.id)))
+        .where(and(eq(tables.communityPosts.id, String(body.postId)), eq(tables.communityPosts.communityId, c!.id)))
         .get();
       if (!p) throw new ApiError(404, "Post not found");
-      authorId = p.authorId;
-      authorIdentity = p.identity;
+      authorId = p!.authorId;
+      authorIdentity = p!.identity;
     } else if (body.commentId) {
-      const cm = db.select().from(tables.communityComments).where(eq(tables.communityComments.id, String(body.commentId))).get();
+      const cm = await db.select().from(tables.communityComments).where(eq(tables.communityComments.id, String(body.commentId))).get();
       if (!cm) throw new ApiError(404, "Reply not found");
       authorId = cm.authorId;
       authorIdentity = cm.identity;
@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
       throw new ApiError(400, "That member already posts with their profile identity — just view their profile");
 
     // blocked in either direction: no new requests, no block-state leak
-    if (blockedEitherWay(user.id, authorId!)) throw new ApiError(403, "You can't send a reveal request to this member");
+    if (await blockedEitherWay(user.id, authorId!)) throw new ApiError(403, "You can't send a reveal request to this member");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.identityReveals)
       .where(
@@ -78,25 +78,25 @@ export async function POST(req: NextRequest) {
     if (hardNo) return { ok: true };
 
     // my label as the target will see it: my current identity in this community
-    const myLabel = maskedLabelFor(c.id, user.id, myMembership.lastIdentity || "real");
-    const theirLabel = maskedLabelFor(c.id, authorId!, authorIdentity);
+    const myLabel = await maskedLabelFor(c!.id, user.id, myMembership.lastIdentity || "real");
+    const theirLabel = await maskedLabelFor(c!.id, authorId!, authorIdentity);
 
     const softDecline = existing.find((r) => r.requesterId === user.id && r.status === "declined");
     let revealId: string;
     if (softDecline) {
       revealId = softDecline.id;
-      db.update(tables.identityReveals)
-        .set({ status: "pending", requesterLabel: myLabel, targetLabel: theirLabel, communityId: c.id, respondedAt: null })
+      await db.update(tables.identityReveals)
+        .set({ status: "pending", requesterLabel: myLabel, targetLabel: theirLabel, communityId: c!.id, respondedAt: null })
         .where(eq(tables.identityReveals.id, softDecline.id))
         .run();
     } else {
       revealId = id();
-      db.insert(tables.identityReveals)
+      await db.insert(tables.identityReveals)
         .values({
           id: revealId,
           requesterId: user.id,
           targetId: authorId!,
-          communityId: c.id,
+          communityId: c!.id,
           requesterLabel: myLabel,
           targetLabel: theirLabel,
           status: "pending",
@@ -104,12 +104,12 @@ export async function POST(req: NextRequest) {
         .run();
     }
 
-    notify({
+    await notify({
       userId: authorId!,
       actorId: null, // never leak the requester's account through the notification
       type: "community",
       title: `${myLabel} would like to reveal identities with you`,
-      body: `From ${c.name} — accepting shows you each other's profiles, privately. The community keeps seeing your masked identities.`,
+      body: `From ${c!.name} — accepting shows you each other's profiles, privately. The community keeps seeing your masked identities.`,
       href: `/communities?tab=reveals`,
     });
 

@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 /** POST { days, reason } — creator requests a deadline extension (persistent, idempotent). */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const ext = requestExtension(params.id, user.id, Number(body.days), String(body.reason || ""));
+  return guarded(async () => {
+    const user = await requireUser();
+    const ext = await requestExtension(params.id, user.id, Number(body.days), String(body.reason || ""));
     return { id: ext.id, status: ext.status };
   });
 }

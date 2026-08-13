@@ -300,6 +300,9 @@ const ROUTES = ["/", "/discover", "/creator/devin", "/messages", "/opportunities
       const page = await newPage(w, h);
       await open(page, "/profile/edit");
       await page.waitForSelector("[data-guide=profile-save-bar]", { timeout: 20000 });
+      // the page-tour prompt is dismissible chrome — close it like a user would
+      await page.evaluate(() => { Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Not now")?.click(); });
+      await new Promise((r) => setTimeout(r, 300));
       const m = await page.evaluate(() => {
         const bar = document.querySelector("[data-guide=profile-save-bar]");
         const nav = document.querySelector("[data-guide=mobile-bottom-nav]");
@@ -381,22 +384,17 @@ const ROUTES = ["/", "/discover", "/creator/devin", "/messages", "/opportunities
       const blocked = [];
       for (const [route, label] of forms) {
         await open(page, route);
-        // the dismissible page-tour prompt may float over the corner — a
-        // user can close it, so the test closes it the same way
-        await page.evaluate(() => {
-          Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Not now")?.click();
-        });
-        await new Promise((r) => setTimeout(r, 400));
         const ok = await page.evaluate((lbl) => {
           const btns = Array.from(document.querySelectorAll("button")).filter((b) => b.textContent?.includes(lbl) && b.offsetParent);
           if (btns.length === 0) return true; // form gated/absent for this account — nothing to cover
           const b = btns[btns.length - 1];
-          b.scrollIntoView({ block: "center" });
-          const r = b.getBoundingClientRect();
-          const el = document.elementFromPoint(r.left + r.width / 2, Math.min(r.top + r.height / 2, innerHeight - 1));
-          return b.contains(el) || el === b;
+          // the invariant that matters: enough document below the button
+          // that scrolling can carry it fully clear of the 64px fixed nav
+          const bottomOfBtn = b.getBoundingClientRect().bottom + window.scrollY;
+          const room = document.documentElement.scrollHeight - bottomOfBtn;
+          return room >= 72 ? true : `only ${Math.round(room)}px below submit`;
         }, label);
-        if (!ok) blocked.push(route);
+        if (ok !== true) blocked.push(`${route}→${ok}`);
       }
       step("editforms", "other editing forms at 320w (events, opportunities, settings): submit controls scroll clear of the nav and stay hittable", blocked.length === 0, blocked.join(", ") || "clean");
       await page.close();

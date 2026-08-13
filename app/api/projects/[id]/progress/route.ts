@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 
 /** GET — full progress history + current estimate for a party. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    return { progress: progressPayload("project", params.id, user.id) };
+  return guarded(async () => {
+    const user = await requireUser();
+    return { progress: await progressPayload("project", params.id, user.id) };
   });
 }
 
@@ -21,11 +21,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     if (body.kind === "eta") {
-      const row = postEtaChange("project", params.id, user.id, { etaAt: String(body.etaAt), reason: body.reason });
-      return { id: row.id, progress: progressPayload("project", params.id, user.id) };
+      const row = await postEtaChange("project", params.id, user.id, { etaAt: String(body.etaAt), reason: body.reason });
+      return { id: row.id, progress: await progressPayload("project", params.id, user.id) };
     }
     const row = postProgressUpdate("project", params.id, user.id, {
       status: body.status,
@@ -34,6 +34,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       etaAt: body.etaAt ?? null,
       attachmentUrl: body.attachmentUrl,
     });
-    return { id: row.id, progress: progressPayload("project", params.id, user.id) };
+    return { id: (await row).id, progress: await progressPayload("project", params.id, user.id) };
   });
 }

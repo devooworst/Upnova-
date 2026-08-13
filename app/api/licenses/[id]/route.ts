@@ -11,21 +11,21 @@ export const dynamic = "force-dynamic";
  *  delivery of the licensed files → payout releases. Licensee only. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const lic = db.select().from(tables.licenses).where(eq(tables.licenses.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const lic = await db.select().from(tables.licenses).where(eq(tables.licenses.id, params.id)).get();
     if (!lic) throw new ApiError(404, "License not found");
     if (String(body.action) !== "confirm") throw new ApiError(400, "Unknown action");
     if (lic.licenseeId !== user.id) throw new ApiError(403, "Only the licensee confirms delivery");
     if (lic.status !== "issued") throw new ApiError(409, `Nothing to confirm from "${lic.status}"`);
 
-    db.update(tables.licenses).set({ status: "completed" }).where(eq(tables.licenses.id, lic.id)).run();
-    db.update(tables.payments)
+    await db.update(tables.licenses).set({ status: "completed" }).where(eq(tables.licenses.id, lic.id)).run();
+    await db.update(tables.payments)
       .set({ status: "released" })
       .where(and(eq(tables.payments.licenseId, lic.id), eq(tables.payments.status, "held")))
       .run();
     if (lic.conversationId) {
-      db.insert(tables.messages)
+      await db.insert(tables.messages)
         .values({
           id: randomBytes(12).toString("hex"),
           conversationId: lic.conversationId,
@@ -34,9 +34,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           body: `License ${lic.id.slice(0, 8).toUpperCase()} completed — delivery confirmed, $${lic.price} released to the creator.`,
         })
         .run();
-      db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, lic.conversationId)).run();
+      await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, lic.conversationId)).run();
     }
-    notify({
+    await notify({
       userId: lic.creatorId, actorId: user.id, type: "payment",
       title: `License completed — $${lic.price} released`,
       body: lic.workTitle, href: "/works?licenses=1", category: "payments",

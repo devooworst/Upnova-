@@ -14,7 +14,7 @@
 /* ------------------------------------------------------------------ */
 
 import { randomBytes } from "crypto";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+
 import { join } from "path";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
@@ -51,12 +51,12 @@ const uid = () => randomBytes(12).toString("hex");
 
 /** Idempotent: creates the three personas (+ Test Creator's bookable
     service) if missing. Safe to call on every QA API hit. */
-export function ensureQaPersonas() {
+export async function ensureQaPersonas() {
   for (const p of QA_PERSONAS) {
-    let user = db.select().from(tables.users).where(eq(tables.users.handle, p.handle)).get();
+    let user = await db.select().from(tables.users).where(eq(tables.users.handle, p.handle)).get();
     if (!user) {
       const id = uid();
-      db.insert(tables.users)
+      await db.insert(tables.users)
         .values({
           id,
           email: `${p.handle}@mavyn.dev`,
@@ -69,7 +69,7 @@ export function ensureQaPersonas() {
           isSeed: false, // CRITICAL: no demo auto-behaviors — the tester acts both sides
         })
         .run();
-      db.insert(tables.profiles)
+      await db.insert(tables.profiles)
         .values({
           id: uid(),
           userId: id,
@@ -85,18 +85,18 @@ export function ensureQaPersonas() {
           openToWork: p.handle === "testcreator",
         })
         .run();
-      user = db.select().from(tables.users).where(eq(tables.users.id, id)).get()!;
+      user = (await db.select().from(tables.users).where(eq(tables.users.id, id)).get())!;
     }
     // Test Creator always has one active, public, bookable service
     if (p.handle === "testcreator") {
-      const svc = db
+      const svc = (await db
         .select()
         .from(tables.services)
         .where(eq(tables.services.ownerId, user.id))
-        .all()
+        .all())
         .find((s) => s.active);
       if (!svc)
-        db.insert(tables.services)
+        await db.insert(tables.services)
           .values({
             id: uid(),
             ownerId: user.id,
@@ -112,14 +112,14 @@ export function ensureQaPersonas() {
     }
     // Test Business too — so the CLIENTS category can be exercised
     if (p.handle === "testbusiness") {
-      const svc = db
+      const svc = (await db
         .select()
         .from(tables.services)
         .where(eq(tables.services.ownerId, user.id))
-        .all()
+        .all())
         .find((s) => s.active);
       if (!svc)
-        db.insert(tables.services)
+        await db.insert(tables.services)
           .values({
             id: uid(),
             ownerId: user.id,
@@ -136,89 +136,91 @@ export function ensureQaPersonas() {
   }
 }
 
-export function qaIds(): { customer: string; creator: string; business: string; serviceId: string; businessServiceId: string } {
-  ensureQaPersonas();
-  const get = (h: string) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()!.id;
-  const creator = get("testcreator");
-  const business = get("testbusiness");
-  const svc = db
+export async function qaIds(): Promise<{ customer: string; creator: string; business: string; serviceId: string; businessServiceId: string }> {
+  await ensureQaPersonas();
+  const get = async (h: string) => (await db.select().from(tables.users).where(eq(tables.users.handle, h)).get())!.id;
+  const creator = await get("testcreator");
+  const business = await get("testbusiness");
+  const svc = (await db
     .select()
     .from(tables.services)
     .where(eq(tables.services.ownerId, creator))
-    .all()
+    .all())
     .find((s) => s.active)!;
-  const bsvc = db
+  const bsvc = (await db
     .select()
     .from(tables.services)
     .where(eq(tables.services.ownerId, business))
-    .all()
+    .all())
     .find((s) => s.active)!;
-  return { customer: get("testcustomer"), creator, business, serviceId: svc.id, businessServiceId: bsvc.id };
+  return { customer: await get("testcustomer"), creator, business, serviceId: svc.id, businessServiceId: bsvc.id };
 }
 
 /* ----------------------------- reset ----------------------------- */
 
 /** Deletes every transactional record involving a QA persona — and
     ONLY those. Real accounts, auth, and seed content stay untouched. */
-export function resetQaData(): number {
-  const ids = QA_HANDLES.map(
-    (h) => db.select().from(tables.users).where(eq(tables.users.handle, h)).get()?.id
-  ).filter(Boolean) as string[];
+export async function resetQaData(): Promise<number> {
+  const ids: string[] = [];
+  for (const h of QA_HANDLES) {
+    const u = await db.select().from(tables.users).where(eq(tables.users.handle, h)).get();
+    if (u) ids.push(u.id);
+  }
   let removed = 0;
   for (const id of ids) {
-    for (const b of db
+    for (const b of await db
       .select()
       .from(tables.bookings)
       .where(or(eq(tables.bookings.clientId, id), eq(tables.bookings.providerId, id)))
       .all()) {
-      db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
-      db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run(); // progress rows cascade
+      await db.delete(tables.payments).where(eq(tables.payments.bookingId, b.id)).run();
+      await db.delete(tables.bookings).where(eq(tables.bookings.id, b.id)).run(); // progress rows cascade
       removed++;
     }
-    for (const p of db
+    for (const p of await db
       .select()
       .from(tables.projects)
       .where(or(eq(tables.projects.clientId, id), eq(tables.projects.creatorId, id)))
       .all()) {
-      db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
-      db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run(); // extensions/progress/reviews cascade
+      await db.delete(tables.payments).where(eq(tables.payments.projectId, p.id)).run();
+      await db.delete(tables.projects).where(eq(tables.projects.id, p.id)).run(); // extensions/progress/reviews cascade
       removed++;
     }
     // live streams hosted by a persona (chat/reactions/guests cascade)
-    for (const l of db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, id)).all()) {
-      db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+    for (const l of await db.select().from(tables.liveStreams).where(eq(tables.liveStreams.hostId, id)).all()) {
+      await db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
       removed++;
     }
     // presence/chat/restrictions a persona left in OTHER streams
-    db.delete(tables.liveViewers).where(eq(tables.liveViewers.userId, id)).run();
-    db.delete(tables.liveMessages).where(eq(tables.liveMessages.userId, id)).run();
-    db.delete(tables.liveReactions).where(eq(tables.liveReactions.userId, id)).run();
-    db.delete(tables.liveGuests).where(eq(tables.liveGuests.userId, id)).run();
-    db.delete(tables.liveModerators).where(eq(tables.liveModerators.userId, id)).run();
-    db.delete(tables.liveRestrictions).where(eq(tables.liveRestrictions.userId, id)).run();
-    for (const o of db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, id)).all()) {
-      db.delete(tables.applications).where(eq(tables.applications.opportunityId, o.id)).run();
-      db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
+    await db.delete(tables.liveViewers).where(eq(tables.liveViewers.userId, id)).run();
+    await db.delete(tables.liveMessages).where(eq(tables.liveMessages.userId, id)).run();
+    await db.delete(tables.liveReactions).where(eq(tables.liveReactions.userId, id)).run();
+    await db.delete(tables.liveGuests).where(eq(tables.liveGuests.userId, id)).run();
+    await db.delete(tables.liveModerators).where(eq(tables.liveModerators.userId, id)).run();
+    await db.delete(tables.liveRestrictions).where(eq(tables.liveRestrictions.userId, id)).run();
+    for (const o of await db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, id)).all()) {
+      await db.delete(tables.applications).where(eq(tables.applications.opportunityId, o.id)).run();
+      await db.delete(tables.opportunities).where(eq(tables.opportunities.id, o.id)).run();
       removed++;
     }
-    db.delete(tables.applications).where(eq(tables.applications.applicantId, id)).run();
-    for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, id)).all()) {
-      db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
+    await db.delete(tables.applications).where(eq(tables.applications.applicantId, id)).run();
+    for (const m of await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, id)).all()) {
+      await db.delete(tables.conversations).where(eq(tables.conversations.id, m.conversationId)).run();
       removed++;
     }
-    db.delete(tables.notifications).where(eq(tables.notifications.userId, id)).run();
-    db.delete(tables.follows).where(or(eq(tables.follows.followerId, id), eq(tables.follows.followingId, id))).run();
-    db.delete(tables.preferredClients).where(or(eq(tables.preferredClients.providerId, id), eq(tables.preferredClients.clientId, id))).run();
-    db.delete(tables.businessTeam).where(or(eq(tables.businessTeam.businessId, id), eq(tables.businessTeam.personId, id))).run();
-    db.delete(tables.bookmarks).where(eq(tables.bookmarks.userId, id)).run();
-    db.delete(tables.interactions).where(eq(tables.interactions.userId, id)).run();
+    await db.delete(tables.notifications).where(eq(tables.notifications.userId, id)).run();
+    await db.delete(tables.follows).where(or(eq(tables.follows.followerId, id), eq(tables.follows.followingId, id))).run();
+    await db.delete(tables.preferredClients).where(or(eq(tables.preferredClients.providerId, id), eq(tables.preferredClients.clientId, id))).run();
+    await db.delete(tables.businessTeam).where(or(eq(tables.businessTeam.businessId, id), eq(tables.businessTeam.personId, id))).run();
+    await db.delete(tables.bookmarks).where(eq(tables.bookmarks.userId, id)).run();
+    await db.delete(tables.interactions).where(eq(tables.interactions.userId, id)).run();
     // PLAN-NEUTRAL FIXTURE — every scenario starts from the same truth:
     // Free plan, Demo Mode, no campus verification, no saved Studio.
     // Only QA personas are touched; the Plan Lab flips these through
     // the REAL routes and this reset always restores the baseline.
-    db.update(tables.users).set({ plan: "free", testerMode: "demo" }).where(eq(tables.users.id, id)).run();
-    db.delete(tables.campusVerifications).where(eq(tables.campusVerifications.userId, id)).run();
-    db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, id)).run();
+    await db.update(tables.users).set({ plan: "free", testerMode: "demo" }).where(eq(tables.users.id, id)).run();
+    await db.delete(tables.campusVerifications).where(eq(tables.campusVerifications.userId, id)).run();
+    await db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, id)).run();
   }
   return removed;
 }
@@ -265,19 +267,20 @@ export type QaRuns = Record<
   }
 >;
 
-export function readRuns(): QaRuns {
+const RUNS_KEY = "qa:runs";
+
+export async function readRuns(): Promise<QaRuns> {
   try {
-    if (!existsSync(RUNS_FILE)) return {};
-    return JSON.parse(readFileSync(RUNS_FILE, "utf8")) as QaRuns;
+    const row = await db.select().from(tables.kvState).where(eq(tables.kvState.key, RUNS_KEY)).get();
+    return row?.value ? (JSON.parse(row.value) as QaRuns) : {};
   } catch {
     return {};
   }
 }
 
-export function writeRuns(runs: QaRuns) {
-  try {
-    writeFileSync(RUNS_FILE, JSON.stringify(runs, null, 2));
-  } catch {
-    /* read-only fs — run state just won't persist */
-  }
+export async function writeRuns(runs: QaRuns) {
+  const value = JSON.stringify(runs);
+  const existing = await db.select().from(tables.kvState).where(eq(tables.kvState.key, RUNS_KEY)).get();
+  if (existing) await db.update(tables.kvState).set({ value, updatedAt: new Date() }).where(eq(tables.kvState.key, RUNS_KEY)).run();
+  else await db.insert(tables.kvState).values({ key: RUNS_KEY, value }).run();
 }

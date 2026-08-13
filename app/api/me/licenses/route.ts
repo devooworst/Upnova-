@@ -7,16 +7,16 @@ export const dynamic = "force-dynamic";
 /** GET /api/me/licenses — every license I hold or issued: the permanent
  *  transaction/license record both sides can point to in a dispute. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select()
       .from(tables.licenses)
       .where(or(eq(tables.licenses.licenseeId, user.id), eq(tables.licenses.creatorId, user.id)))
       .orderBy(desc(tables.licenses.createdAt))
       .all();
     const names = new Map(
-      db.select().from(tables.profiles).all().map((p) => [p.userId, p.displayName])
+      (await db.select().from(tables.profiles).all()).map((p) => [p.userId, p.displayName])
     );
     return {
       licenses: rows.map((l) => ({

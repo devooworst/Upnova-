@@ -20,23 +20,23 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/opportunities?scope= — open listings, scope-aware like the feed. */
 export async function GET(req: NextRequest) {
-  return guarded(() => {
-    const viewer = getSessionUser();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
     const scope = (req.nextUrl.searchParams.get("scope") || "for-you") as FeedScope;
 
-    const rows = db
+    const rows = (await db
       .select({ opp: tables.opportunities, user: tables.users, profile: tables.profiles })
       .from(tables.opportunities)
       .innerJoin(tables.users, eq(tables.opportunities.posterId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.opportunities.createdAt))
-      .all()
+      .all())
       .filter((r) => r.opp.status === "open" && r.user.status === "active");
 
     let filtered = rows;
     if (viewer && scope !== "for-you" && scope !== "global") {
-      const ctx = viewerContext(viewer.id, viewer.profile);
-      const campusMap = verifiedCampusMap(rows.map((r) => r.opp.posterId));
+      const ctx = await viewerContext(viewer.id, viewer.profile);
+      const campusMap = await verifiedCampusMap(rows.map((r) => r.opp.posterId));
       filtered = rows.filter(
         (r) => r.opp.remote || inScope(scope, ctx, r.profile, campusMap.get(r.opp.posterId))
       );
@@ -46,12 +46,12 @@ export async function GET(req: NextRequest) {
     // "creator" = has active listings or completed work; purely descriptive.
     const posterIds = Array.from(new Set(filtered.map((r) => r.opp.posterId)));
     const serviceOwners = new Set(
-      db.select({ ownerId: tables.services.ownerId }).from(tables.services).all()
+      (await db.select({ ownerId: tables.services.ownerId }).from(tables.services).all())
         .filter((s) => posterIds.includes(s.ownerId))
         .map((s) => s.ownerId)
     );
     const completedCreators = new Set(
-      db.select({ creatorId: tables.projects.creatorId, state: tables.projects.state }).from(tables.projects).all()
+      (await db.select({ creatorId: tables.projects.creatorId, state: tables.projects.state }).from(tables.projects).all())
         .filter((pr) => ["completed", "reviewed"].includes(pr.state))
         .map((pr) => pr.creatorId)
     );
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
 
     // For You ordering comes from the engine; hides apply everywhere
     if (viewer) {
-      const taste = buildTaste(viewer.id, viewer.profile);
+      const taste = await buildTaste(viewer.id, viewer.profile);
       const mapped = filtered.map((r) => ({
         item: r,
         scorable: {
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
     }
 
     // roles + remaining openings, one query for all listings
-    const allApps = db
+    const allApps = await db
       .select({ opportunityId: tables.applications.opportunityId, roleId: tables.applications.roleId, status: tables.applications.status })
       .from(tables.applications)
       .all();
@@ -99,17 +99,17 @@ export async function GET(req: NextRequest) {
 
     const myApplications = viewer
       ? new Set(
-          db
+          (await db
             .select({ oppId: tables.applications.opportunityId })
             .from(tables.applications)
             .where(eq(tables.applications.applicantId, viewer.id))
-            .all()
+            .all())
             .map((r) => r.oppId)
         )
       : new Set<string>();
 
     return {
-      opportunities: filtered.map((r) => ({
+      opportunities: await Promise.all(filtered.map(async (r) => ({
         id: r.opp.id,
         title: r.opp.title,
         description: r.opp.description,
@@ -121,8 +121,8 @@ export async function GET(req: NextRequest) {
         // ELIGIBILITY ≠ VISIBILITY: everyone sees the card; the badge says
         // who can apply, and the viewer's verdict pre-renders the lock
         eligibility: r.opp.eligibility,
-        eligibilityLabel: eligibilityLabel(r.opp.eligibility, r.opp.eligibilityCampusId),
-        viewerEligibility: viewer ? checkApplicantEligibility(r.opp, viewer.id) : null,
+        eligibilityLabel: await eligibilityLabel(r.opp.eligibility, r.opp.eligibilityCampusId),
+        viewerEligibility: viewer ? await checkApplicantEligibility(r.opp, viewer.id) : null,
         trustRequired: r.opp.trustRequired,
         applyBy: r.opp.applyBy?.toISOString() ?? null,
         eventDate: r.opp.eventDate?.toISOString() ?? null,
@@ -133,13 +133,13 @@ export async function GET(req: NextRequest) {
             return {};
           }
         })(),
-        roles: rolesFor(r.opp.id, r.opp.roles),
+        roles: await rolesFor(r.opp.id, r.opp.roles),
         engagement: parseEngagement(r.opp.engagement),
         poster: publicUser(r.user, r.profile),
         posterType: posterTypeFor(r.user),
         isMine: viewer?.id === r.opp.posterId,
         applied: myApplications.has(r.opp.id),
-      })),
+      }))),
     };
   });
 }
@@ -147,15 +147,15 @@ export async function GET(req: NextRequest) {
 /** POST /api/opportunities — post a listing as the authenticated user. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const title = String(body.title || "").trim();
     if (!title) throw new ApiError(400, "Title is required");
 
     // BUSINESS CAPACITY: creation-only gate — 409 with the honest
     // current/limit + Pro numbers. Existing opportunities are never
     // touched; individuals are unaffected.
-    assertCapacityById(user.id, "activeOpportunities");
+    await assertCapacityById(user.id, "activeOpportunities");
 
     // budget guard, enforced SERVER-side: total role compensation
     // (pay × openings) can never exceed the stated maximum budget
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       throw new ApiError(400, `Over budget by $${totalComp - budgetNum} — total role compensation is $${totalComp}, budget is $${budgetNum}`);
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.opportunities)
+    await db.insert(tables.opportunities)
       .values({
         id,
         posterId: user.id,
@@ -191,19 +191,19 @@ export async function POST(req: NextRequest) {
         // WHO CAN APPLY — the poster's rule. my_school requires the poster
         // to actually be verified at a school (you can't gate to a campus
         // you don't belong to); alumni is campus-scoped when verified.
-        ...(() => {
+        ...(await (async () => {
           const e = ELIGIBILITIES.includes(body.eligibility) ? body.eligibility : "anyone";
           if (e === "my_school") {
-            const v = campusVerification(user.id);
+            const v = await campusVerification(user.id);
             if (!v) throw new ApiError(400, "Limiting applicants to your school requires your own verified campus status first — verification is free in Your Campus");
-            return { eligibility: "my_school", eligibilityCampusId: v.campusId };
+            return { eligibility: "my_school", eligibilityCampusId: v!.campusId };
           }
           if (e === "alumni") {
             const v = campusVerification(user.id);
-            return { eligibility: "alumni", eligibilityCampusId: v?.campusId ?? null };
+            return { eligibility: "alumni", eligibilityCampusId: (await v)?.campusId ?? null };
           }
           return { eligibility: e, eligibilityCampusId: null };
-        })(),
+        })()),
         applyBy: body.applyBy ? new Date(body.applyBy) : null,
         eventDate: body.eventDate ? new Date(body.eventDate) : null,
         applyConfig: JSON.stringify({
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     const rolesLine = roleList.length
       ? roleList.map((r) => `${r.title} ×${r.count}${r.pay ? ` · $${r.pay}` : ""}`).join(" · ")
       : "";
-    createLinkedPost({
+    await createLinkedPost({
       userId: user.id,
       refType: "opportunity",
       refId: id,
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
     });
     // demo mode: seed locals apply to each role right away so the poster
     // can walk review → select → team → payment immediately
-    seedApplicantsApplyToRoles(id);
+    await seedApplicantsApplyToRoles(id);
     return { id };
   });
 }

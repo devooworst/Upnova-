@@ -16,34 +16,36 @@ const slugify = (s: string) =>
 /** GET — discover communities. Guests see the public directory (name,
  *  description, counts, category, access, rules) but can't join. */
 export async function GET(req: NextRequest) {
-  return guarded(() => {
-    const viewer = getSessionUser();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
     const q = (req.nextUrl.searchParams.get("q") || "").toLowerCase().trim();
     const category = req.nextUrl.searchParams.get("category") || "";
 
     // campus communities are part of the verified campus environment:
     // they only appear in the directory for members verified at THAT campus
-    let viewerCampus = viewer ? campusVerification(viewer.id)?.campusId ?? null : null;
-    if (!viewerCampus && viewer && unrestrictedTester(viewer.id)) viewerCampus = demoCampusId(); // DEMO MODE
+    let viewerCampus = viewer ? (await campusVerification(viewer.id))?.campusId ?? null : null;
+    if (!viewerCampus && viewer && (await unrestrictedTester(viewer.id))) viewerCampus = await demoCampusId(); // DEMO MODE
 
-    let all = db.select().from(tables.communities).orderBy(desc(tables.communities.createdAt)).all();
+    let all = await db.select().from(tables.communities).orderBy(desc(tables.communities.createdAt)).all();
     all = all.filter((c) => !c.campusId || c.campusId === viewerCampus);
     if (q) all = all.filter((c) => (c.name + " " + c.description + " " + c.category).toLowerCase().includes(q));
     if (category) all = all.filter((c) => c.category === category);
 
     const memberships = viewer
-      ? db
-          .select()
-          .from(tables.communityMembers)
-          .where(eq(tables.communityMembers.userId, viewer.id))
-          .all()
-          .map((m) => {
-            const c = all.find((x) => x.id === m.communityId);
-            return c ? refreshMembership(c, m) : m; // lazy paid-membership lifecycle
-          })
+      ? await Promise.all(
+          (await db
+            .select()
+            .from(tables.communityMembers)
+            .where(eq(tables.communityMembers.userId, viewer.id))
+            .all())
+            .map(async (m) => {
+              const c = all.find((x) => x.id === m.communityId);
+              return c ? await refreshMembership(c, m) : m; // lazy paid-membership lifecycle
+            })
+        )
       : [];
     const mByCommunity = new Map(memberships.map((m) => [m.communityId, m]));
-    const counts = communityCounts(all.map((c) => c.id));
+    const counts = await communityCounts(all.map((c) => c.id));
 
     const mine = all
       .filter((c) => {
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest) {
  *  linking it to a campus requires verified campus status there. */
 export async function POST(req: NextRequest) {
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser();
     const body = await req.json().catch(() => ({}));
 
     const name = String(body.name || "").trim();
@@ -97,11 +99,11 @@ export async function POST(req: NextRequest) {
     // campus link needs verified campus membership at THAT campus
     let campusId: string | null = null;
     if (body.campusId) {
-      const v = db
+      const v = (await db
         .select()
         .from(tables.campusVerifications)
         .where(eq(tables.campusVerifications.userId, user.id))
-        .all()
+        .all())
         .find((r) => r.campusId === body.campusId && r.status === "verified");
       if (!v) throw new ApiError(403, "Creating a campus community needs verified campus status at that school");
       campusId = body.campusId;
@@ -109,11 +111,11 @@ export async function POST(req: NextRequest) {
 
     // unique slug
     let slug = slugify(name);
-    if (db.select().from(tables.communities).where(eq(tables.communities.slug, slug)).get())
+    if (await db.select().from(tables.communities).where(eq(tables.communities.slug, slug)).get())
       slug = `${slug}-${id().slice(0, 4)}`;
 
     const communityId = id();
-    db.insert(tables.communities)
+    await db.insert(tables.communities)
       .values({
         id: communityId,
         slug,
@@ -136,7 +138,7 @@ export async function POST(req: NextRequest) {
         createdById: user.id,
       })
       .run();
-    db.insert(tables.communityMembers).values({ communityId, userId: user.id, role: "owner", status: "active" }).run();
+    await db.insert(tables.communityMembers).values({ communityId, userId: user.id, role: "owner", status: "active" }).run();
 
     return { ok: true, id: communityId, slug };
   });

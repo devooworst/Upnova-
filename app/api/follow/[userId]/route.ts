@@ -9,21 +9,21 @@ export const dynamic = "force-dynamic";
 
 /** POST = follow, DELETE = unfollow. */
 export async function POST(_req: NextRequest, { params }: { params: { userId: string } }) {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     if (params.userId === user.id) throw new ApiError(400, "You can't follow yourself");
-    const target = db.select().from(tables.users).where(eq(tables.users.id, params.userId)).get();
+    const target = await db.select().from(tables.users).where(eq(tables.users.id, params.userId)).get();
     if (!target || target.status !== "active") throw new ApiError(404, "User not found");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.follows)
       .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, target.id)))
       .get();
     if (!existing) {
-      db.insert(tables.follows).values({ followerId: user.id, followingId: target.id }).run();
-      recordInteraction(user.id, "user", target.id, "follow");
-      notify({
+      await db.insert(tables.follows).values({ followerId: user.id, followingId: target.id }).run();
+      await recordInteraction(user.id, "user", target.id, "follow");
+      await notify({
         userId: target.id,
         actorId: user.id,
         type: "follow",
@@ -36,12 +36,12 @@ export async function POST(_req: NextRequest, { params }: { params: { userId: st
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { userId: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    db.delete(tables.follows)
+  return guarded(async () => {
+    const user = await requireUser();
+    await db.delete(tables.follows)
       .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, params.userId)))
       .run();
-    recordInteraction(user.id, "user", params.userId, "unfollow");
+    await recordInteraction(user.id, "user", params.userId, "unfollow");
     return { following: false };
   });
 }

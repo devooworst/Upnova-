@@ -12,27 +12,27 @@ export const dynamic = "force-dynamic";
  * the presence window naturally. Returns the live viewer count.
  */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const stream = getStream(params.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const stream = await getStream(params.id);
     if (stream.status !== "live") return { status: "ended", viewerCount: null };
-    assertCanWatch(stream, user.id);
+    await assertCanWatch(stream, user.id);
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.liveViewers)
       .where(and(eq(tables.liveViewers.streamId, stream.id), eq(tables.liveViewers.userId, user.id)))
       .get();
     if (existing)
-      db.update(tables.liveViewers)
+      await db.update(tables.liveViewers)
         .set({ lastSeenAt: new Date() })
         .where(and(eq(tables.liveViewers.streamId, stream.id), eq(tables.liveViewers.userId, user.id)))
         .run();
-    else db.insert(tables.liveViewers).values({ streamId: stream.id, userId: user.id }).run();
+    else (await db.insert(tables.liveViewers).values({ streamId: stream.id, userId: user.id }).run());
 
-    const count = viewerCount(stream.id);
+    const count = await viewerCount(stream.id);
     if (count > stream.peakViewers)
-      db.update(tables.liveStreams).set({ peakViewers: count }).where(eq(tables.liveStreams.id, stream.id)).run();
+      (await db.update(tables.liveStreams).set({ peakViewers: count }).where(eq(tables.liveStreams.id, stream.id)).run());
     return { status: "live", viewerCount: count, windowMs: PRESENCE_WINDOW_MS };
   });
 }

@@ -35,10 +35,10 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const me = requireUser();
-    ensureQaPersonas();
+    const me = await requireUser();
+    await ensureQaPersonas();
 
     // SERVER-SIDE AUTHORIZATION — persona switching is a development
     // tool. Entering a QA persona: dev admins + QA personas only.
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     let targetHandle: string;
     if (body.returnToken) {
       if (!meIsQa) throw new ApiError(403, "Nothing to exit — you are not in a test persona");
-      const h = verifyDemoToken(String(body.returnToken));
+      const h = await verifyDemoToken(String(body.returnToken));
       if (!h) throw new ApiError(403, "Invalid return token");
       targetHandle = h;
     } else {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         throw new ApiError(403, "Only the QA test personas can be impersonated");
     }
 
-    const target = db.select().from(tables.users).where(eq(tables.users.handle, targetHandle)).get();
+    const target = await db.select().from(tables.users).where(eq(tables.users.handle, targetHandle)).get();
     if (!target || target.status !== "active") throw new ApiError(404, "Account not found");
 
     const token = signDemoToken(target.handle);

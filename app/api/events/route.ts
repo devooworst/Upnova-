@@ -21,8 +21,8 @@ const slugify = (s: string) =>
  *  &scope=5mi|25mi|city|state (distance uses the viewer's profile
  *  coordinates server-side — coordinates never leave the server). */
 export async function GET(req: NextRequest) {
-  return guarded(() => {
-    const viewer = getSessionUser();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
     const sp = req.nextUrl.searchParams;
     const q = (sp.get("q") || "").toLowerCase().trim();
     const category = sp.get("category") || "";
@@ -30,13 +30,13 @@ export async function GET(req: NextRequest) {
     const price = sp.get("price") || "all";
     const scope = sp.get("scope") || "all";
 
-    let rows = db
+    let rows = (await db
       .select({ event: tables.events, profile: tables.profiles, u: tables.users })
       .from(tables.events)
       .innerJoin(tables.users, eq(tables.events.hostId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.events.hostId))
       .orderBy(asc(tables.events.startsAt))
-      .all()
+      .all())
       // SCOPE RULE with the visibility/eligibility split: world events
       // always list; campus events list ONLY when the organizer opted
       // into public visibility (info only — RSVP stays campus-gated).
@@ -73,18 +73,18 @@ export async function GET(req: NextRequest) {
     }
 
     const eventIds = rows.map((r) => r.event.id);
-    const rsvps = rsvpCounts(eventIds);
+    const rsvps = await rsvpCounts(eventIds);
     const saved = viewer
       ? new Set(
-          db.select().from(tables.bookmarks).where(eq(tables.bookmarks.userId, viewer.id)).all()
+          ((await db.select().from(tables.bookmarks).where(eq(tables.bookmarks.userId, viewer.id)).all()))
             .filter((b) => b.targetType === "event").map((b) => b.targetId)
         )
       : new Set<string>();
     const mine = viewer
-      ? new Set(db.select().from(tables.eventRsvps).where(eq(tables.eventRsvps.userId, viewer.id)).all().map((r) => r.eventId))
+      ? new Set(((await db.select().from(tables.eventRsvps).where(eq(tables.eventRsvps.userId, viewer.id)).all())).map((r) => r.eventId))
       : new Set<string>();
 
-    const campusNames = new Map(db.select().from(tables.campuses).all().map((c) => [c.id, c.name]));
+    const campusNames = new Map((await db.select().from(tables.campuses).all()).map((c) => [c.id, c.name]));
     return {
       events: rows.map((r) =>
         serializeEvent(r.event, {
@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
  *  appears in the public section). campus:false is the wider world. */
 export async function POST(req: NextRequest) {
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser();
     const body = await req.json().catch(() => ({}));
 
     const title = String(body.title || "").trim();
@@ -122,8 +122,8 @@ export async function POST(req: NextRequest) {
     let campusId: string | null = null;
     let publicVisibility = false;
     if (isCampus) {
-      campusId = verifiedCampusOf(user.id);
-      if (!campusId && unrestrictedTester(user.id)) campusId = demoCampusId(); // DEMO MODE
+      campusId = await verifiedCampusOf(user.id);
+      if (!campusId && (await unrestrictedTester(user.id))) campusId = await demoCampusId(); // DEMO MODE
       if (!campusId) throw new ApiError(403, "Campus events need verified campus status — verify your school in Your Campus first");
       // organizer choice: list publicly (info only) while RSVP stays campus-gated
       publicVisibility = !!body.publicVisibility;
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
     let lng: number | null = null;
     let campusName: string | null = null;
     if (isCampus) {
-      const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId!)).get()!;
+      const campus = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId!)).get())!;
       campusName = campus.name;
       city = `${campus.city}, ${campus.state}`;
       state = campus.state;
@@ -196,10 +196,10 @@ export async function POST(req: NextRequest) {
     };
 
     let slug = slugify(title);
-    if (db.select().from(tables.events).where(eq(tables.events.slug, slug)).get()) slug = `${slug}-${id().slice(0, 4)}`;
+    if (await db.select().from(tables.events).where(eq(tables.events.slug, slug)).get()) slug = `${slug}-${id().slice(0, 4)}`;
 
     const eventId = id();
-    db.insert(tables.events)
+    await db.insert(tables.events)
       .values({
         id: eventId,
         slug,

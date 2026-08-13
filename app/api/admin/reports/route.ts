@@ -6,9 +6,9 @@ import { requireAdmin, guarded, ApiError } from "@/lib/server/auth";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return guarded(() => {
-    requireAdmin();
-    const rows = db
+  return guarded(async () => {
+    await requireAdmin();
+    const rows = await db
       .select({ report: tables.reports, reporter: tables.profiles })
       .from(tables.reports)
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.reports.reporterId))
@@ -34,11 +34,11 @@ export async function GET() {
 /** PATCH { reportId, status: reviewing | resolved | dismissed } */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    requireAdmin();
+  return guarded(async () => {
+    await requireAdmin();
     const status = String(body.status);
     if (!["reviewing", "resolved", "dismissed"].includes(status)) throw new ApiError(400, "Invalid status");
-    db.update(tables.reports).set({ status }).where(eq(tables.reports.id, String(body.reportId))).run();
+    await db.update(tables.reports).set({ status }).where(eq(tables.reports.id, String(body.reportId))).run();
     return { ok: true };
   });
 }

@@ -20,46 +20,46 @@ function findEvent(idOrSlug: string) {
 /** GET — event detail. Campus events are visible ONLY to verified members
  *  of that campus (the host always sees their own). */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const r = findEvent(params.id);
+  return guarded(async () => {
+    const r = await findEvent(params.id);
     if (!r) throw new ApiError(404, "Event not found");
-    const viewer = getSessionUser();
+    const viewer = await getSessionUser();
 
     let campusName: string | null = null;
-    if (r.event.campusId && r.event.publicVisibility) {
+    if (r!.event.campusId && r!.event.publicVisibility) {
       // organizer opted into public listing: anyone may VIEW (info only);
       // eligibility is enforced at RSVP, not here
-      campusName = db.select().from(tables.campuses).where(eq(tables.campuses.id, r.event.campusId)).get()?.name ?? null;
-    } else if (r.event.campusId) {
-      const myCampus = verifiedCampusOf(viewer?.id ?? null);
-      if (myCampus !== r.event.campusId && viewer?.id !== r.event.hostId)
+      campusName = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, r!.event.campusId)).get())?.name ?? null;
+    } else if (r!.event.campusId) {
+      const myCampus = await verifiedCampusOf(viewer?.id ?? null);
+      if (myCampus !== r!.event.campusId && viewer?.id !== r!.event.hostId)
         throw new ApiError(403, "This is a campus event — it's visible to verified members of that campus");
-      campusName = db.select().from(tables.campuses).where(eq(tables.campuses.id, r.event.campusId)).get()?.name ?? null;
+      campusName = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, r!.event.campusId)).get())?.name ?? null;
     }
 
-    const rsvps = rsvpCounts([r.event.id]);
+    const rsvps = await rsvpCounts([r!.event.id]);
     const saved = viewer
-      ? !!db.select().from(tables.bookmarks)
-          .where(and(eq(tables.bookmarks.userId, viewer.id), eq(tables.bookmarks.targetType, "event"), eq(tables.bookmarks.targetId, r.event.id)))
+      ? !!await db.select().from(tables.bookmarks)
+          .where(and(eq(tables.bookmarks.userId, viewer.id), eq(tables.bookmarks.targetType, "event"), eq(tables.bookmarks.targetId, r!.event.id)))
           .get()
       : false;
     const going = viewer
-      ? !!db.select().from(tables.eventRsvps)
-          .where(and(eq(tables.eventRsvps.eventId, r.event.id), eq(tables.eventRsvps.userId, viewer.id)))
+      ? !!await db.select().from(tables.eventRsvps)
+          .where(and(eq(tables.eventRsvps.eventId, r!.event.id), eq(tables.eventRsvps.userId, viewer.id)))
           .get()
       : false;
 
     return {
-      event: serializeEvent(r.event, {
-        hostName: r.profile.displayName,
-        hostHandle: r.u.handle,
-        rsvps: rsvps.get(r.event.id) ?? 0,
+      event: serializeEvent(r!.event, {
+        hostName: r!.profile.displayName,
+        hostHandle: r!.u.handle,
+        rsvps: rsvps.get(r!.event.id) ?? 0,
         saved,
         going,
         viewerLat: viewer?.profile.lat ?? null,
         viewerLng: viewer?.profile.lng ?? null,
         campusName,
-        isHost: viewer?.id === r.event.hostId,
+        isHost: viewer?.id === r!.event.hostId,
       }),
       guest: !viewer,
     };
@@ -72,39 +72,39 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
  *  checkout (not yet built — labeled in the UI), approvals go to the host. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
-    const r = findEvent(params.id);
+    const user = await requireUser();
+    const r = await findEvent(params.id);
     if (!r) throw new ApiError(404, "Event not found");
-    if (r.event.status !== "active") throw new ApiError(409, "This event was cancelled");
-    if (r.event.startsAt.getTime() < Date.now() - 6 * 3_600_000) throw new ApiError(409, "This event already happened");
+    if (r!.event.status !== "active") throw new ApiError(409, "This event was cancelled");
+    if (r!.event.startsAt.getTime() < Date.now() - 6 * 3_600_000) throw new ApiError(409, "This event already happened");
 
-    if (r.event.campusId) {
-      const myCampus = verifiedCampusOf(user.id);
-      if (myCampus !== r.event.campusId && !unrestrictedTester(user.id) /* DEMO MODE */) {
-        const school = db.select().from(tables.campuses).where(eq(tables.campuses.id, r.event.campusId)).get()?.name ?? "that campus";
+    if (r!.event.campusId) {
+      const myCampus = await verifiedCampusOf(user.id);
+      if (myCampus !== r!.event.campusId && !(await unrestrictedTester(user.id)) /* DEMO MODE */) {
+        const school = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, r!.event.campusId)).get())?.name ?? "that campus";
         throw new ApiError(403, `Student verification required — this event is limited to verified ${school} members. Verify your affiliation for free to RSVP.`);
       }
     }
 
-    if (r.event.kind === "ticket") throw new ApiError(409, "This is a ticketed event — ticket checkout is coming; save it for now");
-    if (r.event.kind === "approval") throw new ApiError(409, "This event is request-to-attend — message the host to request a spot");
+    if (r!.event.kind === "ticket") throw new ApiError(409, "This is a ticketed event — ticket checkout is coming; save it for now");
+    if (r!.event.kind === "approval") throw new ApiError(409, "This event is request-to-attend — message the host to request a spot");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.eventRsvps)
-      .where(and(eq(tables.eventRsvps.eventId, r.event.id), eq(tables.eventRsvps.userId, user.id)))
+      .where(and(eq(tables.eventRsvps.eventId, r!.event.id), eq(tables.eventRsvps.userId, user.id)))
       .get();
 
     if (existing) {
-      db.delete(tables.eventRsvps)
-        .where(and(eq(tables.eventRsvps.eventId, r.event.id), eq(tables.eventRsvps.userId, user.id)))
+      await db.delete(tables.eventRsvps)
+        .where(and(eq(tables.eventRsvps.eventId, r!.event.id), eq(tables.eventRsvps.userId, user.id)))
         .run();
       return { ok: true, going: false };
     }
 
-    const current = r.event.attending + (rsvpCounts([r.event.id]).get(r.event.id) ?? 0);
-    if (r.event.capacity != null && current >= r.event.capacity) throw new ApiError(409, "This event is full");
-    db.insert(tables.eventRsvps).values({ eventId: r.event.id, userId: user.id }).run();
+    const current = r!.event.attending + ((await rsvpCounts([r!.event.id])).get(r!.event.id) ?? 0);
+    if (r!.event.capacity != null && current >= r!.event.capacity) throw new ApiError(409, "This event is full");
+    await db.insert(tables.eventRsvps).values({ eventId: r!.event.id, userId: user.id }).run();
     return { ok: true, going: true };
   });
 }

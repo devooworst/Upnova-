@@ -8,11 +8,11 @@ export const dynamic = "force-dynamic";
 /** Dev-only session diagnostics — exists ONLY when the demo flag is on.
  *  No secrets: counts and booleans, never tokens or emails. */
 export async function GET() {
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
     return {
       serverTime: new Date().toISOString(),
-      sessionsInDb: db.select().from(tables.sessions).all().length,
+      sessionsInDb: (await db.select().from(tables.sessions).all()).length,
       stickyEnabled: process.env.MAVYN_DEMO_STICKY_SESSION === "1",
       stickyMarkerPresent: existsSync(join(process.cwd(), "db", ".demo-session")),
       cookielessMode: process.env.MAVYN_DISABLE_SESSION_COOKIES === "1",

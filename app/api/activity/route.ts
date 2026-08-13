@@ -20,19 +20,19 @@ export const dynamic = "force-dynamic";
  * of the product writes — nothing is synthesized for display.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const names = new Map(
-      db.select({ userId: tables.profiles.userId, displayName: tables.profiles.displayName }).from(tables.profiles).all()
+      (await db.select({ userId: tables.profiles.userId, displayName: tables.profiles.displayName }).from(tables.profiles).all())
         .map((p) => [p.userId, p.displayName])
     );
-    const handles = new Map(db.select().from(tables.users).all().map((u) => [u.id, u.handle]));
+    const handles = new Map((await db.select().from(tables.users).all()).map((u) => [u.id, u.handle]));
     const counterpart = (id: string) => ({ id, handle: handles.get(id) ?? "?", displayName: names.get(id) ?? "?" });
-    const payments = db.select().from(tables.payments).all();
+    const payments = await db.select().from(tables.payments).all();
 
     /* latest progress update per record — Activity MIRRORS the history;
        the posting controls live in the project/booking workspaces */
-    const allProgress = db.select().from(tables.progressUpdates).all();
+    const allProgress = await db.select().from(tables.progressUpdates).all();
     const latestFor = (key: "projectId" | "bookingId", id: string) => {
       const rows = allProgress
         .filter((r) => r[key] === id)
@@ -54,12 +54,12 @@ export async function GET() {
     };
 
     /* ---------------- service bookings ---------------- */
-    const bookings = db
+    const bookings = (await db
       .select()
       .from(tables.bookings)
       .where(or(eq(tables.bookings.clientId, user.id), eq(tables.bookings.providerId, user.id)))
       .orderBy(desc(tables.bookings.createdAt))
-      .all()
+      .all())
       .map((b) => {
         const pay = payments.find((p) => p.bookingId === b.id);
         return {
@@ -82,20 +82,20 @@ export async function GET() {
       });
 
     /* ---------------- purchases (orders) ---------------- */
-    const orders = db
+    const orders = await Promise.all((await db
       .select()
       .from(tables.orders)
       .where(or(eq(tables.orders.buyerId, user.id), eq(tables.orders.sellerId, user.id)))
       .orderBy(desc(tables.orders.createdAt))
-      .all()
-      .map((o) => {
+      .all())
+      .map(async (o) => {
         const pay = payments.find((p) => p.orderId === o.id);
-        const events = db
+        const events = (await db
           .select()
           .from(tables.orderEvents)
           .where(eq(tables.orderEvents.orderId, o.id))
           .orderBy(desc(tables.orderEvents.createdAt))
-          .all()
+          .all())
           .slice(0, 10)
           .map((e) => ({ label: e.note || e.kind, at: e.createdAt.toISOString() }))
           .reverse();
@@ -115,15 +115,15 @@ export async function GET() {
           events, // the REAL logged timeline
           updatedAt: o.createdAt.toISOString(),
         };
-      });
+      }));
 
     /* ---------------- projects (hired services) ---------------- */
-    const projects = db
+    const projects = (await db
       .select()
       .from(tables.projects)
       .where(or(eq(tables.projects.clientId, user.id), eq(tables.projects.creatorId, user.id)))
       .orderBy(desc(tables.projects.updatedAt))
-      .all()
+      .all())
       .map((p) => {
         const pay = payments.find((x) => x.projectId === p.id);
         return {
@@ -146,13 +146,13 @@ export async function GET() {
       });
 
     /* ---------------- opportunity applications (mine) ---------------- */
-    const applications = db
+    const applications = (await db
       .select({ app: tables.applications, opp: tables.opportunities })
       .from(tables.applications)
       .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
       .where(eq(tables.applications.applicantId, user.id))
       .orderBy(desc(tables.applications.createdAt))
-      .all()
+      .all())
       .map((r) => ({
         kind: "application" as const,
         id: r.app.id,

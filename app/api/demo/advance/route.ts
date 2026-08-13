@@ -18,9 +18,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireQaOperator();
+    const user = await requireQaOperator();
     const kind = String(body.kind || "");
     const id = String(body.id || "");
     if (!id) throw new ApiError(400, "id is required");

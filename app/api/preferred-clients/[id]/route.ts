@@ -7,8 +7,8 @@ import { sanitizeBenefits, benefitSummary, parseBenefits } from "@/lib/server/pr
 
 export const dynamic = "force-dynamic";
 
-function ownedRelationship(id: string, providerId: string) {
-  const rel = db.select().from(tables.preferredClients).where(eq(tables.preferredClients.id, id)).get();
+async function ownedRelationship(id: string, providerId: string) {
+  const rel =await  await db.select().from(tables.preferredClients).where(eq(tables.preferredClients.id, id)).get();
   if (!rel) throw new ApiError(404, "Relationship not found");
   // AUTHORIZATION: only the provider who owns the relationship may touch
   // it. The client (or any third party) gets a 403 — clients can never
@@ -20,25 +20,25 @@ function ownedRelationship(id: string, providerId: string) {
 /** PATCH { benefits, note } — the provider edits the benefits they offer. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const rel = ownedRelationship(params.id, user.id);
-    if (rel.status !== "active") throw new ApiError(409, "This client was removed — add them again to restore benefits");
+    if ((await rel).status !== "active") throw new ApiError(409, "This client was removed — add them again to restore benefits");
     const benefits = sanitizeBenefits(body.benefits);
     if (benefits.length === 0) throw new ApiError(400, "Choose at least one benefit");
-    db.update(tables.preferredClients)
-      .set({ benefits: JSON.stringify(benefits), note: String(body.note ?? rel.note).slice(0, 300) })
-      .where(eq(tables.preferredClients.id, rel.id))
+    await db.update(tables.preferredClients)
+      .set({ benefits: JSON.stringify(benefits), note: String(body.note ?? (await rel).note).slice(0, 300) })
+      .where(eq(tables.preferredClients.id, (await rel).id))
       .run();
-    notify({
-      userId: rel.clientId,
+    await notify({
+      userId: (await rel).clientId,
       actorId: user.id,
       type: "preferred_added",
       title: `${user.profile.displayName} updated your Preferred Client benefits`,
       body: benefitSummary(benefits),
       href: "/clients",
     });
-    return { id: rel.id, benefits };
+    return { id: (await rel).id, benefits };
   });
 }
 
@@ -48,16 +48,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
  * client is notified privately and never publicly penalized.
  */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const rel = ownedRelationship(params.id, user.id);
-    if (rel.status === "removed") return { id: rel.id, status: "removed" };
-    db.update(tables.preferredClients)
+    if ((await rel).status === "removed") return { id: (await rel).id, status: "removed" };
+    await db.update(tables.preferredClients)
       .set({ status: "removed", removedAt: new Date() })
-      .where(eq(tables.preferredClients.id, rel.id))
+      .where(eq(tables.preferredClients.id, (await rel).id))
       .run();
-    notify({
-      userId: rel.clientId,
+    await notify({
+      userId: (await rel).clientId,
       actorId: user.id,
       type: "preferred_removed",
       title: `Your Preferred Client benefits with ${user.profile.displayName} have ended`,
@@ -65,6 +65,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       href: "/clients",
       priority: "low",
     });
-    return { id: rel.id, status: "removed", hadBenefits: parseBenefits(rel.benefits).length };
+    return { id: (await rel).id, status: "removed", hadBenefits: parseBenefits((await rel).benefits).length };
   });
 }

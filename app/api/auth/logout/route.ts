@@ -17,13 +17,13 @@ export async function POST() {
   if (!token) token = readDemoSession() ?? undefined; // storage-blocked browsers still sign out
   // signed demo token: revoke ALL demo tokens for that handle from now on
   if (token?.startsWith("demo.")) {
-    const handle = verifyDemoToken(token);
-    revokeDemoToken(token); // this exact token dies, by hash — clock-free
+    const handle = await verifyDemoToken(token);
+    await revokeDemoToken(token); // this exact token dies, by hash — clock-free
     const marker = readDemoSession();
-    if (marker?.startsWith("demo.")) revokeDemoToken(marker);
+    if (marker?.startsWith("demo.")) await revokeDemoToken(marker);
     if (handle) {
-      const u = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
-      if (u) db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run(); // account-level signout
+      const u = await db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+      if (u) await db.delete(tables.sessions).where(eq(tables.sessions.userId, u.id)).run(); // account-level signout
     }
     forgetDemoSession();
     cookies().set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
@@ -34,16 +34,16 @@ export async function POST() {
     // holds a different (e.g. newer) session for the same user, destroy
     // that too — otherwise the sticky restore would resurrect the login
     // right after sign-out
-    const row = db.select().from(tables.sessions).where(eq(tables.sessions.token, token)).get();
+    const row = await db.select().from(tables.sessions).where(eq(tables.sessions.token, token)).get();
     const marker = readDemoSession();
     if (marker && marker !== token) {
-      const markerRow = db.select().from(tables.sessions).where(eq(tables.sessions.token, marker)).get();
+      const markerRow = await db.select().from(tables.sessions).where(eq(tables.sessions.token, marker)).get();
       if (markerRow && row && markerRow.userId === row.userId) {
-        destroySession(marker);
+        await destroySession(marker);
         forgetDemoSession(marker);
       }
     }
-    destroySession(token); // the session row dies server-side either way
+    await destroySession(token); // the session row dies server-side either way
     forgetDemoSession(token); // and the sandbox stops remembering it
   }
   // deletion must match the attributes the cookie was set with —

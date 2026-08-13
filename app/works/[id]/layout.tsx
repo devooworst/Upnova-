@@ -4,7 +4,7 @@ import { db, tables } from "@/db";
 import { parseLicenseOptions } from "@/lib/licensing";
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const row = db
+  const row = await db
     .select({ work: tables.works, profile: tables.profiles })
     .from(tables.works)
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.works.creatorId))

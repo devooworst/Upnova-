@@ -21,44 +21,44 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireQaOperator();
+    const user = await requireQaOperator();
     const ms = Math.min(30 * 86400_000, Math.max(0, Number(body.advanceMs) || 0));
     if (!ms) throw new ApiError(400, "advanceMs required (max 30 days)");
 
     const subjects: string[] =
       String(body.scope) === "qa"
-        ? (() => {
-            const ids = qaIds();
+        ? await (async () => {
+            const ids = await qaIds();
             return [ids.customer, ids.creator, ids.business];
           })()
         : [user.id];
 
     let touched = 0;
     for (const id of subjects) {
-      for (const b of db.select().from(tables.bookings).where(or(eq(tables.bookings.clientId, id), eq(tables.bookings.providerId, id))).all()) {
+      for (const b of await db.select().from(tables.bookings).where(or(eq(tables.bookings.clientId, id), eq(tables.bookings.providerId, id))).all()) {
         if (["pending", "accepted", "confirmed"].includes(b.status)) {
-          db.update(tables.bookings).set({ startsAt: new Date(b.startsAt.getTime() - ms) }).where(eq(tables.bookings.id, b.id)).run();
+          await db.update(tables.bookings).set({ startsAt: new Date(b.startsAt.getTime() - ms) }).where(eq(tables.bookings.id, b.id)).run();
           touched++;
         }
       }
-      for (const o of db.select().from(tables.orders).where(or(eq(tables.orders.buyerId, id), eq(tables.orders.sellerId, id))).all()) {
+      for (const o of await db.select().from(tables.orders).where(or(eq(tables.orders.buyerId, id), eq(tables.orders.sellerId, id))).all()) {
         if (o.protectionEndsAt) {
-          db.update(tables.orders).set({ protectionEndsAt: new Date(o.protectionEndsAt.getTime() - ms) }).where(eq(tables.orders.id, o.id)).run();
+          await db.update(tables.orders).set({ protectionEndsAt: new Date(o.protectionEndsAt.getTime() - ms) }).where(eq(tables.orders.id, o.id)).run();
           touched++;
         }
       }
-      for (const opp of db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, id)).all()) {
+      for (const opp of await db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, id)).all()) {
         if (opp.applyBy) {
-          db.update(tables.opportunities).set({ applyBy: new Date(opp.applyBy.getTime() - ms) }).where(eq(tables.opportunities.id, opp.id)).run();
+          await db.update(tables.opportunities).set({ applyBy: new Date(opp.applyBy.getTime() - ms) }).where(eq(tables.opportunities.id, opp.id)).run();
           touched++;
         }
       }
       // project deadlines age too — overdue states become testable
-      for (const p of db.select().from(tables.projects).where(or(eq(tables.projects.clientId, id), eq(tables.projects.creatorId, id))).all()) {
+      for (const p of await db.select().from(tables.projects).where(or(eq(tables.projects.clientId, id), eq(tables.projects.creatorId, id))).all()) {
         if (p.deadline && !["completed", "reviewed", "cancelled"].includes(p.state)) {
-          db.update(tables.projects).set({ deadline: new Date(p.deadline.getTime() - ms) }).where(eq(tables.projects.id, p.id)).run();
+          await db.update(tables.projects).set({ deadline: new Date(p.deadline.getTime() - ms) }).where(eq(tables.projects.id, p.id)).run();
           touched++;
         }
       }

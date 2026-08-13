@@ -22,8 +22,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     return discoverStreams({
       viewerId: user.id,
       filter: String(p.get("filter") || "now"),
@@ -40,8 +40,8 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
 
     const title = String(body.title || "").trim().slice(0, 120);
     if (!title) throw new ApiError(400, "What's happening? Give your live a title.");
@@ -49,12 +49,12 @@ export async function POST(req: NextRequest) {
     const category = LIVE_CATEGORIES.includes(body.category) ? body.category : "other";
     const audience = LIVE_AUDIENCES.includes(body.audience) ? body.audience : "everyone";
 
-    if (activeStreamOf(user.id))
+    if (await activeStreamOf(user.id))
       throw new ApiError(409, "You're already live — end your current stream before starting a new one.");
 
     let campusId: string | null = null;
     if (audience === "campus") {
-      const mine = verifiedCampusIdOf(user.id);
+      const mine = await verifiedCampusIdOf(user.id);
       if (!mine)
         throw new ApiError(403, "Campus streams need a verified campus affiliation — verify your school in Settings first.");
       // a client-sent campusId may only ever CONFIRM the verified one
@@ -66,18 +66,18 @@ export async function POST(req: NextRequest) {
     let communityId: string | null = null;
     if (audience === "community") {
       communityId = String(body.communityId || "");
-      if (!communityId || !isCommunityMember(user.id, communityId))
+      if (!communityId || !(await isCommunityMember(user.id, communityId)))
         throw new ApiError(403, "Pick one of your own communities to stream to.");
     }
 
     // nearby scoping uses the host's profile city centroid — stored
     // server-side on the stream row, NEVER serialized to any client
-    const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get();
+    const profile = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get();
     if (audience === "nearby" && (profile?.lat == null || profile?.lng == null))
       throw new ApiError(400, "Nearby streams need a city on your profile (Settings → Edit profile). Your exact location is never shared.");
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.liveStreams)
+    await db.insert(tables.liveStreams)
       .values({
         id,
         hostId: user.id,
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
       .run();
 
     // the host counts as present from second zero
-    db.insert(tables.liveViewers).values({ streamId: id, userId: user.id }).run();
+    await db.insert(tables.liveViewers).values({ streamId: id, userId: user.id }).run();
 
-    return { id, stream: streamCard(db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, id)).get()!, user.id) };
+    return { id, stream: await streamCard((await db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, id)).get())!, user.id) };
   });
 }

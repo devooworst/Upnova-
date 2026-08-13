@@ -14,7 +14,7 @@
 /*  runtime. Missing file → loud, actionable error.                    */
 /* ------------------------------------------------------------------ */
 
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { ApiError } from "@/lib/server/auth";
@@ -51,6 +51,19 @@ const GEO_PATH = process.env.GEO_DATABASE_PATH || path.join(process.cwd(), "db",
 
 const globalForGeo = globalThis as unknown as { __mavynGeo?: Database.Database };
 
+/* better-sqlite3 is a native module used ONLY for the read-only geo.db
+   reference dataset. On platforms where the native binding can't load
+   (e.g. serverless), geo features go dormant (geoReady() === false)
+   instead of crashing the whole server at import time. */
+function loadDriver(): typeof Database | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("better-sqlite3") as typeof Database;
+  } catch {
+    return null;
+  }
+}
+
 function geo(): Database.Database {
   if (globalForGeo.__mavynGeo) return globalForGeo.__mavynGeo;
   if (!fs.existsSync(GEO_PATH)) {
@@ -59,14 +72,24 @@ function geo(): Database.Database {
       "Location data isn't compiled on this instance yet — run `npm run geo:build` (it builds db/geo.db from the bundled datasets)."
     );
   }
-  const db = new Database(GEO_PATH, { readonly: true, fileMustExist: true });
+  const Driver = loadDriver();
+  if (!Driver) {
+    throw new ApiError(503, "Location data isn't available on this instance (native sqlite driver missing).");
+  }
+  const db = new Driver(GEO_PATH, { readonly: true, fileMustExist: true });
   globalForGeo.__mavynGeo = db;
   return db;
 }
 
 /** available (vs. needs `npm run geo:build`) — used by QA preflight */
 export function geoReady(): boolean {
-  return fs.existsSync(GEO_PATH);
+  if (!fs.existsSync(GEO_PATH)) return false;
+  try {
+    geo();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const LIMIT = 50;

@@ -12,26 +12,26 @@ export const dynamic = "force-dynamic";
  *  Academic Groups / Interest Groups categories. These never appear in the
  *  general Communities directory; general communities never appear here. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const campusId = requireCurrentStudent(user.id);
-    const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const campusId = await requireCurrentStudent(user.id);
+    const campus = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get())!;
 
-    const groups = db
+    const groups = (await db
       .select()
       .from(tables.communities)
       .orderBy(desc(tables.communities.createdAt))
-      .all()
+      .all())
       .filter((c) => c.campusId === campusId && isStudentGroup(c));
 
-    const counts = communityCounts(groups.map((g) => g.id));
+    const counts = await communityCounts(groups.map((g) => g.id));
 
     return {
       campusName: campus.name,
       categories: STUDENT_GROUP_CATEGORIES,
-      groups: groups.map((g) =>
-        serializeCommunity(g, { membership: getMembership(g.id, user.id), counts: counts.get(g.id) })
-      ),
+      groups: await Promise.all(groups.map(async (g) =>
+        serializeCommunity(g, { membership: await getMembership(g.id, user.id), counts: counts.get(g.id) })
+      )),
     };
   });
 }

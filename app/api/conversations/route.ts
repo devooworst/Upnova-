@@ -15,10 +15,10 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/conversations — the authenticated user's conversation list. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
 
-    const memberships = db
+    const memberships = await db
       .select()
       .from(tables.conversationMembers)
       .where(eq(tables.conversationMembers.userId, user.id))
@@ -26,7 +26,7 @@ export async function GET() {
     const convIds = memberships.map((m) => m.conversationId);
     if (convIds.length === 0) return { conversations: [] };
 
-    const allMembers = db
+    const allMembers = await db
       .select({ member: tables.conversationMembers, user: tables.users, profile: tables.profiles })
       .from(tables.conversationMembers)
       .innerJoin(tables.users, eq(tables.conversationMembers.userId, tables.users.id))
@@ -34,7 +34,7 @@ export async function GET() {
       .where(inArray(tables.conversationMembers.conversationId, convIds))
       .all();
 
-    const lastMessages = db
+    const lastMessages = await db
       .select()
       .from(tables.messages)
       .where(inArray(tables.messages.conversationId, convIds))
@@ -43,20 +43,20 @@ export async function GET() {
 
     const myLastRead = new Map(memberships.map((m) => [m.conversationId, m.lastReadAt?.getTime() ?? 0]));
 
-    const conversations = convIds.map((id) => {
+    const conversations = await Promise.all(convIds.map(async (id) => {
       const other = allMembers.find((m) => m.member.conversationId === id && m.user.id !== user.id);
       const msgs = lastMessages.filter((m) => m.conversationId === id);
       const last = msgs[0];
       const unread = msgs.filter(
         (m) => m.senderId !== user.id && m.createdAt.getTime() > (myLastRead.get(id) ?? 0)
       ).length;
-      const project = db
+      const project = await db
         .select()
         .from(tables.projects)
         .where(eq(tables.projects.conversationId, id))
         .orderBy(desc(tables.projects.updatedAt))
         .get();
-      const booking = db
+      const booking = await db
         .select()
         .from(tables.bookings)
         .where(eq(tables.bookings.conversationId, id))
@@ -70,10 +70,10 @@ export async function GET() {
         projectId: project?.id ?? null,
         projectState: project?.state ?? null,
         booking: booking
-          ? { id: booking.id, title: booking.title, startsAt: booking.startsAt.toISOString(), status: booking.status, progress: booking.progress, price: booking.price, myRole: booking.clientId === user.id ? "client" : "provider" }
+          ? { id: booking!.id, title: booking!.title, startsAt: booking!.startsAt.toISOString(), status: booking!.status, progress: booking!.progress, price: booking!.price, myRole: booking!.clientId === user.id ? "client" : "provider" }
           : null,
       };
-    });
+    }));
 
     conversations.sort(
       (a, b) =>
@@ -91,8 +91,8 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     // anti-spam: 30 new-conversation attempts per 15 min per account.
     // QA operators (admin + the three test personas) are exempt IN DEMO
     // MODE ONLY — the Test Center and Full Website QA legitimately open
@@ -107,28 +107,28 @@ export async function POST(req: NextRequest) {
     const handle = String(body.toHandle || "").trim().toLowerCase();
     if (!handle) throw new ApiError(400, "toHandle is required");
 
-    const target = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+    const target = await db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
     if (!target || target.status !== "active") throw new ApiError(404, "User not found");
     if (target.id === user.id) throw new ApiError(400, "You can't message yourself");
-    const targetProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, target.id)).get()!;
-    if (!canMessage(targetProfile, user.id))
+    const targetProfile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, target.id)).get())!;
+    if (!(await canMessage(targetProfile, user.id)))
       throw new ApiError(403, "This creator isn't accepting messages from you");
     // blocks work both ways — same neutral message either direction, so the
     // response never reveals who blocked whom
-    if (blockedEitherWay(user.id, target.id))
+    if (await blockedEitherWay(user.id, target.id))
       throw new ApiError(403, "This creator isn't accepting messages from you");
 
     // ONE resolver for person→conversation everywhere: exact 1:1 by ids
-    const convId = resolvePairConversation(user.id, target.id);
+    const convId = await resolvePairConversation(user.id, target.id);
 
     const first = String(body.firstMessage || "").trim();
     if (first) {
-      db.insert(tables.messages)
+      await db.insert(tables.messages)
         .values({ id: randomBytes(12).toString("hex"), conversationId: convId, senderId: user.id, body: first })
         .run();
       // the FIRST message notifies too — found by the full-system test:
       // recipients previously only heard about replies, not new threads
-      notify({
+      await notify({
         userId: target.id,
         actorId: user.id,
         type: "message",
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
       // SIMULATED demo characters respond to first contact too (found by
       // the full-system test: they only replied to follow-ups). REAL
       // accounts are untouched — maybeAutoReply refuses to speak as them.
-      maybeAutoReply(convId, user.id);
+      await maybeAutoReply(convId, user.id);
     }
 
     return { conversationId: convId };

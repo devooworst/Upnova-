@@ -10,37 +10,37 @@ export const dynamic = "force-dynamic";
 /** POST — invite a user by handle. Who can invite is a community setting. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser();
     const c = findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const m = requireActiveMember(c.id, user.id);
-    if (c.whoCanInvite === "mods" && !isMod(m))
+    const m = await requireActiveMember((await c)!.id, user.id);
+    if ((await c)!.whoCanInvite === "mods" && !isMod(m))
       throw new ApiError(403, "Only moderators can invite members in this community");
 
     const body = await req.json().catch(() => ({}));
     const handle = String(body.handle || "").trim().replace(/^@/, "");
     if (!handle) throw new ApiError(400, "Who do you want to invite? Enter their handle");
 
-    const target = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+    const target = await db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
     if (!target) throw new ApiError(404, `No one on Mavyn has the handle @${handle}`);
     if (target.id === user.id) throw new ApiError(400, "You're already here");
 
-    const existing = getMembership(c.id, target.id);
+    const existing = getMembership((await c)!.id, target.id);
     if (existing) {
-      if (existing.status === "active") throw new ApiError(409, `@${handle} is already a member`);
-      if (existing.status === "invited") throw new ApiError(409, `@${handle} already has an invitation`);
-      if (existing.status === "banned") throw new ApiError(403, `@${handle} was removed from this community`);
+      if ((await existing)!.status === "active") throw new ApiError(409, `@${handle} is already a member`);
+      if ((await existing)!.status === "invited") throw new ApiError(409, `@${handle} already has an invitation`);
+      if ((await existing)!.status === "banned") throw new ApiError(403, `@${handle} was removed from this community`);
       throw new ApiError(409, `@${handle} already has a pending join request — approve it instead`);
     }
 
-    db.insert(tables.communityMembers).values({ communityId: c.id, userId: target.id, status: "invited" }).run();
-    notify({
+    await db.insert(tables.communityMembers).values({ communityId: (await c)!.id, userId: target.id, status: "invited" }).run();
+    await notify({
       userId: target.id,
       actorId: user.id,
       type: "community",
-      title: `Invitation — ${c.name}`,
+      title: `Invitation — ${(await c)!.name}`,
       body: `@${user.handle} invited you to join`,
-      href: `/communities/${c.slug}`,
+      href: `/communities/${(await c)!.slug}`,
     });
     return { ok: true };
   });

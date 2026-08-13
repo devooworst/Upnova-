@@ -6,7 +6,7 @@ import { parseConfig, priceLabel } from "@/lib/servicePolicies";
 /* server-side metadata so shared links unfurl with real content —
    the client page underneath stays the interactive source of truth */
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const row = db
+  const row = await db
     .select({ service: tables.services, profile: tables.profiles })
     .from(tables.services)
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.services.ownerId))

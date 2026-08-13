@@ -14,14 +14,14 @@ export const dynamic = "force-dynamic";
  * or other providers.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
 
-    const rows = clientIdsOf(user.id).map((clientId) => {
-      const u = db.select().from(tables.users).where(eq(tables.users.id, clientId)).get();
-      const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, clientId)).get();
-      const stats = clientStats(user.id, clientId);
-      const rel = db
+    const rows = await Promise.all((await clientIdsOf(user.id)).map(async (clientId) => {
+      const u = await db.select().from(tables.users).where(eq(tables.users.id, clientId)).get();
+      const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, clientId)).get();
+      const stats = await clientStats(user.id, clientId);
+      const rel = await db
         .select()
         .from(tables.preferredClients)
         .where(and(eq(tables.preferredClients.providerId, user.id), eq(tables.preferredClients.clientId, clientId)))
@@ -34,25 +34,25 @@ export async function GET() {
         ...stats,
         preferred: rel
           ? {
-              id: rel.id,
-              status: rel.status,
-              benefits: parseBenefits(rel.benefits),
-              note: rel.note,
-              addedAt: rel.addedAt.toISOString(),
-              removedAt: rel.removedAt?.toISOString() ?? null,
+              id: rel!.id,
+              status: rel!.status,
+              benefits: parseBenefits(rel!.benefits),
+              note: rel!.note,
+              addedAt: rel!.addedAt.toISOString(),
+              removedAt: rel!.removedAt?.toISOString() ?? null,
             }
           : null,
       };
-    });
+    }));
 
     // services + their preferred-only windows (for the early-access control)
-    const services = db
+    const services = await Promise.all((await db
       .select()
       .from(tables.services)
       .where(eq(tables.services.ownerId, user.id))
-      .all()
+      .all())
       .filter((s) => s.active)
-      .map((s) => ({
+      .map(async (s) => ({
         id: s.id,
         title: s.title,
         price: s.price,
@@ -63,10 +63,10 @@ export async function GET() {
         preferredUntil: s.preferredUntil && s.preferredUntil.getTime() > Date.now() ? s.preferredUntil.toISOString() : null,
         // Preferred Early Access setup: the slot cap counts for EVERYONE;
         // the preferred limit bounds bookings during the window only
-        earlyAccess: (() => {
+        earlyAccess: await (async () => {
           const ea = readEarlyAccess(s.config);
           if (!ea) return null;
-          const active = activeBookingsForService(s.id);
+          const active = await activeBookingsForService(s.id);
           return {
             slots: ea.slots,
             preferredLimit: ea.preferredLimit,
@@ -74,7 +74,7 @@ export async function GET() {
             slotsLeft: ea.slots != null ? Math.max(0, ea.slots - active) : null,
           };
         })(),
-      }));
+      })));
 
     rows.sort((a, b) => (b.lastCompletedAt ?? "").localeCompare(a.lastCompletedAt ?? ""));
     return {

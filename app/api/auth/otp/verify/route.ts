@@ -30,22 +30,22 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     // explicit credentials only — see the request route; sticky fallback
     // must never capture a credential-less phone LOGIN
     const hasExplicitCreds = !!req.headers.get("authorization") || !!cookies().get(SESSION_COOKIE);
-    const sessionUser = hasExplicitCreds ? getSessionUser() : null;
-    const phone = consumeOtp(body.phone, body.code); // throws generic errors
+    const sessionUser =await  await (hasExplicitCreds ? getSessionUser() : null);
+    const phone = await consumeOtp(body.phone, body.code); // throws generic errors
 
     if (sessionUser) {
       // VERIFY: attach to the signed-in account (a number belongs to one account)
-      const taken = db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
+      const taken = await db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
       if (taken && taken.id !== sessionUser.id) throw new ApiError(409, "Couldn't verify this number.");
-      db.update(tables.users)
+      await db.update(tables.users)
         .set({ phone, phoneVerified: true })
         .where(eq(tables.users.id, sessionUser.id))
         .run();
-      notify({
+      await notify({
         userId: sessionUser.id,
         type: "security",
         title: "Phone number verified",
@@ -57,16 +57,16 @@ export async function POST(req: NextRequest) {
     }
 
     // LOGIN: only a VERIFIED number signs in
-    const user = db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
+    const user = await db.select().from(tables.users).where(eq(tables.users.phone, phone)).get();
     if (!user || !user.phoneVerified || user.status !== "active")
       throw new ApiError(401, "That code didn't work — request a new one.");
 
-    const { token, expiresAt } = createSession(user.id);
+    const { token, expiresAt } = await createSession(user.id);
     rememberDemoSession(token);
     const cookieless = process.env.MAVYN_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
-    notify({
+    await notify({
       userId: user.id,
       type: "security",
       title: "New sign-in to your account",
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       priority: "high",
     });
 
-    const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
+    const profile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get())!;
     return {
       ...ownProfile(user, profile),
       sessionToken: isDemoMode() ? signDemoToken(user.handle) : token,

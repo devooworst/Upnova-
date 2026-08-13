@@ -12,14 +12,14 @@ export const dynamic = "force-dynamic";
  * checkpoint progress, derived from the REAL records. Demo only.
  */
 export async function GET() {
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const me = requireQaOperator();
-    ensureQaPersonas();
+    const me = await requireQaOperator();
+    await ensureQaPersonas();
 
-    const personas = QA_PERSONAS.map((p) => {
-      const u = db.select().from(tables.users).where(eq(tables.users.handle, p.handle)).get()!;
-      const prof = db.select().from(tables.profiles).where(eq(tables.profiles.userId, u.id)).get()!;
+    const personas = await Promise.all(QA_PERSONAS.map(async (p) => {
+      const u = (await db.select().from(tables.users).where(eq(tables.users.handle, p.handle)).get())!;
+      const prof = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, u.id)).get())!;
       return {
         handle: p.handle,
         label: p.label,
@@ -28,11 +28,11 @@ export async function GET() {
         avatarUrl: prof.avatarUrl,
         active: me.handle === p.handle,
       };
-    });
+    }));
 
-    const runs = readRuns();
-    const scenarios = QA_SCENARIOS.map((s) => {
-      const prog = scenarioProgress(s, runs);
+    const runs = await readRuns();
+    const scenarios = await Promise.all(QA_SCENARIOS.map(async (s) => {
+      const prog = await scenarioProgress(s, runs);
       return {
         id: s.id,
         title: s.title,
@@ -43,7 +43,7 @@ export async function GET() {
         done: prog.done,
         total: prog.total,
       };
-    });
+    }));
 
     // the curriculum view: completed stages count forever
     const overall = {

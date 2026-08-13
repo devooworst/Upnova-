@@ -12,23 +12,23 @@ export const dynamic = "force-dynamic";
  * services appear here (and in public history) instead of being erased.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const services = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const services = await db
       .select()
       .from(tables.services)
       .where(eq(tables.services.ownerId, user.id))
       .orderBy(desc(tables.services.createdAt))
       .all();
 
-    const bookings = db
+    const bookings = await db
       .select()
       .from(tables.bookings)
       .where(eq(tables.bookings.providerId, user.id))
       .all();
 
     return {
-      services: services.map((s) => {
+      services: await Promise.all(services.map(async (s) => {
         const mine = bookings.filter((b) => b.serviceId === s.id);
         const now = Date.now();
         return {
@@ -50,7 +50,7 @@ export async function GET() {
             earned: mine.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.price, 0),
           },
         };
-      }),
+      })),
     };
   });
 }

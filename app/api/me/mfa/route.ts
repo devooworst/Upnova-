@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 /** GET — MFA status for the account. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     return { enabled: u.mfaEnabled };
   });
 }
@@ -23,23 +23,23 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     const action = String(body.action);
 
     if (action === "setup") {
       if (u.mfaEnabled) throw new ApiError(409, "MFA is already enabled");
       const secret = generateSecret();
-      db.update(tables.users).set({ mfaSecret: secret, mfaEnabled: false }).where(eq(tables.users.id, user.id)).run();
+      await db.update(tables.users).set({ mfaSecret: secret, mfaEnabled: false }).where(eq(tables.users.id, user.id)).run();
       return { secret, otpauth: otpauthUrl(secret, user.email) };
     }
 
     if (action === "enable") {
       if (!u.mfaSecret) throw new ApiError(409, "Run setup first");
       if (!verifyTotp(u.mfaSecret, String(body.code || ""))) throw new ApiError(401, "Code didn't match — try the current one");
-      db.update(tables.users).set({ mfaEnabled: true }).where(eq(tables.users.id, user.id)).run();
-      notify({
+      await db.update(tables.users).set({ mfaEnabled: true }).where(eq(tables.users.id, user.id)).run();
+      await notify({
         userId: user.id,
         type: "campus",
         category: "activity",
@@ -54,8 +54,8 @@ export async function POST(req: NextRequest) {
     if (action === "disable") {
       if (!u.mfaEnabled || !u.mfaSecret) throw new ApiError(409, "MFA is not enabled");
       if (!verifyTotp(u.mfaSecret, String(body.code || ""))) throw new ApiError(401, "Code didn't match — try the current one");
-      db.update(tables.users).set({ mfaEnabled: false, mfaSecret: null }).where(eq(tables.users.id, user.id)).run();
-      notify({
+      await db.update(tables.users).set({ mfaEnabled: false, mfaSecret: null }).where(eq(tables.users.id, user.id)).run();
+      await notify({
         userId: user.id,
         type: "campus",
         category: "activity",

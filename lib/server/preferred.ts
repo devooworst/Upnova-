@@ -91,22 +91,22 @@ export function getRelationship(providerId: string, clientId: string) {
     .get();
 }
 
-export function activeRelationship(providerId: string, clientId: string) {
-  const r = getRelationship(providerId, clientId);
-  return r && r.status === "active" ? r : null;
+export async function activeRelationship(providerId: string, clientId: string) {
+  const r = await getRelationship(providerId, clientId);
+  return r && r!.status === "active" ? r : null;
 }
 
 /** Preferred-pricing percent this client gets from this provider (0 = none). */
-export function discountPercent(providerId: string, clientId: string): number {
-  const r = activeRelationship(providerId, clientId);
+export async function discountPercent(providerId: string, clientId: string): Promise<number> {
+  const r = await activeRelationship(providerId, clientId);
   if (!r) return 0;
   const d = parseBenefits(r.benefits).find((b) => b.key === "discount");
   return d?.percent ?? 0;
 }
 
 /** Whether this client may book during the provider's preferred-only window. */
-export function hasEarlyAccess(providerId: string, clientId: string): boolean {
-  const r = activeRelationship(providerId, clientId);
+export async function hasEarlyAccess(providerId: string, clientId: string): Promise<boolean> {
+  const r = await activeRelationship(providerId, clientId);
   if (!r) return false;
   return parseBenefits(r.benefits).some((b) => b.key === "priority_booking" || b.key === "early_access");
 }
@@ -116,15 +116,15 @@ export function hasEarlyAccess(providerId: string, clientId: string): boolean {
    bookings + completed projects with the same provider. Spend is shown
    privately to the provider as context only. */
 
-export function clientStats(providerId: string, clientId: string) {
+export async function clientStats(providerId: string, clientId: string) {
   const yearAgo = Date.now() - 365 * 86400_000;
-  const bookings = db
+  const bookings = await db
     .select()
     .from(tables.bookings)
     .where(and(eq(tables.bookings.providerId, providerId), eq(tables.bookings.clientId, clientId)))
     .all();
   const completedBookings = bookings.filter((b) => b.status === "completed");
-  const projects = db
+  const projects = await db
     .select()
     .from(tables.projects)
     .where(and(eq(tables.projects.creatorId, providerId), eq(tables.projects.clientId, clientId)))
@@ -133,11 +133,11 @@ export function clientStats(providerId: string, clientId: string) {
   const completed12mo =
     completedBookings.filter((b) => b.startsAt.getTime() >= yearAgo).length +
     completedProjects.filter((p) => p.updatedAt.getTime() >= yearAgo).length;
-  const spentCents = db
+  const spentCents = (await db
     .select()
     .from(tables.payments)
     .where(and(eq(tables.payments.payerId, clientId), eq(tables.payments.payeeId, providerId), eq(tables.payments.status, "released")))
-    .all()
+    .all())
     .reduce((n, p) => n + p.amountCents + p.feeCents, 0);
   const lastCompleted = [...completedBookings.map((b) => b.startsAt), ...completedProjects.map((p) => p.updatedAt)]
     .sort((a, b) => b.getTime() - a.getTime())[0];
@@ -158,23 +158,23 @@ export function clientStats(providerId: string, clientId: string) {
 }
 
 /** Everyone who has ever booked / hired this provider (real records only). */
-export function clientIdsOf(providerId: string): string[] {
+export async function clientIdsOf(providerId: string): Promise<string[]> {
   const ids = new Set<string>();
-  for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.providerId, providerId)).all()) ids.add(b.clientId);
-  for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, providerId)).all()) ids.add(p.clientId);
+  for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.providerId, providerId)).all()) ids.add(b.clientId);
+  for (const p of await db.select().from(tables.projects).where(eq(tables.projects.creatorId, providerId)).all()) ids.add(p.clientId);
   return Array.from(ids);
 }
 
 /** Has any real interaction happened between the two? (Anti-spam guard on
     manual adds — providers add people they actually work with.) */
-export function hasRelationshipBasis(providerId: string, clientId: string): boolean {
-  const b = db
+export async function hasRelationshipBasis(providerId: string, clientId: string): Promise<boolean> {
+  const b = await db
     .select({ id: tables.bookings.id })
     .from(tables.bookings)
     .where(and(eq(tables.bookings.providerId, providerId), eq(tables.bookings.clientId, clientId)))
     .get();
   if (b) return true;
-  const p = db
+  const p = await db
     .select({ id: tables.projects.id })
     .from(tables.projects)
     .where(and(eq(tables.projects.creatorId, providerId), eq(tables.projects.clientId, clientId)))
@@ -182,9 +182,9 @@ export function hasRelationshipBasis(providerId: string, clientId: string): bool
   if (p) return true;
   // a shared conversation counts — the provider may want to reward a
   // long-time client whose earlier work predates Mavyn
-  const convs = db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, providerId)).all();
+  const convs = await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, providerId)).all();
   for (const c of convs) {
-    const other = db
+    const other = await db
       .select()
       .from(tables.conversationMembers)
       .where(and(eq(tables.conversationMembers.conversationId, c.conversationId), eq(tables.conversationMembers.userId, clientId)))
@@ -194,35 +194,35 @@ export function hasRelationshipBasis(providerId: string, clientId: string): bool
   return false;
 }
 
-export function upsertPreferred(providerId: string, clientId: string, benefits: Benefit[], note: string) {
-  const existing = getRelationship(providerId, clientId);
+export async function upsertPreferred(providerId: string, clientId: string, benefits: Benefit[], note: string) {
+  const existing = await getRelationship(providerId, clientId);
   if (existing) {
-    db.update(tables.preferredClients)
+    await db.update(tables.preferredClients)
       .set({
         status: "active",
         benefits: JSON.stringify(benefits),
         note: note.slice(0, 300),
-        addedAt: existing.status === "active" ? existing.addedAt : new Date(),
+        addedAt: existing!.status === "active" ? existing!.addedAt : new Date(),
         removedAt: null,
       })
-      .where(eq(tables.preferredClients.id, existing.id))
+      .where(eq(tables.preferredClients.id, existing!.id))
       .run();
-    return db.select().from(tables.preferredClients).where(eq(tables.preferredClients.id, existing.id)).get()!;
+    return (await db.select().from(tables.preferredClients).where(eq(tables.preferredClients.id, existing!.id)).get())!;
   }
   const id = randomBytes(12).toString("hex");
-  db.insert(tables.preferredClients)
+  await db.insert(tables.preferredClients)
     .values({ id, providerId, clientId, status: "active", benefits: JSON.stringify(benefits), note: note.slice(0, 300) })
     .run();
-  return db.select().from(tables.preferredClients).where(eq(tables.preferredClients.id, id)).get()!;
+  return (await db.select().from(tables.preferredClients).where(eq(tables.preferredClients.id, id)).get())!;
 }
 
 /** Active preferred clients of a provider who hold a booking-priority benefit. */
-export function preferredWithEarlyAccess(providerId: string): string[] {
-  return db
+export async function preferredWithEarlyAccess(providerId: string): Promise<string[]> {
+  return (await db
     .select()
     .from(tables.preferredClients)
     .where(and(eq(tables.preferredClients.providerId, providerId), eq(tables.preferredClients.status, "active")))
-    .all()
+    .all())
     .filter((r) => parseBenefits(r.benefits).some((b) => b.key === "priority_booking" || b.key === "early_access"))
     .map((r) => r.clientId);
 }
@@ -284,27 +284,27 @@ export function writeEarlyAccess(rawConfig: string | null | undefined, setup: Ea
 export const SLOT_HOLDING_STATUSES = ["pending", "accepted", "confirmed", "reschedule_requested"] as const;
 
 /** How many active bookings currently hold slots on this service. */
-export function activeBookingsForService(serviceId: string): number {
-  return db
+export async function activeBookingsForService(serviceId: string): Promise<number> {
+  return (await db
     .select()
     .from(tables.bookings)
     .where(eq(tables.bookings.serviceId, serviceId))
-    .all()
+    .all())
     .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status)).length;
 }
 
 /** How many slot-holding bookings a specific client has made since the
     window opened — the per-client early-access limit is measured against
     THIS, so a cancelled booking frees that client's allocation too. */
-export function clientBookingsSinceWindowStart(serviceId: string, clientId: string, startedAtIso: string | null): number {
+export async function clientBookingsSinceWindowStart(serviceId: string, clientId: string, startedAtIso: string | null): Promise<number> {
   if (!startedAtIso) return 0;
   const t0 = new Date(startedAtIso).getTime();
   if (!Number.isFinite(t0)) return 0;
-  return db
+  return (await db
     .select()
     .from(tables.bookings)
     .where(eq(tables.bookings.serviceId, serviceId))
-    .all()
+    .all())
     .filter((b) => b.clientId === clientId && (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status) && b.createdAt.getTime() >= t0).length;
 }
 

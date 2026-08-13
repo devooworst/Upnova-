@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const stream = getStream(params.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const stream = await getStream(params.id);
     const target = body.target === "user" ? "user" : "live_stream";
     const category = ["safety", "spam", "impersonation", "inappropriate", "privacy", "other"].includes(body.category)
       ? body.category
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!targetId) throw new ApiError(400, "Who are you reporting?");
     if (targetId === user.id) throw new ApiError(400, "You can't report yourself");
 
-    db.insert(tables.reports)
+    await db.insert(tables.reports)
       .values({
         id: randomBytes(12).toString("hex"),
         reporterId: user.id,

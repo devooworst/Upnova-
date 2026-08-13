@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 /** Factual borrowing record for a user AS BORROWER: completed on time,
  *  returned late, problem returns, currently overdue. History that both
  *  sides can weigh — advisory context, never an automatic penalty. */
-function borrowerRecord(userId: string, now: number) {
-  const rows = db.select().from(tables.loans).where(eq(tables.loans.borrowerId, userId)).all();
+async function borrowerRecord(userId: string, now: number) {
+  const rows =await  await db.select().from(tables.loans).where(eq(tables.loans.borrowerId, userId)).all();
   return {
     onTime: rows.filter((l) => l.status === "completed" && !l.returnedLate).length,
     late: rows.filter((l) => (l.status === "completed" || l.status === "returned_disputed") && l.returnedLate).length,
@@ -24,30 +24,30 @@ function borrowerRecord(userId: string, now: number) {
  *  overdue notifications to BOTH parties, once each. Overdue is a status
  *  and a conversation, not a punishment. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const rows = db
       .select()
       .from(tables.loans)
       .where(or(eq(tables.loans.borrowerId, user.id), eq(tables.loans.lenderId, user.id)))
       .orderBy(desc(tables.loans.createdAt))
       .all();
-    const names = new Map(db.select().from(tables.profiles).all().map((p) => [p.userId, p.displayName]));
+    const names = new Map((await db.select().from(tables.profiles).all()).map((p) => [p.userId, p.displayName]));
 
     const now = Date.now();
-    for (const loan of rows) {
+    for (const loan of await rows) {
       if (loan.status !== "borrowed") continue;
       const due = loan.dueAt.getTime();
       const when = loan.dueAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" });
       if (!loan.dueSoonNotified && due - now < 24 * 3600_000 && due > now) {
-        db.update(tables.loans).set({ dueSoonNotified: true }).where(eq(tables.loans.id, loan.id)).run();
-        notify({ userId: loan.borrowerId, type: "order", title: `Reminder — ${loan.itemTitle} is due ${when}`, body: "Return it on time or request an extension.", href: "/campus/market?loans=1", priority: "high" });
-        notify({ userId: loan.lenderId, type: "order", title: `${names.get(loan.borrowerId) ?? "The borrower"}'s loan of ${loan.itemTitle} is due ${when}`, body: "", href: "/campus/market?loans=1", priority: "normal" });
+        await db.update(tables.loans).set({ dueSoonNotified: true }).where(eq(tables.loans.id, loan.id)).run();
+        await notify({ userId: loan.borrowerId, type: "order", title: `Reminder — ${loan.itemTitle} is due ${when}`, body: "Return it on time or request an extension.", href: "/campus/market?loans=1", priority: "high" });
+        await notify({ userId: loan.lenderId, type: "order", title: `${names.get(loan.borrowerId) ?? "The borrower"}'s loan of ${loan.itemTitle} is due ${when}`, body: "", href: "/campus/market?loans=1", priority: "normal" });
       }
       if (!loan.overdueNotified && due < now) {
-        db.update(tables.loans).set({ overdueNotified: true }).where(eq(tables.loans.id, loan.id)).run();
-        notify({ userId: loan.borrowerId, type: "order", title: `Overdue — ${loan.itemTitle}`, body: "Nothing bad happens automatically — message the owner or request an extension.", href: "/campus/market?loans=1", priority: "high" });
-        notify({ userId: loan.lenderId, type: "order", title: `Overdue — your ${loan.itemTitle}`, body: `${names.get(loan.borrowerId) ?? "The borrower"} was due ${when}. You can message them or propose a new return date.`, href: "/campus/market?loans=1", priority: "high" });
+        await db.update(tables.loans).set({ overdueNotified: true }).where(eq(tables.loans.id, loan.id)).run();
+        await notify({ userId: loan.borrowerId, type: "order", title: `Overdue — ${loan.itemTitle}`, body: "Nothing bad happens automatically — message the owner or request an extension.", href: "/campus/market?loans=1", priority: "high" });
+        await notify({ userId: loan.lenderId, type: "order", title: `Overdue — your ${loan.itemTitle}`, body: `${names.get(loan.borrowerId) ?? "The borrower"} was due ${when}. You can message them or propose a new return date.`, href: "/campus/market?loans=1", priority: "high" });
       }
     }
 
@@ -61,7 +61,7 @@ export async function GET() {
     return {
       // my own record as a borrower — my history, visible to me
       myRecord: recordOf(user.id),
-      loans: rows.map((l) => {
+      loans: (await rows).map((l) => {
         const isLender = l.lenderId === user.id;
         return {
           id: l.id,

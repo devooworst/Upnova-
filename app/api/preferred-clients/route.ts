@@ -23,23 +23,23 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const client = body.clientId
-      ? db.select().from(tables.users).where(eq(tables.users.id, String(body.clientId))).get()
-      : db.select().from(tables.users).where(eq(tables.users.handle, String(body.clientHandle ?? "").trim().toLowerCase())).get();
+      ? await db.select().from(tables.users).where(eq(tables.users.id, String(body.clientId))).get()
+      : await db.select().from(tables.users).where(eq(tables.users.handle, String(body.clientHandle ?? "").trim().toLowerCase())).get();
     if (!client || client.status !== "active") throw new ApiError(404, "Client not found");
     if (client.id === user.id) throw new ApiError(400, "You can't add yourself as a Preferred Client");
-    if (!hasRelationshipBasis(user.id, client.id))
+    if (!(await hasRelationshipBasis(user.id, client.id)))
       throw new ApiError(409, "Preferred Clients are people you've actually worked with — no booking, project, or conversation exists yet");
 
     const benefits = sanitizeBenefits(body.benefits);
     if (benefits.length === 0) throw new ApiError(400, "Choose at least one benefit");
-    const rel = upsertPreferred(user.id, client.id, benefits, String(body.note ?? ""));
+    const rel = await upsertPreferred(user.id, client.id, benefits, String(body.note ?? ""));
 
-    const clientProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, client.id)).get();
+    const clientProfile = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, client.id)).get();
     void clientProfile;
-    notify({
+    await notify({
       userId: client.id,
       actorId: user.id,
       type: "preferred_added",

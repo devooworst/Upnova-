@@ -32,9 +32,9 @@ export function campusVerification(userId: string) {
 /* session state, and display surfaces keep showing the REAL account   */
 /* facts (verification, plan) — demo mode opens doors, it never lies.  */
 /* ------------------------------------------------------------------ */
-export function unrestrictedTester(userId: string): boolean {
+export async function unrestrictedTester(userId: string): Promise<boolean> {
   if (!isDemoMode()) return false;
-  const u = db
+  const u = await db
     .select({ t: tables.users.testerMode })
     .from(tables.users)
     .where(eq(tables.users.id, userId))
@@ -44,18 +44,18 @@ export function unrestrictedTester(userId: string): boolean {
 
 /** Campus a demo-mode tester is dropped into when they have no real
     verification (the seeded campus). */
-export function demoCampusId(): string | null {
+export async function demoCampusId(): Promise<string | null> {
   const c =
-    db.select().from(tables.campuses).where(eq(tables.campuses.slug, "bowie-state")).get() ??
-    db.select().from(tables.campuses).get();
+    await db.select().from(tables.campuses).where(eq(tables.campuses.slug, "bowie-state")).get() ??
+    await db.select().from(tables.campuses).get();
   return c?.id ?? null;
 }
 
-export function requireCampus(userId: string): string {
-  const v = campusVerification(userId);
+export async function requireCampus(userId: string): Promise<string> {
+  const v = await campusVerification(userId);
   if (v) return v.campusId;
-  if (unrestrictedTester(userId)) {
-    const id = demoCampusId();
+  if (await unrestrictedTester(userId)) {
+    const id = await demoCampusId();
     if (id) return id; // DEMO MODE: gate opens for testing
   }
   throw new ApiError(403, "This is a campus space — verify your school in Your Campus first");
@@ -65,10 +65,10 @@ export function requireCampus(userId: string): string {
     nothing — these areas simply become unavailable for new activity.
     DEMO MODE bypasses the affiliation restriction too (unrestricted
     testing); SIMULATION MODE enforces it exactly like production. */
-export function requireCurrentStudent(userId: string): string {
-  const v = campusVerification(userId);
-  if (unrestrictedTester(userId)) {
-    const id = v?.campusId ?? demoCampusId();
+export async function requireCurrentStudent(userId: string): Promise<string> {
+  const v = await campusVerification(userId);
+  if (await unrestrictedTester(userId)) {
+    const id = v?.campusId ?? (await demoCampusId());
     if (id) return id;
   }
   if (!v) throw new ApiError(403, "This is a campus space — verify your school in Your Campus first");

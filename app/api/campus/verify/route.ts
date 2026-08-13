@@ -24,32 +24,32 @@ const cleanYear = (y: unknown) => {
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const slug = String(body.campus || "bowie-state");
-    const campus = db.select().from(tables.campuses).where(eq(tables.campuses.slug, slug)).get();
+    const campus = await db.select().from(tables.campuses).where(eq(tables.campuses.slug, slug)).get();
     if (!campus) throw new ApiError(404, "School not found");
 
     const affiliation = AFFILIATIONS.includes(body.affiliation) ? body.affiliation : "current_student";
     const gradYear = cleanYear(body.gradYear);
     const program = String(body.program || "").slice(0, 80);
 
-    const existing = db
+    const existing = (await db
       .select()
       .from(tables.campusVerifications)
       .where(eq(tables.campusVerifications.userId, user.id))
-      .all()
+      .all())
       .find((v) => v.campusId === campus.id);
 
     if (existing?.status === "verified") return { status: "verified", campus: campus.name, affiliation: existing.affiliation };
 
     if (existing) {
-      db.update(tables.campusVerifications)
+      await db.update(tables.campusVerifications)
         .set({ status: "verified", affiliation, gradYear, program, verifiedAt: new Date() })
         .where(eq(tables.campusVerifications.id, existing.id))
         .run();
     } else {
-      db.insert(tables.campusVerifications)
+      await db.insert(tables.campusVerifications)
         .values({
           id: `cv-${user.id.slice(0, 8)}-${campus.slug}`,
           userId: user.id,
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         .run();
     }
 
-    notify({
+    await notify({
       userId: user.id,
       type: "campus",
       title: `You're verified at ${campus.name}`,
@@ -80,18 +80,18 @@ export async function POST(req: NextRequest) {
 
 /** GET — my campus verification + academic profile + visibility toggles. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const v = campusVerification(user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const v = await campusVerification(user.id);
     if (!v) return { verified: false };
-    const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, v.campusId)).get()!;
+    const campus = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, v!.campusId)).get())!;
     return {
       verified: true,
       campusId: campus.id,
       campusName: campus.name,
-      affiliation: v.affiliation,
-      gradYear: v.gradYear,
-      program: v.program,
+      affiliation: v!.affiliation,
+      gradYear: v!.gradYear,
+      program: v!.program,
       showSchool: !!v.showSchool,
       showGradYear: !!v.showGradYear,
       showProgram: !!v.showProgram,
@@ -108,24 +108,24 @@ export async function GET() {
  */
 export async function PATCH(req: NextRequest) {
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser();
     const v = campusVerification(user.id);
     if (!v) throw new ApiError(403, "Verify your school first");
     const body = await req.json().catch(() => ({}));
 
     if (body.action === "graduate") {
-      if (v.affiliation !== "current_student") throw new ApiError(409, "Only current students graduate");
-      db.update(tables.campusVerifications)
+      if ((await v!)!.affiliation !== "current_student") throw new ApiError(409, "Only current students graduate");
+      await db.update(tables.campusVerifications)
         .set({ affiliation: "alumni" })
-        .where(eq(tables.campusVerifications.id, v.id))
+        .where(eq(tables.campusVerifications.id, (await v!)!.id))
         .run();
       // STATUS TRANSITION, never a billing event: College+ ends with student
       // life, the account becomes FREE Alumni. Nobody is auto-charged for
       // Pro — Alumni Pro (permanent alumni rate) is an offer, not a default.
-      const acct = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+      const acct = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
       if (acct.plan === "college") {
-        db.update(tables.users).set({ plan: "free" }).where(eq(tables.users.id, user.id)).run();
-        notify({
+        await db.update(tables.users).set({ plan: "free" }).where(eq(tables.users.id, user.id)).run();
+        await notify({
           userId: user.id,
           type: "campus",
           title: "Welcome to Mavyn Alumni",
@@ -134,8 +134,8 @@ export async function PATCH(req: NextRequest) {
           category: "campus",
         });
       }
-      const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, v.campusId)).get()!;
-      notify({
+      const campus = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, (await v!)!.campusId)).get())!;
+      await notify({
         userId: user.id,
         type: "campus",
         title: `Congratulations, ${campus.name} alum`,
@@ -153,7 +153,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.showGradYear === "boolean") patch.showGradYear = body.showGradYear;
     if (typeof body.showProgram === "boolean") patch.showProgram = body.showProgram;
     if (!Object.keys(patch).length) throw new ApiError(400, "Nothing to update");
-    db.update(tables.campusVerifications).set(patch).where(eq(tables.campusVerifications.id, v.id)).run();
+    await db.update(tables.campusVerifications).set(patch).where(eq(tables.campusVerifications.id, (await v!)!.id)).run();
     return { ok: true };
   });
 }

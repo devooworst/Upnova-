@@ -17,17 +17,17 @@ export const dynamic = "force-dynamic";
  * prompt appears only when they press Book. Location = service area only.
  */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const row = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const row = await db
       .select({ service: tables.services, user: tables.users, profile: tables.profiles })
       .from(tables.services)
       .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.services.id, params.id))
       .get();
-    if (!row || row.user.status !== "active") throw new ApiError(404, "Service not found");
-    const { service, user, profile } = row;
+    if (!row || row!.user.status !== "active") throw new ApiError(404, "Service not found");
+    const { service, user, profile } = await row;
     const isOwner = viewer?.id === service.ownerId;
 
     // ---- visibility, enforced server-side ----
@@ -37,11 +37,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     // an unlisted link is MEANT to work for anyone who has it)
     if (service.visibility === "followers" && !isOwner) {
       const follows = viewer
-        ? !!db
+        ? !!(await db
             .select()
             .from(tables.follows)
             .where(and(eq(tables.follows.followerId, viewer.id), eq(tables.follows.followingId, service.ownerId)))
-            .get()
+            .get())
         : false;
       if (!follows) throw new ApiError(403, "This service is only visible to followers");
     }
@@ -55,21 +55,21 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const travel = travelFeeFor(config.travel, distanceMi);
 
     // the provider's real track record — computed, never self-reported
-    const reviews = db.select().from(tables.reviews).where(eq(tables.reviews.subjectId, user.id)).all();
+    const reviews = await db.select().from(tables.reviews).where(eq(tables.reviews.subjectId, user.id)).all();
     const rating = reviews.length
       ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
       : null;
-    const completedBookings = db
+    const completedBookings = (await db
       .select()
       .from(tables.bookings)
       .where(eq(tables.bookings.providerId, user.id))
-      .all()
+      .all())
       .filter((b) => b.status === "completed").length;
-    const completedProjects = db
+    const completedProjects = (await db
       .select()
       .from(tables.projects)
       .where(eq(tables.projects.creatorId, user.id))
-      .all()
+      .all())
       .filter((p) => ["completed", "reviewed"].includes(p.state)).length;
 
     return {
@@ -112,9 +112,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /** PATCH /api/services/[id] { price?, paused?, description? } — owner only. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    requireServiceOwner(params.id, user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    await requireServiceOwner(params.id, user.id);
 
     const patch: Partial<typeof tables.services.$inferInsert> = {};
     if (body.price !== undefined) {
@@ -133,7 +133,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // SCHEDULING updates — booking horizon and friends, sanitized like
     // creation. Partial: only the keys sent change; the rest stay.
     if (body.scheduling && typeof body.scheduling === "object") {
-      const svcRow = db.select().from(tables.services).where(eq(tables.services.id, params.id)).get()!;
+      const svcRow = (await db.select().from(tables.services).where(eq(tables.services.id, params.id)).get())!;
       const cur = parseConfig(svcRow.config);
       const s = body.scheduling as Record<string, unknown>;
       const num = (v: unknown, lo: number, hi: number) => {
@@ -159,17 +159,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       patch.config = JSON.stringify(full);
     }
 
-    db.update(tables.services).set(patch).where(eq(tables.services.id, params.id)).run();
+    await db.update(tables.services).set(patch).where(eq(tables.services.id, params.id)).run();
     return { ok: true };
   });
 }
 
 /** DELETE — deactivate (soft remove) a listing. Owner only. */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    requireServiceOwner(params.id, user.id);
-    db.update(tables.services).set({ active: false }).where(eq(tables.services.id, params.id)).run();
+  return guarded(async () => {
+    const user = await requireUser();
+    await requireServiceOwner(params.id, user.id);
+    await db.update(tables.services).set({ active: false }).where(eq(tables.services.id, params.id)).run();
     return { ok: true };
   });
 }

@@ -11,26 +11,26 @@ export const dynamic = "force-dynamic";
  *  with the school. Off-campus parties, concerts, and city events never
  *  appear here — they live in the public Events section. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const campusId = requireCampus(user.id);
-    const campus = db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const campusId = await requireCampus(user.id);
+    const campus = (await db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get())!;
 
     const now = Date.now();
-    const rows = db
+    const rows = (await db
       .select({ event: tables.events, profile: tables.profiles, u: tables.users })
       .from(tables.events)
       .innerJoin(tables.users, eq(tables.events.hostId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.events.hostId))
       .where(eq(tables.events.campusId, campusId)) // ← the scope rule
       .orderBy(asc(tables.events.startsAt))
-      .all()
+      .all())
       .filter((r) => r.event.status === "active" && r.u.status === "active" && r.event.startsAt.getTime() > now - 6 * 3_600_000);
 
-    const rsvps = rsvpCounts(rows.map((r) => r.event.id));
-    const mine = new Set(db.select().from(tables.eventRsvps).where(eq(tables.eventRsvps.userId, user.id)).all().map((r) => r.eventId));
+    const rsvps = await rsvpCounts(rows.map((r) => r.event.id));
+    const mine = new Set((await db.select().from(tables.eventRsvps).where(eq(tables.eventRsvps.userId, user.id)).all()).map((r) => r.eventId));
     const saved = new Set(
-      db.select().from(tables.bookmarks).where(eq(tables.bookmarks.userId, user.id)).all()
+      (await db.select().from(tables.bookmarks).where(eq(tables.bookmarks.userId, user.id)).all())
         .filter((b) => b.targetType === "event").map((b) => b.targetId)
     );
 

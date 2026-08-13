@@ -15,11 +15,11 @@ export const dynamic = "force-dynamic";
 
 /** GET — applicant list. Poster only (this is the applicant-review screen). */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const opp = requireOpportunityPoster(params.id, user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const opp = await requireOpportunityPoster(params.id, user.id);
 
-    const rows = db
+    const rows = await db
       .select({ app: tables.applications, user: tables.users, profile: tables.profiles })
       .from(tables.applications)
       .innerJoin(tables.users, eq(tables.applications.applicantId, tables.users.id))
@@ -65,9 +65,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /** POST — apply as the authenticated user. Applying accepts the listed budget. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const opp = await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, params.id)).get();
     if (!opp) throw new ApiError(404, "Opportunity not found");
     if (opp.status !== "open") throw new ApiError(409, "This opportunity is no longer open");
     if (opp.posterId === user.id) throw new ApiError(400, "You can't apply to your own opportunity");
@@ -77,10 +77,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // ELIGIBILITY — the poster's "who can apply" rule, enforced where it
     // matters. Visibility was never restricted; application is. DEMO MODE
     // bypasses for testing; SIMULATION MODE behaves like production.
-    const elig = checkApplicantEligibility(opp, user.id);
+    const elig = await checkApplicantEligibility(opp, user.id);
     if (!elig.eligible) throw new ApiError(403, elig.reason || "You aren't eligible for this opportunity");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.applications)
       .where(and(eq(tables.applications.opportunityId, opp.id), eq(tables.applications.applicantId, user.id)))
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (roles.length > 0) {
       const role = roles.find((r) => r.id === String(body.roleId || ""));
       if (!role) throw new ApiError(400, "Pick the role you're applying for");
-      const apps = db
+      const apps = await db
         .select()
         .from(tables.applications)
         .where(eq(tables.applications.opportunityId, opp.id))
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.applications)
+    await db.insert(tables.applications)
       .values({
         id,
         opportunityId: opp.id,
@@ -145,9 +145,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
       .run();
 
-    recordInteraction(user.id, "opportunity", opp.id, "apply");
+    await recordInteraction(user.id, "opportunity", opp.id, "apply");
 
-    notify({
+    await notify({
       userId: opp.posterId,
       actorId: user.id,
       type: "application",

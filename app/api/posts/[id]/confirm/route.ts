@@ -14,18 +14,18 @@ export const dynamic = "force-dynamic";
  * on their own content; nobody else can either.
  */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const post = db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const post = await db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
     if (!post) throw new ApiError(404, "Post not found");
 
-    const trust = postTrustMap([post], user.id).get(post.id)!;
+    const trust = (await postTrustMap([post], user.id)).get(post.id)!;
     if (!trust.verifiedWork) throw new ApiError(409, "This post isn't linked to a completed Mavyn transaction");
     if (post.clientConfirmed) return { confirmed: true };
     if (!trust.canConfirm) throw new ApiError(403, "Only the client on the linked transaction can confirm this work");
 
-    db.update(tables.posts).set({ clientConfirmed: true }).where(eq(tables.posts.id, post.id)).run();
-    notify({
+    await db.update(tables.posts).set({ clientConfirmed: true }).where(eq(tables.posts.id, post.id)).run();
+    await notify({
       userId: post.authorId,
       actorId: user.id,
       type: "post",

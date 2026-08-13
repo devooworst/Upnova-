@@ -13,15 +13,15 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/products — the Shop. Public (guests browse; buying needs an account). */
 export async function GET() {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const rows = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const rows = (await db
       .select({ product: tables.products, user: tables.users, profile: tables.profiles })
       .from(tables.products)
       .innerJoin(tables.users, eq(tables.products.sellerId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.products.createdAt))
-      .all()
+      .all())
       .filter((r) => r.product.status !== "archived" && r.user.status === "active");
 
     return {
@@ -50,8 +50,8 @@ export async function GET() {
 /** POST /api/products — list something for sale. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const title = String(body.title || "").trim().slice(0, 80);
     if (!title) throw new ApiError(400, "Give it a title");
     const price = Math.round(Number(body.price));
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (body.externalUrl && !externalUrl) throw new ApiError(400, "External link must be a valid http(s) URL");
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.products)
+    await db.insert(tables.products)
       .values({
         id,
         sellerId: user.id,
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       })
       .run();
     // one canonical product + one linked feed post (Buy opens the product)
-    createLinkedPost({
+    await createLinkedPost({
       userId: user.id,
       refType: "product",
       refId: id,

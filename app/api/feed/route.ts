@@ -22,35 +22,35 @@ const GUEST_FEED_LIMIT = 12;
  * (The Opportunities feed tab is served by /api/opportunities.)
  */
 export async function GET(req: NextRequest) {
-  return guarded(() => {
+  return guarded(async () => {
     // Guests may look: they get a LIMITED public Discover slice — global,
     // unpersonalized, capped. Members get the full ranked feed. Location
     // privacy is identical for both (locationLabel is computed server-side
     // from each author's own visibility setting; exact coords never leave).
-    const user = getSessionUser();
+    const user = await getSessionUser();
     const tab = user ? req.nextUrl.searchParams.get("tab") || "for-you" : "discover";
     const scope = (user ? req.nextUrl.searchParams.get("scope") || "for-you" : "global") as FeedScope;
 
-    const ctx = user ? viewerContext(user.id, user.profile) : null;
+    const ctx = await (user ? viewerContext(user.id, user.profile) : null);
 
-    const rows = db
+    const rows = (await db
       .select({ post: tables.posts, user: tables.users, profile: tables.profiles })
       .from(tables.posts)
       .innerJoin(tables.users, eq(tables.posts.authorId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.posts.createdAt))
       .limit(300)
-      .all()
+      .all())
       .filter((r) => r.user.status === "active");
 
     const postIds = rows.map((r) => r.post.id);
     const authorIds = Array.from(new Set(rows.map((r) => r.post.authorId)));
 
     const likeRows = postIds.length
-      ? db.select().from(tables.likes).where(inArray(tables.likes.postId, postIds)).all()
+      ? await db.select().from(tables.likes).where(inArray(tables.likes.postId, postIds)).all()
       : [];
     const commentRows = postIds.length
-      ? db.select().from(tables.comments).where(inArray(tables.comments.postId, postIds)).all()
+      ? await db.select().from(tables.comments).where(inArray(tables.comments.postId, postIds)).all()
       : [];
     const communityRows = authorIds.length
       ? db
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
           .where(inArray(tables.communityMembers.userId, authorIds))
           .all()
       : [];
-    const campusMap = verifiedCampusMap(authorIds);
+    const campusMap = await verifiedCampusMap(authorIds);
 
     const likesByPost = new Map<string, number>();
     const likedByMe = new Set<string>();
@@ -70,14 +70,14 @@ export async function GET(req: NextRequest) {
     const commentsByPost = new Map<string, number>();
     for (const c of commentRows) commentsByPost.set(c.postId, (commentsByPost.get(c.postId) ?? 0) + 1);
     const communitiesByUser = new Map<string, Set<string>>();
-    for (const m of communityRows) {
+    for (const m of await communityRows) {
       if (!communitiesByUser.has(m.userId)) communitiesByUser.set(m.userId, new Set());
       communitiesByUser.get(m.userId)!.add(m.communityId);
     }
 
     // ---- the recommendation engine ranks; the route only maps shapes ----
     // guests have no taste profile — nothing personal exists to rank with
-    const taste = user ? buildTaste(user.id, user.profile) : null;
+    const taste =await  await (user ? buildTaste(user.id, user.profile) : null);
 
     const parseTags = (s: string) => {
       try {
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     const scoped = ctx ? rows.filter((r) => inScope(scope, ctx, r.profile, campusMap.get(r.post.authorId))) : rows;
     // trust chips are computed server-side in one pass — Verified Work and
     // Client Confirmed can't be self-declared through the API
-    const trustMap = postTrustMap(scoped.map((r) => r.post), user?.id);
+    const trustMap = await postTrustMap(scoped.map((r) => r.post), user?.id);
     const mapped = scoped.map((r) => {
       const likes = likesByPost.get(r.post.id) ?? 0;
       const commentsCount = commentsByPost.get(r.post.id) ?? 0;
@@ -161,12 +161,12 @@ export async function GET(req: NextRequest) {
     // ---- promoted slot: labeled, separate, NEVER part of organic ranking ----
     let promoted: object | null = null;
     if (tab === "for-you" && user && taste) {
-      const promo = db
+      const promo = ((await db
         .select({ service: tables.services, profile: tables.profiles, u: tables.users })
         .from(tables.services)
         .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
         .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-        .all()
+        .all()))
         .find((r) => r.service.promoted && r.service.active && !r.service.paused && r.service.ownerId !== user.id);
       if (promo && !taste.hiddenTargets.has(promo.service.id)) {
         promoted = {
@@ -185,14 +185,14 @@ export async function GET(req: NextRequest) {
     // service is feed-eligible automatically, no re-posting required. ----
     let suggestedService: object | null = null;
     if (tab === "for-you" && user && taste) {
-      const candidates = db
+      const candidates = (await db
         .select({ service: tables.services, profile: tables.profiles, u: tables.users })
         .from(tables.services)
         .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
         .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-        .all()
+        .all())
         .filter(
-          (r) =>
+          async (r) =>
             r.service.active &&
             !r.service.paused &&
             !r.service.promoted &&
@@ -238,14 +238,14 @@ export async function GET(req: NextRequest) {
     // a product is not a post ----
     let suggestedProduct: object | null = null;
     if (tab === "for-you" && user && taste) {
-      const prods = db
+      const prods = (await db
         .select({ product: tables.products, profile: tables.profiles, u: tables.users })
         .from(tables.products)
         .innerJoin(tables.users, eq(tables.products.sellerId, tables.users.id))
         .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-        .all()
+        .all())
         .filter(
-          (r) =>
+          async (r) =>
             r.product.status === "active" &&
             r.product.sellerId !== user.id &&
             r.u.status === "active" &&
@@ -290,12 +290,12 @@ export async function GET(req: NextRequest) {
     let suggestedWork: object | null = null;
     let suggestedOpportunity: object | null = null;
     if (tab === "for-you" && user && taste) {
-      const workRows = db
+      const workRows = ((((((((((((((((((((((((((((((((((((((((((await db
         .select({ work: tables.works, profile: tables.profiles, u: tables.users })
         .from(tables.works)
         .innerJoin(tables.users, eq(tables.works.creatorId, tables.users.id))
         .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-        .all()
+        .all()))))))))))))))))))))))))))))))))))))))))))
         .filter((r) => r.work.status === "active" && !r.work.exclusiveLicenseId && r.work.creatorId !== user.id && r.u.status === "active" && !taste.hiddenTargets.has(r.work.id));
       const rankedW = ranker.rank(
         workRows.map((r) => ({
@@ -324,12 +324,12 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      const oppRows = db
+      const oppRows = ((((((((((((((((((((((((((((((((((((((((((await db
         .select({ opp: tables.opportunities, profile: tables.profiles, u: tables.users })
         .from(tables.opportunities)
         .innerJoin(tables.users, eq(tables.opportunities.posterId, tables.users.id))
         .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-        .all()
+        .all()))))))))))))))))))))))))))))))))))))))))))
         .filter((r) => r.opp.status === "open" && r.opp.posterId !== user.id && r.u.status === "active" && !taste.hiddenTargets.has(r.opp.id));
       const rankedO = ranker.rank(
         oppRows.map((r) => ({
@@ -360,19 +360,19 @@ export async function GET(req: NextRequest) {
     // community — the reader clicks through to the original source ----
     let suggestedCommunityPost: object | null = null;
     if (tab === "for-you" && user) {
-      const publics = db.select().from(tables.communities).all().filter((c) => c.access === "public");
+      const publics = (await db.select().from(tables.communities).all()).filter((c) => c.access === "public");
       const pubIds = new Set(publics.map((c) => c.id));
       const cutoffC = new Date(Date.now() - 14 * 86_400_000);
-      const cposts = db
+      const cposts = ((await db
         .select()
         .from(tables.communityPosts)
-        .all()
+        .all()))
         .filter((p) => pubIds.has(p.communityId) && !p.removedAt && p.createdAt > cutoffC && p.authorId !== user.id);
       if (cposts.length) {
-        const reactions = db.select().from(tables.communityReactions).all();
+        const reactions = await db.select().from(tables.communityReactions).all();
         const rcount = new Map<string, number>();
         for (const r of reactions) rcount.set(r.postId, (rcount.get(r.postId) ?? 0) + 1);
-        const ccomments = db.select({ postId: tables.communityComments.postId }).from(tables.communityComments).all();
+        const ccomments = await db.select({ postId: tables.communityComments.postId }).from(tables.communityComments).all();
         const ccount = new Map<string, number>();
         for (const r of ccomments) ccount.set(r.postId, (ccount.get(r.postId) ?? 0) + 1);
         cposts.sort(
@@ -382,12 +382,12 @@ export async function GET(req: NextRequest) {
         );
         const top = cposts[0];
         const community = publics.find((c) => c.id === top.communityId)!;
-        const ctxC = buildAuthorCtx([top.authorId], community.id, user.id);
+        const ctxC = await buildAuthorCtx([top.authorId], community.id, user.id);
         suggestedCommunityPost = {
           postId: top.id,
           body: top.body.slice(0, 220),
           author: maskAuthor(top.authorId, top.identity, ctxC),
-          community: { id: community.id, slug: community.slug, name: community.name, members: communityCounts([community.id]).get(community.id)?.members ?? 0 },
+          community: { id: community.id, slug: community.slug, name: community.name, members: (await communityCounts([community.id])).get(community.id)?.members ?? 0 },
           reactions: rcount.get(top.id) ?? 0,
           comments: ccount.get(top.id) ?? 0,
         };

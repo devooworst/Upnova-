@@ -22,14 +22,14 @@ export const dynamic = "force-dynamic";
  * until Pro is active again (enforced where the public payload is built).
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const p = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get())!;
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     const saved = parseStudio(p.studio);
     const isPro = ["pro", "business_pro", "agency"].includes(u.plan);
     const isCollege = u.plan === "college";
-    const demoBypass = !isPro && unrestrictedTester(user.id);
+    const demoBypass = !isPro && (await unrestrictedTester(user.id));
     return {
       studio: saved ?? DEFAULT_STUDIO,
       saved: !!saved,
@@ -45,11 +45,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
-    const user = requireUser();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
-    const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
-    const demoBypass = unrestrictedTester(user.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
+    const p = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get())!;
+    const demoBypass = await unrestrictedTester(user.id);
     // BACKEND permission — never just a hidden button:
     //   pro       → full Studio + My World
     //   college   → Studio basics (theme/frame/accent/font/effect/layout);
@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest) {
     // My World decorative images: uploaded data-URIs are written to disk
     // and replaced with their /uploads path BEFORE sanitizing — the DB
     // stores a ~30-char path instead of up to 900KB of base64 per image.
-    const externalizeImages = (o: unknown) => {
+    const externalizeImages = async (o: unknown) => {
       if (typeof o !== "object" || o === null) return;
       const rec = o as Record<string, unknown>;
       const imgs = rec.images;
@@ -88,14 +88,14 @@ export async function PATCH(req: NextRequest) {
         for (const key of Object.keys(imgs as Record<string, unknown>)) {
           const im = (imgs as Record<string, Record<string, unknown>>)[key];
           if (im && typeof im.src === "string" && im.src.startsWith("data:image/"))
-            im.src = storeImage(im.src, "world", 950_000) ?? "";
+            im.src = (await storeImage(im.src, "world", 950_000)) ?? "";
         }
     };
     const worldAny = (merged as Record<string, unknown>).world;
     if (typeof worldAny === "object" && worldAny !== null) {
-      externalizeImages(worldAny);
-      externalizeImages((worldAny as Record<string, unknown>).tablet);
-      externalizeImages((worldAny as Record<string, unknown>).phone);
+      await externalizeImages(worldAny);
+      await externalizeImages((worldAny as Record<string, unknown>).tablet);
+      await externalizeImages((worldAny as Record<string, unknown>).phone);
     }
     let clean = sanitizeStudio(merged);
     // College+ = decorate the room (student themes, frames, accents,
@@ -108,7 +108,7 @@ export async function PATCH(req: NextRequest) {
       if (before.world?.enabled) worldNote = "My World and full layout control are Pro-only — your design is saved but stays off until Pro is active.";
       else if (before.theme !== clean.theme) worldNote = "That theme is Pro-only — College+ uses the student preset themes.";
     }
-    db.update(tables.profiles)
+    await db.update(tables.profiles)
       .set({ studio: JSON.stringify(clean) })
       .where(eq(tables.profiles.userId, user.id))
       .run();
@@ -117,9 +117,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE() {
-  return guarded(() => {
-    const user = requireUser();
-    db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, user.id)).run();
+  return guarded(async () => {
+    const user = await requireUser();
+    await db.update(tables.profiles).set({ studio: "" }).where(eq(tables.profiles.userId, user.id)).run();
     return { ok: true, studio: DEFAULT_STUDIO };
   });
 }

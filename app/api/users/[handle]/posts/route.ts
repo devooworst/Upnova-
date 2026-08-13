@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/users/[handle]/posts — a creator's public work feed. */
 export async function GET(_req: NextRequest, { params }: { params: { handle: string } }) {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const user = db.select().from(tables.users).where(eq(tables.users.handle, params.handle)).get();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const user = await db.select().from(tables.users).where(eq(tables.users.handle, params.handle)).get();
     if (!user || user.status !== "active") throw new ApiError(404, "User not found");
 
-    const posts = db
+    const posts =await  await db
       .select()
       .from(tables.posts)
       .where(eq(tables.posts.authorId, user.id))
@@ -22,9 +22,9 @@ export async function GET(_req: NextRequest, { params }: { params: { handle: str
       .all();
 
     const ids = posts.map((p) => p.id);
-    const likes = ids.length ? db.select().from(tables.likes).all().filter((l) => ids.includes(l.postId)) : [];
-    const comments = ids.length ? db.select().from(tables.comments).all().filter((c) => ids.includes(c.postId)) : [];
-    const trustMap = postTrustMap(posts, viewer?.id);
+    const likes = ids.length ? (await db.select().from(tables.likes).all()).filter((l) => ids.includes(l.postId)) : [];
+    const comments = ids.length ? (await db.select().from(tables.comments).all()).filter((c) => ids.includes(c.postId)) : [];
+    const trustMap = await postTrustMap(posts, viewer?.id);
 
     return {
       posts: posts.map((p) => ({

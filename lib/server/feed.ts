@@ -52,29 +52,29 @@ type ViewerCtx = {
   skills: Set<string>;
 };
 
-export function viewerContext(userId: string, profile: typeof tables.profiles.$inferSelect): ViewerCtx {
+export async function viewerContext(userId: string, profile: typeof tables.profiles.$inferSelect): Promise<ViewerCtx> {
   const followingIds = new Set(
-    db
+    (await db
       .select({ id: tables.follows.followingId })
       .from(tables.follows)
       .where(eq(tables.follows.followerId, userId))
-      .all()
+      .all())
       .map((r) => r.id)
   );
   const communityIds = new Set(
-    db
+    (await db
       .select({ id: tables.communityMembers.communityId })
       .from(tables.communityMembers)
       .where(eq(tables.communityMembers.userId, userId))
-      .all()
+      .all())
       .map((r) => r.id)
   );
   const campusIds = new Set(
-    db
+    (await db
       .select({ id: tables.campusVerifications.campusId })
       .from(tables.campusVerifications)
       .where(eq(tables.campusVerifications.userId, userId))
-      .all()
+      .all())
       .filter((r, i, arr) => true)
       .map((r) => r.id)
   );
@@ -143,7 +143,7 @@ export function scorePost(
 }
 
 /** Verified campus ids per user — for the My School scope. */
-export function verifiedCampusMap(userIds: string[]): Map<string, Set<string>> {
+export async function verifiedCampusMap(userIds: string[]): Promise<Map<string, Set<string>>> {
   const map = new Map<string, Set<string>>();
   if (userIds.length === 0) return map;
   const rows = db
@@ -151,7 +151,7 @@ export function verifiedCampusMap(userIds: string[]): Map<string, Set<string>> {
     .from(tables.campusVerifications)
     .where(inArray(tables.campusVerifications.userId, userIds))
     .all();
-  for (const r of rows) {
+  for (const r of await rows) {
     if (r.status !== "verified") continue;
     if (!map.has(r.userId)) map.set(r.userId, new Set());
     map.get(r.userId)!.add(r.campusId);

@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
+  return guarded(async () => {
     // ONE identifier field: email, username, or phone number — the type
     // is detected automatically. Every failure uses the same generic
     // message so nothing about account existence leaks.
@@ -41,10 +41,10 @@ export async function POST(req: NextRequest) {
     const phoneDigits = identifier.replace(/[^\d+]/g, "");
     const looksPhone = /^\+?\d{7,15}$/.test(phoneDigits);
     const user = identifier.includes("@")
-      ? db.select().from(tables.users).where(eq(tables.users.email, identifier.toLowerCase())).get()
+      ? await db.select().from(tables.users).where(eq(tables.users.email, identifier.toLowerCase())).get()
       : looksPhone
-        ? db.select().from(tables.users).where(eq(tables.users.phone, `+${phoneDigits.replace(/^\+/, "")}`)).get()
-        : db.select().from(tables.users).where(eq(tables.users.handle, identifier.toLowerCase())).get();
+        ? await db.select().from(tables.users).where(eq(tables.users.phone, `+${phoneDigits.replace(/^\+/, "")}`)).get()
+        : await db.select().from(tables.users).where(eq(tables.users.handle, identifier.toLowerCase())).get();
     if (!user || !verifyPassword(password, user.passwordHash))
       throw new ApiError(401, "Invalid credentials — check your email, username, or phone and password");
     if (user.status !== "active") throw new ApiError(403, "This account is suspended");
@@ -59,19 +59,19 @@ export async function POST(req: NextRequest) {
 
     // transparent upgrade: legacy bcrypt hashes become scrypt on login
     if (needsRehash(user.passwordHash)) {
-      db.update(tables.users)
+      await db.update(tables.users)
         .set({ passwordHash: hashPassword(password) })
         .where(eq(tables.users.id, user.id))
         .run();
     }
 
-    const { token, expiresAt } = createSession(user.id);
+    const { token, expiresAt } = await createSession(user.id);
     rememberDemoSession(token); // dev sticky marker (no-op unless enabled)
     const cookieless = process.env.MAVYN_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
     // security notification: every new sign-in is visible to the account
-    notify({
+    await notify({
       userId: user.id,
       type: "campus", // reuse a neutral channel icon-wise
       category: "activity",
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       href: "/settings",
     });
 
-    const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
+    const profile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get())!;
     // sessionToken lets the client fall back to Bearer transport if the
     // browser refuses the cookie (embedded previews) — same session row
     return {

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q") || "";
   const code = req.nextUrl.searchParams.get("code") || "";
-  return guarded(() => {
+  return guarded(async () => {
     if (code) {
       const c = getCountry(code.slice(0, 2));
       return { items: c ? [c] : [] };

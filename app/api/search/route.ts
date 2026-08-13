@@ -39,8 +39,8 @@ function personRank(q: string, handle: string, name: string): number {
 }
 
 export async function GET(req: NextRequest) {
-  return guarded(() => {
-    const viewer = getSessionUser(); // guests can search public data too
+  return guarded(async () => {
+    const viewer = await getSessionUser(); // guests can search public data too
     const q = norm(String(req.nextUrl.searchParams.get("q") ?? "").trim()).slice(0, 80);
     const full = req.nextUrl.searchParams.get("full") === "1";
     const perSection = full ? 20 : 5;
@@ -50,18 +50,18 @@ export async function GET(req: NextRequest) {
     /* ---------------- blocks: invisible in BOTH directions ---------------- */
     const blockedPair = new Set<string>();
     if (viewer) {
-      for (const b of db.select().from(tables.blocks).all()) {
+      for (const b of await db.select().from(tables.blocks).all()) {
         if (b.blockerId === viewer.id) blockedPair.add(b.blockedId);
         if (b.blockedId === viewer.id) blockedPair.add(b.blockerId);
       }
     }
 
     /* ------------------------------ PEOPLE ------------------------------ */
-    const userRows = db
+    const userRows = (await db
       .select({ user: tables.users, profile: tables.profiles })
       .from(tables.users)
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-      .all()
+      .all())
       .filter(
         (r) =>
           r.user.status === "active" && // suspended never appear
@@ -71,8 +71,8 @@ export async function GET(req: NextRequest) {
 
     const verifiedCampus = new Map<string, string>(); // userId -> campus name (opt-in only)
     {
-      const campuses = new Map(db.select().from(tables.campuses).all().map((c) => [c.id, c.name]));
-      for (const v of db.select().from(tables.campusVerifications).all())
+      const campuses = new Map((await db.select().from(tables.campuses).all()).map((c) => [c.id, c.name]));
+      for (const v of await db.select().from(tables.campusVerifications).all())
         if (v.status === "verified" && v.showSchool) verifiedCampus.set(v.userId, campuses.get(v.campusId) ?? "");
     }
 
@@ -100,20 +100,20 @@ export async function GET(req: NextRequest) {
       });
 
     /* --------------------------- OPPORTUNITIES --------------------------- */
-    const opportunities = db
+    const opportunities = (await db
       .select()
       .from(tables.opportunities)
-      .all()
+      .all())
       .filter((o) => o.status === "open" && (norm(o.title).includes(q) || norm(o.description).includes(q)))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, perSection)
       .map((o) => ({ id: o.id, title: o.title, type: o.type, location: o.remote ? "Remote" : o.location, budget: o.budget }));
 
     /* ------------------------------ SERVICES ------------------------------ */
-    const services = db
+    const services = await Promise.all((await db
       .select()
       .from(tables.services)
-      .all()
+      .all())
       .filter(
         (s) =>
           s.active &&
@@ -122,31 +122,31 @@ export async function GET(req: NextRequest) {
           (norm(s.title).includes(q) || norm(s.description).includes(q) || norm(s.category).includes(q))
       )
       .slice(0, perSection)
-      .map((s) => {
-        const owner = db.select().from(tables.profiles).where(eq(tables.profiles.userId, s.ownerId)).get();
+      .map(async (s) => {
+        const owner = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, s.ownerId)).get();
         return { id: s.id, title: s.title, price: s.price, category: s.category, owner: owner?.displayName ?? "" };
-      });
+      }));
 
     /* ----------------------------- COMMUNITIES ----------------------------- */
-    const communities = db
+    const communities = (await db
       .select()
       .from(tables.communities)
-      .all()
+      .all())
       .filter((c) => norm(c.name).includes(q) || norm(c.description).includes(q))
       .slice(0, perSection)
       .map((c) => ({ id: c.id, slug: c.slug, name: c.name, description: c.description.slice(0, 90) }));
 
     /* -------------------------------- POSTS -------------------------------- */
-    const posts = db
+    const posts = (await Promise.all((await db
       .select()
       .from(tables.posts)
-      .all()
+      .all())
       .filter((p) => !blockedPair.has(p.authorId) && norm(p.body).includes(q))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, perSection)
-      .map((p) => {
-        const author = db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.authorId)).get();
-        const authorUser = db.select().from(tables.users).where(eq(tables.users.id, p.authorId)).get();
+      .map(async (p) => {
+        const author = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.authorId)).get();
+        const authorUser = await db.select().from(tables.users).where(eq(tables.users.id, p.authorId)).get();
         return {
           id: p.id,
           body: p.body.slice(0, 140),
@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
           authorHandle: authorUser?.handle ?? "",
           at: p.createdAt.toISOString(),
         };
-      })
+      })))
       .filter((p) => p.authorHandle); // drop orphans
 
     return { q, people, opportunities, services, communities, posts };

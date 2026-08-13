@@ -6,11 +6,11 @@ import { getScenario, scenarioProgress, buildContext, type QaApi } from "@/lib/s
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function scenarioState(id: string) {
+async function scenarioState(id: string) {
   const scenario = getScenario(id);
   if (!scenario) throw new ApiError(404, "Unknown scenario");
-  const runs = readRuns();
-  const prog = scenarioProgress(scenario, runs);
+  const runs = await readRuns();
+  const prog = await scenarioProgress(scenario, runs);
   return {
     id: scenario.id,
     title: scenario.title,
@@ -28,10 +28,10 @@ function scenarioState(id: string) {
 
 /** GET — live checkpoint evaluation straight from the real database. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    requireQaOperator();
-    ensureQaPersonas();
+    await requireQaOperator();
+    await ensureQaPersonas();
     return scenarioState(params.id);
   });
 }
@@ -50,10 +50,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json().catch(() => ({}));
   const origin = req.nextUrl.origin;
 
-  const gate = await guarded(() => {
+  const gate = await guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    requireQaOperator();
-    ensureQaPersonas();
+    await requireQaOperator();
+    await ensureQaPersonas();
     return { ok: true };
   });
   if (gate.status !== 200) return gate;
@@ -63,8 +63,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const action = String(body.action);
 
   if (action === "start" || action === "reset") {
-    const removed = resetQaData();
-    const runs = readRuns();
+    const removed = await resetQaData();
+    const runs = await readRuns();
     // STRICT PROGRESSION RULES:
     // · Resetting/starting THIS scenario always begins at Task 1 — its
     //   run entry (cursor, passed snapshots, completion) is replaced
@@ -75,8 +75,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     //   verified). Resetting the booking scenario cannot reset the
     //   project scenario, and vice versa.
     runs[scenario.id] = { startedAt: new Date().toISOString() };
-    writeRuns(runs);
-    return Response.json({ ...scenarioState(scenario.id), resetRecords: removed });
+    await writeRuns(runs);
+    return Response.json({ ...(await scenarioState(scenario.id)), resetRecords: removed });
   }
 
   if (action === "repair") {
@@ -86,22 +86,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // rewinds ONLY the QA records to the task's exact starting state.
     // It never marks anything passed: verification still comes solely
     // from real records created after the task is active.
-    const runs = readRuns();
+    const runs = await readRuns();
     const run = runs[scenario.id];
     if (!run) return Response.json({ error: "Start the scenario first" }, { status: 409 });
-    const prog = scenarioProgress(scenario, runs);
+    const prog = await scenarioProgress(scenario, runs);
     if (prog.completed || prog.current == null) return Response.json({ error: "Nothing to repair — the scenario is complete" }, { status: 409 });
     const step = scenario.steps[prog.current];
-    const ctx = buildContext(new Date(run.startedAt), new Date(runs[scenario.id]?.activated?.[step.id] ?? run.startedAt));
-    const readiness = step.ready?.(ctx);
-    if (!readiness || readiness.ok) return Response.json({ ...scenarioState(scenario.id), repaired: "state already correct" });
+    const ctx = await buildContext(new Date(run.startedAt), new Date(runs[scenario.id]?.activated?.[step.id] ?? run.startedAt));
+    const readiness = await step.ready?.(ctx);
+    if (!readiness || readiness.ok) return Response.json({ ...(await scenarioState(scenario.id)), repaired: "state already correct" });
     if (!step.repair) return Response.json({ error: `No automatic repair for this task — reset the scenario to start over. (${readiness.why})` }, { status: 409 });
-    const did = step.repair(ctx);
-    return Response.json({ ...scenarioState(scenario.id), repaired: did });
+    const did = await step.repair(ctx);
+    return Response.json({ ...(await scenarioState(scenario.id)), repaired: did });
   }
 
   if (action === "auto") {
-    const runs = readRuns();
+    const runs = await readRuns();
     if (!runs[scenario.id]) return Response.json({ error: "Start the scenario first" }, { status: 409 });
     const step = scenario.steps.find((s) => s.id === String(body.step));
     if (!step) return Response.json({ error: "Unknown step" }, { status: 404 });
@@ -111,13 +111,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // SEQUENTIAL UNLOCK — even automation cannot skip ahead. Only the
     // one current task may be performed; locked tasks stay locked until
     // every earlier task has actually passed.
-    const prog = scenarioProgress(scenario, runs);
+    const prog = await scenarioProgress(scenario, runs);
     const idx = scenario.steps.findIndex((s) => s.id === step.id);
     const state = prog.steps[idx]?.status;
-    if (state === "done") return Response.json(scenarioState(scenario.id)); // already verified — idempotent
+    if (state === "done") return Response.json(await scenarioState(scenario.id)); // already verified — idempotent
     if (state === "locked")
       return Response.json(
-        { error: `Test ${idx + 1} is locked — test ${(prog.current ?? 0) + 1} must pass first. Tasks unlock strictly in order.` },
+        { error: `Test ${idx + 1} is locked — test ${((await prog).current ?? 0) + 1} must pass first. Tasks unlock strictly in order.` },
         { status: 409 }
       );
 
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return { status: res.status, data };
     };
 
-    const ctx = buildContext(new Date(runs[scenario.id].startedAt));
+    const ctx = await buildContext(new Date(runs[scenario.id].startedAt));
     try {
       await step.perform(ctx, api);
     } catch (e) {
@@ -153,12 +153,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       // benign sub-call failures happen (e.g. re-running an idempotent
       // PATCH) — only surface them when the checkpoint ALSO failed to
       // verify, i.e. when the failure is the actual reason it's stuck
-      const after = scenarioProgress(scenario, readRuns());
+      const after = await scenarioProgress(scenario, await readRuns());
       const nowState = after.steps[idx]?.status;
       if (nowState !== "done")
-        return Response.json({ error: `The step's real API call failed: ${performFailures.join("; ")}`, ...(scenarioState(scenario.id) as object) }, { status: 502 });
+        return Response.json({ error: `The step's real API call failed: ${performFailures.join("; ")}`, ...((await scenarioState(scenario.id)) as object) }, { status: 502 });
     }
-    return Response.json(scenarioState(scenario.id));
+    return Response.json(await scenarioState(scenario.id));
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

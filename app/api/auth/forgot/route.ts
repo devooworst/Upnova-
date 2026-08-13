@@ -16,16 +16,16 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
+  return guarded(async () => {
     const email = String(body.email || "").trim().toLowerCase();
     const rl = rateLimit(`forgot:${email}`, 3, 15 * 60_000);
     if (!rl.ok) throw new ApiError(429, "Too many reset requests — try again later");
 
-    const user = db.select().from(tables.users).where(eq(tables.users.email, email)).get();
+    const user = await db.select().from(tables.users).where(eq(tables.users.email, email)).get();
     if (!user) return { ok: true }; // same response either way
 
     const token = randomBytes(32).toString("hex");
-    db.insert(tables.passwordResets)
+    await db.insert(tables.passwordResets)
       .values({
         id: randomBytes(12).toString("hex"),
         token,

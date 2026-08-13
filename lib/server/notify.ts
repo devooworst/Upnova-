@@ -78,17 +78,19 @@ const PREF_BY_TYPE: Record<string, PrefCategory> = {
 /** Demo delivery: writes to the inspectable outbox table. Production
     swaps this writer for a real provider (Twilio/SES) — same call site.
     Anti-spam: hard cap per user/channel/hour; security is exempt. */
-export function deliver(userId: string, channel: "sms" | "email", to: string, body: string, kind: string) {
+export async function deliver(userId: string, channel: "sms" | "email", to: string, body: string, kind: string) {
   if (kind !== "security" && kind !== "otp") {
     const hourAgo = new Date(Date.now() - 3600_000);
-    const recent = db
-      .select()
-      .from(tables.outbox)
-      .where(and(eq(tables.outbox.userId, userId), eq(tables.outbox.channel, channel), gt(tables.outbox.createdAt, hourAgo)))
-      .all().length;
+    const recent = (
+        await db
+        .select()
+        .from(tables.outbox)
+        .where(and(eq(tables.outbox.userId, userId), eq(tables.outbox.channel, channel), gt(tables.outbox.createdAt, hourAgo)))
+          .all()
+      ).length;
     if (recent >= (channel === "sms" ? 8 : 20)) return; // grouped/limited, never spam
   }
-  db.insert(tables.outbox)
+  await db.insert(tables.outbox)
     .values({ id: randomBytes(12).toString("hex"), userId, channel, to, body: body.slice(0, 320), kind })
     .run();
 }
@@ -136,18 +138,18 @@ const PRIORITY_BY_TYPE: Record<string, NotifyInput["priority"]> = {
   like: "low",
 };
 
-export function notify(input: NotifyInput) {
+export async function notify(input: NotifyInput) {
   // never notify yourself
   if (input.actorId && input.actorId === input.userId) return;
 
   const prefCat = PREF_BY_TYPE[input.type];
-  const recipient = db.select().from(tables.users).where(eq(tables.users.id, input.userId)).get();
+  const recipient = await db.select().from(tables.users).where(eq(tables.users.id, input.userId)).get();
   const prefs = parsePrefs(recipient?.notifyPrefs);
 
   // respect the in-app toggle (security can never be silenced in-app)
   if (prefCat && prefCat !== "security" && !prefs[prefCat].inapp) return;
 
-  db.insert(tables.notifications)
+  await db.insert(tables.notifications)
     .values({
       id: randomBytes(12).toString("hex"),
       userId: input.userId,
@@ -167,7 +169,7 @@ export function notify(input: NotifyInput) {
      line for non-essential messages. */
   if (!prefCat || !recipient) return;
   if (prefs[prefCat].email && recipient.email) {
-    deliver(
+    await deliver(
       input.userId,
       "email",
       recipient.email,
@@ -178,6 +180,6 @@ export function notify(input: NotifyInput) {
   const smsAllowed = recipient.phone && recipient.phoneVerified && recipient.smsConsent && prefs[prefCat].sms;
   if (smsAllowed) {
     const manage = prefCat === "security" ? "" : " Manage alerts in Mavyn Settings.";
-    deliver(input.userId, "sms", recipient.phone!, `Mavyn: ${input.title}. Open Mavyn to review.${manage}`, prefCat);
+    await deliver(input.userId, "sms", recipient.phone!, `Mavyn: ${input.title}. Open Mavyn to review.${manage}`, prefCat);
   }
 }

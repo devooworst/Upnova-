@@ -51,20 +51,20 @@ export interface DayAvailability {
   note?: string;
 }
 
-export function serviceAvailability(serviceId: string, viewerId: string | null, daysAhead = 60): { days: DayAvailability[] } | null {
-  const svc = db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
+export async function serviceAvailability(serviceId: string, viewerId: string | null, daysAhead = 60): Promise<{ days: DayAvailability[] } | null > {
+  const svc = await db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
   if (!svc || !svc.active || svc.visibility === "draft") return null;
-  const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, svc.ownerId)).get();
+  const profile = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, svc.ownerId)).get();
   const cfg = parseConfig(svc.config);
   const sched = cfg.scheduling;
   const n = Math.min(90, Math.max(7, daysAhead));
 
   const acceptsAtAll = !!profile?.hiringEnabled && !!profile?.acceptBookings && !svc.paused;
-  const isPreferred = viewerId ? hasEarlyAccess(svc.ownerId, viewerId) : false;
+  const isPreferred = viewerId ? await hasEarlyAccess(svc.ownerId, viewerId) : false;
 
   // capacity (service-wide slot cap)
   const ea = readEarlyAccess(svc.config);
-  const slotsFull = ea?.slots != null && activeBookingsForService(svc.id) >= ea.slots;
+  const slotsFull = ea?.slots != null && await activeBookingsForService(svc.id) >= ea.slots;
 
   // rolling-mode preferred window (the "drop")
   const windowOpen = !!svc.preferredUntil && svc.preferredUntil.getTime() > Date.now();
@@ -80,7 +80,7 @@ export function serviceAvailability(serviceId: string, viewerId: string | null, 
 
   // per-day booking load (slot-holding only)
   const dayLoad = new Map<string, number>();
-  for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.providerId, svc.ownerId)).all()) {
+  for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.providerId, svc.ownerId)).all()) {
     if (!(SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status)) continue;
     const key = b.startsAt.toISOString().slice(0, 10);
     dayLoad.set(key, (dayLoad.get(key) ?? 0) + 1);
@@ -195,8 +195,8 @@ export interface DaySlots {
   slots: TimeSlot[];
 }
 
-export function serviceDaySlots(serviceId: string, viewerId: string | null, dateStr: string): DaySlots | null {
-  const svc = db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
+export async function serviceDaySlots(serviceId: string, viewerId: string | null, dateStr: string): Promise<DaySlots | null> {
+  const svc = await db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
   if (!svc || !svc.active || svc.visibility === "draft") return null;
   const cfg = parseConfig(svc.config);
   const sched = cfg.scheduling;
@@ -207,7 +207,7 @@ export function serviceDaySlots(serviceId: string, viewerId: string | null, date
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const idx = Math.round((target.getTime() - today.getTime()) / 86400_000);
-  const cal = serviceAvailability(serviceId, viewerId, Math.min(90, Math.max(7, idx + 1)));
+  const cal = await serviceAvailability(serviceId, viewerId, Math.min(90, Math.max(7, idx + 1)));
   const day = cal?.days.find((d) => d.date === dateStr) ?? (idx < 0 ? { date: dateStr, status: "booking_closed" as DayStatus, note: "This date is in the past." } : undefined);
   if (!day) return { date: dateStr, dayStatus: "not_released", reason: "This date is beyond the visible calendar.", slots: [] };
 
@@ -219,11 +219,11 @@ export function serviceDaySlots(serviceId: string, viewerId: string | null, date
   const durationMin = sched.durationMin || 60;
   const bufferMs = (sched.bufferMin ?? 0) * 60_000;
   const noticeMs = (sched.advanceNoticeHours ?? 0) * 3600_000;
-  const taken = db
+  const taken = (await db
     .select()
     .from(tables.bookings)
     .where(eq(tables.bookings.providerId, svc.ownerId))
-    .all()
+    .all())
     .filter((b) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(b.status));
 
   const sameDayBlocked = sched.sameDayBooking === false && dateStr === new Date().toISOString().slice(0, 10);

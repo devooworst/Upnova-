@@ -51,14 +51,14 @@ type Target =
 const fmtDate = (d: Date) =>
   `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 
-function loadTarget(kind: "project" | "booking", id: string, userId: string): Target {
+async function loadTarget(kind: "project" | "booking", id: string, userId: string): Promise<Target> {
   if (kind === "project") {
-    const row = db.select().from(tables.projects).where(eq(tables.projects.id, id)).get();
+    const row = await db.select().from(tables.projects).where(eq(tables.projects.id, id)).get();
     if (!row) throw new ApiError(404, "Project not found");
     if (row.clientId !== userId && row.creatorId !== userId) throw new ApiError(403, "Not a party to this project");
     return { kind, row };
   }
-  const row = db.select().from(tables.bookings).where(eq(tables.bookings.id, id)).get();
+  const row = await db.select().from(tables.bookings).where(eq(tables.bookings.id, id)).get();
   if (!row) throw new ApiError(404, "Booking not found");
   if (row.clientId !== userId && row.providerId !== userId) throw new ApiError(403, "Not your booking");
   return { kind, row };
@@ -70,18 +70,18 @@ const titleOf = (t: Target) => t.row.title;
 const convOf = (t: Target) => t.row.conversationId;
 const hrefOf = (t: Target) => (t.kind === "project" ? `/projects/${t.row.id}` : `/activity?focus=booking:${t.row.id}`);
 
-function displayName(userId: string): string {
-  const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
+async function displayName(userId: string): Promise<string> {
+  const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
   return p?.displayName ?? "Someone";
 }
 
-function systemMessage(t: Target, senderId: string, body: string) {
+async function systemMessage(t: Target, senderId: string, body: string) {
   const conversationId = convOf(t);
   if (!conversationId) return;
-  db.insert(tables.messages)
+  await db.insert(tables.messages)
     .values({ id: randomBytes(12).toString("hex"), conversationId, senderId, body, kind: "system" })
     .run();
-  db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, conversationId)).run();
+  await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, conversationId)).run();
 }
 
 function whereTarget(t: Target) {
@@ -90,15 +90,15 @@ function whereTarget(t: Target) {
     : eq(tables.progressUpdates.bookingId, t.row.id);
 }
 
-function listRows(t: Target) {
-  return db.select().from(tables.progressUpdates).where(whereTarget(t)).orderBy(asc(tables.progressUpdates.createdAt)).all();
+async function listRows(t: Target) {
+  return await db.select().from(tables.progressUpdates).where(whereTarget(t)).orderBy(asc(tables.progressUpdates.createdAt)).all();
 }
 
 /** Latest known estimated completion: the most recent row carrying an
     ETA, falling back to the project deadline (bookings fall back to
     their scheduled end). */
-export function currentEta(t: Target): Date | null {
-  const rows = listRows(t);
+export async function currentEta(t: Target): Promise<Date | null> {
+  const rows = await listRows(t);
   for (let i = rows.length - 1; i >= 0; i--) if (rows[i].etaAt) return rows[i].etaAt!;
   if (t.kind === "project") return t.row.deadline ?? null;
   return new Date(t.row.startsAt.getTime() + t.row.durationMin * 60_000);
@@ -109,13 +109,13 @@ export function currentEta(t: Target): Date | null {
 const PROJECT_UPDATE_STATES = ["in_progress", "extension_requested", "submitted", "approved"];
 const BOOKING_UPDATE_STATUSES = ["accepted", "confirmed"];
 
-export function postProgressUpdate(
+export async function postProgressUpdate(
   kind: "project" | "booking",
   id: string,
   userId: string,
   input: { status?: string; percent?: number | null; message?: string; etaAt?: string | null; attachmentUrl?: string }
 ) {
-  const t = loadTarget(kind, id, userId);
+  const t = await loadTarget(kind, id, userId);
   if (workerOf(t) !== userId)
     throw new ApiError(403, kind === "project" ? "Only the creator posts progress updates" : "Only the provider posts progress updates");
   if (kind === "project" && !PROJECT_UPDATE_STATES.includes((t.row as typeof tables.projects.$inferSelect).state))
@@ -136,7 +136,7 @@ export function postProgressUpdate(
   const attachmentUrl = String(input.attachmentUrl ?? "").trim().slice(0, 400);
 
   const rowId = randomBytes(12).toString("hex");
-  db.insert(tables.progressUpdates)
+  await db.insert(tables.progressUpdates)
     .values({
       id: rowId,
       projectId: kind === "project" ? t.row.id : null,
@@ -154,19 +154,19 @@ export function postProgressUpdate(
   // keep the booking's lightweight stage chip in sync with the real update
   if (kind === "booking") {
     const chip = status === "preparing" || status === "not_started" ? "preparing" : "in_progress";
-    db.update(tables.bookings).set({ progress: chip }).where(eq(tables.bookings.id, t.row.id)).run();
+    (await db.update(tables.bookings).set({ progress: chip }).where(eq(tables.bookings.id, t.row.id)).run());
   }
   if (kind === "project")
-    db.update(tables.projects).set({ updatedAt: new Date() }).where(eq(tables.projects.id, t.row.id)).run();
+    (await db.update(tables.projects).set({ updatedAt: new Date() }).where(eq(tables.projects.id, t.row.id)).run());
 
-  const actor = displayName(userId);
+  const actor = await displayName(userId);
   const bits = [
     percent != null ? `${percent}%` : null,
     PROGRESS_STATUS_LABEL[status],
     etaAt ? `est. completion ${fmtDate(etaAt)}` : null,
   ].filter(Boolean);
-  systemMessage(t, userId, `Progress update — ${bits.join(" · ")}.${message ? ` "${message}"` : ""}`);
-  notify({
+  await systemMessage(t, userId, `Progress update — ${bits.join(" · ")}.${message ? ` "${message}"` : ""}`);
+  await notify({
     userId: clientOf(t),
     actorId: userId,
     type: "progress_update",
@@ -175,26 +175,26 @@ export function postProgressUpdate(
     href: hrefOf(t),
   });
 
-  return db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.id, rowId)).get()!;
+  return (await db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.id, rowId)).get())!;
 }
 
 /* -------------------------------- update ETA -------------------------------- */
 
-export function postEtaChange(
+export async function postEtaChange(
   kind: "project" | "booking",
   id: string,
   userId: string,
   input: { etaAt: string; reason?: string }
 ) {
-  const t = loadTarget(kind, id, userId);
+  const t = await loadTarget(kind, id, userId);
   if (workerOf(t) !== userId) throw new ApiError(403, "Only the person doing the work updates the estimate");
   const etaAt = new Date(input.etaAt);
   if (isNaN(etaAt.getTime())) throw new ApiError(400, "Pick a valid estimated completion date");
-  const prev = currentEta(t);
+  const prev = await currentEta(t);
   const reason = String(input.reason ?? "").trim().slice(0, 400);
 
   const rowId = randomBytes(12).toString("hex");
-  db.insert(tables.progressUpdates)
+  await db.insert(tables.progressUpdates)
     .values({
       id: rowId,
       projectId: kind === "project" ? t.row.id : null,
@@ -207,13 +207,13 @@ export function postEtaChange(
     })
     .run();
 
-  const actor = displayName(userId);
-  systemMessage(
+  const actor = await displayName(userId);
+  await systemMessage(
     t,
     userId,
     `${actor} updated the estimated completion date${prev ? ` — ${fmtDate(prev)} → ${fmtDate(etaAt)}` : ` to ${fmtDate(etaAt)}`}.${reason ? ` "${reason}"` : ""}`
   );
-  notify({
+  await notify({
     userId: clientOf(t),
     actorId: userId,
     type: "eta_changed",
@@ -222,17 +222,17 @@ export function postEtaChange(
     href: hrefOf(t),
   });
 
-  return db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.id, rowId)).get()!;
+  return (await db.select().from(tables.progressUpdates).where(eq(tables.progressUpdates.id, rowId)).get())!;
 }
 
 /* ------------------------------- summaries ------------------------------- */
 
-export function progressPayload(kind: "project" | "booking", id: string, userId: string) {
-  const t = loadTarget(kind, id, userId);
-  const rows = listRows(t);
+export async function progressPayload(kind: "project" | "booking", id: string, userId: string) {
+  const t = await loadTarget(kind, id, userId);
+  const rows = await listRows(t);
   const updates = rows.filter((r) => r.kind === "update");
   const latest = updates.length ? updates[updates.length - 1] : null;
-  const eta = currentEta(t);
+  const eta = await currentEta(t);
   return {
     latest: latest
       ? {
@@ -267,13 +267,13 @@ export function progressPayload(kind: "project" | "booking", id: string, userId:
 
 export type TimelineEvent = { at: string; label: string; detail?: string; tone: "zinc" | "lime" | "amber" | "violet" };
 
-export function projectTimeline(projectId: string, viewerId: string): TimelineEvent[] {
-  const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+export async function projectTimeline(projectId: string, viewerId: string): Promise<TimelineEvent[]> {
+  const p = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!p) return [];
-  const name = (uid: string) => (uid === viewerId ? "You" : displayName(uid));
+  const name = async (uid: string) => (uid === viewerId ? "You" : displayName(uid));
   const events: TimelineEvent[] = [{ at: p.createdAt.toISOString(), label: "Project created", tone: "zinc" }];
 
-  for (const pay of db.select().from(tables.payments).where(eq(tables.payments.projectId, projectId)).all()) {
+  for (const pay of await db.select().from(tables.payments).where(eq(tables.payments.projectId, projectId)).all()) {
     events.push({
       at: pay.createdAt.toISOString(),
       label: `Payment secured — $${(pay.amountCents / 100).toFixed(2)} (TEST)`,
@@ -285,7 +285,7 @@ export function projectTimeline(projectId: string, viewerId: string): TimelineEv
       events.push({ at: p.updatedAt.toISOString(), label: `Payment refunded — $${(pay.amountCents / 100).toFixed(2)} (TEST)`, tone: "zinc" });
   }
 
-  for (const r of db
+  for (const r of await db
     .select()
     .from(tables.progressUpdates)
     .where(eq(tables.progressUpdates.projectId, projectId))
@@ -294,7 +294,7 @@ export function projectTimeline(projectId: string, viewerId: string): TimelineEv
     if (r.kind === "eta") {
       events.push({
         at: r.createdAt.toISOString(),
-        label: `${name(r.authorId)} updated the estimated completion${r.prevEtaAt ? ` — ${fmtDate(r.prevEtaAt)} → ${fmtDate(r.etaAt!)}` : r.etaAt ? ` to ${fmtDate(r.etaAt)}` : ""}`,
+        label: `${await name(r.authorId)} updated the estimated completion${r.prevEtaAt ? ` — ${fmtDate(r.prevEtaAt)} → ${fmtDate(r.etaAt!)}` : r.etaAt ? ` to ${fmtDate(r.etaAt)}` : ""}`,
         detail: r.message || undefined,
         tone: "amber",
       });
@@ -308,10 +308,10 @@ export function projectTimeline(projectId: string, viewerId: string): TimelineEv
     }
   }
 
-  for (const e of db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, projectId)).all()) {
+  for (const e of await db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.projectId, projectId)).all()) {
     events.push({
       at: e.createdAt.toISOString(),
-      label: `${name(e.requestedById)} requested a ${e.days}-day extension`,
+      label: `${await name(e.requestedById)} requested a ${e.days}-day extension`,
       detail: e.reason || undefined,
       tone: "amber",
     });
@@ -323,8 +323,8 @@ export function projectTimeline(projectId: string, viewerId: string): TimelineEv
       });
   }
 
-  for (const r of db.select().from(tables.reviews).where(and(eq(tables.reviews.projectId, projectId))).all())
-    events.push({ at: r.createdAt.toISOString(), label: `${name(r.authorId)} left a ${r.rating.toFixed(1)}-star review`, detail: r.body || undefined, tone: "violet" });
+  for (const r of await db.select().from(tables.reviews).where(and(eq(tables.reviews.projectId, projectId))).all())
+    events.push({ at: r.createdAt.toISOString(), label: `${await name(r.authorId)} left a ${r.rating.toFixed(1)}-star review`, detail: r.body || undefined, tone: "violet" });
 
   events.sort((a, b) => a.at.localeCompare(b.at));
   return events;

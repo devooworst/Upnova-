@@ -12,19 +12,19 @@ export const dynamic = "force-dynamic";
  *  correlate "who's in here" with masked posts, so membership stays a
  *  moderation surface (regular members see counts, not names). */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const c = findCommunity(params.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const me = requireActiveMember(c.id, user.id);
+    const me = await requireActiveMember(c!.id, user.id);
     if (!isMod(me)) throw new ApiError(403, "Member management is a moderator tool");
 
-    const rows = db
+    const rows = await db
       .select({ m: tables.communityMembers, u: tables.users, p: tables.profiles })
       .from(tables.communityMembers)
       .innerJoin(tables.users, eq(tables.communityMembers.userId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-      .where(eq(tables.communityMembers.communityId, c.id))
+      .where(eq(tables.communityMembers.communityId, c!.id))
       .all();
 
     return {
@@ -50,78 +50,78 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
  *  append-only mod log. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
-    const c = findCommunity(params.id);
+    const user = await requireUser();
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const me = requireActiveMember(c.id, user.id);
+    const me = await requireActiveMember(c!.id, user.id);
     if (!isMod(me)) throw new ApiError(403, "Moderator tools need a moderator role");
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || "");
     const targetId = String(body.userId || "");
-    const target = getMembership(c.id, targetId);
+    const target = getMembership(c!.id, targetId);
     if (!target) throw new ApiError(404, "That user isn't part of this community");
     if (targetId === user.id) throw new ApiError(400, "You can't moderate yourself");
-    if (target.role === "owner") throw new ApiError(403, "The owner can't be moderated");
-    if (target.role === "moderator" && me.role !== "owner")
+    if ((await target)!.role === "owner") throw new ApiError(403, "The owner can't be moderated");
+    if ((await target)!.role === "moderator" && me.role !== "owner")
       throw new ApiError(403, "Only the owner can moderate moderators");
 
-    const where = and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.userId, targetId));
-    const set = (patch: Record<string, unknown>) => db.update(tables.communityMembers).set(patch).where(where).run();
+    const where = and(eq(tables.communityMembers.communityId, c!.id), eq(tables.communityMembers.userId, targetId));
+    const set = async (patch: Record<string, unknown>) => await db.update(tables.communityMembers).set(patch).where(where).run();
 
     switch (action) {
       case "approve": {
-        if (target.status !== "pending") throw new ApiError(409, "No pending request from that user");
-        if (c.price > 0) {
+        if ((await target)!.status !== "pending") throw new ApiError(409, "No pending request from that user");
+        if (c!.price > 0) {
           // paid + approval: approval unlocks the PAYMENT step — membership
           // activates when they complete it
-          set({ status: "approved_unpaid" });
-          notify({ userId: targetId, actorId: user.id, type: "community", title: `Approved — ${c.name}`, body: `Complete your $${c.price} ${c.billingPeriod} membership to join.`, href: `/communities/${c.slug}` });
+          await set({ status: "approved_unpaid" });
+          await notify({ userId: targetId, actorId: user.id, type: "community", title: `Approved — ${c!.name}`, body: `Complete your $${c!.price} ${c!.billingPeriod} membership to join.`, href: `/communities/${c!.slug}` });
         } else {
-          if (c.capacity != null && activeMemberCount(c.id) >= c.capacity) throw new ApiError(409, "The community is at capacity — raise it or free a spot first");
-          set({ status: "active", joinedAt: new Date() });
-          notify({ userId: targetId, actorId: user.id, type: "community", title: `Welcome to ${c.name}`, body: "Your join request was approved", href: `/communities/${c.slug}` });
+          if (c!.capacity != null && await activeMemberCount(c!.id) >= c!.capacity) throw new ApiError(409, "The community is at capacity — raise it or free a spot first");
+          await set({ status: "active", joinedAt: new Date() });
+          await notify({ userId: targetId, actorId: user.id, type: "community", title: `Welcome to ${c!.name}`, body: "Your join request was approved", href: `/communities/${c!.slug}` });
         }
         break;
       }
       case "decline": {
-        if (target.status !== "pending") throw new ApiError(409, "No pending request from that user");
-        db.delete(tables.communityMembers).where(where).run();
+        if ((await target)!.status !== "pending") throw new ApiError(409, "No pending request from that user");
+        await db.delete(tables.communityMembers).where(where).run();
         break;
       }
       case "remove": {
-        db.delete(tables.communityMembers).where(where).run();
+        await db.delete(tables.communityMembers).where(where).run();
         break;
       }
       case "ban": {
-        set({ status: "banned" });
+        await set({ status: "banned" });
         break;
       }
       case "mute": {
         const days = Math.min(30, Math.max(1, Number(body.days) || 1));
-        set({ mutedUntil: new Date(Date.now() + days * 86_400_000) });
+        await set({ mutedUntil: new Date(Date.now() + days * 86_400_000) });
         break;
       }
       case "unmute": {
-        set({ mutedUntil: null });
+        await set({ mutedUntil: null });
         break;
       }
       case "promote": {
         if (me.role !== "owner") throw new ApiError(403, "Only the owner appoints moderators");
-        set({ role: "moderator" });
-        notify({ userId: targetId, actorId: user.id, type: "community", title: `${c.name}`, body: "You're now a moderator", href: `/communities/${c.slug}` });
+        await set({ role: "moderator" });
+        await notify({ userId: targetId, actorId: user.id, type: "community", title: `${c!.name}`, body: "You're now a moderator", href: `/communities/${c!.slug}` });
         break;
       }
       case "demote": {
         if (me.role !== "owner") throw new ApiError(403, "Only the owner appoints moderators");
-        set({ role: "member" });
+        await set({ role: "member" });
         break;
       }
       default:
         throw new ApiError(400, "Unknown action");
     }
 
-    logMod({ communityId: c.id, actorId: user.id, action: action === "mute" ? `mute_${body.days || 1}d` : action, targetType: "member", targetId, note: String(body.note || "") });
+    await logMod({ communityId: c!.id, actorId: user.id, action: action === "mute" ? `mute_${body.days || 1}d` : action, targetType: "member", targetId, note: String(body.note || "") });
     return { ok: true };
   });
 }

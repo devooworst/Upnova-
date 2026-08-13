@@ -26,7 +26,7 @@ export const REF_META: Record<RefType, { label: string; cta: string; href: (id: 
   campus: { label: "Campus Market", cta: "View Listing", href: (id) => `/campus/market/${id}` },
 };
 
-export function createLinkedPost(input: {
+export async function createLinkedPost(input: {
   userId: string;
   refType: RefType;
   refId: string;
@@ -35,7 +35,7 @@ export function createLinkedPost(input: {
   imageUrl?: string | null;
 }) {
   const id = randomBytes(12).toString("hex");
-  db.insert(tables.posts)
+  await db.insert(tables.posts)
     .values({
       id,
       authorId: input.userId,

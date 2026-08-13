@@ -42,13 +42,13 @@ export const NEARBY_MILES = 50;
 
 type Stream = typeof tables.liveStreams.$inferSelect;
 
-export function getStream(id: string): Stream {
-  const s = db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, id)).get();
+export async function getStream(id: string): Promise<Stream> {
+  const s = await db.select().from(tables.liveStreams).where(eq(tables.liveStreams.id, id)).get();
   if (!s) throw new ApiError(404, "That live stream doesn't exist");
   return s;
 }
 
-export function activeStreamOf(hostId: string): Stream | undefined {
+export async function activeStreamOf(hostId: string): Promise<Stream | undefined> {
   return db
     .select()
     .from(tables.liveStreams)
@@ -56,20 +56,20 @@ export function activeStreamOf(hostId: string): Stream | undefined {
     .get();
 }
 
-export function isFollowing(followerId: string, followingId: string): boolean {
-  return !!db
+export async function isFollowing(followerId: string, followingId: string): Promise<boolean> {
+  return !!(await db
     .select()
     .from(tables.follows)
     .where(and(eq(tables.follows.followerId, followerId), eq(tables.follows.followingId, followingId)))
-    .get();
+    .get());
 }
 
-export function isCommunityMember(userId: string, communityId: string): boolean {
-  return !!db
+export async function isCommunityMember(userId: string, communityId: string): Promise<boolean> {
+  return !!(await db
     .select()
     .from(tables.communityMembers)
     .where(and(eq(tables.communityMembers.communityId, communityId), eq(tables.communityMembers.userId, userId)))
-    .get();
+    .get());
 }
 
 export function restrictionOf(streamId: string, userId: string, kind: "mute" | "block") {
@@ -86,20 +86,20 @@ export function restrictionOf(streamId: string, userId: string, kind: "mute" | "
     .get();
 }
 
-export function isModerator(streamId: string, userId: string): boolean {
-  return !!db
+export async function isModerator(streamId: string, userId: string): Promise<boolean> {
+  return !!(await db
     .select()
     .from(tables.liveModerators)
     .where(and(eq(tables.liveModerators.streamId, streamId), eq(tables.liveModerators.userId, userId)))
-    .get();
+    .get());
 }
 
-export function guestRow(streamId: string, userId: string) {
-  return db
+export async function guestRow(streamId: string, userId: string) {
+  return (await db
     .select()
     .from(tables.liveGuests)
     .where(and(eq(tables.liveGuests.streamId, streamId), eq(tables.liveGuests.userId, userId)))
-    .all()
+    .all())
     .sort((a, b) => b.invitedAt.getTime() - a.invitedAt.getTime())[0];
 }
 
@@ -108,13 +108,13 @@ export function guestRow(streamId: string, userId: string) {
     exception: the three QA PERSONAS in demo mode (they're seated at the
     demo campus so the Test Center can exercise campus flows) — a fresh
     signup in demo mode gets NO campus, ever. */
-export function verifiedCampusIdOf(userId: string): string | null {
-  const v = campusVerification(userId);
-  if (v && v.status === "verified") return v.campusId;
-  if (unrestrictedTester(userId)) {
-    const u = db.select().from(tables.users).where(eq(tables.users.id, userId)).get();
+export async function verifiedCampusIdOf(userId: string): Promise<string | null> {
+  const v = await campusVerification(userId);
+  if (v && v!.status === "verified") return v!.campusId;
+  if (await unrestrictedTester(userId)) {
+    const u = await db.select().from(tables.users).where(eq(tables.users.id, userId)).get();
     if (u && QA_HANDLES.includes(u.handle)) {
-      const c = db.select().from(tables.campuses).where(eq(tables.campuses.slug, "bowie-state")).get();
+      const c = await db.select().from(tables.campuses).where(eq(tables.campuses.slug, "bowie-state")).get();
       return c?.id ?? null;
     }
   }
@@ -124,27 +124,27 @@ export function verifiedCampusIdOf(userId: string): string | null {
 /* ------------------------- audience gating ------------------------- */
 /** Can this viewer WATCH this stream? Throws a friendly 403 when not.
     The exact same rule gates the detail page, presence, chat and lists. */
-export function assertCanWatch(stream: Stream, viewerId: string): void {
+export async function assertCanWatch(stream: Stream, viewerId: string): Promise<void> {
   if (viewerId === stream.hostId) return;
-  if (restrictionOf(stream.id, viewerId, "block"))
+  if ((await restrictionOf(stream.id, viewerId, "block")))
     throw new ApiError(403, "You can't join this live");
-  const g = guestRow(stream.id, viewerId);
+  const g = await guestRow(stream.id, viewerId);
   if (g && (g.status === "invited" || g.status === "active")) return; // invited guests always may watch
   switch (stream.audience) {
     case "everyone":
       return;
     case "followers":
-      if (!isFollowing(viewerId, stream.hostId))
+      if (!(await isFollowing(viewerId, stream.hostId)))
         throw new ApiError(403, "This live is for the host's followers — follow them to join");
       return;
     case "campus": {
-      const mine = verifiedCampusIdOf(viewerId);
+      const mine = await verifiedCampusIdOf(viewerId);
       if (!mine || mine !== stream.campusId)
         throw new ApiError(403, "This live is for verified members of the host's campus");
       return;
     }
     case "nearby": {
-      const viewer = db.select().from(tables.profiles).where(eq(tables.profiles.userId, viewerId)).get();
+      const viewer = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, viewerId)).get();
       if (
         stream.lat == null || stream.lng == null || viewer?.lat == null || viewer?.lng == null ||
         haversineMi(viewer.lat, viewer.lng, stream.lat, stream.lng) > NEARBY_MILES
@@ -153,7 +153,7 @@ export function assertCanWatch(stream: Stream, viewerId: string): void {
       return;
     }
     case "community": {
-      if (!stream.communityId || !isCommunityMember(viewerId, stream.communityId))
+      if (!stream.communityId || !(await isCommunityMember(viewerId, stream.communityId)))
         throw new ApiError(403, "This live is for members of the host's community");
       return;
     }
@@ -164,9 +164,9 @@ export function assertCanWatch(stream: Stream, viewerId: string): void {
   }
 }
 
-export function canWatch(stream: Stream, viewerId: string): boolean {
+export async function canWatch(stream: Stream, viewerId: string): Promise<boolean> {
   try {
-    assertCanWatch(stream, viewerId);
+    await assertCanWatch(stream, viewerId);
     return true;
   } catch {
     return false;
@@ -175,19 +175,19 @@ export function canWatch(stream: Stream, viewerId: string): boolean {
 
 /* --------------------------- serialization ------------------------- */
 
-export function viewerCount(streamId: string): number {
+export async function viewerCount(streamId: string): Promise<number> {
   const cutoff = Date.now() - PRESENCE_WINDOW_MS;
-  return db
+  return (await db
     .select()
     .from(tables.liveViewers)
     .where(eq(tables.liveViewers.streamId, streamId))
-    .all()
+    .all())
     .filter((v) => v.lastSeenAt.getTime() >= cutoff).length;
 }
 
-function hostCard(hostId: string) {
-  const u = db.select().from(tables.users).where(eq(tables.users.id, hostId)).get()!;
-  const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, hostId)).get()!;
+async function hostCard(hostId: string) {
+  const u = (await db.select().from(tables.users).where(eq(tables.users.id, hostId)).get())!;
+  const p = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, hostId)).get())!;
   const pub = publicUser(u, p);
   return {
     id: u.id,
@@ -203,12 +203,12 @@ function hostCard(hostId: string) {
 }
 
 /** card shape for lists / feed sections — NO coordinates, ever */
-export function streamCard(stream: Stream, viewerId?: string) {
+export async function streamCard(stream: Stream, viewerId?: string) {
   const campus = stream.campusId
-    ? db.select().from(tables.campuses).where(eq(tables.campuses.id, stream.campusId)).get()
+    ? await db.select().from(tables.campuses).where(eq(tables.campuses.id, stream.campusId)).get()
     : null;
   const community = stream.communityId
-    ? db.select().from(tables.communities).where(eq(tables.communities.id, stream.communityId)).get()
+    ? await db.select().from(tables.communities).where(eq(tables.communities.id, stream.communityId)).get()
     : null;
   return {
     id: stream.id,
@@ -221,9 +221,9 @@ export function streamCard(stream: Stream, viewerId?: string) {
     endedAt: stream.endedAt ? stream.endedAt.toISOString() : null,
     replayStatus: stream.replayStatus,
     replayHighlight: stream.replayHighlight,
-    viewerCount: stream.status === "live" ? viewerCount(stream.id) : null,
+    viewerCount: stream.status === "live" ? await viewerCount(stream.id) : null,
     peakViewers: stream.peakViewers,
-    host: hostCard(stream.hostId),
+    host: await hostCard(stream.hostId),
     campusName: campus?.name ?? null,
     communityName: community?.name ?? null,
     isMine: viewerId ? stream.hostId === viewerId : false,
@@ -232,14 +232,14 @@ export function streamCard(stream: Stream, viewerId?: string) {
 
 /* ----------------------------- discovery --------------------------- */
 
-export function discoverStreams(opts: {
+export async function discoverStreams(opts: {
   viewerId: string;
   filter: string; // now | following | foryou | campus | nearby | replays
   category?: string;
   q?: string;
 }) {
   const { viewerId, filter } = opts;
-  let rows = db.select().from(tables.liveStreams).orderBy(desc(tables.liveStreams.startedAt)).all();
+  let rows = await db.select().from(tables.liveStreams).orderBy(desc(tables.liveStreams.startedAt)).all();
 
   if (filter === "replays") {
     rows = rows.filter((s) => s.status === "ended" && s.replayStatus === "saved");
@@ -249,13 +249,17 @@ export function discoverStreams(opts: {
 
   // audience gating on EVERY list — an invite-only or blocked stream is
   // invisible to people who couldn't open it anyway
-  rows = rows.filter((s) => (filter === "replays" ? s.replayStatus === "saved" : canWatch(s, viewerId)));
+  {
+    const watchable = await Promise.all(rows.map((s) => (filter === "replays" ? Promise.resolve(s.replayStatus === "saved") : canWatch(s, viewerId))));
+    rows = rows.filter((_, i) => watchable[i]);
+  }
 
   let campusNote: string | null = null;
   if (filter === "following") {
-    rows = rows.filter((s) => isFollowing(viewerId, s.hostId));
+    const followedFlags = await Promise.all(rows.map((s) => isFollowing(viewerId, s.hostId)));
+    rows = rows.filter((_, i) => followedFlags[i]);
   } else if (filter === "campus") {
-    const mine = verifiedCampusIdOf(viewerId);
+    const mine = await verifiedCampusIdOf(viewerId);
     if (!mine) {
       rows = [];
       campusNote = "Campus Live shows streams from your verified school — verify your campus in Settings to unlock it.";
@@ -263,7 +267,7 @@ export function discoverStreams(opts: {
       rows = rows.filter((s) => s.campusId === mine);
     }
   } else if (filter === "nearby") {
-    const viewer = db.select().from(tables.profiles).where(eq(tables.profiles.userId, viewerId)).get();
+    const viewer = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, viewerId)).get();
     if (viewer?.lat == null || viewer?.lng == null) {
       rows = [];
       campusNote = "Add a city to your profile to see live streams near you — your exact location is never shared.";
@@ -274,8 +278,14 @@ export function discoverStreams(opts: {
     }
   } else if (filter === "foryou") {
     // simple honest ranking: people you follow first, then by live audience size
-    rows = rows
-      .map((s) => ({ s, score: (isFollowing(viewerId, s.hostId) ? 1000 : 0) + viewerCount(s.id) }))
+    rows = (
+      await Promise.all(
+        rows.map(async (s) => ({
+          s,
+          score: ((await isFollowing(viewerId, s.hostId)) ? 1000 : 0) + (await viewerCount(s.id)),
+        }))
+      )
+    )
       .sort((a, b) => b.score - a.score)
       .map((x) => x.s);
   }
@@ -286,19 +296,19 @@ export function discoverStreams(opts: {
     rows = rows.filter((s) => s.title.toLowerCase().includes(q));
   }
 
-  return { items: rows.slice(0, 60).map((s) => streamCard(s, viewerId)), note: campusNote };
+  return { items: await Promise.all(rows.slice(0, 60).map((s) => streamCard(s, viewerId))), note: campusNote };
 }
 
 /* ------------------------------ lifecycle -------------------------- */
 
-export function endStream(stream: Stream) {
+export async function endStream(stream: Stream) {
   const replayStatus = stream.saveReplay ? "saved" : "none";
-  db.update(tables.liveStreams)
+  await db.update(tables.liveStreams)
     .set({ status: "ended", endedAt: new Date(), replayStatus })
     .where(eq(tables.liveStreams.id, stream.id))
     .run();
   // guests' active sessions end with the stream
-  for (const g of db.select().from(tables.liveGuests).where(eq(tables.liveGuests.streamId, stream.id)).all())
+  for (const g of await db.select().from(tables.liveGuests).where(eq(tables.liveGuests.streamId, stream.id)).all())
     if (g.status === "active" || g.status === "invited")
-      db.update(tables.liveGuests).set({ status: "left" }).where(eq(tables.liveGuests.id, g.id)).run();
+      await db.update(tables.liveGuests).set({ status: "left" }).where(eq(tables.liveGuests.id, g.id)).run();
 }

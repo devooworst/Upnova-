@@ -12,9 +12,9 @@ const id = () => randomBytes(12).toString("hex");
 /** GET — my block list. Entries created from masked content show the
  *  masked label that was blocked — the list never de-anonymizes anyone. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select()
       .from(tables.blocks)
       .where(eq(tables.blocks.blockerId, user.id))
@@ -33,14 +33,14 @@ export async function GET() {
  *  you and stops reveal requests in both directions. */
 export async function POST(req: NextRequest) {
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser();
     const body = await req.json().catch(() => ({}));
 
     let targetId: string | null = null;
     let viaLabel = "";
 
     if (body.userId) {
-      const target = db.select().from(tables.users).where(eq(tables.users.id, String(body.userId))).get();
+      const target = await db.select().from(tables.users).where(eq(tables.users.id, String(body.userId))).get();
       if (!target) throw new ApiError(404, "User not found");
       targetId = target.id;
       viaLabel = `@${target.handle}`;
@@ -48,46 +48,46 @@ export async function POST(req: NextRequest) {
       const c = findCommunity(String(body.communityId || ""));
       if (!c) throw new ApiError(404, "Community not found");
       if (body.postId) {
-        const p = db
+        const p = await db
           .select()
           .from(tables.communityPosts)
-          .where(and(eq(tables.communityPosts.id, String(body.postId)), eq(tables.communityPosts.communityId, c.id)))
+          .where(and(eq(tables.communityPosts.id, String(body.postId)), eq(tables.communityPosts.communityId, (await c)!.id)))
           .get();
         if (!p) throw new ApiError(404, "Post not found");
-        targetId = p.authorId;
-        viaLabel = `${maskedLabelFor(c.id, p.authorId, p.identity)} — ${c.name}`;
+        targetId = p!.authorId;
+        viaLabel = `${await maskedLabelFor((await c)!.id, p!.authorId, p!.identity)} — ${(await c)!.name}`;
       } else {
-        const cm = db.select().from(tables.communityComments).where(eq(tables.communityComments.id, String(body.commentId))).get();
+        const cm = await db.select().from(tables.communityComments).where(eq(tables.communityComments.id, String(body.commentId))).get();
         if (!cm) throw new ApiError(404, "Reply not found");
         targetId = cm.authorId;
-        viaLabel = `${maskedLabelFor(c.id, cm.authorId, cm.identity)} — ${c.name}`;
+        viaLabel = `${await maskedLabelFor((await c)!.id, cm.authorId, cm.identity)} — ${(await c)!.name}`;
       }
     } else throw new ApiError(400, "Who do you want to block?");
 
     if (targetId === user.id) throw new ApiError(400, "You can't block yourself");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.blocks)
       .where(and(eq(tables.blocks.blockerId, user.id), eq(tables.blocks.blockedId, targetId!)))
       .get();
     if (existing) throw new ApiError(409, "Already blocked");
 
-    db.insert(tables.blocks).values({ id: id(), blockerId: user.id, blockedId: targetId!, viaLabel }).run();
+    await db.insert(tables.blocks).values({ id: id(), blockerId: user.id, blockedId: targetId!, viaLabel }).run();
 
     // blocking also withdraws any pending reveal request between you
-    const pending = db
+    const pending = (await db
       .select()
       .from(tables.identityReveals)
       .where(eq(tables.identityReveals.status, "pending"))
-      .all()
+      .all())
       .filter(
         (r) =>
           (r.requesterId === user.id && r.targetId === targetId) ||
           (r.requesterId === targetId && r.targetId === user.id)
       );
     for (const r of pending)
-      db.update(tables.identityReveals).set({ status: "declined", respondedAt: new Date() }).where(eq(tables.identityReveals.id, r.id)).run();
+      await db.update(tables.identityReveals).set({ status: "declined", respondedAt: new Date() }).where(eq(tables.identityReveals.id, r.id)).run();
 
     return { ok: true };
   });
@@ -95,12 +95,12 @@ export async function POST(req: NextRequest) {
 
 /** DELETE — unblock. ?id= is the block record id (not a user id). */
 export async function DELETE(req: NextRequest) {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const blockId = new URL(req.url).searchParams.get("id") || "";
-    const b = db.select().from(tables.blocks).where(eq(tables.blocks.id, blockId)).get();
+    const b = await db.select().from(tables.blocks).where(eq(tables.blocks.id, blockId)).get();
     if (!b || b.blockerId !== user.id) throw new ApiError(404, "Block not found");
-    db.delete(tables.blocks).where(eq(tables.blocks.id, b.id)).run();
+    await db.delete(tables.blocks).where(eq(tables.blocks.id, b.id)).run();
     return { ok: true };
   });
 }

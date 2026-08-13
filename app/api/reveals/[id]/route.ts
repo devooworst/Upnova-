@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
  *  (each person's own reveal-privacy setting governs anything more). */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
-    const r = db.select().from(tables.identityReveals).where(eq(tables.identityReveals.id, params.id)).get();
+    const user = await requireUser();
+    const r = await db.select().from(tables.identityReveals).where(eq(tables.identityReveals.id, params.id)).get();
     if (!r) throw new ApiError(404, "Reveal request not found");
     if (r.targetId !== user.id) throw new ApiError(403, "Only the person who was asked can answer");
     if (r.status !== "pending") throw new ApiError(409, "This request was already answered");
@@ -22,14 +22,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const action = String(body.action || "");
     if (!["accept", "decline", "never"].includes(action)) throw new ApiError(400, "accept, decline, or never");
 
-    db.update(tables.identityReveals)
+    await db.update(tables.identityReveals)
       .set({ status: action === "accept" ? "accepted" : action === "never" ? "never" : "declined", respondedAt: new Date() })
       .where(eq(tables.identityReveals.id, r.id))
       .run();
 
     if (action === "accept") {
       // now — and only now — the two see each other
-      notify({
+      await notify({
         userId: r.requesterId,
         actorId: user.id,
         type: "community",

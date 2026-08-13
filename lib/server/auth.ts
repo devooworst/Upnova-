@@ -37,7 +37,8 @@ const stickyOn = () => process.env.MAVYN_DEMO_STICKY_SESSION === "1";
    and do not travel with the platform's snapshots — a committed marker
    file does. Production deletes db/DEMO_MODE (see README + the file
    itself); until then every instance of this demo accepts demo tokens. */
-const demoModeOn = () => stickyOn() || existsSync(join(process.cwd(), "db", "DEMO_MODE"));
+const demoModeOn = () =>
+  process.env.MAVYN_DEMO_MODE === "1" || stickyOn() || existsSync(join(process.cwd(), "db", "DEMO_MODE"));
 
 /* Signed demo token — the transport that survives BOTH storage-blocked
    embeddings and preview-instance swaps. Format:
@@ -63,30 +64,33 @@ export function signDemoToken(handle: string): string {
 
 /* Revocation by TOKEN HASH — the only clock-free, snapshot-safe scheme.
    Sign-out records sha256(token); verification refuses hashes in the set.
-   A FRESH login can never be affected: its hash cannot pre-exist. */
-const REVOKED_FILE = join(process.cwd(), "db", ".demo-revoked.json");
+   A FRESH login can never be affected: its hash cannot pre-exist.
+   Stored in kv_state (Postgres) — Vercel's filesystem is read-only. */
+const REVOKED_KEY = "auth:demo-revoked";
 
-function revokedHashes(): string[] {
-  try { return JSON.parse(readFileSync(REVOKED_FILE, "utf8")); } catch { return []; }
+async function revokedHashes(): Promise<string[]> {
+  const { kvGetJson } = await import("./kv");
+  return kvGetJson<string[]>(REVOKED_KEY, []);
 }
 
-export function revokeDemoToken(token: string) {
+export async function revokeDemoToken(token: string) {
   try {
+    const { kvSetJson } = await import("./kv");
     const h = createHmac("sha256", "revocation").update(token).digest("hex");
-    const set = revokedHashes();
+    const set = await revokedHashes();
     if (!set.includes(h)) set.push(h);
-    writeFileSync(REVOKED_FILE, JSON.stringify(set.slice(-200)), "utf8");
+    await kvSetJson(REVOKED_KEY, set.slice(-200));
   } catch {}
 }
 
-function isRevoked(token: string): boolean {
+async function isRevoked(token: string): Promise<boolean> {
   const h = createHmac("sha256", "revocation").update(token).digest("hex");
-  return revokedHashes().includes(h);
+  return (await revokedHashes()).includes(h);
 }
 
 /** Verify a signed demo token. Returns the handle, or a rejection reason
  *  prefixed with "!" so /api/auth/me can name the exact sub-case. */
-export function verifyDemoTokenDetailed(token: string): { handle: string | null; reason?: string } {
+export async function verifyDemoTokenDetailed(token: string): Promise<{ handle: string | null; reason?: string }> {
   if (!demoModeOn()) return { handle: null, reason: "demo_mode_off_on_this_instance" };
   // v2: demo.<handle>.<iat>.<instance>.<sig> — v1 (no instance) still accepted
   const v2 = /^demo\.([a-z0-9_]+)\.(\d+)\.([a-f0-9]{8})\.([a-f0-9]{64})$/.exec(token);
@@ -103,12 +107,12 @@ export function verifyDemoTokenDetailed(token: string): { handle: string | null;
   if (Date.now() - iat > 30 * 86400_000) return { handle: null, reason: "token_expired_30d" };
   // revocation by hash of the EXACT token — clock-free, snapshot-safe;
   // a freshly minted token can never be pre-revoked
-  if (isRevoked(token)) return { handle: null, reason: "revoked_by_signout" };
+  if (await isRevoked(token)) return { handle: null, reason: "revoked_by_signout" };
   return { handle };
 }
 
-export function verifyDemoToken(token: string): string | null {
-  return verifyDemoTokenDetailed(token).handle;
+export async function verifyDemoToken(token: string): Promise<string | null> {
+  return (await verifyDemoTokenDetailed(token)).handle;
 }
 
 export function rememberDemoSession(token: string) {
@@ -181,17 +185,17 @@ export function sessionCookieOptions(expiresAt?: Date) {
 // scrypt with per-password salt; legacy bcrypt verified + rehashed on login
 export { hashPassword, verifyPassword, needsRehash } from "./passwords";
 
-export function createSession(userId: string) {
+export async function createSession(userId: string) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400_000);
-  db.insert(tables.sessions)
+  await db.insert(tables.sessions)
     .values({ id: randomBytes(12).toString("hex"), token, userId, expiresAt })
     .run();
   return { token, expiresAt };
 }
 
-export function destroySession(token: string) {
-  db.delete(tables.sessions).where(eq(tables.sessions.token, token)).run();
+export async function destroySession(token: string) {
+  await db.delete(tables.sessions).where(eq(tables.sessions.token, token)).run();
 }
 
 export type SessionUser = {
@@ -204,7 +208,7 @@ export type SessionUser = {
 };
 
 /** Resolve the authenticated user from the request cookie. Null when logged out. */
-export function getSessionUser(): SessionUser | null {
+export async function getSessionUser(): Promise<SessionUser | null> {
   let token = cookies().get(SESSION_COOKIE)?.value || cookies().get(LEGACY_SESSION_COOKIE)?.value;
   if (!token) {
     // DEV/DEMO fallback transport: embedded previews can block third-party
@@ -229,26 +233,26 @@ export function getSessionUser(): SessionUser | null {
   // signed demo token? verify cryptographically + resolve BY HANDLE —
   // works on ANY preview instance, no shared state needed
   if (token.startsWith("demo.")) {
-    const handle = verifyDemoToken(token);
+    const handle = await verifyDemoToken(token);
     if (!handle) return null;
-    const row = db
+    const row = await db
       .select({ user: tables.users, profile: tables.profiles })
       .from(tables.users)
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.users.handle, handle))
       .get();
-    if (!row || row.user.status !== "active") return null;
+    if (!row || row!.user.status !== "active") return null;
     return {
-      id: row.user.id,
-      email: row.user.email,
-      handle: row.user.handle,
-      role: row.user.role,
-      plan: row.user.plan,
-      profile: row.profile,
+      id: row!.user.id,
+      email: row!.user.email,
+      handle: row!.user.handle,
+      role: row!.user.role,
+      plan: row!.user.plan,
+      profile: row!.profile,
     };
   }
 
-  const rows = db
+  const rows = await db
     .select({ session: tables.sessions, user: tables.users, profile: tables.profiles })
     .from(tables.sessions)
     .innerJoin(tables.users, eq(tables.sessions.userId, tables.users.id))
@@ -259,7 +263,7 @@ export function getSessionUser(): SessionUser | null {
   const row = rows[0];
   if (!row) return null;
   if (row.session.expiresAt.getTime() < Date.now()) {
-    destroySession(token);
+    await destroySession(token);
     return null;
   }
   if (row.user.status !== "active") return null;
@@ -275,14 +279,14 @@ export function getSessionUser(): SessionUser | null {
 }
 
 /** 401 guard for route handlers. */
-export function requireUser(): SessionUser {
-  const user = getSessionUser();
+export async function requireUser(): Promise<SessionUser> {
+  const user = await getSessionUser();
   if (!user) throw new AuthError(401, "Not authenticated");
   return user;
 }
 
-export function requireAdmin(): SessionUser {
-  const user = requireUser();
+export async function requireAdmin(): Promise<SessionUser> {
+  const user = await requireUser();
   if (user.role !== "admin") throw new AuthError(403, "Admin only");
   return user;
 }
@@ -298,8 +302,8 @@ const QA_OPERATOR_HANDLES = ["testcustomer", "testcreator", "testbusiness"];
 export function isQaOperator(user: SessionUser): boolean {
   return user.role === "admin" || QA_OPERATOR_HANDLES.includes(user.handle);
 }
-export function requireQaOperator(): SessionUser {
-  const user = requireUser();
+export async function requireQaOperator(): Promise<SessionUser> {
+  const user = await requireUser();
   if (!isQaOperator(user))
     throw new AuthError(403, "Test Center and demo tools are restricted to authorized development accounts");
   return user;

@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 /** PATCH /api/me/profile — the Edit Profile save path. Owner-only by construction. */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
 
     const str = (v: unknown, max = 500) => String(v ?? "").slice(0, max);
     const arr = (v: unknown) => JSON.stringify(Array.isArray(v) ? v.slice(0, 40).map((x) => String(x).slice(0, 80)) : []);
@@ -66,13 +66,13 @@ export async function PATCH(req: NextRequest) {
       locationCols = { ...next, ...(textChanged ? { countryCode: "", stateId: "", countyId: "", cityId: "" } : {}) };
     }
 
-    db.update(tables.profiles)
+    await db.update(tables.profiles)
       .set({
         displayName: str(body.displayName, 50) || p.displayName,
         bio: str(body.bio, 300),
         // uploaded images are persisted to disk; the DB keeps only the path
-        avatarUrl: body.avatarUrl === null ? null : storeImage(str(body.avatarUrl, 500_000), "avatar") || p.avatarUrl,
-        coverUrl: body.coverUrl === null ? null : storeImage(str(body.coverUrl, 1_500_000), "cover", 1_600_000) || p.coverUrl,
+        avatarUrl: body.avatarUrl === null ? null : (await storeImage(str(body.avatarUrl, 500_000), "avatar")) || p.avatarUrl,
+        coverUrl: body.coverUrl === null ? null : (await storeImage(str(body.coverUrl, 1_500_000), "cover", 1_600_000)) || p.coverUrl,
         coverPos: Number.isFinite(body.coverPos) ? Math.min(100, Math.max(0, Math.round(body.coverPos))) : p.coverPos,
         locationVisibility: ["city", "county", "state", "country", "hidden"].includes(body.locationVisibility)
           ? body.locationVisibility
@@ -131,16 +131,16 @@ export async function PATCH(req: NextRequest) {
 
     // experience: full replace with the submitted list (owner's rows only)
     if (Array.isArray(body.experience)) {
-      db.delete(tables.experiences).where(eq(tables.experiences.userId, user.id)).run();
-      body.experience.slice(0, 20).forEach(
-        (
-          x: { position?: unknown; organization?: unknown; start?: unknown; end?: unknown; description?: unknown; location?: unknown },
-          i: number
-        ) => {
+      await db.delete(tables.experiences).where(eq(tables.experiences.userId, user.id)).run();
+      const xs: { position?: unknown; organization?: unknown; start?: unknown; end?: unknown; description?: unknown; location?: unknown }[] = body.experience.slice(0, 20);
+      let xi = 0;
+      for (const x of xs) {
+        const i = xi++;
+        {
           const position = String(x.position ?? "").slice(0, 80);
           const organization = String(x.organization ?? "").slice(0, 80);
-          if (!position || !organization) return;
-          db.insert(tables.experiences)
+          if (!position || !organization) continue;
+          await db.insert(tables.experiences)
             .values({
               id: `${user.id.slice(0, 8)}-xp-${Date.now()}-${i}`,
               userId: user.id,
@@ -154,11 +154,11 @@ export async function PATCH(req: NextRequest) {
             })
             .run();
         }
-      );
+      }
     }
 
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
-    const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get()!;
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
+    const profile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get())!;
     return ownProfile(u, profile);
   });
 }

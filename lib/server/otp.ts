@@ -15,22 +15,22 @@ export const normalizePhone = (raw: unknown): string | null => {
 export const hashOtp = (code: string) => createHash("sha256").update(`mavyn-otp|${code}`).digest("hex");
 
 /** Verify-and-consume: returns the phone on success, throws generic errors. */
-export function consumeOtp(phoneRaw: unknown, codeRaw: unknown): string {
+export async function consumeOtp(phoneRaw: unknown, codeRaw: unknown): Promise<string> {
   const phone = normalizePhone(phoneRaw);
   const code = String(codeRaw ?? "").trim();
   const fail = () => new ApiError(401, "That code didn't work — request a new one.");
   if (!phone || !/^\d{6}$/.test(code)) throw fail();
 
-  const row = db
+  const row = await db
     .select()
     .from(tables.otpCodes)
     .where(and(eq(tables.otpCodes.phone, phone), gt(tables.otpCodes.expiresAt, new Date())))
     .orderBy(desc(tables.otpCodes.createdAt))
     .get();
   if (!row) throw fail();
-  if (row.attempts >= 5) throw new ApiError(429, "Too many attempts — request a new code.");
-  db.update(tables.otpCodes).set({ attempts: row.attempts + 1 }).where(eq(tables.otpCodes.id, row.id)).run();
-  if (row.codeHash !== hashOtp(code)) throw fail();
-  db.delete(tables.otpCodes).where(eq(tables.otpCodes.phone, phone)).run();
+  if (row!.attempts >= 5) throw new ApiError(429, "Too many attempts — request a new code.");
+  await db.update(tables.otpCodes).set({ attempts: row!.attempts + 1 }).where(eq(tables.otpCodes.id, row!.id)).run();
+  if (row!.codeHash !== hashOtp(code)) throw fail();
+  await db.delete(tables.otpCodes).where(eq(tables.otpCodes.phone, phone)).run();
   return phone;
 }

@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
     production replaces the writer with a real provider. Own-account
     only — nobody can read anyone else's messages. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = (await db
       .select()
       .from(tables.outbox)
       .where(eq(tables.outbox.userId, user.id))
       .orderBy(desc(tables.outbox.createdAt))
-      .all()
+      .all())
       .slice(0, 30);
     return {
       messages: rows.map((r) => ({

@@ -41,57 +41,59 @@ const IN_FLIGHT_BOOKING = ["pending", "accepted", "confirmed", "reschedule_reque
 const IN_FLIGHT_APP = ["selected", "confirmed", "active"];
 
 /** live usage across every capacity dimension — real rows, no caching */
-export function businessUsage(businessId: string) {
-  const teamRows = db
+export async function businessUsage(businessId: string) {
+  const teamRows = await db
     .select()
     .from(tables.businessTeam)
     .where(and(eq(tables.businessTeam.businessId, businessId), eq(tables.businessTeam.status, "active")))
     .all();
-  const openOpps = db
+  const openOpps = (await db
     .select()
     .from(tables.opportunities)
     .where(eq(tables.opportunities.posterId, businessId))
-    .all()
+    .all())
     .filter((o) => o.status === "open").length;
 
   // active hires = everything IN FLIGHT where the business is the buyer:
   // projects (draft→approved), bookings (pending→confirmed), and hired
   // opportunity engagements not yet completed. Completed history is
   // unlimited on every tier and never counts.
-  const projectsInFlight = db
+  const projectsInFlight = (await db
     .select()
     .from(tables.projects)
     .where(eq(tables.projects.clientId, businessId))
-    .all()
+    .all())
     .filter((p) => IN_FLIGHT_PROJECT.includes(p.state)).length;
-  const bookingsInFlight = db
+  const bookingsInFlight = (await db
     .select()
     .from(tables.bookings)
     .where(eq(tables.bookings.clientId, businessId))
-    .all()
+    .all())
     .filter((b) => IN_FLIGHT_BOOKING.includes(b.status)).length;
-  const appsInFlight = db
+  const appsInFlight = (await db
     .select({ app: tables.applications })
     .from(tables.applications)
     .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
     .where(eq(tables.opportunities.posterId, businessId))
-    .all()
+    .all())
     .filter((r) => IN_FLIGHT_APP.includes(r.app.status)).length;
 
-  const savedTalent = db
-    .select()
-    .from(tables.bookmarks)
-    .where(and(eq(tables.bookmarks.userId, businessId), eq(tables.bookmarks.targetType, "user")))
-    .all().length;
+  const savedTalent = (
+    await db
+      .select()
+      .from(tables.bookmarks)
+      .where(and(eq(tables.bookmarks.userId, businessId), eq(tables.bookmarks.targetType, "user")))
+      .all()
+  ).length;
 
   // client / talent record counts (derived CRM relationships)
   const clientIds = new Set<string>();
-  for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.providerId, businessId)).all()) clientIds.add(b.clientId);
-  for (const p of db.select().from(tables.projects).where(eq(tables.projects.creatorId, businessId)).all()) clientIds.add(p.clientId);
+  for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.providerId, businessId)).all()) clientIds.add(b.clientId);
+  for (const p of await db.select().from(tables.projects).where(eq(tables.projects.creatorId, businessId)).all()) clientIds.add(p.clientId);
   const talentIds = new Set<string>();
-  for (const b of db.select().from(tables.bookings).where(eq(tables.bookings.clientId, businessId)).all()) talentIds.add(b.providerId);
-  for (const p of db.select().from(tables.projects).where(eq(tables.projects.clientId, businessId)).all()) talentIds.add(p.creatorId);
-  for (const r of db
+  for (const b of await db.select().from(tables.bookings).where(eq(tables.bookings.clientId, businessId)).all()) talentIds.add(b.providerId);
+  for (const p of await db.select().from(tables.projects).where(eq(tables.projects.clientId, businessId)).all()) talentIds.add(p.creatorId);
+  for (const r of await db
     .select({ app: tables.applications })
     .from(tables.applications)
     .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
@@ -116,15 +118,15 @@ export function businessUsage(businessId: string) {
  * accounts only; demo mode bypasses (simulation enforces), matching
  * every other gate. NEVER used to hide or delete existing records.
  */
-export function assertBusinessCapacity(
+export async function assertBusinessCapacity(
   user: { id: string; accountType?: string | null; plan?: string | null },
   kind: keyof BusinessLimits
 ) {
   if (user.accountType !== "business") return;
-  if (unrestrictedTester(user.id)) return; // demo mode — gates open, honestly labeled in the UI
+  if (await unrestrictedTester(user.id)) return; // demo mode — gates open, honestly labeled in the UI
   const tier = businessTier(user);
   const limit = BUSINESS_LIMITS[tier][kind];
-  const usage = businessUsage(user.id)[kind];
+  const usage = (await businessUsage(user.id))[kind];
   if (usage < limit) return;
   const proLimit = BUSINESS_LIMITS.business_pro[kind];
   throw new ApiError(
@@ -136,18 +138,18 @@ export function assertBusinessCapacity(
 }
 
 /** convenience: same check, reading the account row fresh by id */
-export function assertCapacityById(userId: string, kind: keyof BusinessLimits) {
-  const row = db.select().from(tables.users).where(eq(tables.users.id, userId)).get();
+export async function assertCapacityById(userId: string, kind: keyof BusinessLimits) {
+  const row = await db.select().from(tables.users).where(eq(tables.users.id, userId)).get();
   if (!row) return;
-  assertBusinessCapacity({ id: row.id, accountType: row.accountType, plan: row.plan }, kind);
+  await assertBusinessCapacity({ id: row.id, accountType: row.accountType, plan: row.plan }, kind);
 }
 
 /** payload for the UI + tests: plan, limits, live usage, enforcement */
-export function limitsPayload(user: { id: string; accountType?: string | null; plan?: string | null }) {
+export async function limitsPayload(user: { id: string; accountType?: string | null; plan?: string | null }) {
   const tier = businessTier(user);
   const limits = BUSINESS_LIMITS[tier];
-  const usage = businessUsage(user.id);
-  const enforced = user.accountType === "business" && !unrestrictedTester(user.id);
+  const usage = await businessUsage(user.id);
+  const enforced = user.accountType === "business" && !(await unrestrictedTester(user.id));
   return {
     plan: tier,
     enforced, // false in demo mode — the UI labels it

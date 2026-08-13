@@ -12,22 +12,22 @@ export const dynamic = "force-dynamic";
  * DELETE ?id= removes; PATCH { id, visible } toggles visibility.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const items = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const items = await db
       .select()
       .from(tables.portfolioItems)
       .where(eq(tables.portfolioItems.userId, user.id))
       .all();
-    const completed = db
+    const completed = await Promise.all((await db
       .select()
       .from(tables.projects)
       .where(eq(tables.projects.creatorId, user.id))
-      .all()
+      .all())
       .filter((p) => ["completed", "reviewed"].includes(p.state))
-      .map((p) => {
-        const client = db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.clientId)).get();
-        const review = db
+      .map(async (p) => {
+        const client = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.clientId)).get();
+        const review = await db
           .select()
           .from(tables.reviews)
           .where(and(eq(tables.reviews.projectId, p.id), eq(tables.reviews.subjectId, user.id)))
@@ -40,30 +40,30 @@ export async function GET() {
           rating: review?.rating ?? null,
           inPortfolio: items.some((i) => i.projectId === p.id),
         };
-      });
+      }));
     return { items, completedProjects: completed };
   });
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const id = randomBytes(12).toString("hex");
 
     if (body.projectId) {
       // add a completed Mavyn project as a verified portfolio entry
-      const p = db.select().from(tables.projects).where(eq(tables.projects.id, String(body.projectId))).get();
+      const p = await db.select().from(tables.projects).where(eq(tables.projects.id, String(body.projectId))).get();
       if (!p || p.creatorId !== user.id) throw new ApiError(403, "Not your project");
       if (!["completed", "reviewed"].includes(p.state)) throw new ApiError(409, "Only completed projects");
-      const existing = db
+      const existing = await db
         .select()
         .from(tables.portfolioItems)
         .where(and(eq(tables.portfolioItems.userId, user.id), eq(tables.portfolioItems.projectId, p.id)))
         .get();
-      if (existing) return { id: existing.id };
-      const client = db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.clientId)).get();
-      db.insert(tables.portfolioItems)
+      if (existing) return { id: existing!.id };
+      const client = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, p.clientId)).get();
+      await db.insert(tables.portfolioItems)
         .values({ id, userId: user.id, title: p.title, kind: "mavyn_project", projectId: p.id, client: client?.displayName ?? "" })
         .run();
       return { id };
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     const title = String(body.title || "").trim();
     if (!title) throw new ApiError(400, "Title is required");
-    db.insert(tables.portfolioItems)
+    await db.insert(tables.portfolioItems)
       .values({
         id,
         userId: user.id,
@@ -86,10 +86,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const id = req.nextUrl.searchParams.get("id") || "";
-    db.delete(tables.portfolioItems)
+    await db.delete(tables.portfolioItems)
       .where(and(eq(tables.portfolioItems.id, id), eq(tables.portfolioItems.userId, user.id)))
       .run();
     return { ok: true };

@@ -15,21 +15,21 @@ import { createLinkedPost } from "@/lib/server/publish";
 
 /** GET /api/services — active marketplace listings with real owners. */
 export async function GET() {
-  return guarded(() => {
-    const viewer = getSessionUser();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
     // followers-only listings appear for people who actually follow the owner
     const followingIds = viewer
       ? new Set(
-          db.select().from(tables.follows).where(eq(tables.follows.followerId, viewer.id)).all().map((f) => f.followingId)
+          ((await db.select().from(tables.follows).where(eq(tables.follows.followerId, viewer.id)).all())).map((f) => f.followingId)
         )
       : new Set<string>();
-    const rows = db
+    const rows = (await db
       .select({ service: tables.services, user: tables.users, profile: tables.profiles })
       .from(tables.services)
       .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.services.createdAt))
-      .all()
+      .all())
       .filter((r) => r.service.active && !r.service.paused && r.user.status === "active")
       // ONE canonical record per service — the directory shows it or it
       // doesn't, based on the creator's visibility choice. Unlisted and
@@ -45,7 +45,7 @@ export async function GET() {
     // promoted listings are pinned first and labeled — never mixed in
     let ordered = rows;
     if (viewer) {
-      const taste = buildTaste(viewer.id, viewer.profile);
+      const taste = await buildTaste(viewer.id, viewer.profile);
       const mapped = rows
         .filter((r) => !r.service.promoted)
         .map((r) => ({
@@ -113,8 +113,8 @@ export async function GET() {
 /** POST /api/services — create a listing owned by the authenticated user. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const title = String(body.title || "").trim();
     const price = Math.round(Number(body.price));
     if (!title) throw new ApiError(400, "Title is required");
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
     const fulfillment = ["appointment", "project", "quote"].includes(body.fulfillment) ? body.fulfillment : "project";
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.services)
+    await db.insert(tables.services)
       .values({
         id,
         ownerId: user.id,
@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
     // publishing = feed presence: public services get ONE linked post so
     // they surface in For You and on the profile (shareToFeed opts out)
     if (visibility === "public" && body.shareToFeed !== false) {
-      createLinkedPost({
+      await createLinkedPost({
         userId: user.id,
         refType: "service",
         refId: id,

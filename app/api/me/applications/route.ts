@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/me/applications — everything the user has applied to. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select({ app: tables.applications, opp: tables.opportunities, poster: tables.profiles })
       .from(tables.applications)
       .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
@@ -18,7 +18,7 @@ export async function GET() {
       .all();
 
     return {
-      applications: rows.map((r) => {
+      applications: await Promise.all(rows.map(async (r) => {
         const role = (() => {
           try {
             const roles = JSON.parse(r.opp.roles) as { id: string; title: string; pay: number | null }[];
@@ -48,7 +48,7 @@ export async function GET() {
             poster: r.poster.displayName,
           },
         };
-      }),
+      })),
     };
   });
 }

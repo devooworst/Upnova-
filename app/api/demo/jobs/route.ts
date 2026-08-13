@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
  * deterministically. Idempotency means calling it repeatedly is safe.
  */
 export async function POST() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     if (!isDemoMode() || user.role !== "admin") throw new ApiError(403, "Admin demo tool");
-    return { ...runJobsTick() };
+    return { ...(await runJobsTick()) };
   });
 }

@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
 /** POST /api/posts — create a post as the authenticated user. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     // anti-spam: 20 posts per 15 min per account
     const rlp = rateLimit(`post:${user.id}`, 20, 15 * 60_000);
     if (!rlp.ok) throw new ApiError(429, `Slow down — try again in ${Math.ceil(rlp.retryAfterSec / 60)} min`);
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Verified Work: the ONLY path is a server-validated link to a completed
     // transaction the poster participated in — ids are checked, not trusted
-    const link = validateWorkLink(
+    const link = await validateWorkLink(
       user.id,
       body.projectId ? String(body.projectId) : null,
       body.bookingId ? String(body.bookingId) : null
@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
     // images live on disk (public/uploads) — the DB stores only the path
     const imageUrl =
       typeof body.imageUrl === "string" && body.imageUrl.startsWith("data:image/") && body.imageUrl.length < 900_000
-        ? storeImage(body.imageUrl, "post")
+        ? await storeImage(body.imageUrl, "post")
         : null;
-    db.insert(tables.posts)
+    await db.insert(tables.posts)
       .values({
         id,
         authorId: user.id,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     // the linked counterparty is asked to confirm — Client Confirmed comes
     // from THEM, never from the poster
     if (link) {
-      notify({
+      await notify({
         userId: link.counterpartyId,
         actorId: user.id,
         type: "post",
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         href: `/creator/${user.handle}`,
       });
       // demo mode: seed counterparties confirm right away
-      seedClientConfirmsWork(id, link.counterpartyId);
+      await seedClientConfirmsWork(id, link.counterpartyId);
     }
     return { id, verifiedWork: !!link };
   });

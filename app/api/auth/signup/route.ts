@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
+  return guarded(async () => {
     // handle uniqueness is case-insensitive: handles are stored lowercased
     const email = String(body.email || "").trim().toLowerCase();
     const handle = String(body.handle || "").trim().toLowerCase().replace(/^@/, "");
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     if (pwError) throw new ApiError(400, pwError);
     if (!displayName) throw new ApiError(400, "Display name is required");
 
-    const existing = db
+    const existing = await db
       .select({ id: tables.users.id })
       .from(tables.users)
       .where(or(eq(tables.users.email, email), eq(tables.users.handle, handle)))
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (existing) throw new ApiError(409, "Email or username already in use");
 
     const userId = randomBytes(12).toString("hex");
-    db.insert(tables.users)
+    await db.insert(tables.users)
       .values({
         id: userId,
         email,
@@ -56,17 +56,17 @@ export async function POST(req: NextRequest) {
         ...(body.notifyEmail === false ? { notifyPrefs: JSON.stringify({ projects: { email: false }, opportunities: { email: false }, bookings: { email: false } }) } : {}),
       })
       .run();
-    db.insert(tables.profiles)
+    await db.insert(tables.profiles)
       .values({ id: randomBytes(12).toString("hex"), userId, displayName })
       .run();
 
-    const { token, expiresAt } = createSession(userId);
+    const { token, expiresAt } = await createSession(userId);
     rememberDemoSession(token); // dev sticky marker (no-op unless enabled)
     const cookieless = process.env.MAVYN_DISABLE_SESSION_COOKIES === "1";
     if (!cookieless) cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 
-    const user = db.select().from(tables.users).where(eq(tables.users.id, userId)).get()!;
-    const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get()!;
+    const user = (await db.select().from(tables.users).where(eq(tables.users.id, userId)).get())!;
+    const profile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get())!;
     return {
       ...ownProfile(user, profile),
       sessionToken: isDemoMode() ? signDemoToken(user.handle) : token,

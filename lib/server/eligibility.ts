@@ -23,18 +23,18 @@ import { campusVerification, unrestrictedTester } from "@/lib/server/campus";
 export const ELIGIBILITIES = ["anyone", "students", "my_school", "alumni"] as const;
 export type Eligibility = (typeof ELIGIBILITIES)[number];
 
-const campusName = (campusId: string | null) =>
-  campusId ? db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get()?.name ?? null : null;
+const campusName = async (campusId: string | null) =>
+  campusId ? (await db.select().from(tables.campuses).where(eq(tables.campuses.id, campusId)).get())?.name ?? null : null;
 
 /** Short badge label for cards ("Verified students", "Bowie State students"…). */
-export function eligibilityLabel(eligibility: string, eligibilityCampusId: string | null): string | null {
+export async function eligibilityLabel(eligibility: string, eligibilityCampusId: string | null): Promise<string | null> {
   if (eligibility === "students") return "Verified students";
   if (eligibility === "my_school") {
-    const name = campusName(eligibilityCampusId);
-    return name ? `${name.replace(" University", "")} students` : "Verified students";
+    const name = await campusName(eligibilityCampusId);
+    return name ? `${name!.replace(" University", "")} students` : "Verified students";
   }
   if (eligibility === "alumni") {
-    const name = campusName(eligibilityCampusId);
+    const name = await campusName(eligibilityCampusId);
     return name ? `${name.replace(" University", "")} alumni` : "Verified alumni";
   }
   return null;
@@ -50,36 +50,36 @@ export interface EligibilityCheck {
   demoBypass?: boolean;
 }
 
-export function checkApplicantEligibility(
+export async function checkApplicantEligibility(
   opp: { eligibility: string; eligibilityCampusId: string | null },
   userId: string
-): EligibilityCheck {
+): Promise<EligibilityCheck> {
   if (opp.eligibility === "anyone" || !ELIGIBILITIES.includes(opp.eligibility as Eligibility))
     return { eligible: true };
 
-  const v = campusVerification(userId);
-  const school = campusName(opp.eligibilityCampusId);
+  const v = await campusVerification(userId);
+  const school = await campusName(opp.eligibilityCampusId);
 
-  const verdict = (() => {
+  const verdict = await (async () => {
     if (opp.eligibility === "students") {
       if (!v) return { eligible: false, reason: "Student verification required — this opportunity is limited to verified students. Verify your student affiliation for free to apply.", verifyFixes: true };
-      if (v.affiliation !== "current_student") return { eligible: false, reason: "This opportunity is for current students. Your verified status is " + (v.affiliation === "alumni" ? "alumni" : "faculty/staff") + " — alumni-open opportunities remain available to you." };
+      if (v!.affiliation !== "current_student") return { eligible: false, reason: "This opportunity is for current students. Your verified status is " + (v!.affiliation === "alumni" ? "alumni" : "faculty/staff") + " — alumni-open opportunities remain available to you." };
       return { eligible: true };
     }
     if (opp.eligibility === "my_school") {
       if (!v) return { eligible: false, reason: `Student verification required — this opportunity is limited to verified ${school ?? "campus"} students. Verify your student affiliation for free to apply.`, verifyFixes: true };
-      if (v.campusId !== opp.eligibilityCampusId) return { eligible: false, reason: `This opportunity is limited to ${school ?? "a specific school"} students — your verification is at a different school.` };
-      if (v.affiliation !== "current_student") return { eligible: false, reason: `This opportunity is for current ${school ?? ""} students. Your verified status is ${v.affiliation === "alumni" ? "alumni" : "faculty/staff"}.` };
+      if (v!.campusId !== opp.eligibilityCampusId) return { eligible: false, reason: `This opportunity is limited to ${school ?? "a specific school"} students — your verification is at a different school.` };
+      if (v!.affiliation !== "current_student") return { eligible: false, reason: `This opportunity is for current ${school ?? ""} students. Your verified status is ${v!.affiliation === "alumni" ? "alumni" : "faculty/staff"}.` };
       return { eligible: true };
     }
     // alumni
     if (!v) return { eligible: false, reason: `Alumni verification required — this opportunity is limited to verified ${school ? school + " " : ""}alumni. Verify your affiliation for free to apply.`, verifyFixes: true };
-    if (opp.eligibilityCampusId && v.campusId !== opp.eligibilityCampusId) return { eligible: false, reason: `This opportunity is limited to ${school} alumni — your verification is at a different school.` };
-    if (v.affiliation !== "alumni") return { eligible: false, reason: "This opportunity is for alumni. Current students can find student opportunities across Mavyn." };
+    if (opp.eligibilityCampusId && v!.campusId !== opp.eligibilityCampusId) return { eligible: false, reason: `This opportunity is limited to ${school} alumni — your verification is at a different school.` };
+    if (v!.affiliation !== "alumni") return { eligible: false, reason: "This opportunity is for alumni. Current students can find student opportunities across Mavyn." };
     return { eligible: true };
   })();
 
   // DEMO MODE: the gate opens for testing — labeled, never silent
-  if (!verdict.eligible && unrestrictedTester(userId)) return { eligible: true, demoBypass: true };
+  if (!verdict.eligible && (await unrestrictedTester(userId))) return { eligible: true, demoBypass: true };
   return verdict;
 }

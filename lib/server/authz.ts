@@ -9,8 +9,8 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { ApiError } from "./auth";
 
-export function isConversationMember(conversationId: string, userId: string): boolean {
-  const row = db
+export async function isConversationMember(conversationId: string, userId: string): Promise<boolean> {
+  const row = await db
     .select({ userId: tables.conversationMembers.userId })
     .from(tables.conversationMembers)
     .where(
@@ -23,35 +23,35 @@ export function isConversationMember(conversationId: string, userId: string): bo
   return !!row;
 }
 
-export function requireConversationMember(conversationId: string, userId: string) {
-  if (!isConversationMember(conversationId, userId))
+export async function requireConversationMember(conversationId: string, userId: string) {
+  if (!(await isConversationMember(conversationId, userId)))
     throw new ApiError(403, "Not a member of this conversation");
 }
 
-export function getProjectForParty(projectId: string, userId: string) {
-  const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+export async function getProjectForParty(projectId: string, userId: string) {
+  const project = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!project) throw new ApiError(404, "Project not found");
   if (project.clientId !== userId && project.creatorId !== userId)
     throw new ApiError(403, "Not a party to this project");
   return project;
 }
 
-export function requireServiceOwner(serviceId: string, userId: string) {
-  const service = db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
+export async function requireServiceOwner(serviceId: string, userId: string) {
+  const service = await db.select().from(tables.services).where(eq(tables.services.id, serviceId)).get();
   if (!service) throw new ApiError(404, "Service not found");
   if (service.ownerId !== userId) throw new ApiError(403, "Not your service");
   return service;
 }
 
-export function requireOpportunityPoster(opportunityId: string, userId: string) {
-  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, opportunityId)).get();
+export async function requireOpportunityPoster(opportunityId: string, userId: string) {
+  const opp = await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, opportunityId)).get();
   if (!opp) throw new ApiError(404, "Opportunity not found");
   if (opp.posterId !== userId) throw new ApiError(403, "Not your opportunity");
   return opp;
 }
 
-export function hasWorkedTogether(a: string, b: string): boolean {
-  const row = db
+export async function hasWorkedTogether(a: string, b: string): Promise<boolean> {
+  const row = await db
     .select({ id: tables.projects.id })
     .from(tables.projects)
     .where(
@@ -62,7 +62,7 @@ export function hasWorkedTogether(a: string, b: string): boolean {
     )
     .get();
   if (row) return true;
-  const rev = db
+  const rev = await db
     .select({ id: tables.projects.id })
     .from(tables.projects)
     .where(
@@ -76,10 +76,10 @@ export function hasWorkedTogether(a: string, b: string): boolean {
 }
 
 /** Can `viewerId` open a conversation with the owner of `targetProfile`? */
-export function canMessage(
+export async function canMessage(
   targetProfile: typeof tables.profiles.$inferSelect,
   viewerId: string
-): boolean {
+): Promise<boolean> {
   if (targetProfile.userId === viewerId) return false;
   switch (targetProfile.whoCanMessage) {
     case "nobody":
@@ -88,7 +88,7 @@ export function canMessage(
       return true;
     case "following": {
       // target must follow the viewer ("people I follow")
-      const row = db
+      const row = await db
         .select({ followerId: tables.follows.followerId })
         .from(tables.follows)
         .where(

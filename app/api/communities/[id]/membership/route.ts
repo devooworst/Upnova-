@@ -11,13 +11,13 @@ export const dynamic = "force-dynamic";
 
 /** GET — my membership + a renewal quote. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const c = findCommunity(params.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    let m = getMembership(c.id, user.id);
+    let m = await getMembership(c.id, user.id);
     if (!m) throw new ApiError(404, "You're not a member");
-    m = refreshMembership(c, m);
+    m = await refreshMembership(c, m);
     return {
       status: m.status,
       memberUntil: m.memberUntil ? new Date(m.memberUntil).toISOString() : null,
@@ -31,14 +31,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
  *  Reactivates an inactive membership — history untouched throughout. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
-    const c = findCommunity(params.id);
+    const user = await requireUser();
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
     if (c.price <= 0) throw new ApiError(409, "This community is free — there's nothing to renew");
 
-    let m = getMembership(c.id, user.id);
+    let m = await getMembership(c.id, user.id);
     if (!m || m.status === "banned") throw new ApiError(403, "You're not a member of this community");
-    m = refreshMembership(c, m);
+    m = await refreshMembership(c, m);
     if (!["active", "inactive"].includes(m.status))
       throw new ApiError(409, "Renewal applies to current or lapsed memberships");
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (Math.abs(Number(body.expectedTotal) - quote.total) > 0.009)
       throw new ApiError(409, `The total changed — it's now $${quote.total.toFixed(2)} ($${c.price} + $${quote.fee.toFixed(2)} platform fee). Review and confirm again.`);
 
-    db.insert(tables.payments)
+    await db.insert(tables.payments)
       .values({
         id: randomBytes(12).toString("hex"),
         communityId: c.id,
@@ -63,12 +63,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const base = Math.max(Date.now(), m.memberUntil ? new Date(m.memberUntil).getTime() : 0);
     const until = new Date(base + communityPeriodDays(c) * 86_400_000);
-    db.update(tables.communityMembers)
+    await db.update(tables.communityMembers)
       .set({ status: "active", memberUntil: until, expiryNotified: false, graceNotified: false })
       .where(and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.userId, user.id)))
       .run();
 
-    notify({ userId: c.createdById, actorId: user.id, type: "community", title: `${c.name} — @${user.handle} renewed`, body: `$${c.price} membership period`, href: `/communities/${c.slug}` });
+    await notify({ userId: c.createdById, actorId: user.id, type: "community", title: `${c.name} — @${user.handle} renewed`, body: `$${c.price} membership period`, href: `/communities/${c.slug}` });
     return { ok: true, status: "active", memberUntil: until.toISOString() };
   });
 }

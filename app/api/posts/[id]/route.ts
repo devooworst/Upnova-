@@ -11,21 +11,21 @@ export const dynamic = "force-dynamic";
  *  links land here and work for guests; interaction still needs an
  *  account. The post remains the canonical record — never a copy. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const row = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const row = await db
       .select({ post: tables.posts, user: tables.users, profile: tables.profiles })
       .from(tables.posts)
       .innerJoin(tables.users, eq(tables.posts.authorId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.posts.id, params.id))
       .get();
-    if (!row || row.user.status !== "active") throw new ApiError(404, "Post not found");
-    const { post, user, profile } = row;
+    if (!row || row!.user.status !== "active") throw new ApiError(404, "Post not found");
+    const { post, user, profile } = await row;
 
-    const likes = db.select().from(tables.likes).where(eq(tables.likes.postId, post.id)).all();
-    const comments = db.select().from(tables.comments).where(eq(tables.comments.postId, post.id)).all();
-    const trust = postTrustMap([post], viewer?.id).get(post.id);
+    const likes = await db.select().from(tables.likes).where(eq(tables.likes.postId, post.id)).all();
+    const comments = await db.select().from(tables.comments).where(eq(tables.comments.postId, post.id)).all();
+    const trust = (await postTrustMap([post], viewer?.id)).get(post.id);
 
     return {
       post: {

@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
  * payment in this environment is a TEST payment — no real money.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     return paymentsFor(user.id);
   });
 }

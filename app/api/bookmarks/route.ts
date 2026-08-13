@@ -10,44 +10,44 @@ const TYPES = ["post", "opportunity", "service", "event", "community"] as const;
 
 /** GET /api/bookmarks — the user's saved items, joined to the real records. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select()
       .from(tables.bookmarks)
       .where(eq(tables.bookmarks.userId, user.id))
       .orderBy(desc(tables.bookmarks.createdAt))
       .all();
 
-    const byType = (t: string) => rows.filter((r) => r.targetType === t).map((r) => r.targetId);
+    const byType = async (t: string) => rows.filter((r) => r.targetType === t).map((r) => r.targetId);
 
-    const posts = byType("post").length
-      ? db
+    const posts = (await byType("post")).length
+      ? await db
           .select({ post: tables.posts, profile: tables.profiles, user: tables.users })
           .from(tables.posts)
           .innerJoin(tables.users, eq(tables.posts.authorId, tables.users.id))
           .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-          .where(inArray(tables.posts.id, byType("post")))
+          .where(inArray(tables.posts.id, await byType("post")))
           .all()
       : [];
-    const opps = byType("opportunity").length
-      ? db
+    const opps = (await byType("opportunity")).length
+      ? await db
           .select({ opp: tables.opportunities, profile: tables.profiles })
           .from(tables.opportunities)
           .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.opportunities.posterId))
-          .where(inArray(tables.opportunities.id, byType("opportunity")))
+          .where(inArray(tables.opportunities.id, await byType("opportunity")))
           .all()
       : [];
-    const eventRows = byType("event").length
-      ? db.select().from(tables.events).where(inArray(tables.events.id, byType("event"))).all()
+    const eventRows = (await byType("event")).length
+      ? await db.select().from(tables.events).where(inArray(tables.events.id, await byType("event"))).all()
       : [];
-    const services = byType("service").length
-      ? db
+    const services = (await byType("service")).length
+      ? await db
           .select({ service: tables.services, profile: tables.profiles, user: tables.users })
           .from(tables.services)
           .innerJoin(tables.users, eq(tables.services.ownerId, tables.users.id))
           .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-          .where(inArray(tables.services.id, byType("service")))
+          .where(inArray(tables.services.id, await byType("service")))
           .all()
       : [];
 
@@ -120,14 +120,14 @@ export async function GET() {
 /** POST { targetType, targetId } — toggle a bookmark. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const targetType = String(body.targetType);
     const targetId = String(body.targetId || "");
     if (!TYPES.includes(targetType as (typeof TYPES)[number]) || !targetId)
       throw new ApiError(400, "Invalid bookmark target");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.bookmarks)
       .where(
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
       .get();
 
     if (existing) {
-      db.delete(tables.bookmarks)
+      await db.delete(tables.bookmarks)
         .where(
           and(
             eq(tables.bookmarks.userId, user.id),
@@ -149,11 +149,11 @@ export async function POST(req: NextRequest) {
           )
         )
         .run();
-      recordInteraction(user.id, targetType as TargetType, targetId, "unsave");
+      await recordInteraction(user.id, targetType as TargetType, targetId, "unsave");
       return { saved: false };
     }
-    db.insert(tables.bookmarks).values({ userId: user.id, targetType, targetId }).run();
-    recordInteraction(user.id, targetType as TargetType, targetId, "save");
+    await db.insert(tables.bookmarks).values({ userId: user.id, targetType, targetId }).run();
+    await recordInteraction(user.id, targetType as TargetType, targetId, "save");
     return { saved: true };
   });
 }

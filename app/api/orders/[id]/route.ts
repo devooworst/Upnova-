@@ -22,9 +22,9 @@ export const dynamic = "force-dynamic";
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const o = db.select().from(tables.orders).where(eq(tables.orders.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const o = await db.select().from(tables.orders).where(eq(tables.orders.id, params.id)).get();
     if (!o) throw new ApiError(404, "Order not found");
     const isBuyer = o.buyerId === user.id;
     const isSeller = o.sellerId === user.id;
@@ -32,13 +32,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const other = isBuyer ? o.sellerId : o.buyerId;
     const action = String(body.action);
-    const set = (patch: Partial<typeof tables.orders.$inferInsert>) =>
-      db.update(tables.orders).set(patch).where(eq(tables.orders.id, o.id)).run();
-    const sys = (convId: string, text: string) => {
-      db.insert(tables.messages)
+    const set = async (patch: Partial<typeof tables.orders.$inferInsert>) =>
+      await db.update(tables.orders).set(patch).where(eq(tables.orders.id, o.id)).run();
+    const sys = async (convId: string, text: string) => {
+      await db.insert(tables.messages)
         .values({ id: randomBytes(12).toString("hex"), conversationId: convId, senderId: user.id, body: text, kind: "system" })
         .run();
-      db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+      await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
     };
 
     if (action === "pay") {
@@ -52,11 +52,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
       // stock check at pay time, not just at order time
       const product = o.productId
-        ? db.select().from(tables.products).where(eq(tables.products.id, o.productId)).get()
+        ? await db.select().from(tables.products).where(eq(tables.products.id, o.productId)).get()
         : null;
       if (product && product.quantity - product.sold < o.qty) throw new ApiError(409, "Sold out while you were checking out");
 
-      db.insert(tables.payments)
+      await db.insert(tables.payments)
         .values({
           id: randomBytes(12).toString("hex"),
           orderId: o.id,
@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         })
         .run();
       if (product) {
-        db.update(tables.products)
+        await db.update(tables.products)
           .set({
             sold: product.sold + o.qty,
             status: product.quantity - (product.sold + o.qty) < 1 ? "sold_out" : product.status,
@@ -76,11 +76,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           .where(eq(tables.products.id, product.id))
           .run();
       }
-      const convId = o.conversationId ?? conversationBetween(o.buyerId, o.sellerId);
-      set({ status: "secured", conversationId: convId });
-      logOrderEvent(o.id, user.id, "paid", `$${((subtotal * 105) / 100).toFixed(2)} secured (incl. fee) — held until completion`);
-      sys(convId, `Order placed — ${o.title}${o.variant ? ` (${o.variant})` : ""} ×${o.qty}. Payment secured: $${((subtotal * 105) / 100).toFixed(2)}. Funds are held until the order completes.`);
-      notify({
+      const convId = o.conversationId ?? (await conversationBetween(o.buyerId, o.sellerId));
+      await set({ status: "secured", conversationId: convId });
+      await logOrderEvent(o.id, user.id, "paid", `$${((subtotal * 105) / 100).toFixed(2)} secured (incl. fee) — held until completion`);
+      await sys(convId, `Order placed — ${o.title}${o.variant ? ` (${o.variant})` : ""} ×${o.qty}. Payment secured: $${((subtotal * 105) / 100).toFixed(2)}. Funds are held until the order completes.`);
+      await notify({
         userId: other,
         actorId: user.id,
         type: "order",
@@ -90,16 +90,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         category: "payments",
       });
       // demo: seed sellers prepare + ship immediately with mock tracking
-      seedSellerFulfills(o.id);
-      const fresh = db.select().from(tables.orders).where(eq(tables.orders.id, o.id)).get()!;
+      await seedSellerFulfills(o.id);
+      const fresh = (await db.select().from(tables.orders).where(eq(tables.orders.id, o.id)).get())!;
       return { status: fresh.status, conversationId: convId };
     }
 
     if (action === "preparing") {
       if (!isSeller) throw new ApiError(403, "Only the seller updates fulfillment");
       if (o.status !== "secured") throw new ApiError(409, `Cannot start preparing from ${o.status}`);
-      set({ status: "preparing" });
-      notify({ userId: other, actorId: user.id, type: "order", title: `Seller is preparing your order`, body: o.title, href: "/orders", priority: "normal" });
+      await set({ status: "preparing" });
+      await notify({ userId: other, actorId: user.id, type: "order", title: `Seller is preparing your order`, body: o.title, href: "/orders", priority: "normal" });
       return { status: "preparing" };
     }
 
@@ -125,11 +125,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       };
       if (rules.sellerEvidenceRequired && !evidence.serial && photos.length === 0)
         throw new ApiError(400, `High-value order ($${o.price * o.qty}) — record the serial number or a photo of the actual item before shipping. It protects YOU in a dispute.`);
-      set({ status: "shipped", tracking: JSON.stringify(tracking), sellerEvidence: JSON.stringify(evidence) });
-      logOrderEvent(o.id, user.id, "shipped", `${tracking.carrier ?? ""} ${tracking.code ?? ""}${evidence.serial ? " · serial recorded (private)" : ""}${photos.length ? ` · ${photos.length} pre-ship photo(s)` : ""}${evidence.weightLb ? ` · ${evidence.weightLb} lb (weight is context, not proof of contents)` : ""}`.trim());
+      await set({ status: "shipped", tracking: JSON.stringify(tracking), sellerEvidence: JSON.stringify(evidence) });
+      await logOrderEvent(o.id, user.id, "shipped", `${tracking.carrier ?? ""} ${tracking.code ?? ""}${evidence.serial ? " · serial recorded (private)" : ""}${photos.length ? ` · ${photos.length} pre-ship photo(s)` : ""}${evidence.weightLb ? ` · ${evidence.weightLb} lb (weight is context, not proof of contents)` : ""}`.trim());
       if (o.conversationId)
-        sys(o.conversationId, `${o.title} shipped${tracking.carrier ? ` via ${tracking.carrier}` : ""}${tracking.code ? ` · tracking ${tracking.code}` : ""}${tracking.eta ? ` · estimated ${new Date(tracking.eta).toLocaleDateString("en-US", { month: "long", day: "numeric" })}` : ""}.`);
-      notify({ userId: other, actorId: user.id, type: "order", title: `Shipped — ${o.title}`, body: tracking.eta ? `Estimated delivery ${new Date(tracking.eta).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "", href: "/orders" });
+        await sys(o.conversationId, `${o.title} shipped${tracking.carrier ? ` via ${tracking.carrier}` : ""}${tracking.code ? ` · tracking ${tracking.code}` : ""}${tracking.eta ? ` · estimated ${new Date(tracking.eta).toLocaleDateString("en-US", { month: "long", day: "numeric" })}` : ""}.`);
+      await notify({ userId: other, actorId: user.id, type: "order", title: `Shipped — ${o.title}`, body: tracking.eta ? `Estimated delivery ${new Date(tracking.eta).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "", href: "/orders" });
       return { status: "shipped" };
     }
 
@@ -138,31 +138,31 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!isSeller) throw new ApiError(403, "Only the seller confirms handoff");
       if (!["secured", "preparing"].includes(o.status)) throw new ApiError(409, `Cannot hand off from ${o.status}`);
       const hRules = protectionRules(o.price * o.qty);
-      set({ status: "delivered", protectionEndsAt: new Date(Date.now() + hRules.protectionHours * 3600_000) });
-      logOrderEvent(o.id, user.id, "delivered", "Seller marked handed off");
-      logOrderEvent(o.id, null, "protection_started", `${hRules.protectionHours}h buyer-protection window`);
-      notify({ userId: other, actorId: user.id, type: "order", title: `Handed off — ${o.title}`, body: `Confirm receipt anytime — otherwise the order completes when the ${hRules.protectionHours}h protection window ends.`, href: "/orders" });
+      await set({ status: "delivered", protectionEndsAt: new Date(Date.now() + hRules.protectionHours * 3600_000) });
+      await logOrderEvent(o.id, user.id, "delivered", "Seller marked handed off");
+      await logOrderEvent(o.id, null, "protection_started", `${hRules.protectionHours}h buyer-protection window`);
+      await notify({ userId: other, actorId: user.id, type: "order", title: `Handed off — ${o.title}`, body: `Confirm receipt anytime — otherwise the order completes when the ${hRules.protectionHours}h protection window ends.`, href: "/orders" });
       return { status: "delivered" };
     }
 
     if (action === "confirm_received") {
       if (!isBuyer) throw new ApiError(403, "Only the buyer confirms receipt");
       if (!["shipped", "delivered"].includes(o.status)) throw new ApiError(409, `Cannot confirm from ${o.status}`);
-      const openCase = db
+      const openCase = (await db
         .select()
         .from(tables.disputes)
         .where(eq(tables.disputes.orderId, o.id))
-        .all()
+        .all())
         .some((d) => ["open", "under_review", "return_authorized", "return_in_transit"].includes(d.status));
       if (openCase) throw new ApiError(409, "There's an open case on this order — resolve or withdraw it first");
-      set({ status: "completed" });
-      logOrderEvent(o.id, user.id, "completed", "Buyer confirmed receipt — funds released");
-      db.update(tables.payments)
+      await set({ status: "completed" });
+      await logOrderEvent(o.id, user.id, "completed", "Buyer confirmed receipt — funds released");
+      await db.update(tables.payments)
         .set({ status: "released" })
         .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
         .run();
-      if (o.conversationId) sys(o.conversationId, `Order completed — $${o.price * o.qty} released to the seller.`);
-      notify({ userId: other, actorId: user.id, type: "order", title: `Order completed — $${o.price * o.qty} released`, body: o.title, href: "/orders", category: "payments" });
+      if (o.conversationId) await sys(o.conversationId, `Order completed — $${o.price * o.qty} released to the seller.`);
+      await notify({ userId: other, actorId: user.id, type: "order", title: `Order completed — $${o.price * o.qty} released`, body: o.title, href: "/orders", category: "payments" });
       return { status: "completed" };
     }
 
@@ -171,22 +171,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!["placed", "secured", "preparing"].includes(o.status))
         throw new ApiError(409, "Shipped orders can't be cancelled — use Report a problem instead");
       const hadPayment = ["secured", "preparing"].includes(o.status);
-      db.update(tables.payments)
+      await db.update(tables.payments)
         .set({ status: "refunded" })
         .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
         .run();
       if (hadPayment && o.productId) {
-        const product = db.select().from(tables.products).where(eq(tables.products.id, o.productId)).get();
+        const product = await db.select().from(tables.products).where(eq(tables.products.id, o.productId)).get();
         if (product)
-          db.update(tables.products)
+          await db.update(tables.products)
             .set({ sold: Math.max(0, product.sold - o.qty), status: product.status === "sold_out" ? "active" : product.status })
             .where(eq(tables.products.id, product.id))
             .run();
       }
-      set({ status: "cancelled" });
-      logOrderEvent(o.id, user.id, "cancelled", hadPayment ? "Refunded in full" : "");
-      if (o.conversationId) sys(o.conversationId, `Order cancelled — ${o.title}.${hadPayment ? " Payment refunded in full." : ""}`);
-      notify({ userId: other, actorId: user.id, type: "order", title: `Order cancelled — ${o.title}`, body: hadPayment ? "Payment refunded in full" : "", href: "/orders" });
+      await set({ status: "cancelled" });
+      await logOrderEvent(o.id, user.id, "cancelled", hadPayment ? "Refunded in full" : "");
+      if (o.conversationId) await sys(o.conversationId, `Order cancelled — ${o.title}.${hadPayment ? " Payment refunded in full." : ""}`);
+      await notify({ userId: other, actorId: user.id, type: "order", title: `Order cancelled — ${o.title}`, body: hadPayment ? "Payment refunded in full" : "", href: "/orders" });
       return { status: "cancelled" };
     }
 

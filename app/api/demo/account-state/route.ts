@@ -23,19 +23,19 @@ const STATES = ["unverified", "current_student", "alumni", "faculty_staff"] as c
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireQaOperator();
+    const user = await requireQaOperator();
     // the developer test panel lives in DEMO MODE only — in Simulation Mode
     // you change verification/plan through the realistic user flows
-    const mode = db.select({ t: tables.users.testerMode }).from(tables.users).where(eq(tables.users.id, user.id)).get();
+    const mode = await db.select({ t: tables.users.testerMode }).from(tables.users).where(eq(tables.users.id, user.id)).get();
     if (mode?.t === "simulation")
       throw new ApiError(403, "Demo account-state switching requires Demo Mode — use the toggle in the top-left");
     const state = String(body.state || "");
     if (!STATES.includes(state as (typeof STATES)[number]))
       throw new ApiError(400, "state must be one of: " + STATES.join(", "));
 
-    const rows = db
+    const rows = await db
       .select()
       .from(tables.campusVerifications)
       .where(eq(tables.campusVerifications.userId, user.id))
@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
 
     if (state === "unverified") {
       for (const r of rows)
-        db.delete(tables.campusVerifications).where(eq(tables.campusVerifications.id, r.id)).run();
+        await db.delete(tables.campusVerifications).where(eq(tables.campusVerifications.id, r.id)).run();
       return { state: "unverified", campus: null };
     }
 
-    const campus = db
+    const campus = await db
       .select()
       .from(tables.campuses)
       .where(eq(tables.campuses.slug, String(body.campus || "bowie-state")))
@@ -57,22 +57,22 @@ export async function POST(req: NextRequest) {
     // same status rule as real graduation: becoming alumni ends College+
     // (plan -> free); it NEVER auto-enrolls anyone in Pro
     if (state === "alumni") {
-      const acct = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+      const acct = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
       if (acct.plan === "college")
-        db.update(tables.users).set({ plan: "free" }).where(eq(tables.users.id, user.id)).run();
+        await db.update(tables.users).set({ plan: "free" }).where(eq(tables.users.id, user.id)).run();
     }
-    const existing = rows.find((r) => r.campusId === campus.id);
+    const existing = rows.find((r) => r.campusId! === campus!.id);
     if (existing) {
-      db.update(tables.campusVerifications)
+      await db.update(tables.campusVerifications)
         .set({ status: "verified", affiliation: state, verifiedAt: existing.verifiedAt ?? new Date() })
         .where(eq(tables.campusVerifications.id, existing.id))
         .run();
     } else {
-      db.insert(tables.campusVerifications)
+      await db.insert(tables.campusVerifications)
         .values({
-          id: `cv-${user.id.slice(0, 8)}-${campus.slug}`,
+          id: `cv-${user.id.slice(0, 8)}-${campus!.slug}`,
           userId: user.id,
-          campusId: campus.id,
+          campusId: campus!.id,
           status: "verified",
           affiliation: state,
           gradYear: state === "alumni" ? "2022" : "2027",
@@ -81,6 +81,6 @@ export async function POST(req: NextRequest) {
         })
         .run();
     }
-    return { state, campus: campus.name };
+    return { state, campus: campus!.name };
   });
 }

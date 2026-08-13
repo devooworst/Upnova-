@@ -33,9 +33,9 @@ export interface WorkLink {
  * Throws unless the transaction exists, is completed, and the poster
  * was a participant. Returns the counterparty (the future confirmer).
  */
-export function validateWorkLink(userId: string, projectId?: string | null, bookingId?: string | null): WorkLink | null {
+export async function validateWorkLink(userId: string, projectId?: string | null, bookingId?: string | null): Promise<WorkLink | null> {
   if (projectId) {
-    const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+    const p = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
     if (!p) throw new ApiError(404, "Linked project not found");
     if (p.creatorId !== userId && p.clientId !== userId)
       throw new ApiError(403, "You can only link work from your own projects");
@@ -44,7 +44,7 @@ export function validateWorkLink(userId: string, projectId?: string | null, book
     return { kind: "project", id: p.id, title: p.title, counterpartyId: p.creatorId === userId ? p.clientId : p.creatorId };
   }
   if (bookingId) {
-    const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+    const b = await db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
     if (!b) throw new ApiError(404, "Linked booking not found");
     if (b.providerId !== userId && b.clientId !== userId)
       throw new ApiError(403, "You can only link work from your own bookings");
@@ -62,14 +62,14 @@ type PostRow = typeof tables.posts.$inferSelect;
  * Recomputes the link validity at read time so a project that somehow
  * regressed never keeps a stale chip.
  */
-export function postTrustMap(posts: PostRow[], viewerId?: string | null): Map<string, PostTrust> {
+export async function postTrustMap(posts: PostRow[], viewerId?: string | null): Promise<Map<string, PostTrust>> {
   const projIds = Array.from(new Set(posts.map((p) => p.projectId).filter(Boolean))) as string[];
   const bookIds = Array.from(new Set(posts.map((p) => p.bookingId).filter(Boolean))) as string[];
   const projects = projIds.length
-    ? db.select().from(tables.projects).where(inArray(tables.projects.id, projIds)).all()
+    ? await db.select().from(tables.projects).where(inArray(tables.projects.id, projIds)).all()
     : [];
   const bookings = bookIds.length
-    ? db.select().from(tables.bookings).where(inArray(tables.bookings.id, bookIds)).all()
+    ? await db.select().from(tables.bookings).where(inArray(tables.bookings.id, bookIds)).all()
     : [];
   const partyIds = new Set<string>();
   for (const p of projects) {
@@ -82,7 +82,7 @@ export function postTrustMap(posts: PostRow[], viewerId?: string | null): Map<st
   }
   const names = new Map(
     (partyIds.size
-      ? db.select().from(tables.profiles).where(inArray(tables.profiles.userId, Array.from(partyIds))).all()
+      ? await db.select().from(tables.profiles).where(inArray(tables.profiles.userId, Array.from(partyIds))).all()
       : []
     ).map((pr) => [pr.userId, pr.displayName])
   );
@@ -123,21 +123,21 @@ export function postTrustMap(posts: PostRow[], viewerId?: string | null): Map<st
  * the human moderator — similarity and heuristics are never proof that
  * work was stolen, and they never trigger automatic action.
  */
-export function computeRiskSignals(targetType: string, targetId: string): string[] {
+export async function computeRiskSignals(targetType: string, targetId: string): Promise<string[]> {
   const signals: string[] = [];
   try {
     if (targetType === "post") {
-      const post = db.select().from(tables.posts).where(eq(tables.posts.id, targetId)).get();
+      const post = await db.select().from(tables.posts).where(eq(tables.posts.id, targetId)).get();
       if (!post) return signals;
 
       // exact duplicate media across different authors (hash match only —
       // says "same file appears twice", not "who made it first is wrong")
       if (post.imageUrl) {
         const hash = createHash("sha256").update(post.imageUrl).digest("hex");
-        const dupes = db
+        const dupes = (await db
           .select()
           .from(tables.posts)
-          .all()
+          .all())
           .filter(
             (p) =>
               p.id !== post.id &&
@@ -150,15 +150,15 @@ export function computeRiskSignals(targetType: string, targetId: string): string
       }
 
       // account age — young accounts posting claimed work is context, not guilt
-      const author = db.select().from(tables.users).where(eq(tables.users.id, post.authorId)).get();
+      const author = await db.select().from(tables.users).where(eq(tables.users.id, post.authorId)).get();
       if (author) {
         const days = (Date.now() - author.createdAt.getTime()) / 86400_000;
         if (days < 7) signals.push(`Author account is ${Math.max(1, Math.round(days))} day(s) old`);
         // prior open/reviewing reports against the same author's content
-        const prior = db
+        const prior = (await db
           .select()
           .from(tables.reports)
-          .all()
+          .all())
           .filter((r) => ["open", "reviewing"].includes(r.status) && r.targetType === "user" && r.targetId === author.id).length;
         if (prior) signals.push(`${prior} other unresolved report(s) reference this account`);
       }

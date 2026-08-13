@@ -1,10 +1,10 @@
 /* ------------------------------------------------------------------ */
 /*  Mavyn — production data model (Drizzle ORM)                       */
 /*                                                                     */
-/*  Dev runs on SQLite (zero-config in any sandbox). The schema is     */
-/*  written to be portable to Postgres for production: swap the        */
-/*  dialect, turn the string "enum" columns into real enums, and       */
-/*  apply the Row Level Security policies in db/rls.sql. Until then,   */
+/*  POSTGRES schema (Drizzle pg-core). Production/preview run on Neon  */
+/*  via DATABASE_URL; local dev runs the SAME schema on PGlite (WASM   */
+/*  Postgres, zero-config in any sandbox). String "enum" columns can   */
+/*  become real enums later; RLS policies live in db/rls.sql. Today    */
 /*  every route handler enforces identical ownership rules in the      */
 /*  app layer via lib/server/authz.ts — no mutation happens without    */
 /*  an ownership check.                                                */
@@ -14,19 +14,19 @@
 /*  user records.                                                      */
 /* ------------------------------------------------------------------ */
 
-import { sqliteTable, text, integer, real, primaryKey, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, doublePrecision, timestamp, boolean, primaryKey, uniqueIndex, index } from "drizzle-orm/pg-core";
 
 const id = () => text("id").primaryKey();
 const ts = (name: string) =>
-  integer(name, { mode: "timestamp_ms" })
+  timestamp(name, { withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date());
-const bool = (name: string, def = false) => integer(name, { mode: "boolean" }).notNull().default(def);
+const bool = (name: string, def = false) => boolean(name).notNull().default(def);
 const seed = () => bool("is_seed", false);
 
 /* ------------------------------- identity ------------------------------- */
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
@@ -50,22 +50,22 @@ export const users = sqliteTable("users", {
   // Never inferred from a username; set only by seed config (demo-world
   // characters) — signups and admin accounts are ALWAYS real. Distinct
   // from isSeed, which only marks rows as wipeable seed DATA.
-  simulated: integer("simulated", { mode: "boolean" }).notNull().default(false),
+  simulated: boolean("simulated").notNull().default(false),
   // PHONE LOGIN + SMS — sensitive account data, never public unless the
   // member explicitly opts in elsewhere. Verified via OTP (hashes only).
   phone: text("phone").unique(),
-  phoneVerified: integer("phone_verified", { mode: "boolean" }).notNull().default(false),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
   // SMS requires EXPLICIT consent — a verified number alone never opts
   // anyone in. Notification prefs: JSON {category: {inapp,email,sms}}
   // per projects|opportunities|bookings|messages|security.
-  smsConsent: integer("sms_consent", { mode: "boolean" }).notNull().default(false),
+  smsConsent: boolean("sms_consent").notNull().default(false),
   notifyPrefs: text("notify_prefs").notNull().default(""),
   status: text("status").notNull().default("active"), // active | suspended
   // individual | business. businessVerified is EARNED through Mavyn's
   // business-verification process — it is never granted by a subscription.
   accountType: text("account_type").notNull().default("individual"),
-  businessVerified: integer("business_verified", { mode: "boolean" }).notNull().default(false),
-  mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).notNull().default(false),
+  businessVerified: boolean("business_verified").notNull().default(false),
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
   mfaSecret: text("mfa_secret"),
   // First-run onboarding state: "" = the guided tour has never been
   // completed (new accounts). JSON {completedAt, skipped} once done.
@@ -76,7 +76,7 @@ export const users = sqliteTable("users", {
   createdAt: ts("created_at"),
 });
 
-export const passwordResets = sqliteTable(
+export const passwordResets = pgTable(
   "password_resets",
   {
     id: id(),
@@ -84,14 +84,14 @@ export const passwordResets = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
     createdAt: ts("created_at"),
   },
   (t) => [index("pwreset_user").on(t.userId)]
 );
 
-export const sessions = sqliteTable(
+export const sessions = pgTable(
   "sessions",
   {
     id: id(),
@@ -99,13 +99,13 @@ export const sessions = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     createdAt: ts("created_at"),
   },
   (t) => [index("sessions_user").on(t.userId)]
 );
 
-export const profiles = sqliteTable("profiles", {
+export const profiles = pgTable("profiles", {
   id: id(),
   userId: text("user_id")
     .notNull()
@@ -140,8 +140,8 @@ export const profiles = sqliteTable("profiles", {
   stateId: text("state_id").notNull().default(""),         // e.g. "US-MD"
   countyId: text("county_id").notNull().default(""),       // e.g. "US-24033"
   cityId: text("city_id").notNull().default(""),           // e.g. "g4346952"
-  lat: real("lat"),
-  lng: real("lng"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
 
   // professional identity (JSON-encoded arrays — SQLite has no json type)
   primaryRole: text("primary_role").notNull().default(""),
@@ -184,7 +184,7 @@ export const profiles = sqliteTable("profiles", {
 
 /* -------------------------------- social -------------------------------- */
 
-export const posts = sqliteTable(
+export const posts = pgTable(
   "posts",
   {
     id: id(),
@@ -226,7 +226,7 @@ export const posts = sqliteTable(
   (t) => [index("posts_author_created").on(t.authorId, t.createdAt)]
 );
 
-export const comments = sqliteTable(
+export const comments = pgTable(
   "comments",
   {
     id: id(),
@@ -242,7 +242,7 @@ export const comments = sqliteTable(
   (t) => [index("comments_post").on(t.postId)]
 );
 
-export const likes = sqliteTable(
+export const likes = pgTable(
   "likes",
   {
     postId: text("post_id")
@@ -256,7 +256,7 @@ export const likes = sqliteTable(
   (t) => [primaryKey({ columns: [t.postId, t.userId] })]
 );
 
-export const follows = sqliteTable(
+export const follows = pgTable(
   "follows",
   {
     followerId: text("follower_id")
@@ -272,13 +272,13 @@ export const follows = sqliteTable(
 
 /* ------------------------------- messaging ------------------------------- */
 
-export const conversations = sqliteTable("conversations", {
+export const conversations = pgTable("conversations", {
   id: id(),
   createdAt: ts("created_at"),
   updatedAt: ts("updated_at"),
 });
 
-export const conversationMembers = sqliteTable(
+export const conversationMembers = pgTable(
   "conversation_members",
   {
     conversationId: text("conversation_id")
@@ -287,12 +287,12 @@ export const conversationMembers = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    lastReadAt: integer("last_read_at", { mode: "timestamp_ms" }),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true, mode: "date" }),
   },
   (t) => [primaryKey({ columns: [t.conversationId, t.userId] }), index("conv_members_user").on(t.userId)]
 );
 
-export const messages = sqliteTable(
+export const messages = pgTable(
   "messages",
   {
     id: id(),
@@ -309,7 +309,7 @@ export const messages = sqliteTable(
   (t) => [index("messages_conv_created").on(t.conversationId, t.createdAt)]
 );
 
-export const notifications = sqliteTable(
+export const notifications = pgTable(
   "notifications",
   {
     id: id(),
@@ -323,7 +323,7 @@ export const notifications = sqliteTable(
     title: text("title").notNull(),
     body: text("body").notNull().default(""),
     href: text("href").notNull(), // every notification has somewhere meaningful to go
-    readAt: integer("read_at", { mode: "timestamp_ms" }),
+    readAt: timestamp("read_at", { withTimezone: true, mode: "date" }),
     createdAt: ts("created_at"),
   },
   (t) => [index("notif_user_read").on(t.userId, t.readAt), index("notif_user_created").on(t.userId, t.createdAt)]
@@ -331,7 +331,7 @@ export const notifications = sqliteTable(
 
 /* ------------------------------ communities ------------------------------ */
 
-export const communities = sqliteTable("communities", {
+export const communities = pgTable("communities", {
   id: id(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
@@ -344,7 +344,7 @@ export const communities = sqliteTable("communities", {
   avatarUrl: text("avatar_url"),
   coverUrl: text("cover_url"),
   rules: text("rules").notNull().default("[]"), // JSON string[]
-  joinApproval: integer("join_approval", { mode: "boolean" }).notNull().default(false),
+  joinApproval: boolean("join_approval").notNull().default(false),
   whoCanPost: text("who_can_post").notNull().default("members"), // members | mods
   whoCanInvite: text("who_can_invite").notNull().default("mods"), // mods | members
   // JSON subset of ["real","alias","anonymous"] — the creator decides which
@@ -373,7 +373,7 @@ export const communities = sqliteTable("communities", {
   createdAt: ts("created_at"),
 });
 
-export const communityMembers = sqliteTable(
+export const communityMembers = pgTable(
   "community_members",
   {
     communityId: text("community_id")
@@ -388,7 +388,7 @@ export const communityMembers = sqliteTable(
     // (paid membership lapsed — history kept, access restricted) | banned
     status: text("status").notNull().default("active"),
     // paid membership: access runs until this instant (+ grace period)
-    memberUntil: integer("member_until", { mode: "timestamp_ms" }),
+    memberUntil: timestamp("member_until", { withTimezone: true, mode: "date" }),
     expiryNotified: bool("expiry_notified"),
     graceNotified: bool("grace_notified"),
     // community-specific alias. Other members never get a link from the
@@ -399,7 +399,7 @@ export const communityMembers = sqliteTable(
     // identifiable. Random per community — no cross-community correlation.
     anonCode: text("anon_code"),
     lastIdentity: text("last_identity").notNull().default("real"), // remembered composer default
-    mutedUntil: integer("muted_until", { mode: "timestamp_ms" }),
+    mutedUntil: timestamp("muted_until", { withTimezone: true, mode: "date" }),
     joinedAt: ts("joined_at"),
   },
   (t) => [primaryKey({ columns: [t.communityId, t.userId] })]
@@ -408,7 +408,7 @@ export const communityMembers = sqliteTable(
 /* Community discussion. authorId is NEVER serialized when identity is
    alias/anonymous — masking happens in lib/server/communities.ts, the only
    serializer for this content. */
-export const communityPosts = sqliteTable(
+export const communityPosts = pgTable(
   "community_posts",
   {
     id: id(),
@@ -427,7 +427,7 @@ export const communityPosts = sqliteTable(
     refId: text("ref_id"),
     pinned: bool("pinned"),
     locked: bool("locked"),
-    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+    removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
     removedById: text("removed_by_id"),
     removedReason: text("removed_reason").notNull().default(""),
     isSeed: seed(),
@@ -436,7 +436,7 @@ export const communityPosts = sqliteTable(
   (t) => [index("community_posts_comm_created").on(t.communityId, t.createdAt)]
 );
 
-export const communityComments = sqliteTable(
+export const communityComments = pgTable(
   "community_comments",
   {
     id: id(),
@@ -448,7 +448,7 @@ export const communityComments = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     identity: text("identity").notNull().default("real"),
     body: text("body").notNull(),
-    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+    removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
     removedById: text("removed_by_id"),
     isSeed: seed(),
     createdAt: ts("created_at"),
@@ -456,7 +456,7 @@ export const communityComments = sqliteTable(
   (t) => [index("community_comments_post").on(t.postId, t.createdAt)]
 );
 
-export const communityReactions = sqliteTable(
+export const communityReactions = pgTable(
   "community_reactions",
   {
     postId: text("post_id")
@@ -472,7 +472,7 @@ export const communityReactions = sqliteTable(
 
 /* Append-only moderation log. Every mod action — including any identity
    reveal — leaves a permanent record. */
-export const communityModLog = sqliteTable(
+export const communityModLog = pgTable(
   "community_mod_log",
   {
     id: id(),
@@ -497,7 +497,7 @@ export const communityModLog = sqliteTable(
    pending → accepted | declined | never ("don't ask again").
    The requester is shown to the target under their MASKED community
    identity; accepting reveals both sides to each other only. */
-export const identityReveals = sqliteTable(
+export const identityReveals = pgTable(
   "identity_reveals",
   {
     id: id(),
@@ -513,7 +513,7 @@ export const identityReveals = sqliteTable(
     // what the requester was looking at when they asked (for their own list)
     targetLabel: text("target_label").notNull().default(""),
     status: text("status").notNull().default("pending"), // pending | accepted | declined | never
-    respondedAt: integer("responded_at", { mode: "timestamp_ms" }),
+    respondedAt: timestamp("responded_at", { withTimezone: true, mode: "date" }),
     isSeed: seed(),
     createdAt: ts("created_at"),
   },
@@ -525,7 +525,7 @@ export const identityReveals = sqliteTable(
 
 /* Blocks. viaLabel preserves what the blocker was looking at (possibly a
    masked identity) so the block list never de-anonymizes anyone. */
-export const blocks = sqliteTable(
+export const blocks = pgTable(
   "blocks",
   {
     id: id(),
@@ -544,7 +544,7 @@ export const blocks = sqliteTable(
 
 /* --------------------------------- campus --------------------------------- */
 
-export const campuses = sqliteTable("campuses", {
+export const campuses = pgTable("campuses", {
   id: id(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
@@ -553,7 +553,7 @@ export const campuses = sqliteTable("campuses", {
   isSeed: seed(),
 });
 
-export const campusVerifications = sqliteTable(
+export const campusVerifications = pgTable(
   "campus_verifications",
   {
     id: id(),
@@ -578,10 +578,10 @@ export const campusVerifications = sqliteTable(
     gradYear: text("grad_year").notNull().default(""),
     // the member controls what the public profile shows; the verification
     // itself stays stored for trust/eligibility either way
-    showSchool: integer("show_school", { mode: "boolean" }).notNull().default(true),
-    showGradYear: integer("show_grad_year", { mode: "boolean" }).notNull().default(true), // school + class year is the public academic identity
-    showProgram: integer("show_program", { mode: "boolean" }).notNull().default(false),
-    verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
+    showSchool: boolean("show_school").notNull().default(true),
+    showGradYear: boolean("show_grad_year").notNull().default(true), // school + class year is the public academic identity
+    showProgram: boolean("show_program").notNull().default(false),
+    verifiedAt: timestamp("verified_at", { withTimezone: true, mode: "date" }),
     createdAt: ts("created_at"),
   },
   (t) => [uniqueIndex("campus_verif_user_campus").on(t.userId, t.campusId)]
@@ -589,7 +589,7 @@ export const campusVerifications = sqliteTable(
 
 /* ------------------------------ marketplace ------------------------------ */
 
-export const services = sqliteTable("services", {
+export const services = pgTable("services", {
   id: id(),
   ownerId: text("owner_id")
     .notNull()
@@ -630,12 +630,12 @@ export const services = sqliteTable("services", {
   // owner's active Preferred Clients holding a priority-booking /
   // early-access benefit can book. Enforced in POST /api/bookings —
   // never a display-only window.
-  preferredUntil: integer("preferred_until", { mode: "timestamp_ms" }),
+  preferredUntil: timestamp("preferred_until", { withTimezone: true, mode: "date" }),
   isSeed: seed(),
   createdAt: ts("created_at"),
 });
 
-export const opportunities = sqliteTable("opportunities", {
+export const opportunities = pgTable("opportunities", {
   id: id(),
   posterId: text("poster_id")
     .notNull()
@@ -645,8 +645,8 @@ export const opportunities = sqliteTable("opportunities", {
   budget: integer("budget"), // null = collaboration / unpaid
   type: text("type").notNull().default("gig"), // gig | collab | event | campus
   location: text("location").notNull().default(""),
-  lat: real("lat"),
-  lng: real("lng"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
   remote: bool("remote", false),
   studentFriendly: bool("student_friendly", false),
   // ELIGIBILITY ≠ VISIBILITY: everyone can SEE the listing; this rule
@@ -657,8 +657,8 @@ export const opportunities = sqliteTable("opportunities", {
   eligibility: text("eligibility").notNull().default("anyone"),
   eligibilityCampusId: text("eligibility_campus_id"),
   trustRequired: text("trust_required").notNull().default("standard"),
-  applyBy: integer("apply_by", { mode: "timestamp_ms" }),
-  eventDate: integer("event_date", { mode: "timestamp_ms" }),
+  applyBy: timestamp("apply_by", { withTimezone: true, mode: "date" }),
+  eventDate: timestamp("event_date", { withTimezone: true, mode: "date" }),
   // poster-defined application requirements:
   // { requireMessage?: boolean, question?: string } — availability is added
   // automatically when the opportunity has a date; portfolio/profile are
@@ -683,7 +683,7 @@ export const opportunities = sqliteTable("opportunities", {
   createdAt: ts("created_at"),
 });
 
-export const applications = sqliteTable(
+export const applications = pgTable(
   "applications",
   {
     id: id(),
@@ -717,7 +717,7 @@ export const applications = sqliteTable(
 
 /* -------------------------------- projects -------------------------------- */
 
-export const projects = sqliteTable(
+export const projects = pgTable(
   "projects",
   {
     id: id(),
@@ -735,7 +735,7 @@ export const projects = sqliteTable(
     // amount = creator payout in whole dollars; fee computed at payment time
     amount: integer("amount").notNull(),
     aiRequirement: text("ai_requirement").notNull().default("client-decides"),
-    deadline: integer("deadline", { mode: "timestamp_ms" }),
+    deadline: timestamp("deadline", { withTimezone: true, mode: "date" }),
     // draft → offer_sent → accepted → in_progress → extension_requested →
     // submitted → approved → completed → reviewed
     // lib/server/projects.ts is the single transition authority.
@@ -747,18 +747,18 @@ export const projects = sqliteTable(
   (t) => [index("projects_client").on(t.clientId), index("projects_creator").on(t.creatorId)]
 );
 
-export const projectMilestones = sqliteTable("project_milestones", {
+export const projectMilestones = pgTable("project_milestones", {
   id: id(),
   projectId: text("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  dueAt: integer("due_at", { mode: "timestamp_ms" }),
+  dueAt: timestamp("due_at", { withTimezone: true, mode: "date" }),
   status: text("status").notNull().default("pending"), // pending | done
   order: integer("order").notNull().default(0),
 });
 
-export const extensionRequests = sqliteTable(
+export const extensionRequests = pgTable(
   "extension_requests",
   {
     id: id(),
@@ -771,7 +771,7 @@ export const extensionRequests = sqliteTable(
     days: integer("days").notNull(),
     reason: text("reason").notNull().default(""),
     status: text("status").notNull().default("pending"), // pending | approved | denied
-    decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
     createdAt: ts("created_at"),
   },
   (t) => [index("ext_project_status").on(t.projectId, t.status)]
@@ -785,7 +785,7 @@ export const extensionRequests = sqliteTable(
    silently). The project/booking timeline is generated from these rows
    plus the other real records (payments, extensions, reviews) — never
    from one overwritten text field. */
-export const progressUpdates = sqliteTable(
+export const progressUpdates = pgTable(
   "progress_updates",
   {
     id: id(),
@@ -800,8 +800,8 @@ export const progressUpdates = sqliteTable(
     status: text("status").notNull().default(""),
     percent: integer("percent"), // 0–100, optional
     message: text("message").notNull().default(""),
-    etaAt: integer("eta_at", { mode: "timestamp_ms" }), // new estimate
-    prevEtaAt: integer("prev_eta_at", { mode: "timestamp_ms" }), // what it replaced (eta rows)
+    etaAt: timestamp("eta_at", { withTimezone: true, mode: "date" }), // new estimate
+    prevEtaAt: timestamp("prev_eta_at", { withTimezone: true, mode: "date" }), // what it replaced (eta rows)
     attachmentUrl: text("attachment_url").notNull().default(""),
     createdAt: ts("created_at"),
   },
@@ -815,7 +815,7 @@ export const progressUpdates = sqliteTable(
    "removed" + removedAt) so the relationship HISTORY survives.
    benefits = JSON array of {key, percent?, label?} chosen by the
    provider — discounts are optional, never mandatory. */
-export const preferredClients = sqliteTable(
+export const preferredClients = pgTable(
   "preferred_clients",
   {
     id: id(),
@@ -828,8 +828,8 @@ export const preferredClients = sqliteTable(
     status: text("status").notNull().default("active"), // active | removed
     benefits: text("benefits").notNull().default("[]"),
     note: text("note").notNull().default(""),
-    addedAt: integer("added_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+    addedAt: timestamp("added_at", { withTimezone: true, mode: "date" }).notNull().$defaultFn(() => new Date()),
+    removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
     createdAt: ts("created_at"),
   },
   (t) => [
@@ -845,7 +845,7 @@ export const preferredClients = sqliteTable(
    "staff" implicitly. Team rows are created only by the business, are
    private to it, and removal keeps the row (endedAt) so history holds.
    compensation is a PRIVATE note for the business — never public. */
-export const businessTeam = sqliteTable(
+export const businessTeam = pgTable(
   "business_team",
   {
     id: id(),
@@ -860,11 +860,11 @@ export const businessTeam = sqliteTable(
     // admin SEAT registration (capacity-tracked per plan). Delegated
     // acting-on-behalf access is a separate rolling-out feature — this
     // flag never grants login rights to the business account.
-    isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
+    isAdmin: boolean("is_admin").notNull().default(false),
     compensation: text("compensation").notNull().default(""), // private note
     notes: text("notes").notNull().default(""),
-    addedAt: integer("added_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+    addedAt: timestamp("added_at", { withTimezone: true, mode: "date" }).notNull().$defaultFn(() => new Date()),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
     createdAt: ts("created_at"),
   },
   (t) => [
@@ -876,7 +876,7 @@ export const businessTeam = sqliteTable(
 
 /* -------------------------------- bookings -------------------------------- */
 
-export const bookings = sqliteTable(
+export const bookings = pgTable(
   "bookings",
   {
     id: id(),
@@ -888,7 +888,7 @@ export const bookings = sqliteTable(
       .notNull()
       .references(() => users.id),
     title: text("title").notNull(),
-    startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true, mode: "date" }).notNull(),
     durationMin: integer("duration_min").notNull().default(60),
     price: integer("price").notNull(),
     // itemized snapshot of what was selected from the creator's menu —
@@ -906,7 +906,7 @@ export const bookings = sqliteTable(
     // demo progress beats for confirmed bookings (one-time provider updates
     // into the conversation): "" -> preparing -> in_progress
     progress: text("progress").notNull().default(""),
-    proposedStartsAt: integer("proposed_starts_at", { mode: "timestamp_ms" }),
+    proposedStartsAt: timestamp("proposed_starts_at", { withTimezone: true, mode: "date" }),
     // bookings and their conversation reference the same transaction
     conversationId: text("conversation_id"),
     isSeed: seed(),
@@ -920,7 +920,7 @@ export const bookings = sqliteTable(
 /* One-time codes for phone verification & phone login. SECURITY: only a
    sha256 HASH of the code is ever stored; 5-minute expiry; 5 attempts;
    request rate limiting lives in the route. */
-export const otpCodes = sqliteTable(
+export const otpCodes = pgTable(
   "otp_codes",
   {
     id: id(),
@@ -928,7 +928,7 @@ export const otpCodes = sqliteTable(
     codeHash: text("code_hash").notNull(),
     purpose: text("purpose").notNull().default("login"), // login | verify
     attempts: integer("attempts").notNull().default(0),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     createdAt: ts("created_at"),
   },
   (t) => [index("otp_phone").on(t.phone, t.createdAt)]
@@ -938,7 +938,7 @@ export const otpCodes = sqliteTable(
    channel (inspectable, honest); production swaps the writer for a real
    provider (Twilio/SES) behind the same dispatch call. OTP codes are
    NEVER written here in plaintext. */
-export const outbox = sqliteTable(
+export const outbox = pgTable(
   "outbox",
   {
     id: id(),
@@ -954,7 +954,7 @@ export const outbox = sqliteTable(
 
 /* ------------------------- portfolio / experience ------------------------- */
 
-export const portfolioItems = sqliteTable("portfolio_items", {
+export const portfolioItems = pgTable("portfolio_items", {
   id: id(),
   userId: text("user_id")
     .notNull()
@@ -969,7 +969,7 @@ export const portfolioItems = sqliteTable("portfolio_items", {
   createdAt: ts("created_at"),
 });
 
-export const experiences = sqliteTable("experiences", {
+export const experiences = pgTable("experiences", {
   id: id(),
   userId: text("user_id")
     .notNull()
@@ -992,7 +992,7 @@ export const experiences = sqliteTable("experiences", {
    or an HONEST external link ("you'll complete your purchase on the
    seller's website" — Mavyn never pretends it processed that sale). */
 
-export const products = sqliteTable("products", {
+export const products = pgTable("products", {
   id: id(),
   sellerId: text("seller_id")
     .notNull()
@@ -1026,7 +1026,7 @@ export const products = sqliteTable("products", {
    delivered → completed (payout released) · cancelled. Funds are held from
    payment until completion, exactly like bookings/projects. */
 
-export const orders = sqliteTable(
+export const orders = pgTable(
   "orders",
   {
     id: id(),
@@ -1052,7 +1052,7 @@ export const orders = sqliteTable(
     tracking: text("tracking").notNull().default("{}"),
     // buyer-protection window: starts at delivery; if no problem is
     // reported before it ends, the order auto-completes and funds release
-    protectionEndsAt: integer("protection_ends_at", { mode: "timestamp_ms" }),
+    protectionEndsAt: timestamp("protection_ends_at", { withTimezone: true, mode: "date" }),
     // PRIVATE seller shipment evidence (JSON): {serial?, weightLb?, note?,
     // photos: []} — recorded before shipping (required for high-value).
     // Never public; serial visible to seller + platform review only.
@@ -1071,7 +1071,7 @@ export const orders = sqliteTable(
    claims content can't be recorded or stolen — the protection is clear
    terms, preserved license records, and a dispute lane with evidence. */
 
-export const works = sqliteTable("works", {
+export const works = pgTable("works", {
   id: id(),
   creatorId: text("creator_id")
     .notNull()
@@ -1098,7 +1098,7 @@ export const works = sqliteTable("works", {
 /* The transaction/license RECORD — who licensed what, on which terms, when,
    for how much. Frozen at purchase; the raw material of dispute resolution. */
 
-export const licenses = sqliteTable(
+export const licenses = pgTable(
   "licenses",
   {
     id: id(), // the license / transaction ID shown to both parties
@@ -1135,7 +1135,7 @@ export const licenses = sqliteTable(
    stays the owner's property and comes back. Verified campus members
    transact; guests browse a limited slice. */
 
-export const campusListings = sqliteTable(
+export const campusListings = pgTable(
   "campus_listings",
   {
     id: id(),
@@ -1160,11 +1160,11 @@ export const campusListings = sqliteTable(
     // general meeting area only — NEVER a private address
     meetSpot: text("meet_spot").notNull().default(""),
     firstCome: bool("first_come", true),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
     // free items: Claim → Reserved → Completed
     claimedById: text("claimed_by_id"),
     // auctions (optional — never the default)
-    auctionEndsAt: integer("auction_ends_at", { mode: "timestamp_ms" }),
+    auctionEndsAt: timestamp("auction_ends_at", { withTimezone: true, mode: "date" }),
     reservePrice: integer("reserve_price"),
     bidIncrement: integer("bid_increment").notNull().default(1),
     // borrow config: $0 by default — this is resource sharing, not rental
@@ -1178,7 +1178,7 @@ export const campusListings = sqliteTable(
   (t) => [index("campus_listings_campus").on(t.campusId, t.createdAt)]
 );
 
-export const bids = sqliteTable(
+export const bids = pgTable(
   "bids",
   {
     id: id(),
@@ -1199,7 +1199,7 @@ export const bids = sqliteTable(
    claimed → Completed (+ overdue flags, extensions, and BEFORE/AFTER
    condition records so "it was already cracked" has an answer). */
 
-export const loans = sqliteTable(
+export const loans = pgTable(
   "loans",
   {
     id: id(),
@@ -1220,22 +1220,22 @@ export const loans = sqliteTable(
     // the borrowing AGREEMENT: when the item is needed (date + approx
     // time), how the exchange happens, and when it comes back (dueAt
     // carries date + approx time)
-    neededAt: integer("needed_at", { mode: "timestamp_ms" }),
+    neededAt: timestamp("needed_at", { withTimezone: true, mode: "date" }),
     exchangeMethod: text("exchange_method").notNull().default("campus_meetup"), // campus_meetup | pickup | dropoff | custom
     exchangeNote: text("exchange_note").notNull().default(""),
-    startAt: integer("start_at", { mode: "timestamp_ms" }),
-    dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(),
+    startAt: timestamp("start_at", { withTimezone: true, mode: "date" }),
+    dueAt: timestamp("due_at", { withTimezone: true, mode: "date" }).notNull(),
     // owner's counter-proposed return date/time on an extension request —
     // the borrower accepts or declines; nothing changes automatically
-    counterUntil: integer("counter_until", { mode: "timestamp_ms" }),
+    counterUntil: timestamp("counter_until", { withTimezone: true, mode: "date" }),
     // factual return record: when the borrower handed it back, and whether
     // that was after the agreed due date (history, never auto-punishment)
-    returnedAt: integer("returned_at", { mode: "timestamp_ms" }),
+    returnedAt: timestamp("returned_at", { withTimezone: true, mode: "date" }),
     returnedLate: bool("returned_late"),
     // {note, photos[]} — recorded at handoff / at return
     conditionBefore: text("condition_before").notNull().default("{}"),
     conditionAfter: text("condition_after").notNull().default("{}"),
-    extensionUntil: integer("extension_until", { mode: "timestamp_ms" }), // pending request
+    extensionUntil: timestamp("extension_until", { withTimezone: true, mode: "date" }), // pending request
     dueSoonNotified: bool("due_soon_notified", false),
     overdueNotified: bool("overdue_notified", false),
     deposit: integer("deposit"), // refundable, held via payments when set
@@ -1252,7 +1252,7 @@ export const loans = sqliteTable(
    returns). Evidence entries: [{by, at, note, photos[]}] — private to the
    parties and platform review. */
 
-export const disputes = sqliteTable(
+export const disputes = pgTable(
   "disputes",
   {
     id: id(),
@@ -1270,7 +1270,7 @@ export const disputes = sqliteTable(
     evidence: text("evidence").notNull().default("[]"),
     returnTracking: text("return_tracking").notNull().default(""),
     resolutionNote: text("resolution_note").notNull().default(""),
-    resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
     isSeed: seed(),
     createdAt: ts("created_at"),
   },
@@ -1282,7 +1282,7 @@ export const disputes = sqliteTable(
    change, payment event, evidence submission, and decision, appended and
    never rewritten. Visible only to the two parties and platform review. */
 
-export const orderEvents = sqliteTable(
+export const orderEvents = pgTable(
   "order_events",
   {
     id: id(),
@@ -1299,7 +1299,7 @@ export const orderEvents = sqliteTable(
 
 /* --------------------------- reviews / payments --------------------------- */
 
-export const reviews = sqliteTable(
+export const reviews = pgTable(
   "reviews",
   {
     id: id(),
@@ -1312,14 +1312,14 @@ export const reviews = sqliteTable(
     subjectId: text("subject_id")
       .notNull()
       .references(() => users.id),
-    rating: real("rating").notNull(),
+    rating: doublePrecision("rating").notNull(),
     body: text("body").notNull().default(""),
     createdAt: ts("created_at"),
   },
   (t) => [uniqueIndex("reviews_project_author").on(t.projectId, t.authorId)]
 );
 
-export const payments = sqliteTable("payments", {
+export const payments = pgTable("payments", {
   id: id(),
   projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
   bookingId: text("booking_id"),
@@ -1350,7 +1350,7 @@ export const payments = sqliteTable("payments", {
    only; ranking logic lives in lib/server/recsys.ts and can be swapped
    for an ML model without touching this table. */
 
-export const interactions = sqliteTable(
+export const interactions = pgTable(
   "interactions",
   {
     id: id(),
@@ -1368,7 +1368,7 @@ export const interactions = sqliteTable(
 
 /* ------------------------------- moderation ------------------------------- */
 
-export const reports = sqliteTable("reports", {
+export const reports = pgTable("reports", {
   id: id(),
   reporterId: text("reporter_id")
     .notNull()
@@ -1388,7 +1388,7 @@ export const reports = sqliteTable("reports", {
 /* -------------------------------- bookmarks -------------------------------- */
 /* One shared save system: any record type, referenced by id — never a copy. */
 
-export const bookmarks = sqliteTable(
+export const bookmarks = pgTable(
   "bookmarks",
   {
     userId: text("user_id")
@@ -1404,7 +1404,7 @@ export const bookmarks = sqliteTable(
 /* --------------------------------- events --------------------------------- */
 /* Slug ids match the event detail routes; list surfaces query this table.   */
 
-export const events = sqliteTable("events", {
+export const events = pgTable("events", {
   id: id(),
   slug: text("slug").notNull().unique(),
   hostId: text("host_id")
@@ -1419,16 +1419,16 @@ export const events = sqliteTable("events", {
   // VISIBILITY ≠ ELIGIBILITY: a campus event may be LISTED publicly
   // (organizer opt-in; info only) while RSVP stays restricted to
   // verified members of that campus.
-  publicVisibility: integer("public_visibility", { mode: "boolean" }).notNull().default(false),
+  publicVisibility: boolean("public_visibility").notNull().default(false),
   category: text("category").notNull().default("Other"),
-  startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true, mode: "date" }).notNull(),
   timeLabel: text("time_label").notNull().default(""),
   location: text("location").notNull().default(""),
   city: text("city").notNull().default(""),
   state: text("state").notNull().default(""),
   // coords power nearby discovery server-side only — never returned by the API
-  lat: real("lat"),
-  lng: real("lng"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
   price: integer("price"), // null = free
   capacity: integer("capacity"),
   attending: integer("attending").notNull().default(0), // seed baseline; real RSVPs add on top
@@ -1442,7 +1442,7 @@ export const events = sqliteTable("events", {
 });
 
 /* One-click "Going" — a real attendee record, not a counter. */
-export const eventRsvps = sqliteTable(
+export const eventRsvps = pgTable(
   "event_rsvps",
   {
     eventId: text("event_id")
@@ -1470,7 +1470,7 @@ export const eventRsvps = sqliteTable(
 /* OTHER part of the system (state, chat, reactions, presence,           */
 /* moderation, guests, replays, permissions) is real and DB-backed.      */
 
-export const liveStreams = sqliteTable("live_streams", {
+export const liveStreams = pgTable("live_streams", {
   id: id(),
   hostId: text("host_id")
     .notNull()
@@ -1495,16 +1495,16 @@ export const liveStreams = sqliteTable("live_streams", {
   replayHighlight: bool("replay_highlight", false),
   // host city centroid at start time — SERVER-SIDE nearby scoping only,
   // never returned by any API (same privacy rule as profiles.lat/lng)
-  lat: real("lat"),
-  lng: real("lng"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
   peakViewers: integer("peak_viewers").notNull().default(0),
   startedAt: ts("started_at"),
-  endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+  endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
   isSeed: seed(),
   createdAt: ts("created_at"),
 });
 
-export const liveMessages = sqliteTable("live_messages", {
+export const liveMessages = pgTable("live_messages", {
   id: id(),
   streamId: text("stream_id")
     .notNull()
@@ -1519,7 +1519,7 @@ export const liveMessages = sqliteTable("live_messages", {
 });
 
 /* named reaction types rendered as icons (heart | fire | clap | wow | laugh) */
-export const liveReactions = sqliteTable("live_reactions", {
+export const liveReactions = pgTable("live_reactions", {
   id: id(),
   streamId: text("stream_id")
     .notNull()
@@ -1532,7 +1532,7 @@ export const liveReactions = sqliteTable("live_reactions", {
 });
 
 /* presence: heartbeat rows — viewerCount = lastSeenAt within the window */
-export const liveViewers = sqliteTable(
+export const liveViewers = pgTable(
   "live_viewers",
   {
     streamId: text("stream_id")
@@ -1548,7 +1548,7 @@ export const liveViewers = sqliteTable(
 );
 
 /* guests / co-hosts: invited → active (split-screen) | declined | removed */
-export const liveGuests = sqliteTable("live_guests", {
+export const liveGuests = pgTable("live_guests", {
   id: id(),
   streamId: text("stream_id")
     .notNull()
@@ -1558,10 +1558,10 @@ export const liveGuests = sqliteTable("live_guests", {
     .references(() => users.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("invited"), // invited | active | declined | removed | left
   invitedAt: ts("invited_at"),
-  joinedAt: integer("joined_at", { mode: "timestamp_ms" }),
+  joinedAt: timestamp("joined_at", { withTimezone: true, mode: "date" }),
 });
 
-export const liveModerators = sqliteTable(
+export const liveModerators = pgTable(
   "live_moderators",
   {
     streamId: text("stream_id")
@@ -1576,7 +1576,7 @@ export const liveModerators = sqliteTable(
 );
 
 /* per-stream restrictions: mute = watch but not chat · block = no access */
-export const liveRestrictions = sqliteTable("live_restrictions", {
+export const liveRestrictions = pgTable("live_restrictions", {
   id: id(),
   streamId: text("stream_id")
     .notNull()
@@ -1586,4 +1586,16 @@ export const liveRestrictions = sqliteTable("live_restrictions", {
     .references(() => users.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(), // mute | block
   createdAt: ts("created_at"),
+});
+
+/* ------------------------------ kv state ------------------------------ */
+/* Small operational state that used to live in files under db/ (QA run
+   cursors, demo sign-out revocations, guide-defect reports). Vercel's
+   filesystem is read-only, so this state lives in the database like
+   everything else. Values are JSON strings keyed by name. */
+
+export const kvState = pgTable("kv_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: ts("updated_at"),
 });

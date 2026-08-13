@@ -64,16 +64,16 @@ function counterpart(project: Proj, userId: string): string {
   return project.clientId === userId ? project.creatorId : project.clientId;
 }
 
-function displayName(userId: string): string {
-  const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
+async function displayName(userId: string): Promise<string> {
+  const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
   return p?.displayName ?? "Someone";
 }
 
 /** Project events appear inside the conversation as system messages —
     the thread literally shows the transaction progressing. */
-function systemMessage(project: Proj, senderId: string, body: string) {
+async function systemMessage(project: Proj, senderId: string, body: string) {
   if (!project.conversationId) return;
-  db.insert(tables.messages)
+  await db.insert(tables.messages)
     .values({
       id: randomBytes(12).toString("hex"),
       conversationId: project.conversationId,
@@ -82,7 +82,7 @@ function systemMessage(project: Proj, senderId: string, body: string) {
       kind: "system",
     })
     .run();
-  db.update(tables.conversations)
+  await db.update(tables.conversations)
     .set({ updatedAt: new Date() })
     .where(eq(tables.conversations.id, project.conversationId))
     .run();
@@ -95,12 +95,12 @@ const money = (n: number) => `$${n}`;
  * The change is announced in the thread and the client is notified —
  * terms can never change silently (see expectedAmount in transition()).
  */
-export function updateTerms(
+export async function updateTerms(
   projectId: string,
   userId: string,
   patch: { amount?: number; deadline?: string | null }
 ) {
-  const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+  const project = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!project) throw new ApiError(404, "Project not found");
   if (partyOf(project, userId) !== "creator") throw new ApiError(403, "Only the creator can update terms");
   if (!["draft", "offer_sent"].includes(project.state))
@@ -123,9 +123,9 @@ export function updateTerms(
   }
   if (changes.length === 0) return project;
 
-  db.update(tables.projects).set(set).where(eq(tables.projects.id, projectId)).run();
-  systemMessage(project, userId, `Project updated — ${changes.join(", ")}. Review the terms before continuing.`);
-  notify({
+  await db.update(tables.projects).set(set).where(eq(tables.projects.id, projectId)).run();
+  await systemMessage(project, userId, `Project updated — ${changes.join(", ")}. Review the terms before continuing.`);
+  await notify({
     userId: counterpart(project, userId),
     actorId: userId,
     type: "project_offer",
@@ -134,16 +134,16 @@ export function updateTerms(
     href: `/messages?project=${project.id}`,
     priority: "high",
   });
-  return db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get()!;
+  return (await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get())!;
 }
 
-export function transition(
+export async function transition(
   projectId: string,
   action: string,
   userId: string,
   opts: { expectedAmount?: number | null; note?: string } = {}
-): Proj {
-  const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+): Promise<Proj> {
+  const project = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!project) throw new ApiError(404, "Project not found");
   const role = partyOf(project, userId);
 
@@ -162,32 +162,32 @@ export function transition(
       throw new ApiError(409, "The project terms changed since you viewed them — review the updated offer before continuing.");
   }
 
-  db.update(tables.projects)
+  await db.update(tables.projects)
     .set({ state: t.to, updatedAt: new Date() })
     .where(eq(tables.projects.id, projectId))
     .run();
 
   const other = counterpart(project, userId);
-  const actor = displayName(userId);
+  const actor = await displayName(userId);
   const href = `/messages?project=${project.id}`;
   const note = (opts.note ?? "").trim().slice(0, 300);
 
   // side effects per transition — notification + a system message in the
   // thread, so the conversation shows the transaction progressing
   if (action === "send_offer") {
-    systemMessage(project, userId, `${actor} sent the project offer — ${project.title} · ${money(project.amount)}. Review it in the project panel.`);
-    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} sent you a project offer`, body: `${project.title} · ${money(project.amount)}`, href });
+    await systemMessage(project, userId, `${actor} sent the project offer — ${project.title} · ${money(project.amount)}. Review it in the project panel.`);
+    await notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} sent you a project offer`, body: `${project.title} · ${money(project.amount)}`, href });
   } else if (action === "accept_offer") {
-    systemMessage(project, userId, `${actor} accepted the offer — ${money(project.amount)}. Next step: secure the payment.`);
-    notify({ userId: other, actorId: userId, type: "project_accepted", title: `${actor} accepted your offer`, body: project.title, href });
+    await systemMessage(project, userId, `${actor} accepted the offer — ${money(project.amount)}. Next step: secure the payment.`);
+    await notify({ userId: other, actorId: userId, type: "project_accepted", title: `${actor} accepted your offer`, body: project.title, href });
   } else if (action === "decline_offer") {
-    systemMessage(project, userId, `${actor} sent the offer back for changes.${note ? ` "${note}"` : ""}`);
-    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} asked for changes to the offer`, body: note || project.title, href });
+    await systemMessage(project, userId, `${actor} sent the offer back for changes.${note ? ` "${note}"` : ""}`);
+    await notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} asked for changes to the offer`, body: note || project.title, href });
   } else if (action === "start") {
     // payment secured — the Stripe Connect PaymentIntent slots in here.
     // (Deliberately not called "escrow": that's a specific legal service.)
     const amountCents = project.amount * 100;
-    db.insert(tables.payments)
+    await db.insert(tables.payments)
       .values({
         id: randomBytes(12).toString("hex"),
         projectId: project.id,
@@ -198,43 +198,43 @@ export function transition(
         status: "held",
       })
       .run();
-    systemMessage(project, userId, `Payment secured — ${money(project.amount)}. ${displayName(project.creatorId)} can begin work. Funds release when the delivery is approved.`);
-    notify({ userId: other, actorId: userId, type: "payment", title: `Payment confirmed for ${project.title}`, body: `${money(project.amount)} secured — you can begin working`, href, category: "payments" });
+    await systemMessage(project, userId, `Payment secured — ${money(project.amount)}. ${await displayName(project.creatorId)} can begin work. Funds release when the delivery is approved.`);
+    await notify({ userId: other, actorId: userId, type: "payment", title: `Payment confirmed for ${project.title}`, body: `${money(project.amount)} secured — you can begin working`, href, category: "payments" });
   } else if (action === "submit") {
-    systemMessage(project, userId, `${actor} delivered work for review.${note ? ` ${note}` : ""}`);
-    notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} delivered — review it`, body: note || project.title, href });
+    await systemMessage(project, userId, `${actor} delivered work for review.${note ? ` ${note}` : ""}`);
+    await notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} delivered — review it`, body: note || project.title, href });
   } else if (action === "approve") {
-    systemMessage(project, userId, `${actor} approved the delivery.`);
-    notify({ userId: other, actorId: userId, type: "project_approved", title: `${actor} approved your delivery`, body: project.title, href });
+    await systemMessage(project, userId, `${actor} approved the delivery.`);
+    await notify({ userId: other, actorId: userId, type: "project_approved", title: `${actor} approved your delivery`, body: project.title, href });
   } else if (action === "complete") {
-    db.update(tables.payments)
+    await db.update(tables.payments)
       .set({ status: "released" })
       .where(and(eq(tables.payments.projectId, project.id), eq(tables.payments.status, "held")))
       .run();
-    systemMessage(project, userId, `Project complete — ${money(project.amount)} released to ${displayName(project.creatorId)}.`);
-    notify({ userId: other, actorId: userId, type: "payment", title: `Payment released — ${money(project.amount)}`, body: project.title, href, category: "payments" });
+    await systemMessage(project, userId, `Project complete — ${money(project.amount)} released to ${await displayName(project.creatorId)}.`);
+    await notify({ userId: other, actorId: userId, type: "payment", title: `Payment released — ${money(project.amount)}`, body: project.title, href, category: "payments" });
   } else if (action === "request_changes") {
-    systemMessage(project, userId, `${actor} requested a revision.${note ? ` "${note}"` : ""} The project stays active.`);
-    notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} requested a revision`, body: note || project.title, href });
+    await systemMessage(project, userId, `${actor} requested a revision.${note ? ` "${note}"` : ""} The project stays active.`);
+    await notify({ userId: other, actorId: userId, type: "project_submitted", title: `${actor} requested a revision`, body: note || project.title, href });
   } else if (action === "cancel") {
-    systemMessage(project, userId, `${actor} cancelled the project before payment. No money moved.`);
-    notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} cancelled ${project.title}`, body: "Cancelled before payment — nothing was charged", href, priority: "normal" });
+    await systemMessage(project, userId, `${actor} cancelled the project before payment. No money moved.`);
+    await notify({ userId: other, actorId: userId, type: "project_offer", title: `${actor} cancelled ${project.title}`, body: "Cancelled before payment — nothing was charged", href, priority: "normal" });
   }
 
-  return db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get()!;
+  return (await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get())!;
 }
 
 /* ------------------------------ extensions ------------------------------ */
 
-export function requestExtension(projectId: string, userId: string, days: number, reason: string) {
-  const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+export async function requestExtension(projectId: string, userId: string, days: number, reason: string) {
+  const project = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!project) throw new ApiError(404, "Project not found");
   if (partyOf(project, userId) !== "creator") throw new ApiError(403, "Only the creator can request an extension");
   if (project.state !== "in_progress") throw new ApiError(409, "Extensions can only be requested while in progress");
   if (!Number.isInteger(days) || days < 1 || days > 30) throw new ApiError(400, "Days must be 1–30");
 
   // idempotent: one pending request per project, never silently recreated
-  const pending = db
+  const pending = await db
     .select()
     .from(tables.extensionRequests)
     .where(and(eq(tables.extensionRequests.projectId, projectId), eq(tables.extensionRequests.status, "pending")))
@@ -242,42 +242,42 @@ export function requestExtension(projectId: string, userId: string, days: number
   if (pending) throw new ApiError(409, "An extension request is already pending");
 
   const id = randomBytes(12).toString("hex");
-  db.insert(tables.extensionRequests).values({ id, projectId, requestedById: userId, days, reason }).run();
-  db.update(tables.projects)
+  await db.insert(tables.extensionRequests).values({ id, projectId, requestedById: userId, days, reason }).run();
+  await db.update(tables.projects)
     .set({ state: "extension_requested", updatedAt: new Date() })
     .where(eq(tables.projects.id, projectId))
     .run();
 
-  systemMessage(
+  await systemMessage(
     project,
     userId,
-    `${displayName(userId)} requested a ${days}-day extension.${reason ? ` "${reason}"` : ""}${
+    `${await displayName(userId)} requested a ${days}-day extension.${reason ? ` "${reason}"` : ""}${
       project.deadline
         ? ` Current deadline ${project.deadline.toLocaleDateString("en-US", { month: "short", day: "numeric" })} → new deadline ${new Date(project.deadline.getTime() + days * 86400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`
         : ""
     }`
   );
-  notify({
+  await notify({
     userId: counterpart(project, userId),
     actorId: userId,
     type: "extension_requested",
-    title: `${displayName(userId)} requested a ${days}-day extension`,
+    title: `${await displayName(userId)} requested a ${days}-day extension`,
     body: reason || project.title,
     href: `/messages?project=${project.id}`,
   });
 
-  return db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.id, id)).get()!;
+  return (await db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.id, id)).get())!;
 }
 
-export function decideExtension(extensionId: string, userId: string, approve: boolean) {
-  const ext = db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.id, extensionId)).get();
+export async function decideExtension(extensionId: string, userId: string, approve: boolean) {
+  const ext = await db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.id, extensionId)).get();
   if (!ext) throw new ApiError(404, "Extension request not found");
   if (ext.status !== "pending") throw new ApiError(409, "Extension request already decided");
 
-  const project = db.select().from(tables.projects).where(eq(tables.projects.id, ext.projectId)).get()!;
+  const project = (await db.select().from(tables.projects).where(eq(tables.projects.id, ext.projectId)).get())!;
   if (partyOf(project, userId) !== "client") throw new ApiError(403, "Only the client can decide extensions");
 
-  db.update(tables.extensionRequests)
+  await db.update(tables.extensionRequests)
     .set({ status: approve ? "approved" : "denied", decidedAt: new Date() })
     .where(eq(tables.extensionRequests.id, extensionId))
     .run();
@@ -285,17 +285,17 @@ export function decideExtension(extensionId: string, userId: string, approve: bo
   const patch: Partial<typeof tables.projects.$inferInsert> = { state: "in_progress", updatedAt: new Date() };
   if (approve && project.deadline)
     patch.deadline = new Date(project.deadline.getTime() + ext.days * 86400_000);
-  db.update(tables.projects).set(patch).where(eq(tables.projects.id, project.id)).run();
+  await db.update(tables.projects).set(patch).where(eq(tables.projects.id, project.id)).run();
 
-  const updated = db.select().from(tables.projects).where(eq(tables.projects.id, project.id)).get()!;
-  systemMessage(
+  const updated = (await db.select().from(tables.projects).where(eq(tables.projects.id, project.id)).get())!;
+  await systemMessage(
     updated,
     userId,
     approve
       ? `Extension approved · +${ext.days} days.${updated.deadline ? ` New deadline: ${updated.deadline.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.` : ""}`
       : "Extension declined — the original deadline stands."
   );
-  notify({
+  await notify({
     userId: ext.requestedById,
     actorId: userId,
     type: approve ? "extension_approved" : "extension_denied",
@@ -304,20 +304,20 @@ export function decideExtension(extensionId: string, userId: string, approve: bo
     href: `/messages?project=${project.id}`,
   });
 
-  return db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.id, extensionId)).get()!;
+  return (await db.select().from(tables.extensionRequests).where(eq(tables.extensionRequests.id, extensionId)).get())!;
 }
 
 /* -------------------------------- reviews -------------------------------- */
 
-export function addReview(projectId: string, authorId: string, rating: number, body: string) {
-  const project = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+export async function addReview(projectId: string, authorId: string, rating: number, body: string) {
+  const project = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!project) throw new ApiError(404, "Project not found");
   partyOf(project, authorId);
   if (!["completed", "reviewed"].includes(project.state))
     throw new ApiError(409, "Reviews open after completion");
   if (rating < 1 || rating > 5) throw new ApiError(400, "Rating must be 1–5");
 
-  const existing = db
+  const existing = await db
     .select()
     .from(tables.reviews)
     .where(and(eq(tables.reviews.projectId, projectId), eq(tables.reviews.authorId, authorId)))
@@ -325,23 +325,23 @@ export function addReview(projectId: string, authorId: string, rating: number, b
   if (existing) throw new ApiError(409, "You already reviewed this project");
 
   const subjectId = counterpart(project, authorId);
-  db.insert(tables.reviews)
+  await db.insert(tables.reviews)
     .values({ id: randomBytes(12).toString("hex"), projectId, authorId, subjectId, rating, body })
     .run();
 
   // both sides reviewed → reviewed (terminal)
-  const count = db.select().from(tables.reviews).where(eq(tables.reviews.projectId, projectId)).all().length;
+  const count = (await db.select().from(tables.reviews).where(eq(tables.reviews.projectId, projectId)).all()).length;
   if (count >= 2)
-    db.update(tables.projects)
+    await db.update(tables.projects)
       .set({ state: "reviewed", updatedAt: new Date() })
       .where(eq(tables.projects.id, projectId))
       .run();
 
-  notify({
+  await notify({
     userId: subjectId,
     actorId: authorId,
     type: "project_approved",
-    title: `${displayName(authorId)} left you a ${rating.toFixed(1)}★ review`,
+    title: `${await displayName(authorId)} left you a ${rating.toFixed(1)}★ review`,
     body,
     href: `/messages?project=${projectId}`,
     category: "work",

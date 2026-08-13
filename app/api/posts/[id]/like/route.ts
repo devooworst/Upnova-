@@ -9,28 +9,28 @@ export const dynamic = "force-dynamic";
 
 /** POST /api/posts/[id]/like — toggle. */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const post = db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const post = await db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
     if (!post) throw new ApiError(404, "Post not found");
 
-    const existing = db
+    const existing = await db
       .select()
       .from(tables.likes)
       .where(and(eq(tables.likes.postId, post.id), eq(tables.likes.userId, user.id)))
       .get();
 
     if (existing) {
-      db.delete(tables.likes)
+      await db.delete(tables.likes)
         .where(and(eq(tables.likes.postId, post.id), eq(tables.likes.userId, user.id)))
         .run();
-      recordInteraction(user.id, "post", post.id, "unlike");
+      await recordInteraction(user.id, "post", post.id, "unlike");
       return { liked: false };
     }
 
-    db.insert(tables.likes).values({ postId: post.id, userId: user.id }).run();
-    recordInteraction(user.id, "post", post.id, "like");
-    notify({
+    await db.insert(tables.likes).values({ postId: post.id, userId: user.id }).run();
+    await recordInteraction(user.id, "post", post.id, "like");
+    await notify({
       userId: post.authorId,
       actorId: user.id,
       type: "like",

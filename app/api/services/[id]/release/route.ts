@@ -32,9 +32,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const svc = db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const svc = await db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
     if (!svc || !svc.active) throw new ApiError(404, "Service not found");
     if (svc.ownerId !== user.id) throw new ApiError(403, "Only the owner schedules releases");
 
@@ -56,11 +56,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (slots != null && perClientLimit != null && perClientLimit > slots)
       throw new ApiError(400, "The per-client booking limit can't exceed the available slots");
 
-    const holders = preferredWithEarlyAccess(user.id);
+    const holders = await preferredWithEarlyAccess(user.id);
     if (eaHours != null && holders.length === 0)
       throw new ApiError(409, "No Preferred Client currently holds a priority-booking or early-access benefit — add one first, or schedule the release without early access");
 
-    const alreadyActive = activeBookingsForService(svc.id);
+    const alreadyActive = await activeBookingsForService(svc.id);
     if (slots != null && alreadyActive >= slots)
       throw new ApiError(409, `This service already has ${alreadyActive} active bookings — a cap of ${slots} slots would be full before it opens`);
 
@@ -82,12 +82,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     full.scheduling = { ...(typeof full.scheduling === "object" && full.scheduling !== null ? (full.scheduling as Record<string, unknown>) : {}), releaseMode: "scheduled" };
     config = JSON.stringify(full);
 
-    db.update(tables.services).set({ config }).where(eq(tables.services.id, svc.id)).run();
+    await db.update(tables.services).set({ config }).where(eq(tables.services.id, svc.id)).run();
 
     const when = releaseAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     if (eaHours != null)
       for (const clientId of holders)
-        notify({
+        await notify({
           userId: clientId,
           actorId: user.id,
           type: "preferred_window",
@@ -113,9 +113,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
 /** DELETE — cancel the pending release. Already-released dates stay released. */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const svc = db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const svc = await db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
     if (!svc) throw new ApiError(404, "Service not found");
     if (svc.ownerId !== user.id) throw new ApiError(403, "Only the owner schedules releases");
     const prev = readRelease(svc.config);
@@ -130,7 +130,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     }
     let config = writeRelease(svc.config, releasedUntil ? { releasedUntil, releaseAt: null, releaseUntil: null, eaHours: null } : null);
     if (readEarlyAccess(config)) config = writeEarlyAccess(config, null);
-    db.update(tables.services).set({ config }).where(eq(tables.services.id, svc.id)).run();
+    await db.update(tables.services).set({ config }).where(eq(tables.services.id, svc.id)).run();
     void parseConfig; // (kept for symmetry with sibling routes)
     return { id: svc.id, releaseAt: null, releasedUntil };
   });

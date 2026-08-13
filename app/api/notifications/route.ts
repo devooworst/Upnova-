@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/notifications — own notifications, newest first. */
 export async function GET(req: NextRequest) {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const limit = Math.min(100, Number(req.nextUrl.searchParams.get("limit")) || 50);
-    const rows = db
+    const rows = await db
       .select()
       .from(tables.notifications)
       .where(eq(tables.notifications.userId, user.id))
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       .limit(limit)
       .all();
 
-    const unread = db
+    const unread = await db
       .select()
       .from(tables.notifications)
       .where(and(eq(tables.notifications.userId, user.id), isNull(tables.notifications.readAt)))
@@ -45,15 +45,15 @@ export async function GET(req: NextRequest) {
 /** PATCH { ids: string[] } or { all: true } — mark read (own only). */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     if (body.all) {
-      db.update(tables.notifications)
+      await db.update(tables.notifications)
         .set({ readAt: new Date() })
         .where(and(eq(tables.notifications.userId, user.id), isNull(tables.notifications.readAt)))
         .run();
     } else if (Array.isArray(body.ids) && body.ids.length) {
-      db.update(tables.notifications)
+      await db.update(tables.notifications)
         .set({ readAt: new Date() })
         .where(
           and(

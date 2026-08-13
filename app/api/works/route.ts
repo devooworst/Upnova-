@@ -12,15 +12,15 @@ export const dynamic = "force-dynamic";
 /** GET /api/works — the licensing marketplace. Public: previews and terms
  *  are exactly what guests should see; licensing needs an account. */
 export async function GET() {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const rows = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const rows = (await db
       .select({ work: tables.works, user: tables.users, profile: tables.profiles })
       .from(tables.works)
       .innerJoin(tables.users, eq(tables.works.creatorId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .orderBy(desc(tables.works.createdAt))
-      .all()
+      .all())
       .filter((r) => r.work.status === "active" && r.user.status === "active");
 
     return {
@@ -47,8 +47,8 @@ export async function GET() {
 /** POST /api/works — publish a licensable work with YOUR license options. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const title = String(body.title || "").trim().slice(0, 80);
     if (!title) throw new ApiError(400, "Give the work a title");
     const options = normalizeLicenseOptions(body.options);
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       typeof v === "string" && v.startsWith(prefix) && v.length < max ? v : null;
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.works)
+    await db.insert(tables.works)
       .values({
         id,
         creatorId: user.id,
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       .run();
     // one canonical work + one linked feed post (License opens the work)
     const priced = options.filter((o) => o.price != null && o.price > 0).sort((a, b) => a.price! - b.price!)[0];
-    createLinkedPost({
+    await createLinkedPost({
       userId: user.id,
       refType: "work",
       refId: id,

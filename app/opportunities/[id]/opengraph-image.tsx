@@ -7,7 +7,7 @@ export const size = OG_SIZE;
 export const contentType = "image/png";
 
 export default async function Image({ params }: { params: { id: string } }) {
-  const row = db
+  const row = await db
     .select({ opp: tables.opportunities, profile: tables.profiles })
     .from(tables.opportunities)
     .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.opportunities.posterId))

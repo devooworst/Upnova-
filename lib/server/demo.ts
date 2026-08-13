@@ -31,14 +31,14 @@ const id = () => randomBytes(12).toString("hex");
     a username and never the seed-DATA flag. REAL/PERSONAL accounts
     (admin, signups) are simulated=false: the platform NEVER sends a
     message or performs an action as them. */
-export function isSeedUser(userId: string): boolean {
-  const u = db.select({ simulated: tables.users.simulated }).from(tables.users).where(eq(tables.users.id, userId)).get();
+export async function isSeedUser(userId: string): Promise<boolean> {
+  const u = await db.select({ simulated: tables.users.simulated }).from(tables.users).where(eq(tables.users.id, userId)).get();
   return !!u?.simulated;
 }
 
-function sendAs(conversationId: string, senderId: string, body: string) {
-  db.insert(tables.messages).values({ id: id(), conversationId, senderId, body }).run();
-  db.update(tables.conversations)
+async function sendAs(conversationId: string, senderId: string, body: string) {
+  await db.insert(tables.messages).values({ id: id(), conversationId, senderId, body }).run();
+  await db.update(tables.conversations)
     .set({ updatedAt: new Date() })
     .where(eq(tables.conversations.id, conversationId))
     .run();
@@ -72,20 +72,20 @@ const REPLIES: Record<string, string[]> = {
 let replyCounter = new Map<string, number>();
 
 /** A seed user replies once per incoming message, cycling their lines. */
-export function maybeAutoReply(conversationId: string, fromUserId: string) {
-  const members = db
+export async function maybeAutoReply(conversationId: string, fromUserId: string) {
+  const members = await db
     .select()
     .from(tables.conversationMembers)
     .where(eq(tables.conversationMembers.conversationId, conversationId))
     .all();
   const other = members.find((m) => m.userId !== fromUserId);
-  if (!other || !isSeedUser(other.userId)) return;
+  if (!other || !await isSeedUser(other.userId)) return;
 
-  const user = db.select().from(tables.users).where(eq(tables.users.id, other.userId)).get()!;
+  const user = (await db.select().from(tables.users).where(eq(tables.users.id, other.userId)).get())!;
 
   // context first: if this conversation has a live booking, the reply moves
   // that booking forward instead of being generic chatter
-  const booking = db
+  const booking = await db
     .select()
     .from(tables.bookings)
     .where(eq(tables.bookings.conversationId, conversationId))
@@ -93,12 +93,12 @@ export function maybeAutoReply(conversationId: string, fromUserId: string) {
     .get();
   const contextual = (() => {
     if (!booking || booking.providerId !== other.userId) return null;
-    const when = booking.startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-    if (booking.status === "accepted")
+    const when = booking!.startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    if (booking!.status === "accepted")
       return `Whenever you're ready, secure the payment and ${when} is locked in for you. Any questions about the options or add-ons before you do?`;
-    if (booking.status === "confirmed")
+    if (booking!.status === "confirmed")
       return `We're all set for ${when}. Are there any special requirements I should plan for?`;
-    if (booking.status === "completed")
+    if (booking!.status === "completed")
       return "It was great working with you! If everything looks good on your end, a quick review really helps.";
     return null;
   })();
@@ -113,42 +113,42 @@ export function maybeAutoReply(conversationId: string, fromUserId: string) {
   const key = `${conversationId}:${other.userId}`;
   const n = replyCounter.get(key) ?? 0;
   replyCounter.set(key, n + 1);
-  sendAs(conversationId, other.userId, pool[n % pool.length]);
+  await sendAs(conversationId, other.userId, pool[n % pool.length]);
 }
 
 /* --------------------------- project behavior --------------------------- */
 
 /** After a client opens a draft with a seed creator: review + send offer. */
-export function seedRespondsToDraft(projectId: string) {
-  const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
-  if (!p || p.state !== "draft" || !isSeedUser(p.creatorId)) return;
+export async function seedRespondsToDraft(projectId: string) {
+  const p = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+  if (!p || p.state !== "draft" || !await isSeedUser(p.creatorId)) return;
   if (p.conversationId) {
-    sendAs(
+    await sendAs(
       p.conversationId,
       p.creatorId,
       `Just reviewed your brief for "${p.title}" — I can do this. Sending the offer now: $${p.amount}, everything as described.`
     );
   }
-  transition(projectId, "send_offer", p.creatorId);
+  await transition(projectId, "send_offer", p.creatorId);
 }
 
 /** After the client funds: seed creator starts, then asks for +2 days (once). */
-export function seedStartsWork(projectId: string) {
-  const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
-  if (!p || p.state !== "in_progress" || !isSeedUser(p.creatorId)) return;
+export async function seedStartsWork(projectId: string) {
+  const p = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+  if (!p || p.state !== "in_progress" || !await isSeedUser(p.creatorId)) return;
   if (p.conversationId) {
-    sendAs(p.conversationId, p.creatorId, "Payment came through — starting today. I'll keep everything in this thread.");
+    await sendAs(p.conversationId, p.creatorId, "Payment came through — starting today. I'll keep everything in this thread.");
   }
   // one honest extension request so the approval flow can be demonstrated;
   // requestExtension enforces a single pending request per project
-  const existing = db
+  const existing = await db
     .select()
     .from(tables.extensionRequests)
     .where(eq(tables.extensionRequests.projectId, projectId))
     .all();
   if (existing.length === 0) {
     try {
-      requestExtension(projectId, p.creatorId, 2, "Adding a final polish pass — two extra days makes it right.");
+      await requestExtension(projectId, p.creatorId, 2, "Adding a final polish pass — two extra days makes it right.");
     } catch {
       /* already pending or wrong state — never force it */
     }
@@ -156,14 +156,14 @@ export function seedStartsWork(projectId: string) {
 }
 
 /** After the client decides the extension: seed creator delivers. */
-export function seedDeliversAfterExtensionDecision(projectId: string) {
-  const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
-  if (!p || p.state !== "in_progress" || !isSeedUser(p.creatorId)) return;
+export async function seedDeliversAfterExtensionDecision(projectId: string) {
+  const p = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+  if (!p || p.state !== "in_progress" || !await isSeedUser(p.creatorId)) return;
   if (p.conversationId) {
-    sendAs(p.conversationId, p.creatorId, "Delivery is up for your review — files and notes attached to the project.");
+    await sendAs(p.conversationId, p.creatorId, "Delivery is up for your review — files and notes attached to the project.");
   }
   try {
-    transition(projectId, "submit", p.creatorId);
+    await transition(projectId, "submit", p.creatorId);
   } catch {
     /* state moved on — do nothing */
   }
@@ -172,12 +172,12 @@ export function seedDeliversAfterExtensionDecision(projectId: string) {
 /* --------------------------- booking behavior --------------------------- */
 
 /** Seed providers respond to booking requests immediately — no waiting. */
-export function seedAcceptsBooking(bookingId: string) {
-  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
-  if (!b || b.status !== "pending" || !isSeedUser(b.providerId)) return;
-  db.update(tables.bookings).set({ status: "accepted" }).where(eq(tables.bookings.id, bookingId)).run();
+export async function seedAcceptsBooking(bookingId: string) {
+  const b = await db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b || b.status !== "pending" || !await isSeedUser(b.providerId)) return;
+  await db.update(tables.bookings).set({ status: "accepted" }).where(eq(tables.bookings.id, bookingId)).run();
   if (b.conversationId) {
-    sendAs(
+    await sendAs(
       b.conversationId,
       b.providerId,
       `Absolutely — I have that time available. I've accepted your booking request for ${b.title}; once payment is in, you're locked in.`
@@ -189,32 +189,32 @@ export function seedAcceptsBooking(bookingId: string) {
     always into the booking's own conversation (by id):
       confirmed → "preparing" (within 24h of start) → "in progress" (during
       the slot). Completion + payout release is handled by the bookings GET. */
-export function seedBookingProgress(bookingId: string) {
-  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
-  if (!b || b.status !== "confirmed" || !isSeedUser(b.providerId)) return;
+export async function seedBookingProgress(bookingId: string) {
+  const b = await db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b || b.status !== "confirmed" || !await isSeedUser(b.providerId)) return;
   const now = Date.now();
   const start = b.startsAt.getTime();
   const end = start + b.durationMin * 60_000;
-  const setProgress = (progress: string) =>
-    db.update(tables.bookings).set({ progress }).where(eq(tables.bookings.id, bookingId)).run();
+  const setProgress = async (progress: string) =>
+    await db.update(tables.bookings).set({ progress }).where(eq(tables.bookings.id, bookingId)).run();
   if (b.progress === "" && now >= start - 24 * 3600_000 && now < start) {
-    setProgress("preparing");
+    await setProgress("preparing");
     if (b.conversationId)
-      sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
-    notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Preparing for your booking", body: b.title, href: "/calendar" });
+      await sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
+    await notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Preparing for your booking", body: b.title, href: "/calendar" });
   } else if (b.progress !== "in_progress" && now >= start && now < end) {
-    setProgress("in_progress");
-    if (b.conversationId) sendAs(b.conversationId, b.providerId, `Starting ${b.title} now.`);
+    await setProgress("in_progress");
+    if (b.conversationId) await sendAs(b.conversationId, b.providerId, `Starting ${b.title} now.`);
   }
 }
 
 /** Seed provider confirms in chat after the client pays. */
-export function seedConfirmsBookingPayment(bookingId: string) {
-  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
-  if (!b || !isSeedUser(b.providerId) || !b.conversationId) return;
+export async function seedConfirmsBookingPayment(bookingId: string) {
+  const b = await db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+  if (!b || !await isSeedUser(b.providerId) || !b.conversationId) return;
   const when = b.startsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
   const time = b.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  sendAs(b.conversationId, b.providerId, `Got it — your payment is secured. You're confirmed for ${when} at ${time}. See you then!`);
+  await sendAs(b.conversationId, b.providerId, `Got it — your payment is secured. You're confirmed for ${when} at ${time}. See you then!`);
 }
 
 /* ------------------- Test Center: force-advance -------------------- */
@@ -225,18 +225,18 @@ export function seedConfirmsBookingPayment(bookingId: string) {
    just without waiting for the clock. Demo deployments only (the
    route gates on isDemoMode); the caller's own steps (like paying)
    are NEVER faked — the response points at the real UI instead. */
-export function forceAdvanceBooking(bookingId: string, actorUserId: string): { ok: true; stage: string } | { requiresAction: string; href: string } {
-  const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
+export async function forceAdvanceBooking(bookingId: string, actorUserId: string): Promise<{ ok: true; stage: string } | { requiresAction: string; href: string }> {
+  const b = await db.select().from(tables.bookings).where(eq(tables.bookings.id, bookingId)).get();
   if (!b) throw new Error("Booking not found");
   if (b.clientId !== actorUserId && b.providerId !== actorUserId) throw new Error("Not your booking");
   const other = b.clientId === actorUserId ? b.providerId : b.clientId;
-  if (!isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
+  if (!await isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
 
   const providerIsSimulated = other === b.providerId; // (other is already verified simulated)
   if (b.status === "pending") {
     // accepting is the PROVIDER'S action — if that's YOU, it's your move
     if (!providerIsSimulated) return { requiresAction: "Accept or decline the request yourself — it's a booking for YOUR service", href: "/calendar" };
-    seedAcceptsBooking(bookingId);
+    await seedAcceptsBooking(bookingId);
     return { ok: true, stage: "Accepted — awaiting your test payment" };
   }
   if (b.status === "accepted") {
@@ -248,70 +248,70 @@ export function forceAdvanceBooking(bookingId: string, actorUserId: string): { o
     // when the caller is the provider (a REAL account never auto-speaks)
     if (!providerIsSimulated) return { requiresAction: "Post progress / mark complete yourself — you're the provider", href: "/calendar" };
     if (b.progress === "") {
-      db.update(tables.bookings).set({ progress: "preparing" }).where(eq(tables.bookings.id, bookingId)).run();
-      if (b.conversationId) sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
-      notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Preparing for your booking", body: b.title, href: `/activity?focus=booking:${b.id}`, category: "work" });
+      await db.update(tables.bookings).set({ progress: "preparing" }).where(eq(tables.bookings.id, bookingId)).run();
+      if (b.conversationId) await sendAs(b.conversationId, b.providerId, `Getting everything ready for ${b.title} — see you soon. Any special requirements I should know about beforehand?`);
+      await notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Preparing for your booking", body: b.title, href: `/activity?focus=booking:${b.id}`, category: "work" });
       return { ok: true, stage: "Preparing" };
     }
     if (b.progress === "preparing") {
-      db.update(tables.bookings).set({ progress: "in_progress" }).where(eq(tables.bookings.id, bookingId)).run();
-      if (b.conversationId) sendAs(b.conversationId, b.providerId, `Starting ${b.title} now.`);
-      notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Service in progress", body: b.title, href: `/activity?focus=booking:${b.id}`, category: "work" });
+      await db.update(tables.bookings).set({ progress: "in_progress" }).where(eq(tables.bookings.id, bookingId)).run();
+      if (b.conversationId) await sendAs(b.conversationId, b.providerId, `Starting ${b.title} now.`);
+      await notify({ userId: b.clientId, actorId: b.providerId, type: "booking", title: "Service in progress", body: b.title, href: `/activity?focus=booking:${b.id}`, category: "work" });
       return { ok: true, stage: "In progress" };
     }
-    db.update(tables.bookings).set({ status: "completed" }).where(eq(tables.bookings.id, bookingId)).run();
-    db.update(tables.payments).set({ status: "released" }).where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held"))).run();
-    if (b.conversationId) sendAs(b.conversationId, b.providerId, `${b.title} is done — thanks for booking me! If everything looks good, a quick review helps a lot.`);
-    notify({ userId: b.clientId, actorId: b.providerId, type: "payment", title: `${b.title} completed`, body: `Payout released to the provider (test payment)`, href: `/activity?focus=booking:${b.id}`, category: "payments" });
+    await db.update(tables.bookings).set({ status: "completed" }).where(eq(tables.bookings.id, bookingId)).run();
+    await db.update(tables.payments).set({ status: "released" }).where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held"))).run();
+    if (b.conversationId) await sendAs(b.conversationId, b.providerId, `${b.title} is done — thanks for booking me! If everything looks good, a quick review helps a lot.`);
+    await notify({ userId: b.clientId, actorId: b.providerId, type: "payment", title: `${b.title} completed`, body: `Payout released to the provider (test payment)`, href: `/activity?focus=booking:${b.id}`, category: "payments" });
     return { ok: true, stage: "Completed — payment released" };
   }
   throw new Error(`Nothing to advance from "${b.status}"`);
 }
 
-export function forceAdvanceOrder(orderId: string, actorUserId: string): { ok: true; stage: string } | { requiresAction: string; href: string } {
-  const o = db.select().from(tables.orders).where(eq(tables.orders.id, orderId)).get();
+export async function forceAdvanceOrder(orderId: string, actorUserId: string): Promise<{ ok: true; stage: string } | { requiresAction: string; href: string }> {
+  const o = await db.select().from(tables.orders).where(eq(tables.orders.id, orderId)).get();
   if (!o) throw new Error("Order not found");
   if (o.buyerId !== actorUserId && o.sellerId !== actorUserId) throw new Error("Not your order");
   const other = o.buyerId === actorUserId ? o.sellerId : o.buyerId;
-  if (!isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
-  const log = (kind: string, note: string) =>
-    db.insert(tables.orderEvents).values({ id: id(), orderId: o.id, actorId: o.sellerId, kind, note }).run();
+  if (!await isSeedUser(other)) throw new Error("Advance works only against seed demo accounts");
+  const log = async (kind: string, note: string) =>
+    await db.insert(tables.orderEvents).values({ id: id(), orderId: o.id, actorId: o.sellerId, kind, note }).run();
 
   if (o.status === "placed") return { requiresAction: "Pay (test payment) in the real UI", href: "/orders" };
   if (o.status === "paid") {
-    db.update(tables.orders).set({ status: "preparing" }).where(eq(tables.orders.id, o.id)).run();
-    log("preparing", "Seller is preparing your order");
-    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Your order is being prepared", body: o.title, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    await db.update(tables.orders).set({ status: "preparing" }).where(eq(tables.orders.id, o.id)).run();
+    await log("preparing", "Seller is preparing your order");
+    await notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Your order is being prepared", body: o.title, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
     return { ok: true, stage: "Preparing" };
   }
   if (o.status === "preparing") {
-    db.update(tables.orders).set({ status: "shipped", tracking: JSON.stringify({ carrier: "Demo Carrier", code: "TEST-" + o.id.slice(0, 6).toUpperCase() }) }).where(eq(tables.orders.id, o.id)).run();
-    log("shipped", "Demo Carrier TEST-" + o.id.slice(0, 6).toUpperCase());
-    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Your order shipped", body: o.title, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    await db.update(tables.orders).set({ status: "shipped", tracking: JSON.stringify({ carrier: "Demo Carrier", code: "TEST-" + o.id.slice(0, 6).toUpperCase() }) }).where(eq(tables.orders.id, o.id)).run();
+    await log("shipped", "Demo Carrier TEST-" + o.id.slice(0, 6).toUpperCase());
+    await notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Your order shipped", body: o.title, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
     return { ok: true, stage: "Shipped" };
   }
   if (o.status === "shipped") {
-    db.update(tables.orders).set({ status: "delivered", protectionEndsAt: new Date(Date.now() + 48 * 3600_000) }).where(eq(tables.orders.id, o.id)).run();
-    log("delivered", "Carrier confirmed delivery");
-    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Delivered", body: `${o.title} — protection window open`, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    await db.update(tables.orders).set({ status: "delivered", protectionEndsAt: new Date(Date.now() + 48 * 3600_000) }).where(eq(tables.orders.id, o.id)).run();
+    await log("delivered", "Carrier confirmed delivery");
+    await notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: "Delivered", body: `${o.title} — protection window open`, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
     return { ok: true, stage: "Delivered — protection window open" };
   }
   if (o.status === "delivered") {
-    db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
-    db.update(tables.payments).set({ status: "released" }).where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held"))).run();
-    log("completed", "Protection window ended with no reported problem — funds released");
-    notify({ userId: o.buyerId, actorId: o.sellerId, type: "payment", title: "Order complete", body: `${o.title} — funds released (test payment)`, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
+    await db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
+    await db.update(tables.payments).set({ status: "released" }).where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held"))).run();
+    await log("completed", "Protection window ended with no reported problem — funds released");
+    await notify({ userId: o.buyerId, actorId: o.sellerId, type: "payment", title: "Order complete", body: `${o.title} — funds released (test payment)`, href: `/activity?focus=purchase:${o.id}`, category: "payments" });
     return { ok: true, stage: "Completed — funds released" };
   }
   throw new Error(`Nothing to advance from "${o.status}"`);
 }
 
-export function forceAdvanceApplication(applicationId: string, actorUserId: string): { ok: true; stage: string } {
-  const a = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+export async function forceAdvanceApplication(applicationId: string, actorUserId: string): Promise<{ ok: true; stage: string }> {
+  const a = await db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
   if (!a) throw new Error("Application not found");
   if (a.applicantId !== actorUserId) throw new Error("Not your application");
-  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, a.opportunityId)).get();
-  if (!opp || !isSeedUser(opp.posterId)) throw new Error("Advance works only against seed demo accounts");
+  const opp = await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, a.opportunityId)).get();
+  if (!opp || !await isSeedUser(opp.posterId)) throw new Error("Advance works only against seed demo accounts");
   const next: Record<string, { status: string; stage: string; note: string }> = {
     submitted: { status: "shortlisted", stage: "Shortlisted", note: "You've been shortlisted" },
     shortlisted: { status: "selected", stage: "Selected", note: "You were selected — congratulations" },
@@ -319,19 +319,19 @@ export function forceAdvanceApplication(applicationId: string, actorUserId: stri
   };
   const step = next[a.status];
   if (!step) throw new Error(`Nothing to advance from "${a.status}"`);
-  db.update(tables.applications).set({ status: step.status }).where(eq(tables.applications.id, a.id)).run();
-  notify({ userId: a.applicantId, actorId: opp.posterId, type: "opportunity", title: step.note, body: opp.title, href: `/opportunities/${opp.id}`, category: "work" });
+  await db.update(tables.applications).set({ status: step.status }).where(eq(tables.applications.id, a.id)).run();
+  await notify({ userId: a.applicantId, actorId: opp.posterId, type: "opportunity", title: step.note, body: opp.title, href: `/opportunities/${opp.id}`, category: "work" });
   return { ok: true, stage: step.stage };
 }
 
 /** Seed counterparty confirms a linked work post ("Client Confirmed"). */
-export function seedClientConfirmsWork(postId: string, counterpartyId: string) {
-  if (!isSeedUser(counterpartyId)) return;
-  const post = db.select().from(tables.posts).where(eq(tables.posts.id, postId)).get();
+export async function seedClientConfirmsWork(postId: string, counterpartyId: string) {
+  if (!await isSeedUser(counterpartyId)) return;
+  const post = await db.select().from(tables.posts).where(eq(tables.posts.id, postId)).get();
   if (!post || post.clientConfirmed) return;
-  db.update(tables.posts).set({ clientConfirmed: true }).where(eq(tables.posts.id, postId)).run();
-  const confirmer = db.select().from(tables.profiles).where(eq(tables.profiles.userId, counterpartyId)).get();
-  notify({
+  await db.update(tables.posts).set({ clientConfirmed: true }).where(eq(tables.posts.id, postId)).run();
+  const confirmer = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, counterpartyId)).get();
+  await notify({
     userId: post.authorId,
     actorId: counterpartyId,
     type: "post",
@@ -342,19 +342,19 @@ export function seedClientConfirmsWork(postId: string, counterpartyId: string) {
 }
 
 /** After the real user reviews a completed project: the seed side reviews back. */
-export function seedReviewsBack(projectId: string, realUserId: string) {
-  const p = db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
+export async function seedReviewsBack(projectId: string, realUserId: string) {
+  const p = await db.select().from(tables.projects).where(eq(tables.projects.id, projectId)).get();
   if (!p) return;
   const seedParty = p.clientId === realUserId ? p.creatorId : p.clientId;
-  if (!isSeedUser(seedParty)) return;
-  const existing = db
+  if (!await isSeedUser(seedParty)) return;
+  const existing = await db
     .select()
     .from(tables.reviews)
     .where(and(eq(tables.reviews.projectId, projectId), eq(tables.reviews.authorId, seedParty)))
     .get();
   if (existing) return;
   try {
-    addReview(projectId, seedParty, 5, "Clear brief, quick decisions, on-time payment. Would work together again.");
+    await addReview(projectId, seedParty, 5, "Clear brief, quick decisions, on-time payment. Would work together again.");
   } catch {
     /* reviews closed — fine */
   }
@@ -363,12 +363,12 @@ export function seedReviewsBack(projectId: string, realUserId: string) {
 /* ------------------- role opportunities (Team & Openings) ------------------- */
 
 /** Seed applicant accepts a role offer instantly — the team view fills in. */
-export function seedAcceptsRoleOffer(applicationId: string) {
-  const app = db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
-  if (!app || app.status !== "selected" || !isSeedUser(app.applicantId)) return;
+export async function seedAcceptsRoleOffer(applicationId: string) {
+  const app = await db.select().from(tables.applications).where(eq(tables.applications.id, applicationId)).get();
+  if (!app || app.status !== "selected" || !await isSeedUser(app.applicantId)) return;
   // the protagonist demo account (admin) never auto-acts — accepting an
   // offer is THEIR moment when a human is driving that account
-  const applicant = db.select().from(tables.users).where(eq(tables.users.id, app.applicantId)).get();
+  const applicant = await db.select().from(tables.users).where(eq(tables.users.id, app.applicantId)).get();
   if (applicant?.role === "admin") return;
   // lazy import avoids a cycle (oppFlow → notify only)
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -380,13 +380,13 @@ export function seedAcceptsRoleOffer(applicationId: string) {
  * each role right away so the poster can demo review → select → team →
  * payment without waiting for anyone.
  */
-export function seedApplicantsApplyToRoles(opportunityId: string) {
-  const opp = db.select().from(tables.opportunities).where(eq(tables.opportunities.id, opportunityId)).get();
+export async function seedApplicantsApplyToRoles(opportunityId: string) {
+  const opp = await db.select().from(tables.opportunities).where(eq(tables.opportunities.id, opportunityId)).get();
   if (!opp) return;
   let roles: { id: string; title: string }[] = [];
   try { roles = JSON.parse(opp.roles); } catch { return; }
   if (!roles.length) return;
-  const seeds = db.select().from(tables.users).all().filter((u) => u.simulated && u.id !== opp.posterId && u.status === "active");
+  const seeds = (await db.select().from(tables.users).all()).filter((u) => u.simulated && u.id !== opp.posterId && u.status === "active");
   const MESSAGES = [
     "This is exactly my lane — portfolio's on my profile, happy to share more.",
     "Available that day and local. Would love to be part of this.",
@@ -397,13 +397,13 @@ export function seedApplicantsApplyToRoles(opportunityId: string) {
     // two applicants per role, cycling through seed users (one app per user)
     for (let k = 0; k < 2 && cursor < seeds.length; k++, cursor++) {
       const u = seeds[cursor];
-      const already = db
+      const already = await db
         .select()
         .from(tables.applications)
         .where(and(eq(tables.applications.opportunityId, opp.id), eq(tables.applications.applicantId, u.id)))
         .get();
       if (already) continue;
-      db.insert(tables.applications)
+      await db.insert(tables.applications)
         .values({
           id: randomBytes(12).toString("hex"),
           opportunityId: opp.id,
@@ -413,7 +413,7 @@ export function seedApplicantsApplyToRoles(opportunityId: string) {
           availability: "yes",
         })
         .run();
-      notify({
+      await notify({
         userId: opp.posterId,
         actorId: u.id,
         type: "application",
@@ -433,15 +433,15 @@ export function seedApplicantsApplyToRoles(opportunityId: string) {
  * mock tracking (ETA ≈ 4 days; pickup/digital hand off directly). The
  * buyer sees every state of the timeline without waiting for a human.
  */
-export function seedSellerFulfills(orderId: string) {
-  const o = db.select().from(tables.orders).where(eq(tables.orders.id, orderId)).get();
-  if (!o || o.status !== "secured" || !isSeedUser(o.sellerId)) return;
+export async function seedSellerFulfills(orderId: string) {
+  const o = await db.select().from(tables.orders).where(eq(tables.orders.id, orderId)).get();
+  if (!o || o.status !== "secured" || !await isSeedUser(o.sellerId)) return;
   if (o.fulfillment === "shipping") {
     const eta = new Date(Date.now() + 4 * 86400_000).toISOString();
     const code = "9400" + String(Math.floor(1e10 + Math.random() * 9e10));
     // high-value: the seed seller records evidence like a careful human would
     const highValue = o.price * o.qty >= 200;
-    db.update(tables.orders)
+    await db.update(tables.orders)
       .set({
         status: "shipped",
         tracking: JSON.stringify({ carrier: "USPS", code, eta }),
@@ -452,27 +452,27 @@ export function seedSellerFulfills(orderId: string) {
       .where(eq(tables.orders.id, o.id))
       .run();
     if (o.conversationId)
-      sendAs(o.conversationId, o.sellerId, `Packed and shipped! USPS tracking ${code} — should land in about 4 days.`);
-    notify({
+      await sendAs(o.conversationId, o.sellerId, `Packed and shipped! USPS tracking ${code} — should land in about 4 days.`);
+    await notify({
       userId: o.buyerId, actorId: o.sellerId, type: "order",
       title: `Shipped — ${o.title}`, body: `USPS · estimated ${new Date(eta).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
       href: "/orders",
     });
   } else if (o.fulfillment === "digital") {
-    db.update(tables.orders).set({ status: "delivered" }).where(eq(tables.orders.id, o.id)).run();
+    await db.update(tables.orders).set({ status: "delivered" }).where(eq(tables.orders.id, o.id)).run();
     if (o.conversationId)
-      sendAs(o.conversationId, o.sellerId, `Download link sent! Confirm you got everything and the order completes.`);
-    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Delivered — ${o.title}`, body: "Confirm receipt to complete the order.", href: "/orders" });
+      await sendAs(o.conversationId, o.sellerId, `Download link sent! Confirm you got everything and the order completes.`);
+    await notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Delivered — ${o.title}`, body: "Confirm receipt to complete the order.", href: "/orders" });
   } else {
     // pickup / local delivery: seed seller proposes the meetup in chat
-    db.update(tables.orders).set({ status: "preparing" }).where(eq(tables.orders.id, o.id)).run();
+    await db.update(tables.orders).set({ status: "preparing" }).where(eq(tables.orders.id, o.id)).run();
     if (o.conversationId)
-      sendAs(
+      await sendAs(
         o.conversationId,
         o.sellerId,
         `I'm flexible for the ${o.fulfillment === "pickup" ? "pickup" : "drop-off"} — does Saturday around 2 PM near downtown work? Exact spot once we confirm.`
       );
-    notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Seller is preparing your order`, body: `${o.title} — arrange the ${o.fulfillment} in Messages`, href: "/orders", priority: "normal" });
+    await notify({ userId: o.buyerId, actorId: o.sellerId, type: "order", title: `Seller is preparing your order`, body: `${o.title} — arrange the ${o.fulfillment} in Messages`, href: "/orders", priority: "normal" });
   }
 }
 
@@ -480,16 +480,16 @@ export function seedSellerFulfills(orderId: string) {
 
 /** Seed creator delivers licensed files instantly in chat — the licensee's
  *  "confirm delivery" moment always arrives without waiting. */
-export function seedCreatorDeliversLicense(licenseId: string) {
-  const lic = db.select().from(tables.licenses).where(eq(tables.licenses.id, licenseId)).get();
-  if (!lic || lic.status !== "issued" || !isSeedUser(lic.creatorId)) return;
+export async function seedCreatorDeliversLicense(licenseId: string) {
+  const lic = await db.select().from(tables.licenses).where(eq(tables.licenses.id, licenseId)).get();
+  if (!lic || lic.status !== "issued" || !await isSeedUser(lic.creatorId)) return;
   if (lic.conversationId)
-    sendAs(
+    await sendAs(
       lic.conversationId,
       lic.creatorId,
       `Files sent! Untagged ${lic.workTitle} + stems are in your inbox. Confirm delivery when you've got everything and the license completes.`
     );
-  notify({
+  await notify({
     userId: lic.licenseeId, actorId: lic.creatorId, type: "order",
     title: `Files delivered — ${lic.workTitle}`,
     body: "Confirm delivery to complete the license and release the payout.",
@@ -503,16 +503,16 @@ export function seedCreatorDeliversLicense(licenseId: string) {
  *  in a seed community, so the discussion feels alive. Replies respect the
  *  community's identity modes: in anonymous-friendly rooms seed members
  *  answer masked, exactly like a real shy member would. */
-export function seedRespondsInCommunity(communityId: string) {
-  const c = db.select().from(tables.communities).where(eq(tables.communities.id, communityId)).get();
+export async function seedRespondsInCommunity(communityId: string) {
+  const c = await db.select().from(tables.communities).where(eq(tables.communities.id, communityId)).get();
   if (!c || !c.isSeed) return;
 
   const cutoff = new Date(Date.now() - 7 * 86_400_000);
-  const posts = db
+  const posts = (await db
     .select()
     .from(tables.communityPosts)
     .where(eq(tables.communityPosts.communityId, communityId))
-    .all()
+    .all())
     .filter((p) => !p.isSeed && !p.removedAt && p.createdAt > cutoff);
 
   let modes: string[] = ["real"];
@@ -526,15 +526,15 @@ export function seedRespondsInCommunity(communityId: string) {
       .from(tables.communityComments)
       .where(eq(tables.communityComments.postId, post.id))
       .all();
-    if (existing.some((cm) => cm.isSeed)) continue; // one seed reply per post
+    if ((await existing).some((cm) => cm.isSeed)) continue; // one seed reply per post
 
     // pick an active seed member who isn't the author (and never the admin)
-    const members = db
+    const members = (await db
       .select({ m: tables.communityMembers, u: tables.users })
       .from(tables.communityMembers)
       .innerJoin(tables.users, eq(tables.communityMembers.userId, tables.users.id))
       .where(eq(tables.communityMembers.communityId, communityId))
-      .all()
+      .all())
       .filter((r) => r.m.status === "active" && r.u.simulated && r.u.id !== post.authorId);
     if (!members.length) continue;
     const replier = members[Math.floor(Math.random() * members.length)];
@@ -553,7 +553,7 @@ export function seedRespondsInCommunity(communityId: string) {
       "This community delivers again. Watching this one.",
       "Felt this. Thanks for posting it.",
     ];
-    db.insert(tables.communityComments)
+    await db.insert(tables.communityComments)
       .values({
         id: id(),
         postId: post.id,
@@ -570,21 +570,22 @@ export function seedRespondsInCommunity(communityId: string) {
  *  request → accept → connection loop can be demonstrated solo.
  *  The protagonist admin account never auto-answers — that decision
  *  belongs to the human driving it. */
-export function seedAcceptsReveal(forUserId: string) {
-  const pending = db
+export async function seedAcceptsReveal(forUserId: string) {
+  const pending = (await db
     .select()
     .from(tables.identityReveals)
     .where(eq(tables.identityReveals.status, "pending"))
-    .all()
-    .filter((r) => r.requesterId === forUserId && isSeedUser(r.targetId));
+    .all())
+    .filter((r) => r.requesterId === forUserId);
   for (const r of pending) {
-    const target = db.select().from(tables.users).where(eq(tables.users.id, r.targetId)).get();
+    if (!(await isSeedUser(r.targetId))) continue;
+    const target = await db.select().from(tables.users).where(eq(tables.users.id, r.targetId)).get();
     if (!target || target.role === "admin") continue;
-    db.update(tables.identityReveals)
+    await db.update(tables.identityReveals)
       .set({ status: "accepted", respondedAt: new Date() })
       .where(eq(tables.identityReveals.id, r.id))
       .run();
-    notify({
+    await notify({
       userId: r.requesterId,
       actorId: r.targetId,
       type: "community",

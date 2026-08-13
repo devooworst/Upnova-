@@ -10,21 +10,21 @@ import { haversineMi } from "@/lib/server/feed";
 
 type EventRow = typeof tables.events.$inferSelect;
 
-export function verifiedCampusOf(userId: string | null): string | null {
+export async function verifiedCampusOf(userId: string | null): Promise<string | null> {
   if (!userId) return null;
   return (
-    db
+    (await db
       .select()
       .from(tables.campusVerifications)
       .where(and(eq(tables.campusVerifications.userId, userId), eq(tables.campusVerifications.status, "verified")))
-      .get()?.campusId ?? null
+      .get())?.campusId ?? null
   );
 }
 
-export function rsvpCounts(eventIds: string[]): Map<string, number> {
+export async function rsvpCounts(eventIds: string[]): Promise<Map<string, number>> {
   const m = new Map<string, number>();
   if (!eventIds.length) return m;
-  for (const r of db.select().from(tables.eventRsvps).all()) {
+  for (const r of await db.select().from(tables.eventRsvps).all()) {
     if (eventIds.includes(r.eventId)) m.set(r.eventId, (m.get(r.eventId) ?? 0) + 1);
   }
   return m;

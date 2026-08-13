@@ -33,8 +33,15 @@ const nextConfig = {
     ];
   },
   experimental: {
-    // native sqlite driver must stay external to the server bundle
-    serverComponentsExternalPackages: ["better-sqlite3"],
+    // native/wasm database drivers must stay external to the server
+    // bundle: better-sqlite3 (geo.db reference data), PGlite (local
+    // Postgres — wasm + data assets break when webpack inlines them),
+    // and the Neon serverless driver (kept external for parity).
+    serverComponentsExternalPackages: ["better-sqlite3", "@electric-sql/pglite", "@neondatabase/serverless"],
+    // local PGlite is single-connection: parallel static-export workers
+    // would each open db/pgdata and abort. One worker locally; Vercel
+    // (DATABASE_URL = Neon over HTTP) parallelizes freely.
+    ...(process.env.DATABASE_URL ? {} : { cpus: 1 }),
   },
 };
 

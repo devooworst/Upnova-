@@ -17,21 +17,23 @@ export const dynamic = "force-dynamic";
 /** GET — community detail (id or slug). Private/invite communities show
  *  their card to everyone (visible, restricted) but content stays inside. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const c = findCommunity(params.id);
+  return guarded(async () => {
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const viewer = getSessionUser();
-    let membership = viewer ? getMembership(c.id, viewer.id) : null;
-    if (membership) membership = refreshMembership(c, membership); // lazy paid-membership lifecycle
+    const viewer = await getSessionUser();
+    let membership = viewer ? await getMembership(c.id, viewer.id) : null;
+    if (membership) membership = await refreshMembership(c, membership); // lazy paid-membership lifecycle
 
-    const counts = communityCounts([c.id]).get(c.id);
+    const counts = (await communityCounts([c.id])).get(c.id);
     let pendingJoins: number | undefined;
     if (isMod(membership)) {
-      pendingJoins = db
-        .select({ s: tables.communityMembers.status })
-        .from(tables.communityMembers)
-        .where(and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.status, "pending")))
-        .all().length;
+      pendingJoins = (
+        await db
+          .select({ s: tables.communityMembers.status })
+          .from(tables.communityMembers)
+          .where(and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.status, "pending")))
+          .all()
+      ).length;
     }
     return { community: serializeCommunity(c, { membership, counts, pendingJoins }), guest: !viewer };
   });
@@ -41,11 +43,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
  *  existing posts keep the identity they were written under. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
-    const c = findCommunity(params.id);
+    const user = await requireUser();
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const m = getMembership(c.id, user.id);
-    if (!m || m.role !== "owner") throw new ApiError(403, "Only the community owner can change settings");
+    const m = getMembership(c!.id, user.id);
+    if (!m || (await m)!.role !== "owner") throw new ApiError(403, "Only the community owner can change settings");
 
     const body = await req.json().catch(() => ({}));
     const patch: Record<string, unknown> = {};
@@ -90,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     if (!Object.keys(patch).length) throw new ApiError(400, "Nothing to update");
 
-    db.update(tables.communities).set(patch).where(eq(tables.communities.id, c.id)).run();
+    await db.update(tables.communities).set(patch).where(eq(tables.communities.id, c!.id)).run();
     return { ok: true };
   });
 }

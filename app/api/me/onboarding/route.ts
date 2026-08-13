@@ -15,9 +15,9 @@ const parse = (raw: string) => {
 
 /** GET — my onboarding state. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const row = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const row = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     const o = parse(row.onboarding);
     return { completed: !!o.completedAt, skipped: !!o.skipped };
   });
@@ -32,24 +32,24 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const action = String(body.action);
     // per-feature tutorial state (the `tours` key) is ALWAYS preserved —
     // finishing or resetting the first-run tour never wipes it
-    const row = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+    const row = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     let prev: Record<string, unknown> = {};
     try { prev = JSON.parse(row.onboarding || "{}") ?? {}; } catch {}
     const keepTours = typeof prev.tours === "object" && prev.tours !== null ? { tours: prev.tours } : {};
     if (action === "complete" || action === "skip") {
-      db.update(tables.users)
+      await db.update(tables.users)
         .set({ onboarding: JSON.stringify({ completedAt: new Date().toISOString(), skipped: action === "skip", ...keepTours }) })
         .where(eq(tables.users.id, user.id))
         .run();
       return { completed: true, skipped: action === "skip" };
     }
     if (action === "reset") {
-      db.update(tables.users).set({ onboarding: JSON.stringify({ ...keepTours }) }).where(eq(tables.users.id, user.id)).run();
+      await db.update(tables.users).set({ onboarding: JSON.stringify({ ...keepTours }) }).where(eq(tables.users.id, user.id)).run();
       return { completed: false, skipped: false };
     }
     throw new ApiError(400, "Unknown action");

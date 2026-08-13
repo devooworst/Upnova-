@@ -52,7 +52,7 @@ export type TargetType = (typeof TARGET_TYPES)[number];
 
 const VIEW_DEDUP_MS = 6 * 3600_000;
 
-export function recordInteraction(
+export async function recordInteraction(
   userId: string,
   targetType: TargetType,
   targetId: string,
@@ -62,7 +62,7 @@ export function recordInteraction(
   try {
     // views dedupe within a window so scrolling doesn't spam the log
     if (["view", "profile_view", "service_view"].includes(action)) {
-      const recent = db
+      const recent = (await db
         .select()
         .from(tables.interactions)
         .where(
@@ -72,11 +72,11 @@ export function recordInteraction(
             eq(tables.interactions.action, action)
           )
         )
-        .all()
+        .all())
         .some((r) => r.createdAt.getTime() > Date.now() - VIEW_DEDUP_MS);
       if (recent) return;
     }
-    db.insert(tables.interactions)
+    await db.insert(tables.interactions)
       .values({ id: randomBytes(12).toString("hex"), userId, targetType, targetId, action, meta: meta.slice(0, 120) })
       .run();
   } catch {
@@ -134,20 +134,20 @@ const parse = (s: string): string[] => {
   }
 };
 
-export function buildTaste(userId: string, profile: typeof tables.profiles.$inferSelect): Taste {
+export async function buildTaste(userId: string, profile: typeof tables.profiles.$inferSelect): Promise<Taste> {
   const followingIds = new Set(
-    db.select({ id: tables.follows.followingId }).from(tables.follows).where(eq(tables.follows.followerId, userId)).all().map((r) => r.id)
+    (await db.select({ id: tables.follows.followingId }).from(tables.follows).where(eq(tables.follows.followerId, userId)).all()).map((r) => r.id)
   );
   const communityIds = new Set(
-    db.select({ id: tables.communityMembers.communityId }).from(tables.communityMembers).where(eq(tables.communityMembers.userId, userId)).all().map((r) => r.id)
+    (await db.select({ id: tables.communityMembers.communityId }).from(tables.communityMembers).where(eq(tables.communityMembers.userId, userId)).all()).map((r) => r.id)
   );
-  const events = db.select().from(tables.interactions).where(eq(tables.interactions.userId, userId)).all();
+  const events = await db.select().from(tables.interactions).where(eq(tables.interactions.userId, userId)).all();
 
   // resolve post/service targets to their authors + categories once
   const postIds = events.filter((e) => e.targetType === "post").map((e) => e.targetId);
-  const posts = postIds.length ? db.select().from(tables.posts).where(inArray(tables.posts.id, postIds)).all() : [];
+  const posts = postIds.length ? await db.select().from(tables.posts).where(inArray(tables.posts.id, postIds)).all() : [];
   const serviceIds = events.filter((e) => e.targetType === "service").map((e) => e.targetId);
-  const services = serviceIds.length ? db.select().from(tables.services).where(inArray(tables.services.id, serviceIds)).all() : [];
+  const services = serviceIds.length ? await db.select().from(tables.services).where(inArray(tables.services.id, serviceIds)).all() : [];
 
   const authorRaw = new Map<string, number>();
   const categoryRaw = new Map<string, number>();

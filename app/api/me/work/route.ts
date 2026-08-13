@@ -12,21 +12,21 @@ export const dynamic = "force-dynamic";
  * not the authority).
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
 
-    const projects = db
+    const projects = (await db
       .select()
       .from(tables.projects)
       .where(or(eq(tables.projects.creatorId, user.id), eq(tables.projects.clientId, user.id)))
-      .all()
+      .all())
       .filter((p) => ["approved", "completed", "reviewed"].includes(p.state));
 
-    const bookings = db
+    const bookings = (await db
       .select()
       .from(tables.bookings)
       .where(or(eq(tables.bookings.providerId, user.id), eq(tables.bookings.clientId, user.id)))
-      .all()
+      .all())
       .filter((b) => b.status === "completed");
 
     const otherIds = Array.from(
@@ -36,7 +36,7 @@ export async function GET() {
       ])
     );
     const names = new Map(
-      db.select().from(tables.profiles).all().filter((pr) => otherIds.includes(pr.userId)).map((pr) => [pr.userId, pr.displayName])
+      (await db.select().from(tables.profiles).all()).filter((pr) => otherIds.includes(pr.userId)).map((pr) => [pr.userId, pr.displayName])
     );
 
     return {

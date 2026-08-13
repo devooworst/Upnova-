@@ -31,9 +31,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const svc = db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const svc = await db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
     if (!svc || !svc.active) throw new ApiError(404, "Service not found");
     if (svc.ownerId !== user.id) throw new ApiError(403, "Only the owner controls Preferred Early Access");
     const hours = Math.round(Number(body.hours));
@@ -52,16 +52,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       throw new ApiError(400, "The per-client booking limit can't exceed the available slots");
 
     // a slot cap below what's ALREADY booked would be a lie — refuse it honestly
-    const alreadyActive = activeBookingsForService(svc.id);
+    const alreadyActive = await activeBookingsForService(svc.id);
     if (slots != null && alreadyActive >= slots)
       throw new ApiError(409, `This service already has ${alreadyActive} active bookings — a cap of ${slots} slots would be full before it starts`);
 
-    const holders = preferredWithEarlyAccess(user.id);
+    const holders = await preferredWithEarlyAccess(user.id);
     if (holders.length === 0)
       throw new ApiError(409, "No Preferred Client currently holds a priority-booking or early-access benefit — add one first");
 
     const until = new Date(Date.now() + hours * 3600_000);
-    db.update(tables.services)
+    await db.update(tables.services)
       .set({
         preferredUntil: until,
         config: writeEarlyAccess(svc.config, { slots, preferredLimit, startedAt: new Date().toISOString() }),
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .run();
 
     for (const clientId of holders)
-      notify({
+      await notify({
         userId: clientId,
         actorId: user.id,
         type: "preferred_window",
@@ -97,9 +97,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
  * a separate concept). `?full=1` also removes the slot cap entirely.
  */
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const svc = db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const svc = await db.select().from(tables.services).where(eq(tables.services.id, params.id)).get();
     if (!svc) throw new ApiError(404, "Service not found");
     if (svc.ownerId !== user.id) throw new ApiError(403, "Only the owner controls Preferred Early Access");
     const full = req.nextUrl.searchParams.get("full") === "1";
@@ -107,7 +107,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       const ea = readEarlyAccess(svc.config);
       return ea?.slots ? { slots: ea.slots, preferredLimit: null, startedAt: ea.startedAt } : null;
     })();
-    db.update(tables.services)
+    await db.update(tables.services)
       .set({ preferredUntil: null, config: writeEarlyAccess(svc.config, kept) })
       .where(eq(tables.services.id, svc.id))
       .run();

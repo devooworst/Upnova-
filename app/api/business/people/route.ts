@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
  * never makes anyone an employee. Visible only to the account itself.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     return peopleFor(user.id);
   });
 }

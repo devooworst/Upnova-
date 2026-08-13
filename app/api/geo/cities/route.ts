@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  return guarded(() => {
+  return guarded(async () => {
     const country = String(p.get("country") || "").trim();
     if (!country) throw new ApiError(400, "Pick a country first.");
     return {

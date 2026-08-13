@@ -16,9 +16,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const stream = getStream(params.id);
+  return guarded(async () => {
+    const user = await requireUser();
+    const stream = await getStream(params.id);
     if (stream.status !== "live") throw new ApiError(409, "This live has ended");
     const action = String(body.action || "");
 
@@ -28,19 +28,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
       if (action === "invite") {
         const handle = String(body.handle || "").trim().toLowerCase().replace(/^@/, "");
-        const target = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+        const target = await db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
         if (!target || target.status !== "active") throw new ApiError(404, "No Mavyn member with that username");
         if (target.id === user.id) throw new ApiError(400, "You're already the host");
-        const existing = guestRow(stream.id, target.id);
+        const existing = await guestRow(stream.id, target.id);
         if (existing && (existing.status === "invited" || existing.status === "active"))
           throw new ApiError(409, "They're already invited");
-        const active = db.select().from(tables.liveGuests).where(eq(tables.liveGuests.streamId, stream.id)).all()
+        const active = ((await db.select().from(tables.liveGuests).where(eq(tables.liveGuests.streamId, stream.id)).all()))
           .filter((g) => g.status === "active" || g.status === "invited");
         if (active.length >= 3) throw new ApiError(409, "A live supports the host plus up to 3 guests");
-        db.insert(tables.liveGuests)
+        await db.insert(tables.liveGuests)
           .values({ id: randomBytes(12).toString("hex"), streamId: stream.id, userId: target.id })
           .run();
-        notify({
+        await notify({
           userId: target.id,
           actorId: user.id,
           type: "live_guest_invite",
@@ -51,20 +51,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return { ok: true };
       }
 
-      const g = guestRow(stream.id, String(body.userId || ""));
+      const g = await guestRow(stream.id, String(body.userId || ""));
       if (!g || (g.status !== "invited" && g.status !== "active")) throw new ApiError(404, "They're not in this live");
-      db.update(tables.liveGuests).set({ status: "removed" }).where(eq(tables.liveGuests.id, g.id)).run();
+      (await db.update(tables.liveGuests).set({ status: "removed" }).where(eq(tables.liveGuests.id, g.id)).run());
       return { ok: true };
     }
 
     if (["accept", "decline", "leave"].includes(action)) {
-      const g = guestRow(stream.id, user.id);
+      const g = await guestRow(stream.id, user.id);
       if (!g || (g.status !== "invited" && g.status !== "active")) throw new ApiError(404, "You're not invited to this live");
       if (action === "accept") {
         if (g.status !== "invited") throw new ApiError(409, "You're already on stage");
-        db.update(tables.liveGuests).set({ status: "active", joinedAt: new Date() }).where(eq(tables.liveGuests.id, g.id)).run();
+        (await db.update(tables.liveGuests).set({ status: "active", joinedAt: new Date() }).where(eq(tables.liveGuests.id, g.id)).run());
       } else {
-        db.update(tables.liveGuests).set({ status: action === "decline" ? "declined" : "left" }).where(eq(tables.liveGuests.id, g.id)).run();
+        (await db.update(tables.liveGuests).set({ status: action === "decline" ? "declined" : "left" }).where(eq(tables.liveGuests.id, g.id)).run());
       }
       return { ok: true };
     }

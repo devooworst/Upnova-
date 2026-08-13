@@ -18,9 +18,9 @@ import { db, tables } from "@/db";
  * else (stale id, someone else's thread) is ignored and the correct
  * conversation is resolved from the ids instead.
  */
-export function resolvePairConversation(userA: string, userB: string, provided?: string | null): string {
+export async function resolvePairConversation(userA: string, userB: string, provided?: string | null): Promise<string> {
   if (provided) {
-    const members = db
+    const members = await db
       .select()
       .from(tables.conversationMembers)
       .where(eq(tables.conversationMembers.conversationId, provided))
@@ -29,11 +29,11 @@ export function resolvePairConversation(userA: string, userB: string, provided?:
     if (members.length === 2 && ids.has(userA) && ids.has(userB)) return provided;
   }
 
-  const mine = db
+  const mine = (await db
     .select()
     .from(tables.conversationMembers)
     .where(eq(tables.conversationMembers.userId, userA))
-    .all()
+    .all())
     .map((m) => m.conversationId);
   if (mine.length) {
     const memberRows = db
@@ -42,7 +42,7 @@ export function resolvePairConversation(userA: string, userB: string, provided?:
       .where(inArray(tables.conversationMembers.conversationId, mine))
       .all();
     const byConv = new Map<string, string[]>();
-    for (const m of memberRows) {
+    for (const m of await memberRows) {
       const arr = byConv.get(m.conversationId) ?? [];
       arr.push(m.userId);
       byConv.set(m.conversationId, arr);
@@ -53,8 +53,8 @@ export function resolvePairConversation(userA: string, userB: string, provided?:
   }
 
   const cid = randomBytes(12).toString("hex");
-  db.insert(tables.conversations).values({ id: cid }).run();
-  db.insert(tables.conversationMembers)
+  await db.insert(tables.conversations).values({ id: cid }).run();
+  await db.insert(tables.conversationMembers)
     .values([
       { conversationId: cid, userId: userA },
       { conversationId: cid, userId: userB },

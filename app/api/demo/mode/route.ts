@@ -18,13 +18,13 @@ export const dynamic = "force-dynamic";
  */
 export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
+  return guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
-    const user = requireQaOperator();
+    const user = await requireQaOperator();
     const mode = String(body.mode || "");
     if (mode !== "demo" && mode !== "simulation")
       throw new ApiError(400, 'mode must be "demo" or "simulation"');
-    db.update(tables.users).set({ testerMode: mode }).where(eq(tables.users.id, user.id)).run();
+    await db.update(tables.users).set({ testerMode: mode }).where(eq(tables.users.id, user.id)).run();
     return { mode };
   });
 }

@@ -15,35 +15,35 @@ export const dynamic = "force-dynamic";
  * viewable as history.
  */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const row = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const row = await db
       .select({ product: tables.products, user: tables.users, profile: tables.profiles })
       .from(tables.products)
       .innerJoin(tables.users, eq(tables.products.sellerId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.products.id, params.id))
       .get();
-    if (!row || row.user.status !== "active") throw new ApiError(404, "Product not found");
-    const { product, user, profile } = row;
+    if (!row || row!.user.status !== "active") throw new ApiError(404, "Product not found");
+    const { product, user, profile } = await row;
 
     // seller history — computed from records, never self-reported.
     // "Here's what Mavyn has actually verified", not "trust this person".
-    const completedOrders = db
+    const completedOrders = (await db
       .select()
       .from(tables.orders)
       .where(eq(tables.orders.sellerId, user.id))
-      .all()
+      .all())
       .filter((o) => o.status === "completed").length;
-    const reviews = db.select().from(tables.reviews).where(eq(tables.reviews.subjectId, user.id)).all();
+    const reviews = await db.select().from(tables.reviews).where(eq(tables.reviews.subjectId, user.id)).all();
     const rating = reviews.length
       ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
       : null;
-    const otherListings = db
+    const otherListings = (await db
       .select()
       .from(tables.products)
       .where(eq(tables.products.sellerId, user.id))
-      .all()
+      .all())
       .filter((p) => p.id !== product.id && p.status === "active")
       .slice(0, 4)
       .map((p) => ({ id: p.id, title: p.title, price: p.price }));
@@ -90,9 +90,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /** PATCH — seller manages the listing. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const product = db.select().from(tables.products).where(eq(tables.products.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const product = await db.select().from(tables.products).where(eq(tables.products.id, params.id)).get();
     if (!product) throw new ApiError(404, "Product not found");
     if (product.sellerId !== user.id) throw new ApiError(403, "Not your listing");
 
@@ -106,7 +106,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       patch.quantity = Math.min(10_000, Math.max(product.sold, Math.round(Number(body.quantity) || 1)));
     if (["active", "sold_out", "archived"].includes(body.status)) patch.status = body.status;
     if (typeof body.description === "string") patch.description = body.description.slice(0, 1500);
-    db.update(tables.products).set(patch).where(eq(tables.products.id, params.id)).run();
+    await db.update(tables.products).set(patch).where(eq(tables.products.id, params.id)).run();
     return { ok: true };
   });
 }

@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
  * the tour gates anything.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const row = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
-    const v = campusVerification(user.id);
-    const campus = v ? db.select().from(tables.campuses).where(eq(tables.campuses.id, v.campusId)).get() : null;
-    const isStudent = !!v && v.affiliation === "current_student";
+  return guarded(async () => {
+    const user = await requireUser();
+    const row = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
+    const v = await campusVerification(user.id);
+    const campus = v ? await db.select().from(tables.campuses).where(eq(tables.campuses.id, v!.campusId)).get() : null;
+    const isStudent = !!v && v!.affiliation === "current_student";
     const isBusiness = row.accountType === "business";
     const audience = isBusiness ? "business" : isStudent ? "student" : "creator";
     const plan = row.plan;

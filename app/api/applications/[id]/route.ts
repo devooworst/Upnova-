@@ -26,9 +26,9 @@ export const dynamic = "force-dynamic";
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const app = db.select().from(tables.applications).where(eq(tables.applications.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const app = await db.select().from(tables.applications).where(eq(tables.applications.id, params.id)).get();
     if (!app) throw new ApiError(404, "Application not found");
 
     const action = String(body.action);
@@ -42,12 +42,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (action === "next_cycle") {
       // poster starts the next paid cycle of an ACTIVE engagement
-      requireOpportunityPoster(app.opportunityId, user.id);
+      await requireOpportunityPoster(app.opportunityId, user.id);
       return startEngagementCycle(app.id);
     }
 
     /* --------------------------- poster side --------------------------- */
-    const opp = requireOpportunityPoster(app.opportunityId, user.id);
+    const opp = await requireOpportunityPoster(app.opportunityId, user.id);
     if (!["shortlist", "select", "decline", "interview", "offer", "complete_engagement"].includes(action))
       throw new ApiError(400, "Unknown action");
 
@@ -56,13 +56,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!["submitted", "shortlisted", "interview"].includes(app.status))
         throw new ApiError(409, `Cannot schedule an interview from "${app.status}"`);
       const external = body.external === true;
-      const applicantName = db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get()?.displayName ?? "Applicant";
+      const applicantName = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, app.applicantId)).get())?.displayName ?? "Applicant";
       if (external) {
-        db.update(tables.applications)
+        await db.update(tables.applications)
           .set({ status: "interview", interview: JSON.stringify({ mode: "external", note: String(body.note || "").slice(0, 200) }) })
           .where(eq(tables.applications.id, app.id))
           .run();
-        notify({
+        await notify({
           userId: app.applicantId, actorId: user.id, type: "application",
           title: `Interview — ${opp.title}`,
           body: `The interview happens OUTSIDE Mavyn.${body.note ? ` ${String(body.note).slice(0, 120)}` : ""} Details in Messages.`,
@@ -72,9 +72,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       const at = new Date(body.at);
       if (isNaN(at.getTime()) || at.getTime() < Date.now()) throw new ApiError(400, "Pick a future interview time");
-      const convId = conversationBetween(user.id, app.applicantId);
+      const convId = await conversationBetween(user.id, app.applicantId);
       // Mavyn-scheduled: a $0 booking lands on BOTH calendars
-      db.insert(tables.bookings)
+      await db.insert(tables.bookings)
         .values({
           id: randomBytes(12).toString("hex"),
           serviceId: null, clientId: user.id, providerId: app.applicantId,
@@ -83,18 +83,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           location: opp.remote ? "Remote" : opp.location, status: "confirmed", conversationId: convId,
         })
         .run();
-      db.update(tables.applications)
+      await db.update(tables.applications)
         .set({ status: "interview", interview: JSON.stringify({ mode: "mavyn", at: at.toISOString() }) })
         .where(eq(tables.applications.id, app.id))
         .run();
-      db.insert(tables.messages)
+      await db.insert(tables.messages)
         .values({
           id: randomBytes(12).toString("hex"), conversationId: convId, senderId: user.id, kind: "system",
           body: `Interview scheduled — ${opp.title} · ${at.toLocaleDateString("en-US", { month: "long", day: "numeric" })} at ${at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}. It's on both calendars.`,
         })
         .run();
-      db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
-      notify({
+      await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+      await notify({
         userId: app.applicantId, actorId: user.id, type: "booking",
         title: `Interview scheduled — ${opp.title}`,
         body: `${at.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} — it's on your calendar`,
@@ -125,27 +125,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         note: String(body.note || "").slice(0, 500) || undefined,
         cycles: 0,
       };
-      db.update(tables.applications)
+      await db.update(tables.applications)
         .set({ status: "selected", offer: JSON.stringify(offer) })
         .where(eq(tables.applications.id, app.id))
         .run();
-      notify({
+      await notify({
         userId: app.applicantId, actorId: user.id, type: "application_selected",
         title: `Offer — ${offer.title}`,
         body: `${ENGAGEMENT_TYPES.find((t) => t.id === offer.engagementType)?.label}${offer.amount ? ` · $${offer.amount}${["weekly","biweekly","monthly","hourly"].includes(offer.compModel) ? ` per ${cycleLabel(offer.compModel)}` : ""}` : ""}${offer.classification === "external_employment" ? " · employment handled OUTSIDE Mavyn" : " · paid through Mavyn (secured → released)"}. Review it in My Applications.`,
         href: "/opportunities?apps=1",
       });
-      seedAcceptsRoleOffer(app.id); // demo: seed applicants accept instantly
-      const fresh = db.select().from(tables.applications).where(eq(tables.applications.id, app.id)).get()!;
+      await seedAcceptsRoleOffer(app.id); // demo: seed applicants accept instantly
+      const fresh = (await db.select().from(tables.applications).where(eq(tables.applications.id, app.id)).get())!;
       return { status: fresh.status };
     }
 
     /* ---- the relationship ends: completed, kept in history ---- */
     if (action === "complete_engagement") {
       if (app.status !== "active") throw new ApiError(409, `Cannot complete from "${app.status}"`);
-      db.update(tables.applications).set({ status: "completed" }).where(eq(tables.applications.id, app.id)).run();
+      await db.update(tables.applications).set({ status: "completed" }).where(eq(tables.applications.id, app.id)).run();
       const offer = parseOffer(app.offer);
-      notify({
+      await notify({
         userId: app.applicantId, actorId: user.id, type: "application",
         title: `Engagement completed — ${offer?.title ?? opp.title}`,
         body: "It stays in both histories. Thanks for the work!",
@@ -157,8 +157,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const role = roles.find((r) => r.id === app.roleId);
 
     if (action === "shortlist") {
-      db.update(tables.applications).set({ status: "shortlisted" }).where(eq(tables.applications.id, app.id)).run();
-      notify({
+      await db.update(tables.applications).set({ status: "shortlisted" }).where(eq(tables.applications.id, app.id)).run();
+      await notify({
         userId: app.applicantId,
         actorId: user.id,
         type: "application_shortlisted",
@@ -171,9 +171,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (action === "decline") {
-      db.update(tables.applications).set({ status: "declined" }).where(eq(tables.applications.id, app.id)).run();
+      await db.update(tables.applications).set({ status: "declined" }).where(eq(tables.applications.id, app.id)).run();
       // professional, never harsh — the standard update
-      notify({
+      await notify({
         userId: app.applicantId,
         actorId: user.id,
         type: "application",
@@ -188,14 +188,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     /* ------------------------------ select ------------------------------ */
     // BUSINESS CAPACITY: selecting an applicant creates an active hire —
     // creation-only gate (existing engagements are never touched)
-    if (action === "select") assertCapacityById(user.id, "activeHires");
+    if (action === "select") await assertCapacityById(user.id, "activeHires");
     if (roles.length > 0) {
       // role opportunity: select = OFFER. Capacity is enforced here — the
       // server, not the screen, decides when a role is full.
       if (!role) throw new ApiError(409, "This application isn't tied to a role");
       if (!["submitted", "shortlisted", "offer_declined"].includes(app.status))
         throw new ApiError(409, `Cannot select from "${app.status}"`);
-      const allApps = db
+      const allApps = await db
         .select()
         .from(tables.applications)
         .where(eq(tables.applications.opportunityId, opp.id))
@@ -203,12 +203,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (openingsLeft(role, allApps) < 1)
         throw new ApiError(409, `${role.title} is filled — ${role.count}/${role.count} openings taken`);
 
-      db.update(tables.applications).set({ status: "selected" }).where(eq(tables.applications.id, app.id)).run();
+      await db.update(tables.applications).set({ status: "selected" }).where(eq(tables.applications.id, app.id)).run();
 
       const when = opp.eventDate
-        ? opp.eventDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+        ? opp!.eventDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })
         : "date to be confirmed";
-      notify({
+      await notify({
         userId: app.applicantId,
         actorId: user.id,
         type: "application_selected",
@@ -218,18 +218,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       });
 
       // demo: seed applicants accept immediately — the team view fills in
-      seedAcceptsRoleOffer(app.id);
+      await seedAcceptsRoleOffer(app.id);
 
-      const fresh = db.select().from(tables.applications).where(eq(tables.applications.id, app.id)).get()!;
+      const fresh = (await db.select().from(tables.applications).where(eq(tables.applications.id, app.id)).get())!;
       return { status: fresh.status };
     }
 
     // ---- legacy simple opportunity: select → project (unchanged) ----
-    db.update(tables.applications).set({ status: "selected" }).where(eq(tables.applications.id, app.id)).run();
-    db.update(tables.opportunities).set({ status: "filled" }).where(eq(tables.opportunities.id, opp.id)).run();
+    await db.update(tables.applications).set({ status: "selected" }).where(eq(tables.applications.id, app.id)).run();
+    await db.update(tables.opportunities).set({ status: "filled" }).where(eq(tables.opportunities.id, opp.id)).run();
 
-    const convId = conversationBetween(user.id, app.applicantId);
-    db.insert(tables.messages)
+    const convId = await conversationBetween(user.id, app.applicantId);
+    await db.insert(tables.messages)
       .values({
         id: randomBytes(12).toString("hex"),
         conversationId: convId,
@@ -239,7 +239,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .run();
 
     const projectId = randomBytes(12).toString("hex");
-    db.insert(tables.projects)
+    await db.insert(tables.projects)
       .values({
         id: projectId,
         clientId: user.id,
@@ -254,7 +254,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       })
       .run();
 
-    notify({
+    await notify({
       userId: app.applicantId,
       actorId: user.id,
       type: "application_selected",
@@ -269,14 +269,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 /** DELETE — the applicant withdraws their own application. */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const app = db.select().from(tables.applications).where(eq(tables.applications.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const app = await db.select().from(tables.applications).where(eq(tables.applications.id, params.id)).get();
     if (!app) throw new ApiError(404, "Application not found");
     if (app.applicantId !== user.id) throw new ApiError(403, "Not your application");
     if (["selected", "confirmed"].includes(app.status))
       throw new ApiError(409, "You were already selected — talk to the poster instead");
-    db.delete(tables.applications).where(eq(tables.applications.id, params.id)).run();
+    await db.delete(tables.applications).where(eq(tables.applications.id, params.id)).run();
     return { withdrawn: true };
   });
 }

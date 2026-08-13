@@ -9,30 +9,30 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/users?near=1&limit=4 — creator directory (sidebar widgets, discovery). */
 export async function GET(req: NextRequest) {
-  return guarded(() => {
-    const viewer = getSessionUser();
+  return guarded(async () => {
+    const viewer = await getSessionUser();
     const near = req.nextUrl.searchParams.get("near") === "1";
     const limit = Math.min(20, Number(req.nextUrl.searchParams.get("limit")) || 6);
     const classOf = req.nextUrl.searchParams.get("classOf") || "";
     const campusSlug = req.nextUrl.searchParams.get("campus") || "";
 
-    const rows = db
+    const rows = ((await db
       .select({ user: tables.users, profile: tables.profiles })
       .from(tables.users)
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
-      .all()
+      .all()))
       .filter((r) => r.user.status === "active" && r.user.id !== viewer?.id && r.profile.visibility === "public");
 
     // "Class of" is a discovery ATTRIBUTE (never a community): filterable
     // only for members who opted into showing their grad year
     let allowedIds: Set<string> | null = null;
     if (classOf || campusSlug) {
-      const campus = campusSlug ? db.select().from(tables.campuses).where(eq(tables.campuses.slug, campusSlug)).get() : null;
-      const verifs = db
+      const campus = campusSlug ? await db.select().from(tables.campuses).where(eq(tables.campuses.slug, campusSlug)).get() : null;
+      const verifs = (await db
         .select()
         .from(tables.campusVerifications)
         .where(eq(tables.campusVerifications.status, "verified"))
-        .all()
+        .all())
         .filter((v) => v.showSchool)
         .filter((v) => (campus ? v.campusId === campus.id : true))
         .filter((v) => (classOf ? v.showGradYear && v.gradYear === classOf : true));
@@ -42,11 +42,11 @@ export async function GET(req: NextRequest) {
 
     const followed = viewer
       ? new Set(
-          db
+          (await db
             .select({ id: tables.follows.followingId })
             .from(tables.follows)
             .where(eq(tables.follows.followerId, viewer.id))
-            .all()
+            .all())
             .map((x) => x.id)
         )
       : new Set<string>();

@@ -10,9 +10,9 @@ import { recordInteraction } from "@/lib/server/recsys";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    requireUser();
-    const rows = db
+  return guarded(async () => {
+    await requireUser();
+    const rows = await db
       .select({ comment: tables.comments, user: tables.users, profile: tables.profiles })
       .from(tables.comments)
       .innerJoin(tables.users, eq(tables.comments.authorId, tables.users.id))
@@ -33,17 +33,17 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const post = db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const post = await db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
     if (!post) throw new ApiError(404, "Post not found");
     const text = String(body.body || "").trim();
     if (!text) throw new ApiError(400, "Comment is required");
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.comments).values({ id, postId: post.id, authorId: user.id, body: text }).run();
-    recordInteraction(user.id, "post", post.id, "comment");
-    notify({
+    await db.insert(tables.comments).values({ id, postId: post.id, authorId: user.id, body: text }).run();
+    await recordInteraction(user.id, "post", post.id, "comment");
+    await notify({
       userId: post.authorId,
       actorId: user.id,
       type: "like",

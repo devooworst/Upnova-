@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/me/notifications — prefs + phone/SMS state (own account). */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     return {
       prefs: parsePrefs(u.notifyPrefs),
       phone: u.phone ? `•••• ${u.phone.slice(-4)}` : null, // never echo the full number back out
@@ -28,9 +28,9 @@ export async function GET() {
  */
 export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
-    const user = requireUser();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+  return guarded(async () => {
+    const user = await requireUser();
+    const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     const patch: Record<string, unknown> = {};
 
     if (body.prefs !== undefined) {
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest) {
         throw new ApiError(400, "Verify a phone number first — SMS alerts need a verified number.");
       patch.smsConsent = body.smsConsent;
       if (body.smsConsent !== !!u.smsConsent)
-        notify({
+        await notify({
           userId: user.id,
           type: "security",
           title: body.smsConsent ? "SMS alerts turned on" : "SMS alerts turned off",
@@ -52,21 +52,21 @@ export async function PATCH(req: NextRequest) {
         });
     }
     if (!Object.keys(patch).length) throw new ApiError(400, "Nothing to update");
-    db.update(tables.users).set(patch).where(eq(tables.users.id, user.id)).run();
-    const fresh = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
+    await db.update(tables.users).set(patch).where(eq(tables.users.id, user.id)).run();
+    const fresh = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     return { ok: true, prefs: parsePrefs(fresh.notifyPrefs), smsConsent: !!fresh.smsConsent, categories: PREF_CATEGORIES };
   });
 }
 
 /** DELETE — remove the phone number (and with it, all SMS). */
 export async function DELETE() {
-  return guarded(() => {
-    const user = requireUser();
-    db.update(tables.users)
+  return guarded(async () => {
+    const user = await requireUser();
+    await db.update(tables.users)
       .set({ phone: null, phoneVerified: false, smsConsent: false })
       .where(eq(tables.users.id, user.id))
       .run();
-    notify({
+    await notify({
       userId: user.id,
       type: "security",
       title: "Phone number removed",

@@ -28,21 +28,21 @@ import { parseConfig } from "@/lib/servicePolicies";
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 
-function alreadySent(userId: string, type: string, hrefLike: string): boolean {
-  return !!db
+async function alreadySent(userId: string, type: string, hrefLike: string): Promise<boolean> {
+  return !!(await db
     .select()
     .from(tables.notifications)
     .where(and(eq(tables.notifications.userId, userId), eq(tables.notifications.type, type), like(tables.notifications.href, `%${hrefLike}%`)))
-    .get();
+    .get());
 }
 
 /** run one pass of every job; returns per-job send counts (for tests/ops) */
-export function runJobsTick(now = new Date()) {
+export async function runJobsTick(now = new Date()) {
   const counts = { reminders: 0, reviewNudges: 0, rebookNudges: 0, releaseAlerts: 0 };
   const t = now.getTime();
 
-  const bookings = db.select().from(tables.bookings).all();
-  const profiles = new Map(db.select().from(tables.profiles).all().map((p) => [p.userId, p]));
+  const bookings = await db.select().from(tables.bookings).all();
+  const profiles = new Map((await db.select().from(tables.profiles).all()).map((p) => [p.userId, p] as const));
   const nameOf = (id: string) => profiles.get(id)?.displayName?.split(" ")[0] ?? "them";
 
   /* ---- 1 · appointment reminders: 24h window, both sides ---- */
@@ -52,8 +52,8 @@ export function runJobsTick(now = new Date()) {
     if (until <= 0 || until > DAY) continue;
     const when = b.startsAt.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
     for (const [uid, other] of [[b.clientId, b.providerId], [b.providerId, b.clientId]] as const) {
-      if (alreadySent(uid, "booking_reminder", b.id)) continue;
-      notify({
+      if (await alreadySent(uid, "booking_reminder", b.id)) continue;
+      await notify({
         userId: uid,
         actorId: null,
         type: "booking_reminder",
@@ -68,13 +68,13 @@ export function runJobsTick(now = new Date()) {
   /* ---- 2 · review nudges: projects completed in the last 7 days that
      were never reviewed (state stays "completed" until the client
      reviews, then becomes "reviewed") — one gentle ask, ever ---- */
-  const projects = db.select().from(tables.projects).all();
+  const projects = await db.select().from(tables.projects).all();
   for (const pr of projects) {
     if (pr.state !== "completed") continue;
     const age = t - pr.updatedAt.getTime();
     if (age < 0 || age > 7 * DAY) continue;
-    if (alreadySent(pr.clientId, "review_nudge", pr.id)) continue;
-    notify({
+    if (await alreadySent(pr.clientId, "review_nudge", pr.id)) continue;
+    await notify({
       userId: pr.clientId,
       actorId: null,
       type: "review_nudge",
@@ -102,8 +102,8 @@ export function runJobsTick(now = new Date()) {
     if (hasUpcoming.has(key)) continue;
     const age = t - at;
     if (age < 21 * DAY || age > 35 * DAY) continue;
-    if (alreadySent(b.clientId, "rebook_nudge", `rebook=${b.id}`)) continue;
-    notify({
+    if (await alreadySent(b.clientId, "rebook_nudge", `rebook=${b.id}`)) continue;
+    await notify({
       userId: b.clientId,
       actorId: null,
       type: "rebook_nudge",
@@ -115,7 +115,7 @@ export function runJobsTick(now = new Date()) {
   }
 
   /* ---- 4 · release-open alerts: the moment early access starts ---- */
-  const services = db.select().from(tables.services).all();
+  const services = await db.select().from(tables.services).all();
   for (const s of services) {
     if (!s.active) continue;
     if (parseConfig(s.config).scheduling.releaseMode !== "scheduled") continue;
@@ -124,9 +124,9 @@ export function runJobsTick(now = new Date()) {
     const openAt = Date.parse(rel.releaseAt);
     // fire in the window [releaseAt, releaseAt + 6h] — late ticks still alert, ancient releases don't
     if (t < openAt || t - openAt > 6 * HOUR) continue;
-    for (const clientId of preferredWithEarlyAccess(s.ownerId)) {
-      if (alreadySent(clientId, "release_open", `${s.id}?open=${rel.releaseAt}`)) continue;
-      notify({
+    for (const clientId of await preferredWithEarlyAccess(s.ownerId)) {
+      if (await alreadySent(clientId, "release_open", `${s.id}?open=${rel.releaseAt}`)) continue;
+      await notify({
         userId: clientId,
         actorId: s.ownerId,
         type: "release_open",
@@ -148,11 +148,9 @@ export function startJobScheduler() {
   if (g.__mavynJobs) return;
   if (process.env.MAVYN_JOBS === "0") return;
   const timer = setInterval(() => {
-    try {
-      runJobsTick();
-    } catch (err) {
+    runJobsTick().catch((err) => {
       console.warn("[mavyn] job tick failed:", (err as Error).message);
-    }
+    });
   }, 60_000);
   timer.unref?.(); // builds, scripts, and tests exit normally
   g.__mavynJobs = timer;

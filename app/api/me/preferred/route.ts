@@ -12,29 +12,29 @@ export const dynamic = "force-dynamic";
  * provider's full list.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await Promise.all((await db
       .select()
       .from(tables.preferredClients)
       .where(and(eq(tables.preferredClients.clientId, user.id), eq(tables.preferredClients.status, "active")))
-      .all()
-      .map((rel) => {
-        const provider = db.select().from(tables.users).where(eq(tables.users.id, rel.providerId)).get();
-        const profile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, rel.providerId)).get();
-        const stats = clientStats(rel.providerId, user.id);
-        const service = db
+      .all())
+      .map(async (rel) => {
+        const provider = await db.select().from(tables.users).where(eq(tables.users.id, rel.providerId)).get();
+        const profile = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, rel.providerId)).get();
+        const stats = await clientStats(rel.providerId, user.id);
+        const service = (await db
           .select()
           .from(tables.services)
           .where(eq(tables.services.ownerId, rel.providerId))
-          .all()
+          .all())
           .find((s) => s.active && s.visibility === "public");
         // an OPEN preferred-only window from this provider right now?
-        const window = db
+        const window = (await db
           .select()
           .from(tables.services)
           .where(eq(tables.services.ownerId, rel.providerId))
-          .all()
+          .all())
           .filter((s) => s.active && s.preferredUntil && s.preferredUntil.getTime() > Date.now())
           .map((s) => ({ serviceId: s.id, title: s.title, until: s.preferredUntil!.toISOString() }));
         return {
@@ -53,7 +53,7 @@ export async function GET() {
           bookAgainServiceId: service?.id ?? null,
           earlyWindows: window,
         };
-      });
+      }));
     return { preferred: rows };
   });
 }

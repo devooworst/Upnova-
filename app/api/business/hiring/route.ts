@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
  * display-only number.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     return hiringFor(user.id);
   });
 }

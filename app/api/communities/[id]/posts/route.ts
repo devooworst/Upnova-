@@ -33,12 +33,12 @@ const id = () => randomBytes(12).toString("hex");
  *  limited slice of PUBLIC communities only. Authors are masked here,
  *  server-side — masked posts carry no userId anywhere in the payload. */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const c = findCommunity(params.id);
+  return guarded(async () => {
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const viewer = getSessionUser();
-    let membership = viewer ? getMembership(c.id, viewer.id) : null;
-    if (membership) membership = refreshMembership(c, membership);
+    const viewer = await getSessionUser();
+    let membership = viewer ? await getMembership(c.id, viewer.id) : null;
+    if (membership) membership = await refreshMembership(c, membership);
     const activeMember = !!membership && membership.status === "active";
 
     if (!activeMember && c.access !== "public")
@@ -46,8 +46,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // campus rooms live inside the verified campus environment — existing
     // active members (e.g. alumni who joined as students) keep access
     if (c.campusId && !activeMember) {
-      const vc = viewer ? campusVerification(viewer.id) : null;
-      const demoBypass = !!viewer && unrestrictedTester(viewer.id); // DEMO MODE
+      const vc = viewer ? await campusVerification(viewer.id) : null;
+      const demoBypass = !!viewer && (await unrestrictedTester(viewer.id)); // DEMO MODE
       if (!demoBypass && (!vc || vc.campusId !== c.campusId))
         throw new ApiError(403, "This is a campus community — verify your school in Your Campus to view it");
     }
@@ -60,20 +60,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
 
     // demo: seed members reply to fresh protagonist posts (lazy, on read)
-    if (viewer) seedRespondsInCommunity(c.id);
+    if (viewer) await seedRespondsInCommunity(c.id);
 
     const q = (req.nextUrl.searchParams.get("q") || "").toLowerCase().trim();
-    let rows = db
+    let rows = ((await db
       .select()
       .from(tables.communityPosts)
       .where(eq(tables.communityPosts.communityId, c.id))
       .orderBy(desc(tables.communityPosts.createdAt))
-      .all()
+      .all()))
       .filter((p) => !p.removedAt || p.authorId === viewer?.id || isMod(membership));
     if (q) rows = rows.filter((p) => !p.removedAt && p.body.toLowerCase().includes(q));
 
     // block filter — you don't see content from people you blocked
-    const blocked = viewerBlockSet(viewer?.id ?? null);
+    const blocked = await viewerBlockSet(viewer?.id ?? null);
     rows = rows.filter((p) => !blocked.has(p.authorId));
 
     rows.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt.getTime() - a.createdAt.getTime());
@@ -81,25 +81,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const postIds = rows.map((p) => p.id);
     const reactions = postIds.length
-      ? db.select().from(tables.communityReactions).where(inArray(tables.communityReactions.postId, postIds)).all()
+      ? await db.select().from(tables.communityReactions).where(inArray(tables.communityReactions.postId, postIds)).all()
       : [];
     const comments = postIds.length
-      ? db.select({ postId: tables.communityComments.postId, removedAt: tables.communityComments.removedAt }).from(tables.communityComments).where(inArray(tables.communityComments.postId, postIds)).all()
+      ? await db.select({ postId: tables.communityComments.postId, removedAt: tables.communityComments.removedAt }).from(tables.communityComments).where(inArray(tables.communityComments.postId, postIds)).all()
       : [];
 
-    const ctx = buildAuthorCtx(rows.map((p) => p.authorId), c.id, viewer?.id ?? null);
+    const ctx = await buildAuthorCtx(rows.map((p) => p.authorId), c.id, viewer?.id ?? null);
 
     return {
       guest: !viewer,
       member: activeMember,
-      posts: rows.map((p) => ({
+      posts: await Promise.all(rows.map(async (p) => ({
         id: p.id,
         author: maskAuthor(p.authorId, p.identity, ctx),
         identity: p.identity,
         body: p.removedAt ? "" : p.body,
         removed: !!p.removedAt,
         removedReason: p.removedAt ? p.removedReason || "Removed" : null,
-        ref: p.removedAt ? null : buildRefCard(p.refType, p.refId),
+        ref: p.removedAt ? null : await buildRefCard(p.refType, p.refId),
         pinned: !!p.pinned,
         locked: !!p.locked,
         reactions: reactions.filter((r) => r.postId === p.id).length,
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         comments: comments.filter((x) => x.postId === p.id && !x.removedAt).length,
         createdAt: p.createdAt,
         canModerate: isMod(membership),
-      })),
+      }))),
     };
   });
 }
@@ -117,10 +117,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
  *  writing is rate-limited; the choice is remembered as the default. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   return guarded(async () => {
-    const user = requireUser();
-    const c = findCommunity(params.id);
+    const user = await requireUser();
+    const c = await findCommunity(params.id);
     if (!c) throw new ApiError(404, "Community not found");
-    const membership = requireActiveMember(c.id, user.id);
+    const membership = await requireActiveMember(c.id, user.id);
     if (memberIsMuted(membership)) throw new ApiError(403, "You're temporarily muted in this community");
     if (c.whoCanPost === "mods" && !isMod(membership))
       throw new ApiError(403, "Only moderators can post in this community");
@@ -130,10 +130,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (text.length < 2) throw new ApiError(400, "Say something first");
     if (text.length > 4000) throw new ApiError(400, "Posts max out at 4,000 characters");
 
-    const { identity } = validateIdentityChoice(c, membership, String(body.identity || membership.lastIdentity || "real"), body.alias);
+    const { identity } = await validateIdentityChoice(c, membership, String(body.identity || membership.lastIdentity || "real"), body.alias);
     if (identity === "anonymous") {
-      assertAnonAllowance(user.id);
-      ensureAnonCode(c.id, user.id);
+      await assertAnonAllowance(user.id);
+      await ensureAnonCode(c.id, user.id);
     }
 
     // optional attached Mavyn link → typed ref card (source preserved)
@@ -141,31 +141,31 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let refId: string | null = null;
     if (body.refUrl) {
       const parsed = parseRefUrl(String(body.refUrl));
-      if (!parsed || !resolveRef(parsed.refType, parsed.refId))
+      if (!parsed || !(await resolveRef(parsed.refType, parsed.refId)))
         throw new ApiError(400, "That link doesn't point to an Mavyn service, opportunity, product, work, event, or campus listing");
       refType = parsed.refType;
       refId = parsed.refId;
     }
 
     const postId = id();
-    db.insert(tables.communityPosts)
+    await db.insert(tables.communityPosts)
       .values({ id: postId, communityId: c.id, authorId: user.id, identity, body: text, refType, refId })
       .run();
-    db.update(tables.communityMembers)
+    await db.update(tables.communityMembers)
       .set({ lastIdentity: identity })
       .where(and(eq(tables.communityMembers.communityId, c.id), eq(tables.communityMembers.userId, user.id)))
       .run();
 
     // mentions — only active members get pinged; a masked author is
     // announced by their masked label, never their account
-    const label = maskedLabelFor(c.id, user.id, identity);
+    const label = await maskedLabelFor(c.id, user.id, identity);
     const handles = Array.from(new Set((text.match(/@([a-zA-Z0-9_]+)/g) || []).map((h) => h.slice(1))));
     for (const h of handles.slice(0, 8)) {
-      const target = db.select().from(tables.users).where(eq(tables.users.handle, h)).get();
+      const target = await db.select().from(tables.users).where(eq(tables.users.handle, h)).get();
       if (!target || target.id === user.id) continue;
       const tm = getMembership(c.id, target.id);
-      if (!tm || tm.status !== "active") continue;
-      notify({
+      if (!tm || (await tm)!.status !== "active") continue;
+      await notify({
         userId: target.id,
         actorId: identity === "real" ? user.id : null, // masked actor never leaks
         type: "community",

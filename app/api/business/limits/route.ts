@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
  * the Test Center's subscription assertions.
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const row = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()!;
-    return limitsPayload({ id: row.id, accountType: row.accountType, plan: row.plan });
+  return guarded(async () => {
+    const user = await requireUser();
+    const row = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
+    return await limitsPayload({ id: row.id, accountType: row.accountType, plan: row.plan });
   });
 }

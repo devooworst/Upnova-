@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/projects — projects where I'm client or creator. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select()
       .from(tables.projects)
       .where(or(eq(tables.projects.clientId, user.id), eq(tables.projects.creatorId, user.id)))
@@ -21,11 +21,11 @@ export async function GET() {
       .all();
 
     return {
-      projects: rows.map((p) => {
+      projects: await Promise.all(rows.map(async (p) => {
         const otherId = p.clientId === user.id ? p.creatorId : p.clientId;
-        const otherUser = db.select().from(tables.users).where(eq(tables.users.id, otherId)).get()!;
-        const otherProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get()!;
-        const pendingExt = db
+        const otherUser = (await db.select().from(tables.users).where(eq(tables.users.id, otherId)).get())!;
+        const otherProfile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get())!;
+        const pendingExt = await db
           .select()
           .from(tables.extensionRequests)
           .where(eq(tables.extensionRequests.projectId, p.id))
@@ -49,7 +49,7 @@ export async function GET() {
           })),
           updatedAt: p.updatedAt.toISOString(),
         };
-      }),
+      })),
     };
   });
 }
@@ -62,23 +62,23 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const asCreator = !!body.asCreator;
     const handle = String((asCreator ? body.clientHandle : body.creatorHandle) || "").trim().toLowerCase();
-    const other = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+    const other = await db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
     if (!other || other.status !== "active") throw new ApiError(404, "User not found");
     if (other.id === user.id) throw new ApiError(400, "You can't open a project with yourself");
     const creator = asCreator ? { id: user.id } : other;
     if (!asCreator) {
-      const creatorProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, other.id)).get()!;
+      const creatorProfile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, other.id)).get())!;
       if (!creatorProfile.hiringEnabled || !creatorProfile.acceptOffers)
         throw new ApiError(403, "This creator isn't accepting project offers");
     }
 
     // BUSINESS CAPACITY: hiring someone new counts toward active
     // hires/projects (talent, never "employees") — creation-only gate
-    if (!asCreator) assertCapacityById(user.id, "activeHires");
+    if (!asCreator) await assertCapacityById(user.id, "activeHires");
 
     const amount = Math.round(Number(body.amount));
     if (!Number.isFinite(amount) || amount < 1) throw new ApiError(400, "Amount must be at least $1");
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     if (!title) throw new ApiError(400, "Title is required");
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.projects)
+    await db.insert(tables.projects)
       .values({
         id,
         clientId: asCreator ? other.id : user.id,
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       .run();
 
     // dev demo: seed creators review the brief and send the offer right away
-    seedRespondsToDraft(id);
+    await seedRespondsToDraft(id);
 
     return { id };
   });

@@ -8,26 +8,26 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/live/[id]/viewers — host/moderator only: who's here now. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const user = requireUser();
-    const stream = getStream(params.id);
-    if (stream.hostId !== user.id && !isModerator(stream.id, user.id))
+  return guarded(async () => {
+    const user = await requireUser();
+    const stream = await getStream(params.id);
+    if (stream.hostId !== user.id && !(await isModerator(stream.id, user.id)))
       throw new ApiError(403, "Only the host and moderators see the viewer list");
 
     const cutoff = Date.now() - PRESENCE_WINDOW_MS;
-    const restrictions = db.select().from(tables.liveRestrictions).where(eq(tables.liveRestrictions.streamId, stream.id)).all();
+    const restrictions = (await db.select().from(tables.liveRestrictions).where(eq(tables.liveRestrictions.streamId, stream.id)).all());
     const mods = new Set(
-      db.select().from(tables.liveModerators).where(eq(tables.liveModerators.streamId, stream.id)).all().map((m) => m.userId)
+      ((await db.select().from(tables.liveModerators).where(eq(tables.liveModerators.streamId, stream.id)).all())).map((m) => m.userId)
     );
-    const viewers = db
+    const viewers = await Promise.all((await db
       .select()
       .from(tables.liveViewers)
       .where(eq(tables.liveViewers.streamId, stream.id))
-      .all()
+      .all())
       .filter((v) => v.lastSeenAt.getTime() >= cutoff)
-      .map((v) => {
-        const u = db.select().from(tables.users).where(eq(tables.users.id, v.userId)).get();
-        const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, v.userId)).get();
+      .map(async (v) => {
+        const u = await db.select().from(tables.users).where(eq(tables.users.id, v.userId)).get();
+        const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, v.userId)).get();
         return {
           userId: v.userId,
           handle: u?.handle ?? "",
@@ -38,7 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           muted: restrictions.some((r) => r.userId === v.userId && r.kind === "mute"),
           blocked: restrictions.some((r) => r.userId === v.userId && r.kind === "block"),
         };
-      });
+      }));
     return { viewers };
   });
 }

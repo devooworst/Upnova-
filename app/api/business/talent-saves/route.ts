@@ -17,28 +17,28 @@ export const dynamic = "force-dynamic";
  *   DELETE { handle | userId } → unsave
  */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = (await db
       .select()
       .from(tables.bookmarks)
       .where(and(eq(tables.bookmarks.userId, user.id), eq(tables.bookmarks.targetType, "user")))
-      .all()
+      .all())
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    const saved = rows
-      .map((r) => {
-        const u = db.select().from(tables.users).where(eq(tables.users.id, r.targetId)).get();
-        const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, r.targetId)).get();
+    const saved = (await Promise.all(rows
+      .map(async (r) => {
+        const u = await db.select().from(tables.users).where(eq(tables.users.id, r.targetId)).get();
+        const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, r.targetId)).get();
         if (!u || !p) return null;
         let skills: string[] = [];
         try {
           skills = JSON.parse(p.skills || "[]");
         } catch {}
-        const service = db
+        const service = (await db
           .select()
           .from(tables.services)
           .where(eq(tables.services.ownerId, u.id))
-          .all()
+          .all())
           .find((s) => s.active && s.visibility === "public");
         return {
           id: u.id,
@@ -51,47 +51,47 @@ export async function GET() {
           serviceId: service?.id ?? null,
           savedAt: r.createdAt.toISOString(),
         };
-      })
+      })))
       .filter(Boolean);
     return { saved };
   });
 }
 
-function resolveTarget(body: Record<string, unknown>) {
-  const target = body.userId
-    ? db.select().from(tables.users).where(eq(tables.users.id, String(body.userId))).get()
-    : db.select().from(tables.users).where(eq(tables.users.handle, String(body.handle ?? "").trim().toLowerCase())).get();
+async function resolveTarget(body: Record<string, unknown>) {
+  const target = await body.userId
+    ? await db.select().from(tables.users).where(eq(tables.users.id, String(body.userId))).get()
+    : await db.select().from(tables.users).where(eq(tables.users.handle, String(body.handle ?? "").trim().toLowerCase())).get();
   if (!target || target.status !== "active") throw new ApiError(404, "Person not found");
   return target;
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const target = resolveTarget(body);
-    if (target.id === user.id) throw new ApiError(400, "You can't save yourself");
-    const existing = db
+    if ((await target).id === user.id) throw new ApiError(400, "You can't save yourself");
+    const existing = await db
       .select()
       .from(tables.bookmarks)
-      .where(and(eq(tables.bookmarks.userId, user.id), eq(tables.bookmarks.targetType, "user"), eq(tables.bookmarks.targetId, target.id)))
+      .where(and(eq(tables.bookmarks.userId, user.id), eq(tables.bookmarks.targetType, "user"), eq(tables.bookmarks.targetId, (await target).id)))
       .get();
-    if (existing) return { saved: true, handle: target.handle };
+    if (existing) return { saved: true, handle: (await target).handle };
     // creation-only capacity gate; existing saves are never touched
-    assertCapacityById(user.id, "savedTalent");
-    db.insert(tables.bookmarks).values({ userId: user.id, targetType: "user", targetId: target.id }).run();
-    return { saved: true, handle: target.handle };
+    await assertCapacityById(user.id, "savedTalent");
+    await db.insert(tables.bookmarks).values({ userId: user.id, targetType: "user", targetId: (await target).id }).run();
+    return { saved: true, handle: (await target).handle };
   });
 }
 
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  return guarded(() => {
-    const user = requireUser();
+  return guarded(async () => {
+    const user = await requireUser();
     const target = resolveTarget(body);
-    db.delete(tables.bookmarks)
-      .where(and(eq(tables.bookmarks.userId, user.id), eq(tables.bookmarks.targetType, "user"), eq(tables.bookmarks.targetId, target.id)))
+    await db.delete(tables.bookmarks)
+      .where(and(eq(tables.bookmarks.userId, user.id), eq(tables.bookmarks.targetType, "user"), eq(tables.bookmarks.targetId, (await target).id)))
       .run();
-    return { saved: false, handle: target.handle };
+    return { saved: false, handle: (await target).handle };
   });
 }

@@ -24,9 +24,9 @@ const DONE_PROJECT_STATES = ["completed", "reviewed"];
 
 type Person = { id: string; handle: string; displayName: string; avatarUrl: string | null; primaryRole: string; skills: string[] };
 
-function person(userId: string): Person | null {
-  const u = db.select().from(tables.users).where(eq(tables.users.id, userId)).get();
-  const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
+async function person(userId: string): Promise<Person | null> {
+  const u = await db.select().from(tables.users).where(eq(tables.users.id, userId)).get();
+  const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, userId)).get();
   if (!u || !p) return null;
   let skills: string[] = [];
   try {
@@ -37,8 +37,8 @@ function person(userId: string): Person | null {
 
 /** any real interaction between two accounts, either direction —
     the anti-spam basis for manual adds (team, preferred, …) */
-export function interactionBasis(a: string, b: string): boolean {
-  const bk = db
+export async function interactionBasis(a: string, b: string): Promise<boolean> {
+  const bk = await db
     .select({ id: tables.bookings.id })
     .from(tables.bookings)
     .where(
@@ -49,7 +49,7 @@ export function interactionBasis(a: string, b: string): boolean {
     )
     .get();
   if (bk) return true;
-  const pr = db
+  const pr = await db
     .select({ id: tables.projects.id })
     .from(tables.projects)
     .where(
@@ -65,7 +65,7 @@ export function interactionBasis(a: string, b: string): boolean {
     [a, b],
     [b, a],
   ] as const) {
-    const app = db
+    const app = await db
       .select({ app: tables.applications })
       .from(tables.applications)
       .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
@@ -74,8 +74,8 @@ export function interactionBasis(a: string, b: string): boolean {
     if (app) return true;
   }
   // a shared two-person conversation
-  for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, a)).all()) {
-    const other = db
+  for (const m of await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, a)).all()) {
+    const other = await db
       .select()
       .from(tables.conversationMembers)
       .where(and(eq(tables.conversationMembers.conversationId, m.conversationId), eq(tables.conversationMembers.userId, b)))
@@ -87,24 +87,24 @@ export function interactionBasis(a: string, b: string): boolean {
 
 /* ------------------------------ categories ------------------------------ */
 
-export function peopleFor(businessId: string) {
-  const payments = db
+export async function peopleFor(businessId: string) {
+  const payments = await db
     .select()
     .from(tables.payments)
     .where(or(eq(tables.payments.payerId, businessId), eq(tables.payments.payeeId, businessId)))
     .all();
 
   /* ---- TEAM: explicit rows only ---- */
-  const teamRows = db.select().from(tables.businessTeam).where(eq(tables.businessTeam.businessId, businessId)).all();
-  const team = teamRows
-    .map((t) => {
-      const p = person(t.personId);
+  const teamRows = await db.select().from(tables.businessTeam).where(eq(tables.businessTeam.businessId, businessId)).all();
+  const team = (await Promise.all(teamRows
+    .map(async (t) => {
+      const p = await person(t.personId);
       if (!p) return null;
-      const activeProjects = db
+      const activeProjects = (await db
         .select()
         .from(tables.projects)
         .where(and(eq(tables.projects.clientId, businessId), eq(tables.projects.creatorId, t.personId)))
-        .all()
+        .all())
         .filter((x) => ACTIVE_PROJECT_STATES.includes(x.state)).length;
       return {
         rowId: t.id,
@@ -118,25 +118,25 @@ export function peopleFor(businessId: string) {
         endedAt: t.endedAt?.toISOString() ?? null,
         activeProjects,
       };
-    })
-    .filter(Boolean) as NonNullable<ReturnType<typeof person> & Record<string, unknown>>[];
+    })))
+    .filter(Boolean) as NonNullable<Awaited<ReturnType<typeof person>> & Record<string, unknown>>[];
 
   /* ---- CLIENTS: they booked/hired ME ---- */
   const clientIds = new Set<string>();
-  const bookingsAsProvider = db.select().from(tables.bookings).where(eq(tables.bookings.providerId, businessId)).all();
+  const bookingsAsProvider = await db.select().from(tables.bookings).where(eq(tables.bookings.providerId, businessId)).all();
   for (const b of bookingsAsProvider) clientIds.add(b.clientId);
-  const projectsAsProvider = db.select().from(tables.projects).where(eq(tables.projects.creatorId, businessId)).all();
+  const projectsAsProvider = await db.select().from(tables.projects).where(eq(tables.projects.creatorId, businessId)).all();
   for (const p of projectsAsProvider) clientIds.add(p.clientId);
-  const clients = Array.from(clientIds)
-    .map((cid) => {
-      const p = person(cid);
+  const clients = (await Promise.all(Array.from(clientIds)
+    .map(async (cid) => {
+      const p = await person(cid);
       if (!p) return null;
       const myBookings = bookingsAsProvider.filter((b) => b.clientId === cid);
       const myProjects = projectsAsProvider.filter((x) => x.clientId === cid);
       const totalSpentCents = payments
         .filter((x) => x.payerId === cid && x.payeeId === businessId && x.status === "released")
         .reduce((n, x) => n + x.amountCents + x.feeCents, 0);
-      const pref = db
+      const pref = await db
         .select()
         .from(tables.preferredClients)
         .where(and(eq(tables.preferredClients.providerId, businessId), eq(tables.preferredClients.clientId, cid)))
@@ -150,28 +150,27 @@ export function peopleFor(businessId: string) {
         completedProjects: myProjects.filter((x) => DONE_PROJECT_STATES.includes(x.state)).length,
         totalSpent: Math.round(totalSpentCents / 100),
         lastAt: lastAt?.toISOString() ?? null,
-        preferred: pref?.status === "active" ? parseBenefits(pref.benefits).length : 0,
+        preferred: pref?.status === "active" ? parseBenefits(pref!.benefits).length : 0,
       };
-    })
-    .filter(Boolean);
+    }))).filter(Boolean);
 
   /* ---- TALENT: I hired THEM ---- */
   const talentIds = new Set<string>();
-  const bookingsAsClient = db.select().from(tables.bookings).where(eq(tables.bookings.clientId, businessId)).all();
+  const bookingsAsClient = await db.select().from(tables.bookings).where(eq(tables.bookings.clientId, businessId)).all();
   for (const b of bookingsAsClient) talentIds.add(b.providerId);
-  const projectsAsClient = db.select().from(tables.projects).where(eq(tables.projects.clientId, businessId)).all();
+  const projectsAsClient = await db.select().from(tables.projects).where(eq(tables.projects.clientId, businessId)).all();
   for (const p of projectsAsClient) talentIds.add(p.creatorId);
-  const hiredApps = db
+  const hiredApps = (await db
     .select({ app: tables.applications, opp: tables.opportunities })
     .from(tables.applications)
     .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
     .where(eq(tables.opportunities.posterId, businessId))
-    .all()
+    .all())
     .filter((r) => HIRED_APP_STATUSES.includes(r.app.status));
   for (const r of hiredApps) talentIds.add(r.app.applicantId);
-  const talent = Array.from(talentIds)
-    .map((tid) => {
-      const p = person(tid);
+  const talent = (await Promise.all(Array.from(talentIds)
+    .map(async (tid) => {
+      const p = await person(tid);
       if (!p) return null;
       const myBookings = bookingsAsClient.filter((b) => b.providerId === tid);
       const myProjects = projectsAsClient.filter((x) => x.creatorId === tid);
@@ -179,17 +178,17 @@ export function peopleFor(businessId: string) {
       const totalPaidCents = payments
         .filter((x) => x.payerId === businessId && x.payeeId === tid && x.status === "released")
         .reduce((n, x) => n + x.amountCents, 0);
-      const myReview = db
+      const myReview = (await db
         .select()
         .from(tables.reviews)
         .where(and(eq(tables.reviews.authorId, businessId), eq(tables.reviews.subjectId, tid)))
-        .all()
+        .all())
         .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime())[0];
-      const service = db
+      const service = (await db
         .select()
         .from(tables.services)
         .where(eq(tables.services.ownerId, tid))
-        .all()
+        .all())
         .find((s) => s.active && s.visibility === "public");
       const current = myProjects.filter((x) => ACTIVE_PROJECT_STATES.includes(x.state));
       return {
@@ -206,27 +205,26 @@ export function peopleFor(businessId: string) {
         hireAgainServiceId: service?.id ?? null,
         onTeam: teamRows.some((t) => t.personId === tid && t.status === "active"),
       };
-    })
-    .filter(Boolean);
+    }))).filter(Boolean);
 
   /* ---- CONTACTS: talked, never hired/booked either way ---- */
   const known = new Set<string>([...teamRows.map((t) => t.personId), ...Array.from(clientIds), ...Array.from(talentIds), businessId]);
   const contacts: { id: string; handle: string; displayName: string; avatarUrl: string | null; primaryRole: string; skills: string[]; lastMessageAt: string | null; conversationId: string }[] = [];
-  for (const m of db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, businessId)).all()) {
-    const members = db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.conversationId, m.conversationId)).all();
+  for (const m of await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.userId, businessId)).all()) {
+    const members = await db.select().from(tables.conversationMembers).where(eq(tables.conversationMembers.conversationId, m.conversationId)).all();
     if (members.length !== 2) continue;
     const other = members.find((x) => x.userId !== businessId);
     if (!other || known.has(other.userId)) continue;
     known.add(other.userId);
-    const p = person(other.userId);
+    const p = await person(other.userId);
     if (!p) continue;
-    const lastMsg = db
+    const lastMsg = (await db
       .select()
       .from(tables.messages)
       .where(eq(tables.messages.conversationId, m.conversationId))
-      .all()
+      .all())
       .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime())[0];
-    contacts.push({ ...p, lastMessageAt: lastMsg?.createdAt.toISOString() ?? null, conversationId: m.conversationId });
+    contacts.push({ ...p!, lastMessageAt: lastMsg?.createdAt.toISOString() ?? null, conversationId: m.conversationId });
   }
 
   return { team, clients, talent, contacts };
@@ -234,16 +232,16 @@ export function peopleFor(businessId: string) {
 
 /* ------------------------------- hiring ------------------------------- */
 
-export function hiringFor(businessId: string) {
-  const opps = db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, businessId)).all();
-  const apps = db
+export async function hiringFor(businessId: string) {
+  const opps = await db.select().from(tables.opportunities).where(eq(tables.opportunities.posterId, businessId)).all();
+  const apps = await db
     .select({ app: tables.applications, opp: tables.opportunities })
     .from(tables.applications)
     .innerJoin(tables.opportunities, eq(tables.applications.opportunityId, tables.opportunities.id))
     .where(eq(tables.opportunities.posterId, businessId))
     .all();
-  const projects = db.select().from(tables.projects).where(eq(tables.projects.clientId, businessId)).all();
-  const bookings = db.select().from(tables.bookings).where(eq(tables.bookings.clientId, businessId)).all();
+  const projects = await db.select().from(tables.projects).where(eq(tables.projects.clientId, businessId)).all();
+  const bookings = await db.select().from(tables.bookings).where(eq(tables.bookings.clientId, businessId)).all();
 
   const activeHires =
     projects.filter((p) => ACTIVE_PROJECT_STATES.includes(p.state)).length +
@@ -258,9 +256,9 @@ export function hiringFor(businessId: string) {
   for (const p of projects) if (![...["draft", "offer_sent", "cancelled"]].includes(p.state)) hiredPeople.add(p.creatorId);
   for (const b of bookings) if (["confirmed", "completed"].includes(b.status)) hiredPeople.add(b.providerId);
 
-  const name = (uid: string) => {
-    const p = db.select().from(tables.profiles).where(eq(tables.profiles.userId, uid)).get();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, uid)).get();
+  const name = async (uid: string) => {
+    const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, uid)).get();
+    const u = await db.select().from(tables.users).where(eq(tables.users.id, uid)).get();
     return { id: uid, handle: u?.handle ?? "?", displayName: p?.displayName ?? "?", avatarUrl: p?.avatarUrl ?? null };
   };
 
@@ -284,60 +282,60 @@ export function hiringFor(businessId: string) {
         applications: apps.filter((r) => r.app.opportunityId === o.id).length,
         createdAt: o.createdAt.toISOString(),
       })),
-    activeEngagements: [
+    activeEngagements: await Promise.all([
       ...projects
         .filter((p) => ACTIVE_PROJECT_STATES.includes(p.state))
-        .map((p) => ({ kind: "project" as const, id: p.id, title: p.title, state: p.state, with: name(p.creatorId), href: `/projects/${p.id}` })),
+        .map(async (p) => ({ kind: "project" as const, id: p.id, title: p.title, state: p.state, with: await name(p.creatorId), href: `/projects/${p.id}` })),
       ...bookings
         .filter((b) => ["pending", "accepted", "confirmed"].includes(b.status))
-        .map((b) => ({ kind: "booking" as const, id: b.id, title: b.title, state: b.status, with: name(b.providerId), href: `/activity?focus=booking:${b.id}` })),
+        .map(async (b) => ({ kind: "booking" as const, id: b.id, title: b.title, state: b.status, with: await name(b.providerId), href: `/activity?focus=booking:${b.id}` })),
       ...apps
         .filter((r) => ["selected", "confirmed", "active"].includes(r.app.status))
-        .map((r) => ({ kind: "engagement" as const, id: r.app.id, title: r.opp.title, state: r.app.status, with: name(r.app.applicantId), href: `/opportunities/${r.opp.id}/applicants` })),
-    ],
+        .map(async (r) => ({ kind: "engagement" as const, id: r.app.id, title: r.opp.title, state: r.app.status, with: await name(r.app.applicantId), href: `/opportunities/${r.opp.id}/applicants` })),
+    ]),
     // hiring activity — the real application trail, newest first
-    activity: apps
+    activity: await Promise.all(apps
       .sort((a, b) => b.app.createdAt.getTime() - a.app.createdAt.getTime())
       .slice(0, 15)
-      .map((r) => ({
+      .map(async (r) => ({
         id: r.app.id,
-        applicant: name(r.app.applicantId),
+        applicant: await name(r.app.applicantId),
         opportunityId: r.opp.id,
         opportunityTitle: r.opp.title,
         status: r.app.status,
         at: r.app.createdAt.toISOString(),
-      })),
+      }))),
   };
 }
 
 /* ------------------------------- payments ------------------------------- */
 
-export function paymentsFor(userId: string) {
-  const rows = db
+export async function paymentsFor(userId: string) {
+  const rows = (await db
     .select()
     .from(tables.payments)
     .where(or(eq(tables.payments.payerId, userId), eq(tables.payments.payeeId, userId)))
-    .all()
+    .all())
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-  const titleOf = (p: (typeof rows)[number]): string => {
+  const titleOf = async (p: (typeof rows)[number]): Promise<string> => {
     if (p.bookingId) {
-      const b = db.select().from(tables.bookings).where(eq(tables.bookings.id, p.bookingId)).get();
+      const b = await db.select().from(tables.bookings).where(eq(tables.bookings.id, p.bookingId)).get();
       if (b) return b.title;
     }
     if (p.projectId) {
-      const pr = db.select().from(tables.projects).where(eq(tables.projects.id, p.projectId)).get();
+      const pr = await db.select().from(tables.projects).where(eq(tables.projects.id, p.projectId)).get();
       if (pr) return pr.title;
     }
     if (p.orderId) {
-      const o = db.select().from(tables.orders).where(eq(tables.orders.id, p.orderId)).get();
+      const o = await db.select().from(tables.orders).where(eq(tables.orders.id, p.orderId)).get();
       if (o) return o.title;
     }
     return "Transaction";
   };
-  const who = (uid: string) => {
-    const prof = db.select().from(tables.profiles).where(eq(tables.profiles.userId, uid)).get();
-    const u = db.select().from(tables.users).where(eq(tables.users.id, uid)).get();
+  const who = async (uid: string) => {
+    const prof = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, uid)).get();
+    const u = await db.select().from(tables.users).where(eq(tables.users.id, uid)).get();
     return { id: uid, handle: u?.handle ?? "?", displayName: prof?.displayName ?? "?" };
   };
 
@@ -353,16 +351,16 @@ export function paymentsFor(userId: string) {
       totalEarned: sum(inn.filter((p) => p.status === "released"), false),
       pendingIn: sum(inn.filter((p) => p.status === "held"), false),
     },
-    transactions: rows.slice(0, 60).map((p) => ({
+    transactions: await Promise.all(rows.slice(0, 60).map(async (p) => ({
       id: p.id,
       direction: p.payerId === userId ? ("out" as const) : ("in" as const),
       amountCents: p.amountCents,
       feeCents: p.feeCents,
       status: p.status, // held | released | refunded — all TEST
-      title: titleOf(p),
-      with: who(p.payerId === userId ? p.payeeId : p.payerId),
+      title: await titleOf(p),
+      with: await who(p.payerId === userId ? p.payeeId : p.payerId),
       record: p.bookingId ? { kind: "booking", id: p.bookingId } : p.projectId ? { kind: "project", id: p.projectId } : p.orderId ? { kind: "order", id: p.orderId } : null,
       at: p.createdAt.toISOString(),
-    })),
+    }))),
   };
 }

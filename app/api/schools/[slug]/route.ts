@@ -16,17 +16,17 @@ export const dynamic = "force-dynamic";
  * a hidden year appear in "All" but never under a year filter.
  */
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
-  return guarded(() => {
-    const campus = db.select().from(tables.campuses).where(eq(tables.campuses.slug, params.slug)).get();
+  return guarded(async () => {
+    const campus = await db.select().from(tables.campuses).where(eq(tables.campuses.slug, params.slug)).get();
     if (!campus) throw new ApiError(404, "School not found");
 
-    const rows = db
+    const rows = (await db
       .select({ v: tables.campusVerifications, u: tables.users, p: tables.profiles })
       .from(tables.campusVerifications)
       .innerJoin(tables.users, eq(tables.campusVerifications.userId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(and(eq(tables.campusVerifications.campusId, campus.id), eq(tables.campusVerifications.status, "verified")))
-      .all()
+      .all())
       .filter((r) => r.u.status === "active" && r.v.showSchool);
 
     const people = rows.map((r) => ({

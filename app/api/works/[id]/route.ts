@@ -14,20 +14,20 @@ export const dynamic = "force-dynamic";
 /** GET /api/works/[id] — public work page: preview, the creator's license
  *  options with full terms, and the creator's VERIFIED track record. */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  return guarded(() => {
-    const viewer = getSessionUser();
-    const row = db
+  return guarded(async () => {
+    const viewer = await getSessionUser();
+    const row = await db
       .select({ work: tables.works, user: tables.users, profile: tables.profiles })
       .from(tables.works)
       .innerJoin(tables.users, eq(tables.works.creatorId, tables.users.id))
       .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
       .where(eq(tables.works.id, params.id))
       .get();
-    if (!row || row.user.status !== "active") throw new ApiError(404, "Work not found");
-    const { work, user, profile } = row;
+    if (!row || row!.user.status !== "active") throw new ApiError(404, "Work not found");
+    const { work, user, profile } = await row;
 
-    const workLicenses = db.select().from(tables.licenses).where(eq(tables.licenses.workId, work.id)).all();
-    const creatorLicenses = db.select().from(tables.licenses).where(eq(tables.licenses.creatorId, user.id)).all();
+    const workLicenses = await db.select().from(tables.licenses).where(eq(tables.licenses.workId, work.id)).all();
+    const creatorLicenses = await db.select().from(tables.licenses).where(eq(tables.licenses.creatorId, user.id)).all();
     const myLicense = viewer ? workLicenses.find((l) => l.licenseeId === viewer.id) : undefined;
 
     return {
@@ -63,13 +63,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /** PATCH — creator manages the work (archive/unarchive). */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const work = db.select().from(tables.works).where(eq(tables.works.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const work = await db.select().from(tables.works).where(eq(tables.works.id, params.id)).get();
     if (!work) throw new ApiError(404, "Work not found");
     if (work.creatorId !== user.id) throw new ApiError(403, "Not your work");
     if (["active", "archived"].includes(body.status))
-      db.update(tables.works).set({ status: body.status }).where(eq(tables.works.id, work.id)).run();
+      await db.update(tables.works).set({ status: body.status }).where(eq(tables.works.id, work.id)).run();
     return { ok: true };
   });
 }
@@ -84,9 +84,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const work = db.select().from(tables.works).where(eq(tables.works.id, params.id)).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const work = await db.select().from(tables.works).where(eq(tables.works.id, params.id)).get();
     if (!work || work.status !== "active") throw new ApiError(404, "Work not found");
     if (work.creatorId === user.id) throw new ApiError(400, "You can't license your own work");
     if (work.exclusiveLicenseId)
@@ -97,8 +97,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // quote/custom options are negotiated — the conversation IS the flow
     if (option.price == null) {
-      const convId = conversationBetween(user.id, work.creatorId);
-      db.insert(tables.messages)
+      const convId = await conversationBetween(user.id, work.creatorId);
+      await db.insert(tables.messages)
         .values({
           id: randomBytes(12).toString("hex"),
           conversationId: convId,
@@ -106,8 +106,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           body: `Hi! I'm interested in the "${option.name}" license for "${work.title}" — can we talk terms?`,
         })
         .run();
-      db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
-      notify({
+      await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+      await notify({
         userId: work.creatorId, actorId: user.id, type: "message",
         title: `License inquiry — ${work.title}`,
         body: `${user.profile.displayName} wants to discuss "${option.name}"`,
@@ -122,10 +122,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       throw new ApiError(409, `The total changed — it is now $${(totalCents / 100).toFixed(2)}. Review before paying.`);
 
     const licenseId = randomBytes(12).toString("hex");
-    const convId = conversationBetween(user.id, work.creatorId);
+    const convId = await conversationBetween(user.id, work.creatorId);
     const free = option.price === 0;
 
-    db.insert(tables.licenses)
+    await db.insert(tables.licenses)
       .values({
         id: licenseId,
         workId: work.id,
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .run();
 
     if (!free) {
-      db.insert(tables.payments)
+      await db.insert(tables.payments)
         .values({
           id: randomBytes(12).toString("hex"),
           licenseId,
@@ -157,9 +157,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .run();
     }
     if (option.type === "exclusive")
-      db.update(tables.works).set({ exclusiveLicenseId: licenseId }).where(eq(tables.works.id, work.id)).run();
+      await db.update(tables.works).set({ exclusiveLicenseId: licenseId }).where(eq(tables.works.id, work.id)).run();
 
-    db.insert(tables.messages)
+    await db.insert(tables.messages)
       .values({
         id: randomBytes(12).toString("hex"),
         conversationId: convId,
@@ -168,9 +168,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         body: `License ${licenseId.slice(0, 8).toUpperCase()} issued — "${work.title}" · ${option.name}${free ? " (free)" : ` · $${(totalCents / 100).toFixed(2)} secured`}${option.attribution ? " · attribution required" : ""}.${option.type === "exclusive" ? " Exclusive: further licensing of this work has stopped." : ""}${free ? "" : " Funds release when the licensee confirms delivery."}`,
       })
       .run();
-    db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
+    await db.update(tables.conversations).set({ updatedAt: new Date() }).where(eq(tables.conversations.id, convId)).run();
 
-    notify({
+    await notify({
       userId: work.creatorId, actorId: user.id, type: "payment",
       title: `${free ? "Free license issued" : "License sold"} — ${work.title}`,
       body: `${option.name}${free ? "" : ` · $${option.price} secured — deliver the files to complete`}`,
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
 
     // demo: seed creators deliver instantly in chat
-    if (!free) seedCreatorDeliversLicense(licenseId);
+    if (!free) await seedCreatorDeliversLicense(licenseId);
 
     return { licenseId, status: free ? "completed" : "issued", conversationId: convId };
   });

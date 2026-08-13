@@ -17,9 +17,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/bookings — bookings where I'm the client or the provider. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select()
       .from(tables.bookings)
       .where(or(eq(tables.bookings.clientId, user.id), eq(tables.bookings.providerId, user.id)))
@@ -28,18 +28,18 @@ export async function GET() {
 
     // demo progress beats: seed providers announce "preparing" and
     // "in progress" into the CORRECT conversation (by booking ids), once
-    for (const b of rows) seedBookingProgress(b.id);
+    for (const b of rows) await seedBookingProgress(b.id);
     // demo mode: when a seed provider's confirmed appointment time has
     // passed, the appointment "happened" — completed, payout released
     for (const b of rows) {
-      if (b.status === "confirmed" && b.startsAt.getTime() < Date.now() && isSeedUser(b.providerId)) {
-        db.update(tables.bookings).set({ status: "completed" }).where(eq(tables.bookings.id, b.id)).run();
-        db.update(tables.payments)
+      if (b.status === "confirmed" && b.startsAt.getTime() < Date.now() && await isSeedUser(b.providerId)) {
+        await db.update(tables.bookings).set({ status: "completed" }).where(eq(tables.bookings.id, b.id)).run();
+        await db.update(tables.payments)
           .set({ status: "released" })
           .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
           .run();
         b.status = "completed";
-        notify({
+        await notify({
           userId: b.clientId,
           actorId: b.providerId,
           type: "payment",
@@ -51,12 +51,12 @@ export async function GET() {
       }
     }
 
-    const payRows = db.select().from(tables.payments).all().filter((p) => p.bookingId);
+    const payRows = (await db.select().from(tables.payments).all()).filter((p) => p.bookingId);
     return {
-      bookings: rows.map((b) => {
+      bookings: await Promise.all(rows.map(async (b) => {
         const otherId = b.clientId === user.id ? b.providerId : b.clientId;
-        const otherUser = db.select().from(tables.users).where(eq(tables.users.id, otherId)).get()!;
-        const otherProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get()!;
+        const otherUser = (await db.select().from(tables.users).where(eq(tables.users.id, otherId)).get())!;
+        const otherProfile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get())!;
         const payment = payRows.find((p) => p.bookingId === b.id);
         return {
           id: b.id,
@@ -74,7 +74,7 @@ export async function GET() {
           myRole: b.clientId === user.id ? "client" : "provider",
           with: publicUser(otherUser, otherProfile),
         };
-      }),
+      })),
     };
   });
 }
@@ -82,26 +82,26 @@ export async function GET() {
 /** POST — book a provider's service slot. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const service = db.select().from(tables.services).where(eq(tables.services.id, String(body.serviceId))).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const service = await db.select().from(tables.services).where(eq(tables.services.id, String(body.serviceId))).get();
     if (!service || !service.active) throw new ApiError(404, "Service not found");
     // visibility is enforced where money happens, not just in the UI:
     // drafts aren't published; followers-only requires actually following
     if (service.visibility === "draft") throw new ApiError(404, "Service not found");
     if (service.visibility === "followers") {
-      const follows = !!db
+      const follows = !!(await db
         .select()
         .from(tables.follows)
         .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, service.ownerId)))
-        .get();
+        .get());
       if (!follows) throw new ApiError(403, "This service is only available to followers");
     }
     if (service.ownerId === user.id) throw new ApiError(400, "You can't book your own service");
 
     // BUSINESS CAPACITY: a business booking talent adds an active hire —
     // creation-only gate, never blocks anyone from booking THE business
-    assertCapacityById(user.id, "activeHires");
+    await assertCapacityById(user.id, "activeHires");
 
     /* ---- PREFERRED EARLY ACCESS ----------------------------------
        Early Access controls WHO gets access first; availability controls
@@ -119,25 +119,25 @@ export async function POST(req: NextRequest) {
     const eaSetup = readEarlyAccess(service.config);
     const windowOpen = !!service.preferredUntil && service.preferredUntil.getTime() > Date.now();
     if (eaSetup?.slots != null) {
-      const activeNow = activeBookingsForService(service.id);
+      const activeNow = await activeBookingsForService(service.id);
       if (activeNow >= eaSetup.slots)
         throw new ApiError(409, `Fully booked — all ${eaSetup.slots} slots for this service are taken. If a slot opens up (a cancellation), booking reopens automatically.`);
     }
     if (windowOpen) {
       const opens = service.preferredUntil!.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-      if (!hasEarlyAccess(service.ownerId, user.id))
+      if (!(await hasEarlyAccess(service.ownerId, user.id)))
         throw new ApiError(403, `Preferred Early Access is on — this provider's Preferred Clients get first pick. Booking opens to everyone ${opens}`);
       if (eaSetup?.preferredLimit != null) {
-        const mine = clientBookingsSinceWindowStart(service.id, user.id, eaSetup.startedAt);
+        const mine = await clientBookingsSinceWindowStart(service.id, user.id, eaSetup.startedAt);
         if (mine >= eaSetup.preferredLimit)
           throw new ApiError(409, `Early-access limit reached — ${eaSetup.preferredLimit} booking${eaSetup.preferredLimit === 1 ? "" : "s"} per Preferred Client during this window. Remaining availability opens to everyone ${opens}`);
       }
     }
-    const providerProfile = db
+    const providerProfile = (await db
       .select()
       .from(tables.profiles)
       .where(eq(tables.profiles.userId, service.ownerId))
-      .get()!;
+      .get())!;
     if (!providerProfile.hiringEnabled || !providerProfile.acceptBookings)
       throw new ApiError(403, "This creator isn't accepting bookings");
 
@@ -147,14 +147,14 @@ export async function POST(req: NextRequest) {
 
     // the creator's config drives duration, radius, limits, and travel
     const config = parseConfig(service.config);
-    const providerProfileFull = db
+    const providerProfileFull = await db
       .select()
       .from(tables.profiles)
       .where(eq(tables.profiles.userId, service.ownerId))
       .get()!;
     const distanceMi =
-      user.profile.lat != null && providerProfileFull.lat != null
-        ? Math.round(haversineMi(user.profile.lat, user.profile.lng!, providerProfileFull.lat, providerProfileFull.lng!) * 10) / 10
+      user.profile.lat != null && providerProfileFull!.lat != null
+        ? Math.round(haversineMi(user.profile.lat, user.profile.lng!, providerProfileFull!.lat, providerProfileFull!.lng!) * 10) / 10
         : null;
 
     // service radius: outside the area → refused up front, never a surprise
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       distanceMi != null &&
       distanceMi > config.travel.radiusMi
     )
-      throw new ApiError(409, `Outside ${providerProfileFull.displayName}'s service area (${config.travel.radiusMi} mi)`);
+      throw new ApiError(409, `Outside ${providerProfileFull!.displayName}'s service area (${config.travel.radiusMi} mi)`);
 
     const travelFee = travelFeeFor(config.travel, distanceMi).fee;
 
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     const sched = config.scheduling;
     const reqStart = new Date(body.startsAt);
     if (sched.days && sched.days.length && !sched.days.includes(reqStart.getDay()))
-      throw new ApiError(409, `${providerProfileFull.displayName} doesn't take bookings on ${reqStart.toLocaleDateString("en-US", { weekday: "long" })}s`);
+      throw new ApiError(409, `${providerProfileFull!.displayName} doesn't take bookings on ${reqStart.toLocaleDateString("en-US", { weekday: "long" })}s`);
     const hour = reqStart.getHours();
     if (sched.startHour != null && sched.endHour != null && (hour < sched.startHour || hour >= sched.endHour))
       throw new ApiError(409, `Outside working hours (${sched.startHour}:00–${sched.endHour}:00)`);
@@ -196,11 +196,11 @@ export async function POST(req: NextRequest) {
           releasedThrough = Math.max(releasedThrough, relUntil); // fully open
         } else if (Date.now() >= relAt && reqT > releasedThrough && reqT <= relUntil) {
           // the release is in its Preferred Early Access phase
-          if (!hasEarlyAccess(service.ownerId, user.id))
+          if (!(await hasEarlyAccess(service.ownerId, user.id)))
             throw new ApiError(403, `This new availability is in Preferred Early Access — it opens to everyone ${fmtT(publicAt)}`);
           const eaRel = readEarlyAccess(service.config);
           if (eaRel?.preferredLimit != null) {
-            const mine = clientBookingsSinceWindowStart(service.id, user.id, rel!.releaseAt);
+            const mine = await clientBookingsSinceWindowStart(service.id, user.id, rel!.releaseAt);
             if (mine >= eaRel.preferredLimit)
               throw new ApiError(409, `Early-access limit reached — ${eaRel.preferredLimit} booking${eaRel.preferredLimit === 1 ? "" : "s"} per Preferred Client for this release. It opens to everyone ${fmtT(publicAt)}`);
           }
@@ -210,13 +210,13 @@ export async function POST(req: NextRequest) {
         }
       }
       if (reqT > releasedThrough)
-        throw new ApiError(409, `${providerProfileFull.displayName} releases availability on specific dates — that date isn't part of any released or scheduled batch yet`);
+        throw new ApiError(409, `${providerProfileFull!.displayName} releases availability on specific dates — that date isn't part of any released or scheduled batch yet`);
     } else {
       // ROLLING HORIZON: how far ahead THIS provider releases availability.
       const horizon = sched.horizonDays ?? 60;
       if (reqStart.getTime() > Date.now() + horizon * 86400_000) {
         const releases = new Date(reqStart.getTime() - horizon * 86400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        throw new ApiError(409, `${providerProfileFull.displayName} opens bookings ${horizon} days ahead — that date isn't released yet (bookable from ${releases})`);
+        throw new ApiError(409, `${providerProfileFull!.displayName} opens bookings ${horizon} days ahead — that date isn't released yet (bookable from ${releases})`);
       }
     }
     if (sched.sameDayBooking === false && reqStart.toDateString() === new Date().toDateString())
@@ -229,11 +229,11 @@ export async function POST(req: NextRequest) {
       const dayStart = new Date(body.startsAt);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(dayStart.getTime() + 86400_000);
-      const sameDay = db
+      const sameDay = (await db
         .select()
         .from(tables.bookings)
         .where(eq(tables.bookings.providerId, service.ownerId))
-        .all()
+        .all())
         .filter(
           (x) =>
             ["pending", "accepted", "confirmed", "reschedule_requested"].includes(x.status) &&
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
             x.startsAt < dayEnd
         ).length;
       if (sameDay >= config.scheduling.maxPerDay)
-        throw new ApiError(409, `${providerProfileFull.displayName} is fully booked that day (max ${config.scheduling.maxPerDay}/day)`);
+        throw new ApiError(409, `${providerProfileFull!.displayName} is fully booked that day (max ${config.scheduling.maxPerDay}/day)`);
     }
 
     // --- the customer's menu selection, priced by the CREATOR's menu ---
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
     // benefit, it's applied server-side and disclosed as its own line on
     // the frozen receipt — the client never has to ask, and the price
     // can't be spoofed from the request.
-    const prefPct = discountPercent(service.ownerId, user.id);
+    const prefPct = await discountPercent(service.ownerId, user.id);
     const prefDiscount = prefPct > 0 ? Math.round((selection.payout * prefPct) / 100) : 0;
     const finalPayout = selection.payout - prefDiscount;
     const finalLines = prefDiscount > 0
@@ -270,11 +270,11 @@ export async function POST(req: NextRequest) {
 
     // the calendar is the source of truth: no double-booking a taken slot
     const durationMin = selection.durationMin || Math.min(480, Math.max(15, Number(body.durationMin) || 60));
-    const conflicts = db
+    const conflicts = (await db
       .select()
       .from(tables.bookings)
       .where(eq(tables.bookings.providerId, service.ownerId))
-      .all()
+      .all())
       .some((x) => {
         if (!["accepted", "confirmed", "pending", "reschedule_requested"].includes(x.status)) return false;
         // the creator's buffer widens every conflict window
@@ -295,8 +295,8 @@ export async function POST(req: NextRequest) {
        conversation is EXACTLY the 1:1 between these two people, otherwise
        we find-or-create the correct one. Every downstream auto-message
        (acceptance, payment, progress) lands in the right thread by ID. */
-    const conversationId = resolvePairConversation(user.id, service.ownerId, body.conversationId ? String(body.conversationId) : null);
-    db.insert(tables.bookings)
+    const conversationId = await resolvePairConversation(user.id, service.ownerId, body.conversationId ? String(body.conversationId) : null);
+    await db.insert(tables.bookings)
       .values({
         id,
         serviceId: service.id,
@@ -313,7 +313,7 @@ export async function POST(req: NextRequest) {
       })
       .run();
 
-    notify({
+    await notify({
       userId: service.ownerId,
       actorId: user.id,
       type: "booking",
@@ -323,22 +323,22 @@ export async function POST(req: NextRequest) {
     });
 
     if (prefDiscount > 0)
-      notify({
+      await notify({
         userId: user.id,
         actorId: service.ownerId,
         type: "preferred_added",
-        title: `You received Preferred Client pricing from ${providerProfileFull.displayName}`,
+        title: `You received Preferred Client pricing from ${providerProfileFull!.displayName}`,
         body: `${selection.title} — $${prefDiscount} off (${prefPct}%)`,
         href: "/calendar",
         priority: "low",
       });
 
-    recordInteraction(user.id, "service", service.id, "book");
+    await recordInteraction(user.id, "service", service.id, "book");
 
     // demo mode: seed providers respond immediately — the flow never stalls
-    seedAcceptsBooking(id);
+    await seedAcceptsBooking(id);
 
-    const fresh = db.select().from(tables.bookings).where(eq(tables.bookings.id, id)).get()!;
+    const fresh = (await db.select().from(tables.bookings).where(eq(tables.bookings.id, id)).get())!;
     return { id, status: fresh.status };
   });
 }

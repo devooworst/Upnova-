@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/orders — my purchases and my sales, with live states. */
 export async function GET() {
-  return guarded(() => {
-    const user = requireUser();
-    const rows = db
+  return guarded(async () => {
+    const user = await requireUser();
+    const rows = await db
       .select()
       .from(tables.orders)
       .where(or(eq(tables.orders.buyerId, user.id), eq(tables.orders.sellerId, user.id)))
@@ -23,7 +23,7 @@ export async function GET() {
       .all();
 
     // open disputes freeze everything — fetch once for the lazy transitions
-    const allDisputes = db.select().from(tables.disputes).all();
+    const allDisputes = await db.select().from(tables.disputes).all();
     const hasOpenDispute = (orderId: string) =>
       allDisputes.some((d) => d.orderId === orderId && ["open", "under_review", "return_authorized", "return_in_transit"].includes(d.status));
 
@@ -36,12 +36,12 @@ export async function GET() {
           if (t.eta && new Date(t.eta).getTime() < Date.now()) {
             const rules = protectionRules(o.price * o.qty);
             const ends = new Date(Date.now() + rules.protectionHours * 3600_000);
-            db.update(tables.orders).set({ status: "delivered", protectionEndsAt: ends }).where(eq(tables.orders.id, o.id)).run();
+            await db.update(tables.orders).set({ status: "delivered", protectionEndsAt: ends }).where(eq(tables.orders.id, o.id)).run();
             o.status = "delivered";
             o.protectionEndsAt = ends;
-            logOrderEvent(o.id, null, "delivered", "Carrier confirmed delivery");
-            logOrderEvent(o.id, null, "protection_started", `${rules.protectionHours}h buyer-protection window`);
-            notify({
+            await logOrderEvent(o.id, null, "delivered", "Carrier confirmed delivery");
+            await logOrderEvent(o.id, null, "protection_started", `${rules.protectionHours}h buyer-protection window`);
+            await notify({
               userId: o.buyerId,
               actorId: o.sellerId,
               type: "order",
@@ -54,23 +54,23 @@ export async function GET() {
       }
       // protection window over + no open case → auto-complete, release funds
       if (o.status === "delivered" && o.protectionEndsAt && o.protectionEndsAt.getTime() < Date.now() && !hasOpenDispute(o.id)) {
-        db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
-        db.update(tables.payments)
+        await db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
+        await db.update(tables.payments)
           .set({ status: "released" })
           .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
           .run();
         o.status = "completed";
-        logOrderEvent(o.id, null, "completed", "Protection window ended with no reported problem — funds released");
-        notify({ userId: o.sellerId, actorId: o.buyerId, type: "payment", title: `Order completed — $${o.price * o.qty} released`, body: `${o.title} · protection window ended with no reported problems`, href: "/orders", category: "payments" });
+        await logOrderEvent(o.id, null, "completed", "Protection window ended with no reported problem — funds released");
+        await notify({ userId: o.sellerId, actorId: o.buyerId, type: "payment", title: `Order completed — $${o.price * o.qty} released`, body: `${o.title} · protection window ended with no reported problems`, href: "/orders", category: "payments" });
       }
     }
 
-    const payments = db.select().from(tables.payments).all().filter((p) => p.orderId);
+    const payments = (await db.select().from(tables.payments).all()).filter((p) => p.orderId);
     return {
-      orders: rows.map((o) => {
+      orders: await Promise.all(rows.map(async (o) => {
         const otherId = o.buyerId === user.id ? o.sellerId : o.buyerId;
-        const otherUser = db.select().from(tables.users).where(eq(tables.users.id, otherId)).get()!;
-        const otherProfile = db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get()!;
+        const otherUser = (await db.select().from(tables.users).where(eq(tables.users.id, otherId)).get())!;
+        const otherProfile = (await db.select().from(tables.profiles).where(eq(tables.profiles.userId, otherId)).get())!;
         const payment = payments.find((p) => p.orderId === o.id);
         return {
           id: o.id,
@@ -98,7 +98,7 @@ export async function GET() {
           with: publicUser(otherUser, otherProfile),
           createdAt: o.createdAt.toISOString(),
         };
-      }),
+      })),
     };
   });
 }
@@ -106,9 +106,9 @@ export async function GET() {
 /** POST /api/orders — place an order (Mavyn checkout products only). */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  return guarded(() => {
-    const user = requireUser();
-    const product = db.select().from(tables.products).where(eq(tables.products.id, String(body.productId))).get();
+  return guarded(async () => {
+    const user = await requireUser();
+    const product = await db.select().from(tables.products).where(eq(tables.products.id, String(body.productId))).get();
     if (!product || product.status === "archived") throw new ApiError(404, "Product not found");
     if (product.sellerId === user.id) throw new ApiError(400, "You can't buy your own listing");
     if (product.externalUrl)
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     const fulfillment = offered.includes(body.fulfillment) ? body.fulfillment : offered[0];
 
     const id = randomBytes(12).toString("hex");
-    db.insert(tables.orders)
+    await db.insert(tables.orders)
       .values({
         id,
         productId: product.id,
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
         note: String(body.note || "").slice(0, 300),
       })
       .run();
-    logOrderEvent(id, user.id, "created", `${product.title}${picks.length ? ` (${picks.join(" · ")})` : ""} ×${qty} · listing price $${product.price}`);
+    await logOrderEvent(id, user.id, "created", `${product.title}${picks.length ? ` (${picks.join(" · ")})` : ""} ×${qty} · listing price $${product.price}`);
 
     return { id, status: "placed", total: product.price * qty };
   });

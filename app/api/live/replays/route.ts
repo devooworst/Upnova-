@@ -12,19 +12,19 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const handle = String(req.nextUrl.searchParams.get("host") || "").toLowerCase();
-  return guarded(() => {
-    const viewer = requireUser();
+  return guarded(async () => {
+    const viewer = await requireUser();
     if (!handle) throw new ApiError(400, "host is required");
-    const host = db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
+    const host = await db.select().from(tables.users).where(eq(tables.users.handle, handle)).get();
     if (!host) throw new ApiError(404, "User not found");
-    const rows = db
+    const rows = (await db
       .select()
       .from(tables.liveStreams)
       .where(eq(tables.liveStreams.hostId, host.id))
       .orderBy(desc(tables.liveStreams.startedAt))
-      .all()
+      .all())
       .filter((s) => s.status === "ended" && s.replayStatus === "saved")
       .slice(0, 24);
-    return { items: rows.map((s) => streamCard(s, viewer.id)) };
+    return { items: await Promise.all(rows.map((s) => streamCard(s, viewer.id))) };
   });
 }
