@@ -244,6 +244,7 @@ export default function EditProfile() {
   const [active, setActive] = useState<SectionId>("profile");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toast, setToast] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /* platform-verified state — read-only here */
   const { user: sessionUser } = useSession();
@@ -284,9 +285,10 @@ export default function EditProfile() {
 
   const onSave = async () => {
     if (!canSave) return;
+    setSaveError(null);
     const clean = { ...draft, username: draft.username.trim().replace(/^@/, "").toLowerCase() };
-    const ok = await saveProfile(clean);
-    if (!ok) return;
+    const result = await saveProfile(clean);
+    if (result !== true) return setSaveError(result); // the server's honest reason, in the save bar
     setSaved(clean);
     setToast(true);
     setTimeout(() => router.push("/profile"), 900);
@@ -1667,12 +1669,14 @@ export default function EditProfile() {
           same bottom-0 bar, same compact right-aligned pair.            */}
       <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-line bg-ink/95 backdrop-blur lg:bottom-0 lg:bg-ink/90" data-guide="profile-save-bar">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2.5 lg:py-3">
-          <p className={`${dirty ? "block" : "hidden"} w-full text-center text-[11px] text-zinc-500 sm:block sm:w-auto sm:text-left sm:text-xs`}>
-            {dirty
-              ? usernameBlocked
-                ? "Fix your username before saving."
-                : "You have unsaved changes."
-              : "All changes saved."}
+          <p className={`${dirty || saveError ? "block" : "hidden"} w-full text-center text-[11px] sm:block sm:w-auto sm:text-left sm:text-xs ${saveError ? "text-rose-300" : "text-zinc-500"}`} data-guide="profile-save-status">
+            {saveError
+              ? saveError
+              : dirty
+                ? usernameBlocked
+                  ? "Fix your username before saving."
+                  : "You have unsaved changes."
+                : "All changes saved."}
           </p>
           <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
             <button onClick={() => router.push("/profile")} className="btn-ghost h-11 flex-1 px-4 text-sm sm:flex-none lg:h-auto lg:py-2">

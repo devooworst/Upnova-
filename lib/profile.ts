@@ -305,13 +305,18 @@ export function isLoggedOut() {
 }
 
 /** Persist to the database, then refresh every subscriber. */
-export async function saveProfile(p: ProfileData): Promise<boolean> {
+export async function saveProfile(p: ProfileData): Promise<true | string> {
   const res = await fetch("/api/me/profile", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(toApi(p)),
   });
-  if (!res.ok) return false;
+  if (!res.ok) {
+    // surface the server's specific reason (oversized image, storage not
+    // configured, …) — a silent false left users clicking Save into a void
+    const j = await res.json().catch(() => ({}));
+    return (j as { error?: string }).error || `Save failed (HTTP ${res.status}) — try again.`;
+  }
   await loadProfile(true);
   return true;
 }

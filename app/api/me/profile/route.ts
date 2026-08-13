@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { storeImage } from "@/lib/server/blobs";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded } from "@/lib/server/auth";
+import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { ownProfile } from "@/lib/server/serialize";
 import { resolveLocation, geoReady } from "@/lib/server/geo";
 
@@ -18,6 +18,24 @@ export async function PATCH(req: NextRequest) {
     const arr = (v: unknown) => JSON.stringify(Array.isArray(v) ? v.slice(0, 40).map((x) => String(x).slice(0, 80)) : []);
     const b = (v: unknown, def: boolean) => (typeof v === "boolean" ? v : def);
     const p = user.profile;
+
+    /* Image intake — NEVER silent. A new upload (data-URI) that can't be
+       stored is a 400 naming the reason; truncating an oversized data-URI
+       would corrupt the base64, so oversized is rejected outright. URLs /
+       existing paths pass through; storage-layer failures (Blob token
+       missing/invalid) throw their own specific 502/503 from storeImage. */
+    const image = async (v: unknown, prefix: string, maxChars: number, maxBytes?: number) => {
+      if (typeof v !== "string" || !v) return null;
+      const isNewUpload = v.startsWith("data:");
+      if (isNewUpload && v.length > maxChars)
+        throw new ApiError(400, `That ${prefix} image is too large — pick a smaller photo (roughly under ${Math.round((maxChars * 0.75) / 1_000_000 * 10) / 10}MB).`);
+      const stored = await storeImage(v, prefix, maxBytes);
+      // a data: URI must NEVER be persisted raw — if storage didn't turn it
+      // into a real URL/path, the upload failed and the user hears why
+      if (isNewUpload && (!stored || stored.startsWith("data:")))
+        throw new ApiError(400, `That ${prefix} image couldn't be read — use a JPEG, PNG, WebP, or GIF.`);
+      return stored;
+    };
 
     /* ---------------- location: validated relationally ----------------
        Preferred path: body.location = { countryCode, stateId, countyId,
@@ -71,8 +89,8 @@ export async function PATCH(req: NextRequest) {
         displayName: str(body.displayName, 50) || p.displayName,
         bio: str(body.bio, 300),
         // uploaded images are persisted to disk; the DB keeps only the path
-        avatarUrl: body.avatarUrl === null ? null : (await storeImage(str(body.avatarUrl, 500_000), "avatar")) || p.avatarUrl,
-        coverUrl: body.coverUrl === null ? null : (await storeImage(str(body.coverUrl, 1_500_000), "cover", 1_600_000)) || p.coverUrl,
+        avatarUrl: body.avatarUrl === null ? null : (await image(body.avatarUrl, "avatar", 700_000)) || p.avatarUrl,
+        coverUrl: body.coverUrl === null ? null : (await image(body.coverUrl, "cover", 2_200_000, 1_600_000)) || p.coverUrl,
         coverPos: Number.isFinite(body.coverPos) ? Math.min(100, Math.max(0, Math.round(body.coverPos))) : p.coverPos,
         locationVisibility: ["city", "county", "state", "country", "hidden"].includes(body.locationVisibility)
           ? body.locationVisibility
