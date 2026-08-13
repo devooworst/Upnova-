@@ -22,7 +22,7 @@
 
 import {
   Radio, Eye, Share2, Flag, Heart, Flame, Hand, Star, Smile, Pin, Trash2, MicOff, Ban,
-  Shield, UserPlus, X, Loader2, Send, Users, Video, Bookmark, Sparkles,
+  Shield, UserPlus, X, Loader2, Send, Users, Video, Bookmark, Sparkles, ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -205,6 +205,9 @@ export default function LiveStreamPage() {
         {stream.replayStatus === "deleted" && " · replay deleted"}
         {stream.replayStatus === "none" && " · replay not saved"}
       </p>
+      <p className="mt-1 text-[10px] text-zinc-600">
+        Replays keep the chat transcript and stream record. Video isn't recorded yet — your camera was a local preview only until Mavyn's media transport ships.
+      </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {stream.replayStatus !== "saved" && stream.replayStatus !== "deleted" && (
           <button onClick={() => act("/replay", { action: "save" })} data-guide="live-replay-save" className="flex items-center gap-1.5 rounded-full bg-lime-400 px-4 py-2 text-xs font-bold text-black hover:bg-lime-300">
@@ -232,6 +235,17 @@ export default function LiveStreamPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5">
+      {/* after the live ends, a plain way back to Live — client-side
+          navigation, session and state untouched */}
+      {!live && (
+        <Link
+          href="/live"
+          data-guide="live-back"
+          className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600"
+        >
+          <ArrowLeft size={13} /> Back to Live
+        </Link>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         {/* ============================ STAGE ============================ */}
         <div className="min-w-0">
@@ -425,7 +439,7 @@ export default function LiveStreamPage() {
                 {stream.replayStatus === "saved" ? "You're watching the replay." : "This live has ended."}
               </p>
               {stream.replayStatus === "saved" && (
-                <p className="mt-1 text-xs text-zinc-500">Peak {stream.peakViewers} viewer{stream.peakViewers === 1 ? "" : "s"} · chat transcript on the right.</p>
+                <p className="mt-1 text-xs text-zinc-500">Peak {stream.peakViewers} viewer{stream.peakViewers === 1 ? "" : "s"} · chat transcript on the right · video wasn't recorded (media transport pending).</p>
               )}
             </div>
           )}
