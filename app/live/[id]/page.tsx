@@ -12,9 +12,12 @@
 /*  replay (if saved) or an honest "this live has ended".              */
 /*                                                                     */
 /*  Transport note: chat/presence/reactions poll the real APIs — a     */
-/*  refresh or reconnect simply resumes the heartbeat. Real video      */
-/*  ingest (WebRTC/RTMP) needs media infrastructure; the stage is a    */
-/*  live presence canvas until then and says so honestly.              */
+/*  refresh or reconnect simply resumes the heartbeat. The person on   */
+/*  stage (host / active guest) gets REAL local camera+mic capture     */
+/*  (LiveCameraStage · getUserMedia) as a self-view; remote video      */
+/*  DELIVERY still needs media infrastructure (WebRTC SFU or a         */
+/*  provider like Cloudflare Stream/LiveKit) and the UI says so        */
+/*  honestly until it exists.                                          */
 /* ------------------------------------------------------------------ */
 
 import {
@@ -25,6 +28,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
+import LiveCameraStage from "@/components/LiveCameraStage";
 
 type Detail = {
   stream: {
@@ -233,23 +237,30 @@ export default function LiveStreamPage() {
         <div className="min-w-0">
           <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-zinc-900 via-[#141019] to-zinc-900">
             <div className={`grid aspect-video ${stageCount > 1 ? (stageCount > 2 ? "grid-cols-2 grid-rows-2" : "grid-cols-2") : ""}`}>
-              {[{ handle: stream.host.handle, displayName: stream.host.displayName, avatarUrl: stream.host.avatarUrl, role: "Host" },
-                ...activeGuests.map((g) => ({ handle: g.handle, displayName: g.displayName, avatarUrl: g.avatarUrl, role: "Guest" }))].map((p) => (
+              {[{ handle: stream.host.handle, displayName: stream.host.displayName, avatarUrl: stream.host.avatarUrl, role: "Host", isMe: me.isHost },
+                ...activeGuests.map((g) => ({ handle: g.handle, displayName: g.displayName, avatarUrl: g.avatarUrl, role: "Guest", isMe: !!user && g.userId === user.id }))].map((p) => (
                 <div key={p.handle} className="relative flex flex-col items-center justify-center border border-line-soft/40">
-                  <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-xl font-bold text-zinc-300 ring-2 ring-red-400/30">
-                    {p.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      p.displayName.slice(0, 1)
-                    )}
-                  </span>
-                  <p className="mt-2 text-sm font-semibold text-zinc-200">{p.displayName}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-zinc-500">{p.role}</p>
-                  {live && (
-                    <span className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-zinc-500">
-                      <Video size={11} /> on stage
-                    </span>
+                  {live && p.isMe ? (
+                    /* the person broadcasting sees their REAL camera here */
+                    <LiveCameraStage displayName={p.displayName} />
+                  ) : (
+                    <>
+                      <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-xl font-bold text-zinc-300 ring-2 ring-red-400/30">
+                        {p.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          p.displayName.slice(0, 1)
+                        )}
+                      </span>
+                      <p className="mt-2 text-sm font-semibold text-zinc-200">{p.displayName}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-zinc-500">{p.role}</p>
+                      {live && (
+                        <span className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-zinc-500">
+                          <Video size={11} /> on stage
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -270,9 +281,9 @@ export default function LiveStreamPage() {
                 </span>
               )}
             </div>
-            {live && (
-              <p className="absolute bottom-2 left-3 text-[10px] text-zinc-600">
-                Live presence stage — camera/screen ingest arrives with Mavyn's media infrastructure.
+            {live && !(me.isHost || me.guestStatus === "active") && (
+              <p className="absolute bottom-2 left-3 max-w-[70%] text-[10px] text-zinc-600">
+                Video transmission isn't live yet — presence, chat, and reactions are real-time; the host sees their own camera locally.
               </p>
             )}
           </div>
