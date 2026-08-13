@@ -315,23 +315,23 @@ export default function DbPostCard({
         <button
           onClick={toggleLike}
           aria-label="Like"
-          className={`flex items-center gap-1.5 transition active:scale-90 ${liked ? "text-rose-400" : "hover:text-zinc-200"}`}
+          className={`-m-3 flex items-center gap-1.5 p-3 transition active:scale-90 ${liked ? "text-rose-400" : "hover:text-zinc-200"}`}
         >
           <Heart className={`h-[18px] w-[18px] ${liked ? "fill-rose-400" : ""}`} />
           {likes > 0 && <span className="tabular-nums">{likes}</span>}
         </button>
-        <button onClick={openComments} aria-label="Comment" className="flex items-center gap-1.5 transition hover:text-zinc-200">
+        <button onClick={openComments} aria-label="Comment" className="-m-3 flex items-center gap-1.5 p-3 transition hover:text-zinc-200">
           <MessageCircle className="h-[18px] w-[18px]" />
           {commentCount > 0 && <span className="tabular-nums">{commentCount}</span>}
         </button>
-        <button onClick={share} aria-label="Share" className="flex items-center gap-1.5 transition hover:text-zinc-200">
+        <button onClick={share} aria-label="Share" className="-m-3 flex items-center gap-1.5 p-3 transition hover:text-zinc-200">
           <Send className="h-[17px] w-[17px]" />
         </button>
         <button
           onClick={toggleSave}
           aria-label={saved ? "Remove bookmark" : "Save"}
           title={saved ? "Remove bookmark" : "Save"}
-          className={`ml-auto flex items-center transition ${saved ? "text-violet-300" : "hover:text-zinc-200"}`}
+          className={`-m-3 ml-auto flex items-center p-3 transition ${saved ? "text-violet-300" : "hover:text-zinc-200"}`}
         >
           <Bookmark className={`h-[18px] w-[18px] ${saved ? "fill-violet-300" : ""}`} />
         </button>

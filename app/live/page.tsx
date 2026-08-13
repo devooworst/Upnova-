@@ -197,7 +197,7 @@ export default function LivePage() {
       )}
 
       {showGoLive && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowGoLive(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4" onClick={() => setShowGoLive(false)}>
           <div
             className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-5"
             onClick={(e) => e.stopPropagation()}

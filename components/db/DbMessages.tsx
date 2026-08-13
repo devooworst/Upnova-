@@ -1049,7 +1049,7 @@ function ProjectPanel({
 
       {/* ------------------------- mock payment screen ------------------------- */}
       {payOpen && project && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => !busy && setPayOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4 backdrop-blur-sm" onClick={() => !busy && setPayOpen(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
             {!paid ? (
               <>

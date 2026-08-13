@@ -78,6 +78,32 @@ html.light {
 
 html {
   scroll-behavior: smooth;
+  /* MOBILE FOUNDATION — applied once, globally, instead of per-component:
+     no gray tap flashes, no landscape font inflation, no double-tap-zoom
+     delay on controls. Content behaves like a native app, desktop unchanged. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation; /* removes the 300ms double-tap-zoom wait on touch */
+}
+
+/* iOS Safari zooms the whole page when a focused field's font is <16px —
+   the single most common mobile-form complaint. On phones every field
+   renders at 16px; ≥sm keeps the existing compact desktop sizing. */
+@media (max-width: 639.98px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 1rem !important;
+  }
 }
 
 body {

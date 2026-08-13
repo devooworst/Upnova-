@@ -223,7 +223,7 @@ function PostModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/80 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card" onClick={(e) => e.stopPropagation()}>
         {post.imageUrl && (
           <div className="relative aspect-[4/3]">

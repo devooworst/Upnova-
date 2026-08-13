@@ -702,7 +702,7 @@ export default function ProPage() {
 
       {/* cancel confirmation */}
       {cancelOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setCancelOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4" onClick={() => setCancelOpen(false)}>
           <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>
             <p className="text-[15px] font-bold tracking-tight text-zinc-50">Cancel Mavyn Pro?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">

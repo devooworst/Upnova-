@@ -112,7 +112,7 @@ export default function PostCard({ post }: { post: Post }) {
       {/* fullscreen viewer */}
       {fullscreen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-8"
+          className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/95 p-2 sm:p-8"
           onClick={() => setFullscreen(false)}
         >
           <button

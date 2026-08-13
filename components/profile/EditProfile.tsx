@@ -1727,7 +1727,7 @@ function PublicPreview({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div

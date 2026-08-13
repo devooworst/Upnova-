@@ -253,7 +253,7 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
   // The server enforces the same rule; this panel just says it kindly.
   if (opp.viewerEligibility && !opp.viewerEligibility.eligible) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4" onClick={onClose}>
         <div className="card-people w-full max-w-sm border-violet-400/30 p-5 text-center" onClick={(e) => e.stopPropagation()}>
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-400/10">
             <Lock className="h-6 w-6 text-violet-400" />
@@ -364,7 +364,7 @@ function ApplyModal({ opp, onClose, onDone }: { opp: OpportunityItem; onClose: (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>

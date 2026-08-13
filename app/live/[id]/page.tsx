@@ -250,7 +250,7 @@ export default function LiveStreamPage() {
         {/* ============================ STAGE ============================ */}
         <div className="min-w-0">
           <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-zinc-900 via-[#141019] to-zinc-900">
-            <div className={`grid aspect-video ${stageCount > 1 ? (stageCount > 2 ? "grid-cols-2 grid-rows-2" : "grid-cols-2") : ""}`}>
+            <div className={`grid aspect-[4/3] sm:aspect-video ${stageCount > 1 ? (stageCount > 2 ? "grid-cols-2 grid-rows-2" : "grid-cols-2") : ""}`}>
               {[{ handle: stream.host.handle, displayName: stream.host.displayName, avatarUrl: stream.host.avatarUrl, role: "Host", isMe: me.isHost },
                 ...activeGuests.map((g) => ({ handle: g.handle, displayName: g.displayName, avatarUrl: g.avatarUrl, role: "Guest", isMe: !!user && g.userId === user.id }))].map((p) => (
                 <div key={p.handle} className="relative flex flex-col items-center justify-center border border-line-soft/40">
@@ -526,7 +526,7 @@ export default function LiveStreamPage() {
 
       {/* ---------- viewers modal (host/mods) ---------- */}
       {showViewers && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowViewers(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4" onClick={() => setShowViewers(false)}>
           <div className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-4" onClick={(e) => e.stopPropagation()}>
             <p className="mb-3 text-sm font-bold text-zinc-100">Watching now</p>
             {viewers.length === 0 && <p className="text-xs text-zinc-500">Nobody in the window right now.</p>}
@@ -553,7 +553,7 @@ export default function LiveStreamPage() {
 
       {/* ---------- invite modal ---------- */}
       {showInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowInvite(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4" onClick={() => setShowInvite(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-4" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-bold text-zinc-100">Invite a guest on stage</p>
             <p className="mt-1 text-xs text-zinc-500">Interviews, collabs, tutoring, panels — up to 3 guests.</p>
@@ -571,7 +571,7 @@ export default function LiveStreamPage() {
 
       {/* ---------- report modal ---------- */}
       {showReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowReport(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4" onClick={() => setShowReport(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-4" onClick={(e) => e.stopPropagation()}>
             {reportDone ? (
               <p className="py-4 text-center text-sm text-zinc-300">Report filed — a human reviews it. Nothing is auto-punished.</p>

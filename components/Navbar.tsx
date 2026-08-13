@@ -220,7 +220,7 @@ export default function Navbar() {
       {/* Log out confirmation */}
       {logoutOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-black/70 p-4"
           onClick={() => setLogoutOpen(false)}
         >
           <div className="card w-full max-w-xs p-5 text-center" onClick={(e) => e.stopPropagation()}>

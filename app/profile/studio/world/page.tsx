@@ -309,7 +309,7 @@ export default function MyWorldEditor() {
   };
 
   if (user === undefined || (user && (!cfg || !cover)))
-    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink"><div className="h-8 w-48 animate-pulse rounded bg-card-raised" /></div>;
+    return <div className="fixed inset-0 z-50 flex items-end justify-center pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-0 bg-ink"><div className="h-8 w-48 animate-pulse rounded bg-card-raised" /></div>;
   if (user === null)
     return (
       <div className="mx-auto max-w-md pt-12 text-center">

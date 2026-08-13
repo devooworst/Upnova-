@@ -224,7 +224,7 @@ export default function LiveCameraStage({ displayName }: { displayName: string }
             onClick={toggleCam}
             aria-label={camOn ? "Turn camera off" : "Turn camera on"}
             data-guide="live-cam-toggle"
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition sm:h-8 sm:w-8 ${
               camOn ? "bg-black/60 text-zinc-100 hover:bg-black/80" : "bg-rose-500/90 text-white hover:bg-rose-400"
             }`}
           >
@@ -234,7 +234,7 @@ export default function LiveCameraStage({ displayName }: { displayName: string }
             onClick={toggleMic}
             aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
             data-guide="live-mic-toggle"
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition sm:h-8 sm:w-8 ${
               micOn ? "bg-black/60 text-zinc-100 hover:bg-black/80" : "bg-rose-500/90 text-white hover:bg-rose-400"
             }`}
           >
