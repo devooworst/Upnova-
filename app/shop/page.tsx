@@ -10,6 +10,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import Link from "next/link";
 import { Search, Tag, Plus, ExternalLink, Package } from "lucide-react";
 import Avatar from "@/components/Avatar";
@@ -108,10 +109,10 @@ export default function ShopPage() {
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {items === null ? (
-          [0, 1, 2, 3].map((i) => <div key={i} className="card-money h-52 animate-pulse" aria-hidden />)
+          [0, 1, 2, 3].map((i) => <div key={i} className="card-shop h-52 animate-pulse" aria-hidden />)
         ) : (
           filtered.map((p) => (
-            <article key={p.id} className={`card-money flex min-w-0 flex-col break-words p-4 ${p.soldOut ? "opacity-60" : ""}`}>
+            <article key={p.id} className={`card-shop flex min-w-0 flex-col break-words p-4 ${p.soldOut ? "opacity-60" : ""}`}>
               {p.media[0] && (
                 <Link href={`/shop/${p.id}`} className="relative mb-3 block aspect-[4/3] overflow-hidden rounded-xl border border-line">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -125,6 +126,8 @@ export default function ShopPage() {
                   </h3>
                   <p className="font-mono text-sm font-medium tracking-[0.08em] text-lime-300">${p.price}</p>
                 </div>
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                <CategoryChip category="shop" />
                 {p.soldOut ? (
                   <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-500">Sold</span>
                 ) : p.external ? (
@@ -132,6 +135,7 @@ export default function ShopPage() {
                     External
                   </span>
                 ) : null}
+                </span>
               </div>
               <p className="mt-1 line-clamp-2 flex-1 text-xs leading-relaxed text-zinc-400">{p.description}</p>
               <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">

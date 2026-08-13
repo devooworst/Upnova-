@@ -186,7 +186,7 @@ export default function GlobalSearch({ variant = "desktop" }: { variant?: "deskt
               {/* compact cross-sections */}
               {results.opportunities.slice(0, 2).map((o) => (
                 <button key={o.id} onClick={() => go(`/opportunities/${o.id}`)} className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-card-raised">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10"><Briefcase className="h-3.5 w-3.5 text-amber-300" /></span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-lime-400/30 bg-lime-400/10"><Briefcase className="h-3.5 w-3.5 text-lime-300" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-zinc-100">{o.title}</span>
                     <span className="block truncate text-xs text-zinc-500">Opportunity · {o.location}{o.budget != null ? ` · $${o.budget}` : ""}</span>
@@ -195,7 +195,7 @@ export default function GlobalSearch({ variant = "desktop" }: { variant?: "deskt
               ))}
               {results.services.slice(0, 2).map((s) => (
                 <button key={s.id} onClick={() => go(`/services/${s.id}`)} className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-card-raised">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-lime-400/30 bg-lime-400/10"><ShoppingBag className="h-3.5 w-3.5 text-lime-300" /></span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-400/30 bg-sky-400/10"><ShoppingBag className="h-3.5 w-3.5 text-sky-300" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-zinc-100">{s.title}</span>
                     <span className="block truncate text-xs text-zinc-500">Service · {s.owner} · from ${s.price}</span>

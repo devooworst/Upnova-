@@ -128,9 +128,19 @@ export default function DbNotificationBell() {
                         ? "bg-transparent"
                         : n.priority === "high"
                           ? "bg-amber-400"
-                          : n.category === "payments"
-                            ? "bg-lime-400"
-                            : "bg-violet-400"
+                          : n.type === "booking"
+                            ? "bg-orange-400"
+                            : n.type === "order"
+                              ? "bg-amber-400"
+                              : n.type.startsWith("preferred")
+                                ? "bg-rose-400"
+                                : n.type.startsWith("project") || n.type === "extension_requested"
+                                  ? "bg-violet-400"
+                                  : ["gig", "opportunity", "application", "application_selected"].includes(n.type) || n.category === "payments"
+                                    ? "bg-lime-400"
+                                    : n.type === "service"
+                                      ? "bg-sky-400"
+                                      : "bg-violet-400"
                     }`}
                   />
                   <span className="min-w-0">

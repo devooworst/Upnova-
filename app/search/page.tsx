@@ -131,7 +131,7 @@ function SearchInner() {
           {/* ---------------- OPPORTUNITIES ---------------- */}
           <section className="card overflow-hidden">
             <p className="flex items-center gap-2 border-b border-line-soft px-5 py-3 text-sm font-bold text-zinc-100">
-              <Briefcase className="h-4 w-4 text-amber-400" /> Opportunities
+              <Briefcase className="h-4 w-4 text-lime-400" /> Opportunities
               <span className="ml-auto font-mono text-[10px] text-zinc-600">{data.opportunities.length}</span>
             </p>
             {data.opportunities.length === 0 ? (
@@ -159,7 +159,7 @@ function SearchInner() {
           {/* ---------------- SERVICES ---------------- */}
           <section className="card overflow-hidden">
             <p className="flex items-center gap-2 border-b border-line-soft px-5 py-3 text-sm font-bold text-zinc-100">
-              <ShoppingBag className="h-4 w-4 text-lime-400" /> Services
+              <ShoppingBag className="h-4 w-4 text-sky-400" /> Services
               <span className="ml-auto font-mono text-[10px] text-zinc-600">{data.services.length}</span>
             </p>
             {data.services.length === 0 ? (

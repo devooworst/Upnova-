@@ -8,6 +8,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import AvailabilityStrip from "@/components/AvailabilityStrip";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -206,10 +207,10 @@ export default function ServicesPage() {
       {/* listings — money cards, receipt DNA */}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {items === null ? (
-          [0, 1, 2, 3].map((i) => <div key={i} className="card-money h-44 animate-pulse" aria-hidden />)
+          [0, 1, 2, 3].map((i) => <div key={i} className="card-service h-44 animate-pulse" aria-hidden />)
         ) : (
           filtered.map((s) => (
-            <article key={s.id} className="card-money flex min-w-0 flex-col break-words p-4">
+            <article key={s.id} className="card-service flex min-w-0 flex-col break-words p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   {s.promoted && (
@@ -224,11 +225,14 @@ export default function ServicesPage() {
                     From ${s.price}
                   </p>
                 </div>
-                {s.trustRequired === "high-trust" && (
-                  <span className="shrink-0 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300">
-                    High-Trust
-                  </span>
-                )}
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <CategoryChip category="service" />
+                  {s.trustRequired === "high-trust" && (
+                    <span className="shrink-0 rounded-full border border-lime-400/40 bg-lime-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-lime-300">
+                      High-Trust
+                    </span>
+                  )}
+                </span>
               </div>
               <p className="mt-1.5 flex-1 text-xs leading-relaxed text-zinc-400">{s.description}</p>
               {menuSummary(s.config?.menu) && (

@@ -188,6 +188,33 @@ body {
   @apply rounded-xl border border-line border-t-2 border-t-lime-400/35 bg-card shadow-card transition-colors hover:border-t-lime-400/60;
 }
 
+/* ------------------- CATEGORY COLOR SYSTEM (cards) -------------------
+   Same geometry as .card-money — only the top-edge hue differs, so a
+   card's TYPE reads at a glance: lime=opportunity · sky=service ·
+   amber=shop · violet=work · orange=booking · rose=client · zinc=activity.
+   Single source of truth for chips/dots/labels: lib/categories.tsx.  */
+.card-opportunity {
+  @apply rounded-xl border border-line border-t-2 border-t-lime-400/35 bg-card shadow-card transition-colors hover:border-t-lime-400/60;
+}
+.card-service {
+  @apply rounded-xl border border-line border-t-2 border-t-sky-400/35 bg-card shadow-card transition-colors hover:border-t-sky-400/60;
+}
+.card-shop {
+  @apply rounded-xl border border-line border-t-2 border-t-amber-400/35 bg-card shadow-card transition-colors hover:border-t-amber-400/60;
+}
+.card-work {
+  @apply rounded-xl border border-line border-t-2 border-t-violet-400/35 bg-card shadow-card transition-colors hover:border-t-violet-400/60;
+}
+.card-booking {
+  @apply rounded-xl border border-line border-t-2 border-t-orange-400/35 bg-card shadow-card transition-colors hover:border-t-orange-400/60;
+}
+.card-client {
+  @apply rounded-xl border border-line border-t-2 border-t-rose-400/35 bg-card shadow-card transition-colors hover:border-t-rose-400/60;
+}
+.card-activity {
+  @apply rounded-xl border border-line border-t-2 border-t-zinc-500/35 bg-card shadow-card transition-colors hover:border-t-zinc-500/60;
+}
+
 .card-people {
   @apply rounded-3xl border border-line bg-card shadow-card;
 }

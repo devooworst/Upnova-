@@ -10,6 +10,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import Link from "next/link";
 import { Disc3, Plus, FileKey2, MessageSquare, Check } from "lucide-react";
 import Avatar from "@/components/Avatar";
@@ -123,12 +124,12 @@ export default function WorksPage() {
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {works === null ? (
-              [0, 1].map((i) => <div key={i} className="card-money h-44 animate-pulse" aria-hidden />)
+              [0, 1].map((i) => <div key={i} className="card-work h-44 animate-pulse" aria-hidden />)
             ) : (
               filtered.map((w) => {
                 const from = w.options.filter((o) => o.price != null && o.price > 0).sort((a, b) => a.price! - b.price!)[0];
                 return (
-                  <article key={w.id} className={`card-money flex min-w-0 flex-col break-words p-4 ${w.exclusivelyLicensed ? "opacity-70" : ""}`}>
+                  <article key={w.id} className={`card-work flex min-w-0 flex-col break-words p-4 ${w.exclusivelyLicensed ? "opacity-70" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{kindLabel(w.kind)}</p>
@@ -139,11 +140,14 @@ export default function WorksPage() {
                           {w.exclusivelyLicensed ? "Exclusively licensed" : from ? `Licenses from $${from.price}` : w.options.some((o) => o.price === 0) ? "Free option available" : "Custom licensing"}
                         </p>
                       </div>
-                      {w.watermarked && (
-                        <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-500" title={`Tagged streaming preview · ${w.previewLength}s`}>
-                          Tagged preview
-                        </span>
-                      )}
+                      <span className="flex shrink-0 flex-col items-end gap-1">
+                        <CategoryChip category="work" />
+                        {w.watermarked && (
+                          <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-500" title={`Tagged streaming preview · ${w.previewLength}s`}>
+                            Tagged preview
+                          </span>
+                        )}
+                      </span>
                     </div>
                     <p className="mt-1.5 line-clamp-2 flex-1 text-xs leading-relaxed text-zinc-400">{w.description}</p>
                     <p className="mt-2 flex flex-wrap gap-1.5">

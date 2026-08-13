@@ -120,7 +120,7 @@ export default function OpportunitiesTab({ isOwner }: { isOwner: boolean }) {
         ) : (
           <div className="space-y-2.5">
             {completed.map((w) => (
-              <article key={w.id} className="card-money flex flex-wrap items-center gap-3 p-4">
+              <article key={w.id} className="card-opportunity flex flex-wrap items-center gap-3 p-4">
                 <div className="min-w-0 flex-1">
                   <h4 className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-zinc-100">
                     {w.title}

@@ -125,7 +125,7 @@ export default function ProductPage() {
         <Link href="/shop" className="btn-ghost mt-4 inline-flex px-4 py-1.5 text-xs">Browse the Shop</Link>
       </div>
     );
-  if (!p) return <div className="card-money mx-auto h-64 max-w-2xl animate-pulse" aria-hidden />;
+  if (!p) return <div className="card-shop mx-auto h-64 max-w-2xl animate-pulse" aria-hidden />;
 
   const s = p.sellerStats;
 
@@ -137,7 +137,7 @@ export default function ProductPage() {
 
       <PublishedBanner path={`/shop/${p.id}`} title={`${p.title} — $${p.price} on Mavyn`} text={p.external ? "Sold on the seller's website" : "Funds held until delivery"} />
 
-      <article className="card-money p-5 sm:p-6">
+      <article className="card-shop p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 capitalize">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, Store, Briefcase } from "lucide-react";
 import CreatorCard from "@/components/CreatorCard";
@@ -128,7 +129,7 @@ export default function DiscoverClient() {
                       <div className="flex items-center gap-3">
                         <Avatar src={c.avatar} initials={c.initials} gradient={c.gradient} size="sm" />
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-bold text-zinc-100">{svc.title}</h3>
+                          <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-100">{svc.title} <CategoryChip category="service" /></h3>
                           <p className="flex items-center gap-1 text-xs text-zinc-500">
                             by {c.name} {c.verified && <VerifiedBadge />}
                           </p>

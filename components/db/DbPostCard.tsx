@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CATEGORY_META } from "@/lib/categories";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, MessageCircle, MapPin, Send, Bookmark, MoreHorizontal, EyeOff, Ban } from "lucide-react";
@@ -17,10 +18,10 @@ import { Flag, ArrowUpRight } from "lucide-react";
 /* linked feed items: the post is a POINTER to one canonical object —
    the CTA opens the real thing (book/apply/buy/license), never a copy */
 const REF_META: Record<string, { label: string; cta: string; tone: string; href: (id: string) => string }> = {
-  service: { label: "Service", cta: "Book / Request", tone: "bg-lime-400", href: (id) => `/services/${id}` },
-  opportunity: { label: "Opportunity", cta: "Apply", tone: "bg-amber-400", href: (id) => `/opportunities/${id}` },
-  product: { label: "Product", cta: "Buy", tone: "bg-lime-400", href: (id) => `/shop/${id}` },
-  work: { label: "Work", cta: "License", tone: "bg-lime-400", href: (id) => `/works/${id}` },
+  service: { label: "Service", cta: "Book / Request", tone: CATEGORY_META.service.dot, href: (id) => `/services/${id}` },
+  opportunity: { label: "Opportunity", cta: "Apply", tone: CATEGORY_META.opportunity.dot, href: (id) => `/opportunities/${id}` },
+  product: { label: "Product", cta: "Buy", tone: CATEGORY_META.shop.dot, href: (id) => `/shop/${id}` },
+  work: { label: "Work", cta: "License", tone: CATEGORY_META.work.dot, href: (id) => `/works/${id}` },
   event: { label: "Event", cta: "View Event", tone: "bg-amber-400", href: (id) => `/events/${id}` },
   campus: { label: "Campus Market", cta: "View Listing", tone: "bg-violet-400", href: (id) => `/campus/market/${id}` },
 };

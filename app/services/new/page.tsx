@@ -945,7 +945,7 @@ export default function NewServicePage() {
       {stepName === "Preview" && (
         <section className="space-y-3">
           <p className="text-xs text-zinc-500">This is what clients will see. Publish when it looks right.</p>
-          <article className="card-money p-5">
+          <article className="card-service p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-zinc-50">{title || "Untitled service"}</h3>

@@ -490,7 +490,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     <h2 className={`text-sm font-bold ${accent.text} ${headingFont.cls}`}>Services</h2>
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       {services.map((s) => (
-        <article key={s.id} className="card-money flex flex-col p-4">
+        <article key={s.id} className="card-service flex flex-col p-4">
           <h3 className="text-sm font-bold text-zinc-100">
             <Link href={`/services/${s.id}`} className="transition hover:text-lime-300">{s.title}</Link>
           </h3>

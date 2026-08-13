@@ -99,7 +99,7 @@ export default function WorkPage() {
         <Link href="/works" className="btn-ghost mt-4 inline-flex px-4 py-1.5 text-xs">Browse works</Link>
       </div>
     );
-  if (!w) return <div className="card-money mx-auto h-64 max-w-2xl animate-pulse" aria-hidden />;
+  if (!w) return <div className="card-work mx-auto h-64 max-w-2xl animate-pulse" aria-hidden />;
 
   const kindLabel = WORK_KINDS.find((k) => k.id === w.kind)?.label ?? w.kind;
   const isAudio = w.previewUrl?.startsWith("data:audio/");
@@ -112,7 +112,7 @@ export default function WorkPage() {
 
       <PublishedBanner path={`/works/${w.id}`} title={`${w.title} — license on Mavyn`} text="Stream the preview, license on the creator's terms" />
 
-      <article className="card-money p-5 sm:p-6">
+      <article className="card-work p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             {w.coverUrl && (

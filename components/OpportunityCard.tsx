@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import { Flame, ArrowRight, Check, Flag, FolderOpen, X } from "lucide-react";
 import ReportModal from "./ReportModal";
 import Avatar from "./Avatar";
@@ -27,12 +28,13 @@ export default function OpportunityCard({ id }: { id: string }) {
   if (!opp) return null;
 
   return (
-    <article className="card-money relative overflow-hidden">
+    <article className="card-opportunity relative overflow-hidden">
       <div className="p-4">
         {/* stamp row: category + budget stub */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
+            <p className="flex flex-wrap items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">
+              <CategoryChip category="opportunity" />
               {opp.featured && <Flame className="h-3.5 w-3.5" />}
               {opp.featured ? "Featured · " : ""}
               {opp.category}
@@ -156,7 +158,7 @@ STUDENT-FRIENDLY
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
           onClick={() => setPitchOpen(false)}
         >
-          <div className="card-money w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="card-opportunity w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-400">

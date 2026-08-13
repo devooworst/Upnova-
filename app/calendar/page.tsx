@@ -12,6 +12,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
 import { defaultPercentFor } from "@/lib/progressDefaults";
 import Link from "next/link";
@@ -283,7 +284,7 @@ export default function BookingsPage() {
                     <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${STATUS[b.status]?.badge}`}>
                       {STATUS[b.status]?.label}
                     </span>
-                    <span className="shrink-0 text-[11px] font-semibold text-violet-300">View booking →</span>
+                    <span className="shrink-0 text-[11px] font-semibold text-orange-300">View booking →</span>
                   </button>
                 ))}
               </div>
@@ -401,7 +402,7 @@ function PendingCard({ b, onChanged, onOpen }: { b: Booking; onChanged: () => vo
   return (
     <div data-guide={`booking-card-${b.with.handle}`} className="rounded-xl border border-amber-400/25 bg-amber-400/5 p-3">
       <button onClick={onOpen} className="w-full text-left">
-        <p className="text-xs font-bold text-zinc-100">{b.title} — {b.with.displayName}</p>
+        <p className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-zinc-100"><CategoryChip category="booking" /> <span className="min-w-0 truncate">{b.title} — {b.with.displayName}</span></p>
         <p className="mt-0.5 text-[11px] text-zinc-500">
           {new Date(b.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {fmtTime(b.startsAt)} ·{" "}
           <span className="font-mono tracking-[0.08em] text-lime-300">${b.price}</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CategoryChip } from "@/lib/categories";
 import Link from "next/link";
 import {
   Activity as ActivityIcon,
@@ -285,6 +286,10 @@ export default function ActivityPage() {
                         <div className="min-w-0 flex-1">
                           <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
                             <span className="truncate">{i.title}</span>
+                            <CategoryChip
+                              category={i.kind === "booking" ? "booking" : i.kind === "purchase" ? "shop" : i.kind === "application" ? "opportunity" : "work"}
+                              label={i.kind === "booking" ? "Booking" : i.kind === "purchase" ? "Order" : i.kind === "application" ? "Application" : "Project"}
+                            />
                             {attn && (
                               <span className="shrink-0 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">
                                 {attn}

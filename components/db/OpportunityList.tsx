@@ -108,7 +108,7 @@ export default function OpportunityList({ scope = "for-you", compact = false }: 
       {items.map((o) => (
         <article
           key={o.id}
-          className={`card-money p-4 sm:p-5 ${
+          className={`card-opportunity p-4 sm:p-5 ${
             o.posterType === "verified_business" ? "border-l-2 border-l-sky-400/70" : ""
           }`}
         >

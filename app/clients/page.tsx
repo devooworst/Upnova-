@@ -158,7 +158,7 @@ export default function ClientsPage() {
       {/* ================= MY BENEFITS (client side) ================= */}
       <section className="card p-5">
         <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
-          <Star className="h-4 w-4 text-violet-300" /> Where you&apos;re a Preferred Client
+          <Star className="h-4 w-4 text-rose-300" /> Where you&apos;re a Preferred Client
         </h2>
         <p className="mt-0.5 text-[11px] text-zinc-500">
           Providers who personally added you. This is between you and them — it never shows publicly.
@@ -172,7 +172,7 @@ export default function ClientsPage() {
         ) : (
           <div className="mt-3 space-y-2.5">
             {mine.map((m) => (
-              <div key={m.id} className="rounded-xl border border-violet-400/25 bg-violet-400/5 p-3.5">
+              <div key={m.id} className="rounded-xl border border-rose-400/25 bg-rose-400/5 p-3.5">
                 <div className="flex items-center gap-3">
                   <Link href={`/creator/${m.provider.handle}`}>
                     <Avatar src={m.provider.avatarUrl} initials={m.provider.displayName.charAt(0)} size="md" />
@@ -192,7 +192,7 @@ export default function ClientsPage() {
                 <ul className="mt-2.5 space-y-1">
                   {m.benefits.map((b) => (
                     <li key={b.key} className="flex items-center gap-1.5 text-xs text-zinc-300">
-                      <Check className="h-3 w-3 text-violet-300" /> {benefitLabel(b)}
+                      <Check className="h-3 w-3 text-rose-300" /> {benefitLabel(b)}
                     </li>
                   ))}
                 </ul>
@@ -306,7 +306,7 @@ export default function ClientsPage() {
                     <p className="text-sm font-semibold text-zinc-100">
                       {c.displayName}
                       {c.eligible && (
-                        <span className="ml-2 rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-300">
+                        <span className="ml-2 rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-300">
                           Eligible
                         </span>
                       )}

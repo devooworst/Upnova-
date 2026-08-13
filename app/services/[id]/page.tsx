@@ -111,7 +111,7 @@ export default function ServicePage() {
         <Link href="/services" className="btn-ghost mt-4 inline-flex px-4 py-1.5 text-xs">Browse services</Link>
       </div>
     );
-  if (!svc) return <div className="card-money mx-auto h-64 max-w-2xl animate-pulse" aria-hidden />;
+  if (!svc) return <div className="card-service mx-auto h-64 max-w-2xl animate-pulse" aria-hidden />;
 
   const menu = svc.config.menu;
   const s = svc.ownerStats;
@@ -122,7 +122,7 @@ export default function ServicePage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Services
       </Link>
 
-      <article className="card-money p-5 sm:p-6">
+      <article className="card-service p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 capitalize">
