@@ -5,6 +5,7 @@ import { CategoryChip } from "@/lib/categories";
 import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, Store, Briefcase } from "lucide-react";
 import CreatorCard from "@/components/CreatorCard";
+import DiscoverGrid from "@/components/DiscoverGrid";
 import CommunityCard from "@/components/CommunityCard";
 import EventCard from "@/components/EventCard";
 import ReachBadge from "@/components/ReachBadge";
@@ -37,14 +38,29 @@ export default function DiscoverClient() {
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
+  const explicitTab = params.get("tab");
+  const gridChip = explicitTab
+    ? ((
+        { Creators: "people", Services: "services", Opportunities: "opportunities", Events: "events" } as const
+      )[explicitTab as "Creators" | "Services" | "Opportunities" | "Events"] ?? "all")
+    : "all";
+
   return (
     <div className="space-y-5">
       <header className="px-1">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Discover</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 hidden text-sm text-zinc-500 lg:block">
           Search people, services, paid work, and communities on Mavyn.
         </p>
       </header>
+
+      {/* MOBILE + TABLET: the browsing grid — Discover is for scanning,
+          For You is for reading. Desktop keeps the established layout. */}
+      <div className="lg:hidden">
+        <DiscoverGrid initialChip={gridChip} />
+      </div>
+
+      <div className="hidden space-y-5 lg:block">
 
       {/* search */}
       <div className="relative">
@@ -232,6 +248,7 @@ export default function DiscoverClient() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
