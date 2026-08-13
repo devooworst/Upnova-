@@ -78,21 +78,31 @@ export default function PaymentsPage() {
         <button onClick={load} className="btn-ghost px-3 py-2 text-xs" aria-label="Refresh"><RefreshCw className="h-3.5 w-3.5" /></button>
       </header>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {(
-          [
-            ["Total spent", s?.totalSpent, "text-zinc-100"],
-            ["Pending out (secured)", s?.pendingOut, "text-amber-300"],
-            ["Refunded", s?.refunded, "text-zinc-400"],
-            ["Total earned", s?.totalEarned, "text-lime-300"],
-            ["Pending in (secured)", s?.pendingIn, "text-amber-300"],
-          ] as const
-        ).map(([label, n, tone]) => (
-          <div key={label} className="card p-3 text-center">
-            <p className={`font-mono text-lg font-bold tracking-tight ${tone}`}>{n != null ? `$${n}` : "—"}</p>
-            <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+      {/* the two sides of your money, visually separated: sky = you as the
+          CLIENT paying · lime = you as the PROVIDER earning */}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-line border-t-2 border-t-sky-400/40 bg-card p-3">
+          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-sky-300">You paying — as a client</p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+            {([["Total spent", s?.totalSpent, "text-zinc-100"], ["Pending out (secured)", s?.pendingOut, "text-amber-300"], ["Refunded", s?.refunded, "text-zinc-400"]] as const).map(([label, n, tone]) => (
+              <div key={label}>
+                <p className={`font-mono text-lg font-bold tracking-tight ${tone}`}>{n != null ? `$${n}` : "—"}</p>
+                <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+        <div className="rounded-xl border border-line border-t-2 border-t-lime-400/40 bg-card p-3">
+          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-lime-300">You earning — as a provider</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-center">
+            {([["Total earned", s?.totalEarned, "text-lime-300"], ["Pending in (secured)", s?.pendingIn, "text-amber-300"]] as const).map(([label, n, tone]) => (
+              <div key={label}>
+                <p className={`font-mono text-lg font-bold tracking-tight ${tone}`}>{n != null ? `$${n}` : "—"}</p>
+                <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <section className="card overflow-hidden">
@@ -105,7 +115,7 @@ export default function PaymentsPage() {
           <ul className="divide-y divide-line-soft">
             {data.transactions.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${t.direction === "in" ? "border-lime-400/40 bg-lime-400/10 text-lime-300" : "border-line bg-card-raised text-zinc-400"}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${t.direction === "in" ? "border-lime-400/40 bg-lime-400/10 text-lime-300" : "border-sky-400/40 bg-sky-400/10 text-sky-300"}`}>
                   {t.direction === "in" ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -113,7 +123,7 @@ export default function PaymentsPage() {
                     <Link href={recordHref(t.record)} className="hover:underline">{t.title}</Link>
                   </p>
                   <p className="font-mono text-[10px] tracking-[0.06em] text-zinc-500">
-                    {t.direction === "in" ? "from" : "to"}{" "}
+                    {t.direction === "in" ? "received · from" : "you paid · to"}{" "}
                     <Link href={`/creator/${t.with.handle}`} className="text-zinc-400 hover:underline">{t.with.displayName}</Link>
                     {" · "}{new Date(t.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     {t.direction === "out" && t.feeCents > 0 ? ` · incl. $${(t.feeCents / 100).toFixed(2)} fee` : ""}
@@ -122,7 +132,7 @@ export default function PaymentsPage() {
                 <span className={`rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-wide ${STATUS_TONE[t.status] ?? "border-line text-zinc-400"}`}>
                   {t.status} · test
                 </span>
-                <span className={`font-mono text-sm font-bold tracking-[0.06em] ${t.direction === "in" ? "text-lime-300" : "text-zinc-200"}`}>
+                <span className={`font-mono text-sm font-bold tracking-[0.06em] ${t.direction === "in" ? "text-lime-300" : "text-sky-300"}`}>
                   {t.direction === "in" ? "+" : "−"}${((t.amountCents + (t.direction === "out" ? t.feeCents : 0)) / 100).toFixed(2)}
                 </span>
               </li>

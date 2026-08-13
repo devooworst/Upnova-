@@ -232,9 +232,9 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       ) : posts === null ? (
         <Skeleton />
       ) : (
-        <div key={`${tab}-${scope}`} className="animate-fade-up space-y-4">
+        <div key={`${tab}-${scope}`} className="animate-fade-up space-y-6">
           {posts.map((p, i) => (
-            <span key={p.id} className="block space-y-4">
+            <span key={p.id} className="block space-y-6">
               <DbPostCard
                 post={p}
                 flat

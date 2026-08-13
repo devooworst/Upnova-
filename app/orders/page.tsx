@@ -11,6 +11,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PaymentDirection } from "@/components/PaymentDirection";
 import Link from "next/link";
 import { Package, Truck, Flag, MessageSquare, Check, X, RotateCcw, Clock, FileText, ImagePlus } from "lucide-react";
 import Avatar from "@/components/Avatar";
@@ -346,9 +347,22 @@ function OrderCard({
       {/* ------------------------------ actions ------------------------------ */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
         {o.myRole === "buyer" && o.status === "placed" && (
-          <button onClick={() => act(o.id, { action: "pay", expectedTotal: +(o.price * o.qty * 1.05).toFixed(2) })} className="btn-lime px-3.5 py-1.5 text-xs">
-            Pay ${(o.price * o.qty * 1.05).toFixed(2)} — demo payment
-          </button>
+          <span className="flex w-full flex-col gap-2">
+            <PaymentDirection side="paying" name={o.with.displayName} context={o.title} amount={`$${(o.price * o.qty * 1.05).toFixed(2)}`} />
+            <button onClick={() => act(o.id, { action: "pay", expectedTotal: +(o.price * o.qty * 1.05).toFixed(2) })} className="btn-pay w-full justify-center px-3.5 py-1.5 text-xs sm:w-auto sm:self-start">
+              Pay ${(o.price * o.qty * 1.05).toFixed(2)} — demo payment
+            </button>
+          </span>
+        )}
+        {o.myRole === "seller" && ["secured", "preparing", "shipped", "delivered"].includes(o.status) && (
+          <PaymentDirection
+            side="receiving"
+            name={o.with.displayName}
+            context={o.title}
+            status="secured — releases when the buyer confirms"
+            amount={`$${o.price * o.qty}`}
+            className="w-full"
+          />
         )}
         {o.myRole === "buyer" && ["shipped", "delivered"].includes(o.status) && !openDispute && (
           <button onClick={() => act(o.id, { action: "confirm_received" })} className="btn-lime px-3.5 py-1.5 text-xs">

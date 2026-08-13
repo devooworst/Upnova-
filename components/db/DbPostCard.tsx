@@ -170,7 +170,7 @@ export default function DbPostCard({
   const a = post.author;
 
   return (
-    <article className={flat ? "border-b border-line-soft pb-5" : "card-people p-4 sm:p-5"}>
+    <article className={flat ? "border-b border-line pb-6" : "card-people p-4 sm:p-5"}>
       {/* header */}
       <div className="flex items-start gap-3">
         <Link href={`/creator/${a.handle}`} className="shrink-0">
@@ -311,7 +311,7 @@ export default function DbPostCard({
       <TrustChips trust={post.trust} postId={post.id} />
 
       {/* actions — quiet: the content is the star, these are the verbs */}
-      <div className={`flex items-center text-[13px] text-zinc-500 ${flat ? "mt-3.5 gap-6" : "mt-3 gap-5 border-t border-line-soft pt-2.5 text-xs"}`}>
+      <div className={`flex items-center text-[13px] text-zinc-500 ${flat ? "mt-4 gap-6" : "mt-3 gap-5 border-t border-line-soft pt-2.5 text-xs"}`}>
         <button
           onClick={toggleLike}
           aria-label="Like"

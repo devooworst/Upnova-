@@ -8,6 +8,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import { PaymentDirection } from "@/components/PaymentDirection";
 import { CategoryChip } from "@/lib/categories";
 import AvailabilityStrip from "@/components/AvailabilityStrip";
 import { useRouter } from "next/navigation";
@@ -747,7 +748,13 @@ function BookWizard({ service, initialDate, onClose }: { service: ServiceItem; i
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {error}
               </p>
             )}
-            <button onClick={pay} disabled={busy} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+            <PaymentDirection
+              side="paying"
+              name={service.owner.displayName}
+              context={service.title}
+              amount={`$${(subtotal + fee).toFixed(2)}`}
+            />
+            <button onClick={pay} disabled={busy} className="btn-pay w-full justify-center py-2.5 text-sm disabled:opacity-40">
               {busy ? "Processing…" : `Pay $${(subtotal + fee).toFixed(2)}`}
             </button>
           </div>

@@ -15,6 +15,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PaymentDirection } from "@/components/PaymentDirection";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Send, ChevronLeft, Briefcase, Flag, X, Star, Check } from "lucide-react";
@@ -856,9 +857,12 @@ function ProjectPanel({
               </>
             )}
             {project.state === "accepted" && project.myRole === "client" && (
-              <button disabled={busy} onClick={() => setPayOpen(true)} className="btn-lime w-full justify-center py-2 text-sm">
-                Pay ${(project.amount + fee).toFixed(2)}
-              </button>
+              <div className="space-y-2">
+                <PaymentDirection side="paying" name={project.with.displayName} context={project.title} amount={`$${(project.amount + fee).toFixed(2)}`} />
+                <button disabled={busy} onClick={() => setPayOpen(true)} className="btn-pay w-full justify-center py-2 text-sm">
+                  Pay ${(project.amount + fee).toFixed(2)}
+                </button>
+              </div>
             )}
             {project.state === "accepted" && project.myRole === "creator" && (
               <p className="text-xs text-zinc-500">Accepted — waiting for the payment to be secured.</p>
@@ -870,6 +874,14 @@ function ProjectPanel({
             )}
             {project.state === "in_progress" && project.myRole === "creator" && (
               <>
+                <PaymentDirection
+                  side="receiving"
+                  name={project.with.displayName}
+                  context={project.title}
+                  status="secured — releases when the delivery is approved"
+                  amount={`$${project.amount}`}
+                  className="mb-2"
+                />
                 <input
                   value={deliverNote}
                   onChange={(e) => setDeliverNote(e.target.value)}
@@ -1079,7 +1091,7 @@ function ProjectPanel({
                     if (ok) setPaid(true);
                     else setPayOpen(false);
                   }}
-                  className="btn-lime mt-4 w-full justify-center py-2.5 text-sm disabled:opacity-40"
+                  className="btn-pay mt-4 w-full justify-center py-2.5 text-sm disabled:opacity-40"
                 >
                   {busy ? "Processing…" : `Pay $${(project.amount + fee).toFixed(2)}`}
                 </button>

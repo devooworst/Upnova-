@@ -194,7 +194,7 @@ export default function WorkPage() {
                       <span className="text-xs text-zinc-400">
                         {o.price == null ? "Opens the conversation to negotiate terms." : o.price === 0 ? "Free — the record is still created." : `$${o.price} + $${(o.price * 0.05).toFixed(2)} fee = $${(o.price * 1.05).toFixed(2)} (demo payment, held until delivery)`}
                       </span>
-                      <button onClick={() => license(o)} disabled={busy} className="btn-lime px-3.5 py-1.5 text-xs disabled:opacity-40">
+                      <button onClick={() => license(o)} disabled={busy} className={`${o.price != null && o.price > 0 ? "btn-pay" : "btn-lime"} px-3.5 py-1.5 text-xs disabled:opacity-40`}>
                         {busy ? "…" : o.price == null ? "Start conversation" : o.price === 0 ? "Get free license" : `Pay $${(o.price * 1.05).toFixed(2)}`}
                       </button>
                       <button onClick={() => setBuying(null)} className="btn-ghost px-2.5 py-1.5 text-xs">Back</button>

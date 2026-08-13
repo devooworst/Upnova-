@@ -300,7 +300,7 @@ export default function ActivityPage() {
                             {i.myRole} · with {i.with.displayName} (@{i.with.handle})
                             {i.startsAt ? ` · ${new Date(i.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
                             {i.amount != null ? ` · $${i.amount}` : ""}
-                            {i.paymentStatus ? ` · payment ${i.paymentStatus} (test)` : ""}
+                            {i.paymentStatus ? <span className={i.myRole === "provider" || i.myRole === "seller" || i.myRole === "creator" ? "text-lime-400/90" : "text-sky-400/90"}>{` · payment ${i.paymentStatus} (test)`}</span> : ""}
                             <span className="text-zinc-600"> · updated {timeAgo(i.latestUpdate?.at && i.latestUpdate.at > lastAt ? i.latestUpdate.at : lastAt)}</span>
                           </p>
                           {i.latestUpdate && (

@@ -11,6 +11,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useState } from "react";
+import { PaymentDirection } from "@/components/PaymentDirection";
 import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
 import { defaultPercentFor } from "@/lib/progressDefaults";
 import Link from "next/link";
@@ -535,14 +536,24 @@ export default function ProjectPage() {
 
       {/* ---------------- next step ---------------- */}
       {nextStep && (
-        <button
-          disabled={busy}
-          onClick={() => call(`/api/projects/${project.id}`, { action: nextStep.action, expectedAmount: project.amount }, "PATCH")}
-          data-guide="project-primary"
-          className="btn-lime w-full justify-center py-2.5 text-sm"
-        >
-          {nextStep.label}
-        </button>
+        <div className="space-y-2">
+          {nextStep.action === "start" && (
+            <PaymentDirection
+              side="paying"
+              name={project.with.displayName}
+              context={project.title}
+              amount={`$${(project.amount + fee).toFixed(2)}`}
+            />
+          )}
+          <button
+            disabled={busy}
+            onClick={() => call(`/api/projects/${project.id}`, { action: nextStep.action, expectedAmount: project.amount }, "PATCH")}
+            data-guide="project-primary"
+            className={`${nextStep.action === "start" ? "btn-pay" : "btn-lime"} w-full justify-center py-2.5 text-sm`}
+          >
+            {nextStep.label}
+          </button>
+        </div>
       )}
 
       {/* parties + terms — a receipt, money-card DNA */}

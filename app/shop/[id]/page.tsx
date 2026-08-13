@@ -9,6 +9,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useState } from "react";
+import { PaymentDirection } from "@/components/PaymentDirection";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Tag, Star, Lock, Link2, Check, ExternalLink, BadgeCheck, ShieldCheck } from "lucide-react";
@@ -210,7 +211,8 @@ export default function ProductPage() {
               <div className="flex justify-between border-t border-dashed border-line pt-1.5 font-semibold"><dt className="text-zinc-200">Total</dt><dd className="font-mono tracking-[0.08em] text-lime-300">${total.toFixed(2)}</dd></div>
             </dl>
             {buyError && <p className="text-xs font-medium text-rose-300">{buyError}</p>}
-            <button onClick={pay} disabled={busy} className="btn-lime w-full justify-center py-2.5 text-sm disabled:opacity-40">
+            <PaymentDirection side="paying" name={p.seller.displayName} context={p.title} amount={`$${total.toFixed(2)}`} />
+            <button onClick={pay} disabled={busy} className="btn-pay w-full justify-center py-2.5 text-sm disabled:opacity-40">
               {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
             </button>
           </div>

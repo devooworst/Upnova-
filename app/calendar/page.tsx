@@ -12,6 +12,7 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PaymentDirection } from "@/components/PaymentDirection";
 import { CategoryChip } from "@/lib/categories";
 import { EtaPicker, UpdatePreview, combineEta, fmtEta, clampPercent } from "@/components/ProgressComposer";
 import { defaultPercentFor } from "@/lib/progressDefaults";
@@ -556,9 +557,25 @@ function BookingModal({ b, onClose, onChanged }: { b: Booking; onClose: () => vo
           {b.status === "pending" && b.myRole === "client" && (
             <p className="text-xs text-zinc-500">Waiting for {b.with.displayName} to accept your request.</p>
           )}
+          {b.status === "confirmed" && b.myRole === "provider" && (
+            <PaymentDirection
+              side="receiving"
+              name={b.with.displayName}
+              context={b.title}
+              status="secured — releases when the booking completes"
+              amount={`$${(b.price + (b.travelFee ?? 0)).toFixed(2)}`}
+            />
+          )}
           {b.status === "accepted" && b.myRole === "client" && (
             <div>
-              <button disabled={busy} onClick={() => act("pay")} data-guide="booking-pay" className="btn-lime w-full justify-center py-2 text-sm">
+              <PaymentDirection
+                side="paying"
+                name={b.with.displayName}
+                context={b.title}
+                amount={`$${((b.price + (b.travelFee ?? 0)) * 1.05).toFixed(2)}`}
+                className="mb-2"
+              />
+              <button disabled={busy} onClick={() => act("pay")} data-guide="booking-pay" className="btn-pay w-full justify-center py-2 text-sm">
                 Pay ${((b.price + (b.travelFee ?? 0)) * 1.05).toFixed(2)} — secures the booking
               </button>
               <p className="mt-1.5 text-center font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
