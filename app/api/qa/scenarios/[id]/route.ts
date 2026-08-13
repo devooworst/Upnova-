@@ -129,7 +129,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const api: QaApi = async (handle, path, init) => {
       const res = await fetch(origin + path, {
         method: init?.method ?? "GET",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${signDemoToken(handle)}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${signDemoToken(handle)}`,
+          // self-requests must pass Vercel Deployment Protection when it's on
+          ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+            ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+            : {}),
+        },
         body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
       });
       let data: Record<string, unknown> = {};

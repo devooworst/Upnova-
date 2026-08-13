@@ -87,6 +87,33 @@ export async function POST(req: NextRequest) {
   if (gate.status !== 200) return gate;
 
   const BASE = req.nextUrl.origin;
+  /* Vercel Deployment Protection intercepts server→self requests (they
+     carry no SSO cookie). The official escape hatch is the Protection
+     Bypass for Automation secret — attach it when provided. */
+  const BYPASS: Record<string, string> = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+    ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+    : {};
+  const qfetch = (path: string, init: RequestInit = {}) =>
+    fetch(path.startsWith("http") ? path : BASE + path, {
+      ...init,
+      headers: { ...BYPASS, ...((init.headers as Record<string, string>) ?? {}) },
+    });
+  /* PREFLIGHT — if protection still blocks self-requests, say EXACTLY that
+     instead of failing 40 auth steps with unreadable HTML bodies. */
+  {
+    const probe = await qfetch("/api/auth/me");
+    const ct = probe.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) {
+      return Response.json(
+        {
+          error:
+            "The QA runner's self-requests are intercepted before they reach Mavyn (Vercel Deployment Protection). Fix: Vercel → Project Settings → Deployment Protection → either add 'Protection Bypass for Automation' (the secret is exposed to the app as VERCEL_AUTOMATION_BYPASS_SECRET automatically) or disable protection for Preview deployments. Nothing in the app's authentication is broken — the requests never arrive.",
+          probeStatus: probe.status,
+        },
+        { status: 409 }
+      );
+    }
+  }
   const started = Date.now();
   const cats: Category[] = [];
   const cat = (name: string) => {
@@ -96,13 +123,13 @@ export async function POST(req: NextRequest) {
   };
   const tok: Record<string, string> = {};
   const api = async (who: string | null, path: string, init?: { method?: string; body?: unknown }) => {
-    const res = await fetch(BASE + path, {
+    const res = await qfetch(path, {
       method: init?.method ?? "GET",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${who ? tok[who] : "none"}` },
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
     let data: Record<string, unknown> = {};
-    try { data = await res.json(); } catch { /* non-json */ }
+    try { data = await res.json(); } catch { data = { error: `non-JSON response (HTTP ${res.status})` }; }
     return { status: res.status, data };
   };
   const step = (c: Category, name: string, pass: boolean, detail: Partial<StepResult> = {}) => {
@@ -261,7 +288,7 @@ export async function POST(req: NextRequest) {
     // kind (no cookie, no bearer, no storage — a brand-new browser)
     // must resolve to NOBODY. No sticky fallback, no default account,
     // no inherited session — ever.
-    const bare = await fetch(BASE + "/api/auth/me", { headers: {} });
+    const bare = await qfetch("/api/auth/me", { headers: {} });
     const bareData = (await bare.json().catch(() => ({}))) as { user?: unknown };
     step(c, "fresh browser/device (zero credentials) inherits NO session — sign-in screen, not someone's account", bare.status === 200 && bareData.user == null, {
       route: "GET /api/auth/me (no credentials at all)",
@@ -273,14 +300,14 @@ export async function POST(req: NextRequest) {
        actual application as a guest — same layout, nav, feed, search —
        with participation gated by contextual Sign Up / Sign In prompts.
        No separate landing page, no auto-opened login form. ---- */
-    const gHome = await fetch(BASE + "/", { redirect: "manual" });
+    const gHome = await qfetch("/", { redirect: "manual" });
     step(c, "the app itself is public: GET / with zero credentials serves the REAL app shell (200, no redirect to any landing/login)",
       gHome.status === 200, { route: "GET / (no credentials, redirect:manual)", actual: String(gHome.status) });
-    const gWel = await fetch(BASE + "/welcome", { redirect: "manual" });
+    const gWel = await qfetch("/welcome", { redirect: "manual" });
     step(c, "/welcome (old landing + logout destination) now redirects INTO the app — Guest Mode is not a separate page",
       gWel.status >= 300 && gWel.status < 400 && (gWel.headers.get("location") ?? "").replace(BASE, "") === "/", {
       expected: "3xx → /", actual: `${gWel.status} → ${gWel.headers.get("location")}` });
-    const gFeed = await (await fetch(BASE + "/api/feed?tab=foryou")).json();
+    const gFeed = await (await qfetch("/api/feed?tab=foryou")).json();
     step(c, "guests browse the REAL feed — capped preview (guest:true, items present, ≤ guest limit of 12), not unlimited",
       gFeed.guest === true && Array.isArray(gFeed.items) && gFeed.items.length >= 1 && gFeed.items.length <= 12, {
       route: "GET /api/feed (no credentials)", actual: `guest=${gFeed.guest} items=${gFeed.items?.length}` });
@@ -288,22 +315,22 @@ export async function POST(req: NextRequest) {
       typeof gFeed.totalPublic === "number" && gFeed.totalPublic >= (gFeed.items?.length ?? 0), {
       expected: "totalPublic ≥ items shown (powers 'You've seen the preview' card in the feed)",
       actual: `totalPublic=${gFeed.totalPublic} shown=${gFeed.items?.length}` });
-    const gOpp = await fetch(BASE + "/api/opportunities");
-    const gSvc = await fetch(BASE + "/api/services");
-    const gSearch = await (await fetch(BASE + "/api/search?q=lena")).json();
+    const gOpp = await qfetch("/api/opportunities");
+    const gSvc = await qfetch("/api/services");
+    const gSearch = await (await qfetch("/api/search?q=lena")).json();
     step(c, "guests browse opportunities, services, and search public people — same APIs members use",
       gOpp.status === 200 && gSvc.status === 200 && (gSearch.people ?? []).some((p: any) => p.handle === "lena"), {
       actual: `opps=${gOpp.status} services=${gSvc.status} search=${(gSearch.people ?? []).length}` });
     // every participating action requires an account: server enforces 401,
     // the client turns it into the contextual join prompt (never silent)
-    const gPost = await fetch(BASE + "/api/posts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "guest post attempt" }) });
-    const gConv = await fetch(BASE + "/api/conversations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ withHandle: "lena" }) });
-    const gFollow = await fetch(BASE + "/api/follow/" + lena.id, { method: "POST" });
+    const gPost = await qfetch("/api/posts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "guest post attempt" }) });
+    const gConv = await qfetch("/api/conversations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ withHandle: "lena" }) });
+    const gFollow = await qfetch("/api/follow/" + lena.id, { method: "POST" });
     step(c, "guest restrictions hold server-side: post / message / follow all 401 without an account (apply, book, buy gated the same way)",
       gPost.status === 401 && gConv.status === 401 && gFollow.status === 401, {
       actual: `post=${gPost.status} conversation=${gConv.status} follow=${gFollow.status}` });
-    const gl = await fetch(BASE + "/login", { redirect: "manual" });
-    const gs = await fetch(BASE + "/signup", { redirect: "manual" });
+    const gl = await qfetch("/login", { redirect: "manual" });
+    const gs = await qfetch("/signup", { redirect: "manual" });
     step(c, "Sign In and Join pages load directly from Guest Mode (200 each, no loop back)",
       gl.status === 200 && gs.status === 200, { actual: `login=${gl.status} signup=${gs.status}` });
 
@@ -329,10 +356,10 @@ export async function POST(req: NextRequest) {
 
       // REBRAND CONTINUITY: a session issued under the old UpNova cookie
       // name still resolves — same sessions table, legacy name accepted
-      const rawLogin = await fetch(BASE + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: "tonbkeep", password: "Persist-check-2026" }) });
+      const rawLogin = await qfetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: "tonbkeep", password: "Persist-check-2026" }) });
       const setCookie = rawLogin.headers.get("set-cookie") ?? "";
       const cookieToken = /mavyn_session=([^;]+)/.exec(setCookie)?.[1] ?? "";
-      const legacyMe = cookieToken ? await fetch(BASE + "/api/auth/me", { headers: { cookie: `upnova_session=${cookieToken}` } }) : null;
+      const legacyMe = cookieToken ? await qfetch("/api/auth/me", { headers: { cookie: `upnova_session=${cookieToken}` } }) : null;
       const legacyUser = legacyMe ? ((await legacyMe.json()) as any).user : null;
       step(c, "REBRAND CONTINUITY: the same session token under the LEGACY upnova_session cookie name still signs in — old UpNova sessions are Mavyn sessions",
         !!cookieToken && legacyUser?.handle === "tonbkeep", { actual: `token=${!!cookieToken} user=${legacyUser?.handle ?? "null"}` });
@@ -1521,7 +1548,7 @@ export async function POST(req: NextRequest) {
     const tokCustomer = signDemoToken("testcustomer");
     const tokAdmin = signDemoToken("devin"); // the QA Lab operator
     const asTok = async (tok: string, path: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + path, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(path, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       let data: any = {}; try { data = await res.json(); } catch {}
       return { status: res.status, data };
     };
@@ -1606,7 +1633,7 @@ export async function POST(req: NextRequest) {
     const tokCust2 = signDemoToken("testcustomer");
     const tokCrea2 = signDemoToken("testcreator");
     const asT = async (tok: string, path: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + path, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(path, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       let data: any = {}; try { data = await res.json(); } catch {}
       return { status: res.status, data };
     };
@@ -1809,7 +1836,7 @@ export async function POST(req: NextRequest) {
     const tokA3 = signDemoToken("devin");
     const tokCrea3 = signDemoToken("testcreator");
     const as3 = async (tok: string, pth: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       let data: any = {}; try { data = await res.json(); } catch {}
       return { status: res.status, data };
     };
@@ -1856,7 +1883,7 @@ export async function POST(req: NextRequest) {
     const tokNormal = signDemoToken("rachel"); // a normal (non-admin) account
     const tokPersona = signDemoToken("testcustomer");
     const hit = async (tok: string | null, pth: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       return res.status;
     };
     const s1 = await hit(tokNormal, "/api/qa/state");
@@ -1895,7 +1922,7 @@ export async function POST(req: NextRequest) {
     const tCust = signDemoToken("testcustomer");
     const tAdm = signDemoToken("devin");
     const px = async (tok: string, pth: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       let data: any = {}; try { data = await res.json(); } catch {}
       return { status: res.status, data };
     };
@@ -1962,7 +1989,7 @@ export async function POST(req: NextRequest) {
     const tokA4 = signDemoToken("devin");
     const tokC4 = signDemoToken("testcustomer");
     const as4 = async (tok: string, pth: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       let data: any = {}; try { data = await res.json(); } catch {}
       return { status: res.status, data };
     };
@@ -2041,7 +2068,7 @@ export async function POST(req: NextRequest) {
     const c = cat("QA SCENARIO WALKTHROUGHS");
     const tokA = signDemoToken("devin");
     const asA = async (pth: string, init?: { method?: string; body?: unknown }) => {
-      const res = await fetch(BASE + pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokA}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
+      const res = await qfetch(pth, { method: init?.method ?? "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokA}` }, body: init?.body !== undefined ? JSON.stringify(init.body) : undefined });
       let data: any = {}; try { data = await res.json(); } catch {}
       return { status: res.status, data };
     };
@@ -2498,7 +2525,7 @@ export async function POST(req: NextRequest) {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 12_000);
       try {
-        const res = await fetch(BASE + pth, {
+        const res = await qfetch(pth, {
           redirect: "follow",
           signal: ctrl.signal,
           headers: who ? { Authorization: `Bearer ${sweepTok[who]}` } : {},
