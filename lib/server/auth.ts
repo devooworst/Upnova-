@@ -38,7 +38,27 @@ const stickyOn = () => process.env.MAVYN_DEMO_STICKY_SESSION === "1";
    file does. Production deletes db/DEMO_MODE (see README + the file
    itself); until then every instance of this demo accepts demo tokens. */
 const demoModeOn = () =>
-  process.env.MAVYN_DEMO_MODE === "1" || stickyOn() || existsSync(join(process.cwd(), "db", "DEMO_MODE"));
+  process.env.MAVYN_DEMO_MODE === "1" ||
+  stickyOn() ||
+  // Vercel PREVIEW deployments are QA environments by definition — the
+  // Test Center / demo·simulation tooling must be available there for
+  // full-site QA after the migration. Production (VERCEL_ENV=production)
+  // is NOT included: it stays realistic unless MAVYN_DEMO_MODE=1 or the
+  // committed marker file explicitly says otherwise. Tool ACCESS is
+  // still requireQaOperator (dev admins + the three QA personas) — this
+  // flag alone never shows controls to normal users.
+  process.env.VERCEL_ENV === "preview" ||
+  existsSync(join(process.cwd(), "db", "DEMO_MODE"));
+
+/** why demo mode is on — surfaced by /api/debug/session for diagnosis */
+export function demoModeSources(): string[] {
+  const via: string[] = [];
+  if (process.env.MAVYN_DEMO_MODE === "1") via.push("MAVYN_DEMO_MODE env");
+  if (stickyOn()) via.push("sticky-session env (dev)");
+  if (process.env.VERCEL_ENV === "preview") via.push("vercel preview environment");
+  if (existsSync(join(process.cwd(), "db", "DEMO_MODE"))) via.push("db/DEMO_MODE marker file");
+  return via;
+}
 
 /* Signed demo token — the transport that survives BOTH storage-blocked
    embeddings and preview-instance swaps. Format:
