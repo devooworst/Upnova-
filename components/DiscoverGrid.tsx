@@ -1,27 +1,35 @@
 "use client";
 
 /* ------------------------------------------------------------------ */
-/*  DiscoverGrid — the MOBILE/TABLET Discover surface.                 */
+/*  DiscoverGrid — the Discover surface (all widths).                  */
 /*                                                                     */
-/*  Discover is for BROWSING, not consuming: a dense two-column grid   */
-/*  (3 on big phones, 4 on tablets) of small, mixed, type-badged cards */
-/*  — several items visible in the first viewport, tap → detail view.  */
-/*  For You stays the immersive one-post-at-a-time feed; this surface  */
-/*  deliberately looks and behaves nothing like it.                    */
+/*  Discover has ONE job: search people and explore the Mavyn          */
+/*  ecosystem. It is deliberately NOT category navigation — the        */
+/*  sidebar already owns intentional trips to Opportunities /          */
+/*  Services / Shop / Works / etc., so there is no permanent filter    */
+/*  row here. Browsing is a compact, intentionally MIXED grid          */
+/*  (person | work | service, post | opportunity | event…) where the   */
+/*  colored type badge — color + text label, never color alone —       */
+/*  tells you what each tile is, and tapping opens its detail page.    */
 /*                                                                     */
-/*  Everything here is REAL data from the existing APIs (services,     */
-/*  opportunities, shop, works, events, feed authors/photos, search).  */
-/*  Type badges reuse the established category color system — color    */
-/*  never stands alone, every badge carries its text label.            */
+/*  Search is the first-class citizen: results are relevance-ranked    */
+/*  (people/profiles first — searching "Ava Chen" surfaces the         */
+/*  person, then her works, posts, services…), and type filters        */
+/*  appear ONLY inside an active search, to narrow results — they      */
+/*  vanish the moment the query clears.                                */
 /*                                                                     */
-/*  Performance: constant 4:3 thumbnail boxes (zero layout shift),     */
-/*  native lazy-loading, one fetch round per surface.                  */
+/*  Three distinct experiences by design:                              */
+/*    For You  = immersive feed   ·   Discover = exploration grid      */
+/*    Sidebar  = direct navigation                                     */
+/*                                                                     */
+/*  Everything here is REAL data from the existing APIs. Constant 4:3  */
+/*  thumbnails (zero layout shift) + native lazy-loading.              */
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Search, Briefcase, ShoppingBag, Wrench, CalendarDays, Music2, Users, ImageIcon } from "lucide-react";
-import { CATEGORY_META, type ContentCategory } from "@/lib/categories";
+import { CATEGORY_META } from "@/lib/categories";
 import Avatar from "@/components/Avatar";
 
 /* one uniform card model for every content type */
@@ -34,18 +42,6 @@ interface Card {
   image?: string | null;
   avatar?: string | null; // people cards
 }
-
-const CHIPS = [
-  ["all", "All"],
-  ["people", "People"],
-  ["services", "Services"],
-  ["opportunities", "Opportunities"],
-  ["shop", "Shop"],
-  ["events", "Events"],
-  ["works", "Works"],
-  ["posts", "Posts"],
-] as const;
-type Chip = (typeof CHIPS)[number][0];
 
 /* badge styling: marketplace types come straight from the category
    system; events keep Mavyn's amber-events law, people the violet-people
@@ -92,12 +88,23 @@ function interleave(groups: Card[][]): Card[] {
   return out;
 }
 
-export default function DiscoverGrid({ initialChip = "all" }: { initialChip?: Chip }) {
-  const [chip, setChip] = useState<Chip>(initialChip);
+/* relevance for non-people results: exact title → title prefix →
+   word prefix → title contains → meta contains */
+function relevance(card: Card, nq: string): number {
+  const t = card.title.toLowerCase();
+  if (t === nq) return 0;
+  if (t.startsWith(nq)) return 1;
+  if (t.split(/\s+/).some((w) => w.startsWith(nq))) return 2;
+  if (t.includes(nq)) return 3;
+  return card.meta.toLowerCase().includes(nq) ? 4 : 5;
+}
+
+export default function DiscoverGrid() {
   const [q, setQ] = useState("");
   const [browse, setBrowse] = useState<Card[] | null>(null); // no-query catalog
   const [results, setResults] = useState<Card[] | null>(null); // search results
   const [searching, setSearching] = useState(false);
+  const [resultType, setResultType] = useState<"all" | Card["type"]>("all"); // in-search narrowing only
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ---------- browse catalog: one parallel round of the real APIs ---------- */
@@ -156,25 +163,33 @@ export default function DiscoverGrid({ initialChip = "all" }: { initialChip?: Ch
     return () => { alive = false; };
   }, []);
 
-  /* ---------- search: same compact grid, never a feed ---------- */
+  /* ---------- search: relevance-ranked, people first ---------- */
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
     const query = q.trim();
+    setResultType("all"); // narrowing belongs to ONE search, never carries over
     if (!query) { setResults(null); setSearching(false); return; }
     setSearching(true);
     debounce.current = setTimeout(async () => {
       try {
         const d = await fetch(`/api/search?q=${encodeURIComponent(query)}`).then((r) => r.json());
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const cards: Card[] = [
-          ...(d.people ?? []).map((u: any) => ({ key: `u${u.id}`, type: "people" as const, href: `/creator/${u.handle}`, title: u.displayName, meta: u.roleLine || `@${u.handle}`, avatar: u.avatarUrl })),
+        const people: Card[] = (d.people ?? []).map((u: any) => ({ key: `u${u.id}`, type: "people" as const, href: `/creator/${u.handle}`, title: u.displayName, meta: u.roleLine || `@${u.handle}`, avatar: u.avatarUrl }));
+        const rest: Card[] = [
+          ...(d.works ?? []).map((w: any) => ({ key: `w${w.id}`, type: "works" as const, href: `/works/${w.id}`, title: w.title, meta: [w.kind, w.creator].filter(Boolean).join(" · "), image: w.coverUrl ?? null })),
           ...(d.services ?? []).map((s: any) => ({ key: `s${s.id}`, type: "services" as const, href: `/services/${s.id}`, title: s.title, meta: [money(s.price) && `From ${money(s.price)}`, s.owner].filter(Boolean).join(" · ") })),
           ...(d.opportunities ?? []).map((o: any) => ({ key: `o${o.id}`, type: "opportunities" as const, href: `/opportunities/${o.id}`, title: o.title, meta: money(o.budget) ?? "" })),
+          ...(d.products ?? []).map((p: any) => ({ key: `p${p.id}`, type: "shop" as const, href: `/shop/${p.id}`, title: p.title, meta: [money(p.price), p.seller].filter(Boolean).join(" · "), image: p.image ?? null })),
+          ...(d.events ?? []).map((e: any) => ({ key: `e${e.id}`, type: "events" as const, href: `/events/${e.slug ?? e.id}`, title: e.title, meta: [e.startsAt && new Date(e.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }), e.city].filter(Boolean).join(" · "), image: e.imageUrl ?? null })),
           ...(d.communities ?? []).map((c: any) => ({ key: `c${c.id}`, type: "communities" as const, href: `/communities/${c.slug}`, title: c.name, meta: c.description ?? "" })),
           ...(d.posts ?? []).map((p: any) => ({ key: `f${p.id}`, type: "posts" as const, href: `/posts/${p.id}`, title: p.body, meta: p.author ?? "" })),
         ];
         /* eslint-enable @typescript-eslint/no-explicit-any */
-        setResults(cards);
+        /* people lead (a name search should surface the person first),
+           then everything else by how well the title matches */
+        const nq = query.toLowerCase();
+        rest.sort((a, b) => relevance(a, nq) - relevance(b, nq));
+        setResults([...people, ...rest]);
       } catch {
         setResults([]);
       }
@@ -183,15 +198,24 @@ export default function DiscoverGrid({ initialChip = "all" }: { initialChip?: Ch
     return () => { if (debounce.current) clearTimeout(debounce.current); };
   }, [q]);
 
+  const inSearch = results !== null;
   const source = results ?? browse;
+
+  /* type counts — used ONLY for the in-search narrowing pills */
+  const typeCounts = useMemo(() => {
+    const m = new Map<Card["type"], number>();
+    for (const c of results ?? []) m.set(c.type, (m.get(c.type) ?? 0) + 1);
+    return m;
+  }, [results]);
+
   const visible = useMemo(
-    () => (source ?? []).filter((c) => chip === "all" || c.type === chip),
-    [source, chip]
+    () => (source ?? []).filter((c) => !inSearch || resultType === "all" || c.type === resultType),
+    [source, inSearch, resultType]
   );
 
   return (
     <div className="space-y-3" data-guide="discover-grid">
-      {/* search — a first-class part of Discover */}
+      {/* search — the first-class citizen of Discover */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
         <input
@@ -205,34 +229,48 @@ export default function DiscoverGrid({ initialChip = "all" }: { initialChip?: Ch
         />
       </div>
 
-      {/* type chips — one horizontal rail, no vertical real estate */}
-      <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5" data-guide="discover-chips">
-        {CHIPS.map(([id, label]) => (
+      {/* narrowing pills — exist ONLY inside an active search with mixed
+          results; browsing never shows category controls (the sidebar is
+          the intentional way into Opportunities / Services / Shop / …) */}
+      {inSearch && typeCounts.size > 1 && (
+        <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5" data-guide="discover-result-filters">
           <button
-            key={id}
-            onClick={() => setChip(id)}
-            className={`h-9 shrink-0 rounded-full border px-3.5 text-xs font-semibold transition ${
-              chip === id ? "border-zinc-300 bg-zinc-100 text-zinc-900" : "border-line text-zinc-400 hover:border-zinc-600"
+            onClick={() => setResultType("all")}
+            className={`h-8 shrink-0 rounded-full border px-3 text-[11px] font-semibold transition ${
+              resultType === "all" ? "border-zinc-300 bg-zinc-100 text-zinc-900" : "border-line text-zinc-400 hover:border-zinc-600"
             }`}
           >
-            {label}
+            All results · {results!.length}
           </button>
-        ))}
-      </div>
+          {(Object.keys(BADGE) as Card["type"][])
+            .filter((t) => typeCounts.has(t))
+            .map((t) => (
+              <button
+                key={t}
+                onClick={() => setResultType(resultType === t ? "all" : t)}
+                className={`h-8 shrink-0 rounded-full border px-3 text-[11px] font-semibold transition ${
+                  resultType === t ? "border-zinc-300 bg-zinc-100 text-zinc-900" : "border-line text-zinc-400 hover:border-zinc-600"
+                }`}
+              >
+                {BADGE[t].label} · {typeCounts.get(t)}
+              </button>
+            ))}
+        </div>
+      )}
 
-      {/* the grid: 2 cols on phones → 3 on big phones → 4 on tablets */}
+      {/* the grid: 2 cols on phones → 3 → 4 → 5 on desktop */}
       {source === null ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" aria-busy="true">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5" aria-busy="true">
+          {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-card" />
           ))}
         </div>
       ) : visible.length === 0 ? (
         <p className="py-10 text-center text-sm text-zinc-500">
-          {searching ? "Searching…" : results ? "Nothing matched — try another word or category." : "Nothing here yet."}
+          {searching ? "Searching…" : inSearch ? "Nothing matched — try another word." : "Nothing here yet."}
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
           {visible.map((c) => {
             const Icon = PLACEHOLDER_ICON[c.type];
             const badge = BADGE[c.type];

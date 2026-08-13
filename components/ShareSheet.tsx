@@ -12,6 +12,15 @@
 import { useEffect, useState } from "react";
 import { Share2, Link2, Check, Mail, MessageCircle } from "lucide-react";
 
+/* Callers truncate user text with String.slice(), which can cut an emoji
+   (surrogate pair) in half. A lone surrogate makes encodeURIComponent
+   throw "URI malformed" and crash the whole page render — so every
+   string leaving this component gets scrubbed to well-formed Unicode. */
+const wellFormed = (s: string) =>
+  typeof (s as unknown as { toWellFormed?: () => string }).toWellFormed === "function"
+    ? (s as unknown as { toWellFormed: () => string }).toWellFormed().replace(/\uFFFD+$/, "").trimEnd()
+    : s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "").replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1").trimEnd();
+
 export default function ShareSheet({
   path,
   title,
@@ -33,11 +42,13 @@ export default function ShareSheet({
     setCanNative(typeof navigator !== "undefined" && !!navigator.share);
   }, [path]);
 
-  const message = text ? `${title} — ${text}` : title;
+  const safeTitle = wellFormed(title);
+  const safeText = text ? wellFormed(text) : "";
+  const message = safeText ? `${safeTitle} — ${safeText}` : safeTitle;
 
   const native = async () => {
     try {
-      await navigator.share({ title, text: message, url });
+      await navigator.share({ title: safeTitle, text: message, url });
     } catch {
       /* user dismissed — nothing to handle */
     }
@@ -75,7 +86,7 @@ export default function ShareSheet({
         </a>
       ))}
       <a
-        href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(`${message}\n\n${url}`)}`}
+        href={`mailto:?subject=${encodeURIComponent(safeTitle)}&body=${encodeURIComponent(`${message}\n\n${url}`)}`}
         className="btn-ghost px-3 py-1.5 text-xs"
       >
         <Mail className="h-3.5 w-3.5" /> Email

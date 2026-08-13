@@ -2377,8 +2377,15 @@ export async function POST(req: NextRequest) {
       creatorPage.includes("ResponsiveProfile") && profileView.includes("ResponsiveProfile") && !creatorPage.includes("DbCreatorProfile"));
     step(c, "mobile profile implements the required hierarchy: cover → avatar → name/badge → roles → Open to work → campus/class → location/service area → actions → bio → Posts|Services|Portfolio|About tabs with grouped About cards",
       ["mobile-profile-tabs", "Open to work", "Class of", "Serves", "Edit Profile", '"Posts", "Services", "Portfolio", "About"', "Verification", "never shown"].every((m) => mobileProfile.includes(m)));
-    step(c, "discovered & fixed by this pass: Discover's filter rail stacked OFF-CANVAS on phones (results had zero width) — now flex-col below lg, identical row at lg+",
-      read("components/DiscoverClient.tsx").includes("flex-col gap-6 lg:flex-row"));
+    step(c, "Discover is search-first exploration at EVERY width — no permanent category rail (sidebar owns intentional navigation): the legacy tab/filter page is gone, one mixed type-badged grid, and type pills exist ONLY inside active search results",
+      (() => {
+        const dc = read("components/DiscoverClient.tsx");
+        const dg = read("components/DiscoverGrid.tsx");
+        return !dc.includes("discoverCategories") && !dc.includes("FilterGroup") && !dc.includes("lg:hidden") &&
+          dc.includes("DiscoverGrid") && !dg.includes("discover-chips") &&
+          dg.includes("discover-result-filters") && dg.includes("inSearch && typeCounts.size > 1") &&
+          dg.includes("interleave(");
+      })());
     step(c, "discovered & fixed by this pass: /communities hydration mismatch under its Suspense boundary — the deterministic useHydrated gate (same fix as the People page), no suppression anywhere",
       communities.includes("useHydrated") && communities.includes("!hydrated || user === undefined") && !communities.includes("suppressHydrationWarning"));
     step(c, "the Test Center session pill sits ABOVE the bottom nav on touch layouts (bottom-20 → lg:bottom-3) — QA chrome never covers navigation",

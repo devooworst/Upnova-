@@ -18,9 +18,11 @@ export const dynamic = "force-dynamic";
 /*  non-public profiles excluded, blocks excluded in BOTH directions.  */
 /*  Following is NEVER required — any account can find any account.    */
 /*                                                                     */
-/*  Also searches opportunities, services, communities, and posts so   */
-/*  the results page has real sections — same visibility rules the     */
-/*  product already enforces (open opps, public active services…).    */
+/*  Also searches opportunities, services, communities, posts, works,  */
+/*  events, and shop products so results pages and Discover have real  */
+/*  sections — same visibility rules the product already enforces      */
+/*  (open opps, public active services, active works, world-visible    */
+/*  upcoming events, non-archived products…).                          */
 /* ------------------------------------------------------------------ */
 
 const norm = (s: string) => s.toLowerCase().normalize("NFKD");
@@ -45,7 +47,7 @@ export async function GET(req: NextRequest) {
     const full = req.nextUrl.searchParams.get("full") === "1";
     const perSection = full ? 20 : 5;
     if (q.length < 1)
-      return { q: "", people: [], opportunities: [], services: [], communities: [], posts: [] };
+      return { q: "", people: [], opportunities: [], services: [], communities: [], posts: [], works: [], events: [], products: [] };
 
     /* ---------------- blocks: invisible in BOTH directions ---------------- */
     const blockedPair = new Set<string>();
@@ -157,6 +159,73 @@ export async function GET(req: NextRequest) {
       })))
       .filter((p) => p.authorHandle); // drop orphans
 
-    return { q, people, opportunities, services, communities, posts };
+    /* -------------------------------- WORKS --------------------------------
+       Same visibility as GET /api/works: active work + active creator,
+       blocks respected. Matches title/description/kind. */
+    const works = (await db
+      .select({ work: tables.works, profile: tables.profiles, u: tables.users })
+      .from(tables.works)
+      .innerJoin(tables.users, eq(tables.works.creatorId, tables.users.id))
+      .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.works.creatorId))
+      .all())
+      .filter(
+        (r) =>
+          r.work.status === "active" &&
+          r.u.status === "active" &&
+          !blockedPair.has(r.work.creatorId) &&
+          (norm(r.work.title).includes(q) || norm(r.work.description).includes(q) || norm(r.work.kind).includes(q))
+      )
+      .sort((a, b) => b.work.createdAt.getTime() - a.work.createdAt.getTime())
+      .slice(0, perSection)
+      .map((r) => ({ id: r.work.id, title: r.work.title, kind: r.work.kind, coverUrl: r.work.coverUrl, creator: r.profile.displayName }));
+
+    /* -------------------------------- EVENTS --------------------------------
+       Same visibility as GET /api/events: world events (or campus events the
+       organizer made publicly visible), active host, upcoming (6h grace). */
+    const nowMs = Date.now();
+    const events = (await db
+      .select({ event: tables.events, u: tables.users })
+      .from(tables.events)
+      .innerJoin(tables.users, eq(tables.events.hostId, tables.users.id))
+      .all())
+      .filter(
+        (r) =>
+          (!r.event.campusId || r.event.publicVisibility) &&
+          r.event.status === "active" &&
+          r.u.status === "active" &&
+          r.event.startsAt.getTime() > nowMs - 6 * 3_600_000 &&
+          (norm(r.event.title).includes(q) || norm(r.event.description).includes(q) || norm(r.event.city ?? "").includes(q) || norm(r.event.category ?? "").includes(q))
+      )
+      .sort((a, b) => a.event.startsAt.getTime() - b.event.startsAt.getTime())
+      .slice(0, perSection)
+      .map((r) => ({ id: r.event.id, slug: r.event.slug, title: r.event.title, city: r.event.city, startsAt: r.event.startsAt.toISOString(), imageUrl: r.event.imageUrl }));
+
+    /* ------------------------------- PRODUCTS -------------------------------
+       Same visibility as GET /api/products: not archived, active seller,
+       blocks respected. Matches title/description/category. */
+    const products = (await db
+      .select({ product: tables.products, profile: tables.profiles, u: tables.users })
+      .from(tables.products)
+      .innerJoin(tables.users, eq(tables.products.sellerId, tables.users.id))
+      .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.products.sellerId))
+      .all())
+      .filter(
+        (r) =>
+          r.product.status !== "archived" &&
+          r.u.status === "active" &&
+          !blockedPair.has(r.product.sellerId) &&
+          (norm(r.product.title).includes(q) || norm(r.product.description).includes(q) || norm(r.product.category ?? "").includes(q))
+      )
+      .sort((a, b) => b.product.createdAt.getTime() - a.product.createdAt.getTime())
+      .slice(0, perSection)
+      .map((r) => ({
+        id: r.product.id,
+        title: r.product.title,
+        price: r.product.price,
+        image: (() => { try { return (JSON.parse(r.product.media) as string[])[0] ?? null; } catch { return null; } })(),
+        seller: r.profile.displayName,
+      }));
+
+    return { q, people, opportunities, services, communities, posts, works, events, products };
   });
 }
