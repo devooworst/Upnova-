@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   FlaskConical,
@@ -63,20 +63,96 @@ export default function SimulationPage() {
   const [ftBusy, setFtBusy] = useState(false);
   const [ft, setFt] = useState<{ summary: { passed: number; failed: number; blocked: number; notTested?: number; critical?: number; durationMs: number }; categories: { name: string; ok: boolean; passed?: number; failed?: number; blocked?: number; notTested?: number; steps: { name: string; status: string; expected?: string; actual?: string; route?: string; record?: string; severity?: string }[] }[] } | null>(null);
   const [ftOpen, setFtOpen] = useState<string | null>(null);
+  const [ftNote, setFtNote] = useState<string | null>(null);
   const runFullTest = async () => {
     setFtBusy(true);
     setFt(null);
+    setFtNote(null);
+    // the POST does the work; the POLL makes the run interruption-proof —
+    // if this tab is discarded, the network drops, or the component
+    // remounts (all normal on phones), the finished results are recovered
+    // from the server's persisted record instead of being lost.
+    const kicked = Date.now();
+    startFtPoll(kicked);
     try {
       const res = await fetch("/api/demo/fulltest", { method: "POST" });
       const d = await res.json();
-      if (res.ok) setFt(d);
-      else setAdvMsg(`✗ ${d.error || "Full test could not run"}`);
+      if (res.ok) {
+        stopFtPoll();
+        setFt(d);
+        setFtBusy(false);
+      } else if (res.status === 409 && String(d.error || "").includes("already in progress")) {
+        setFtNote("A run is already in progress — waiting for its results…"); // keep polling
+      } else {
+        stopFtPoll();
+        setAdvMsg(`✗ ${d.error || "Full test could not run"}`);
+        setFtBusy(false);
+      }
     } catch {
-      setAdvMsg("✗ Network error running the full test");
+      // connection lost mid-run (classic on mobile) — the poll takes over
+      setFtNote("Connection dropped while the run was in progress — recovering results…");
     }
-    setFtBusy(false);
     refresh();
   };
+
+  const ftPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopFtPoll = () => {
+    if (ftPollRef.current) clearInterval(ftPollRef.current);
+    ftPollRef.current = null;
+  };
+  const startFtPoll = (since: number) => {
+    stopFtPoll();
+    const deadline = Date.now() + 10 * 60_000;
+    ftPollRef.current = setInterval(async () => {
+      if (Date.now() > deadline) {
+        stopFtPoll();
+        setFtBusy(false);
+        setFtNote("The run did not finish within 10 minutes — it was likely killed by a platform timeout. Check the server logs.");
+        return;
+      }
+      try {
+        const r = await fetch("/api/demo/fulltest");
+        if (!r.ok) return;
+        const rec = (await r.json()) as { status?: string; startedAt?: number; finishedAt?: number; payload?: typeof ft };
+        if (rec.status === "done" && rec.payload && (rec.finishedAt ?? 0) >= since - 60_000) {
+          stopFtPoll();
+          setFt(rec.payload);
+          setFtBusy(false);
+          setFtNote(null);
+        }
+      } catch {
+        /* transient — keep polling */
+      }
+    }, 5000);
+  };
+
+  // MOUNT RESTORE — a phone coming back to this page mid- or post-run
+  // picks up exactly where things stand instead of showing a blank panel
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/demo/fulltest");
+        if (!r.ok || !alive) return;
+        const rec = (await r.json()) as { status?: string; startedAt?: number; finishedAt?: number; payload?: typeof ft };
+        if (rec.status === "running" && rec.startedAt && Date.now() - rec.startedAt < 8 * 60_000) {
+          setFtBusy(true);
+          setFtNote("A QA run started earlier is still in progress — results will appear here when it finishes.");
+          startFtPoll(rec.startedAt);
+        } else if (rec.status === "done" && rec.payload) {
+          setFt(rec.payload);
+          if (rec.finishedAt) setFtNote(`Results restored from the run finished at ${new Date(rec.finishedAt).toLocaleTimeString()}.`);
+        }
+      } catch {
+        /* no record yet */
+      }
+    })();
+    return () => {
+      alive = false;
+      stopFtPoll();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const advanceClock = async (ms: number, label: string, scope?: "qa") => {
     setBusy(true);
     const res = await fetch("/api/demo/clock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advanceMs: ms, ...(scope ? { scope } : {}) }) });
@@ -217,6 +293,7 @@ export default function SimulationPage() {
           <button onClick={runFullTest} disabled={ftBusy} className="btn-lime shrink-0 rounded-md px-5 py-2.5 text-sm disabled:opacity-50">
             {ftBusy ? "Running…" : "Run Full Website QA"}
           </button>
+          {ftNote && <p className="w-full text-[11px] text-amber-300">{ftNote}</p>}
         </div>
         {ft && (
           <div className="p-5">

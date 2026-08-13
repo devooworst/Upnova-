@@ -68,7 +68,7 @@ export default function DemoModeSwitch() {
   if (!user || !user.demoTools) {
     return (
       <span
-        className="ml-1 hidden rounded border border-line px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.15em] text-zinc-500 sm:inline"
+        className="ml-1 inline rounded border border-line px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.15em] text-zinc-500"
         title="Demo deployment — simulated payments and responses. No real money moves."
       >
         demo
@@ -77,7 +77,7 @@ export default function DemoModeSwitch() {
   }
 
   return (
-    <div ref={ref} className="relative ml-1 hidden sm:block">
+    <div ref={ref} className="relative ml-1">
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
@@ -100,7 +100,7 @@ export default function DemoModeSwitch() {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-line bg-card p-2 shadow-xl">
+        <div className="fixed inset-x-3 top-16 z-50 max-h-[70dvh] overflow-y-auto rounded-xl border border-line bg-card p-2 shadow-xl sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-72">
           <p className="px-2 pb-1.5 pt-1 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Testing mode — this account
           </p>

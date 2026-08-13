@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
+import { kvGetJson, kvSetJson } from "@/lib/server/kv";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError, isDemoMode } from "@/lib/server/auth";
+import { requireUser, guarded, ApiError, isDemoMode, requireQaOperator } from "@/lib/server/auth";
 import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
 import { readEarlyAccess, writeEarlyAccess, readRelease, writeRelease } from "@/lib/server/preferred";
@@ -24,7 +25,7 @@ import { signDemoToken } from "@/lib/server/auth";
 const runNonce = () => Date.now().toString(36).slice(-6);
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /* ------------------------------------------------------------------ */
 /* FULL MAVYN SYSTEM TEST — the Test Center "game mode" backend.      */
@@ -77,6 +78,20 @@ const PLANNED_CATEGORIES = [
   "DATABASE INTEGRITY",
 ];
 
+/** GET — the LATEST run record. The client polls this, so a run started
+ *  on a phone survives tab discards, dropped connections, remounts, and
+ *  navigation: whatever happens to the original request, the finished
+ *  results are recoverable from here. */
+export async function GET() {
+  return guarded(async () => {
+    if (!isDemoMode()) throw new ApiError(404, "Not found");
+    await requireQaOperator();
+    return await kvGetJson<Record<string, unknown>>(FULLTEST_KEY, { status: "none" });
+  });
+}
+
+const FULLTEST_KEY = "qa:fulltest:latest";
+
 export async function POST(req: NextRequest) {
   const gate = await guarded(async () => {
     if (!isDemoMode()) throw new ApiError(404, "Not found");
@@ -85,6 +100,13 @@ export async function POST(req: NextRequest) {
     return { ok: true };
   });
   if (gate.status !== 200) return gate;
+
+  // one run at a time — a double-tap on a phone must not start two
+  const prior = await kvGetJson<{ status?: string; startedAt?: number }>(FULLTEST_KEY, {});
+  if (prior.status === "running" && prior.startedAt && Date.now() - prior.startedAt < 8 * 60_000)
+    return Response.json({ error: "A Full Website QA run is already in progress — its results will appear when it finishes." }, { status: 409 });
+  const runStartedAt = Date.now();
+  await kvSetJson(FULLTEST_KEY, { status: "running", startedAt: runStartedAt });
 
   const BASE = req.nextUrl.origin;
   /* Vercel Deployment Protection intercepts server→self requests (they
@@ -2644,7 +2666,7 @@ export async function POST(req: NextRequest) {
     critical: all.filter((s) => s.status === "FAILED" && s.severity === "CRITICAL").length,
     durationMs: Date.now() - started,
   };
-  return Response.json({
+  const payload = {
     summary,
     categories: cats.map((c) => ({
       name: c.name,
@@ -2655,5 +2677,9 @@ export async function POST(req: NextRequest) {
       notTested: c.steps.filter((s) => s.status === "NOT_TESTED").length,
       steps: c.steps,
     })),
-  });
+  };
+  // persist BEFORE responding — if this response never reaches a phone
+  // (dropped connection, discarded tab), the poller still gets the truth
+  await kvSetJson(FULLTEST_KEY, { status: "done", startedAt: runStartedAt, finishedAt: Date.now(), payload });
+  return Response.json(payload);
 }
