@@ -39,7 +39,11 @@ const nextConfig = {
           // (No frame-blocking headers: the app legitimately runs embedded.)
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=()" },
+          // camera/microphone are allowed for THIS origin only — Mavyn Live's
+          // on-stage capture needs them. An empty allowlist here silently
+          // vetoed getUserMedia with NotAllowedError no matter what the
+          // user's browser permissions said. payment/usb stay disabled.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), payment=(), usb=()" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
         ],
       },

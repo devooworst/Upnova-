@@ -30,13 +30,32 @@ function explain(err: unknown): { reason: string; detail: string; retryable: boo
   const name = err instanceof DOMException ? err.name : err instanceof Error ? err.name : "";
   switch (name) {
     case "NotAllowedError":
-    case "PermissionDeniedError":
+    case "PermissionDeniedError": {
+      // NotAllowedError covers TWO different worlds: the user/browser said
+      // no, OR the page itself is vetoed by a Permissions-Policy header /
+      // iframe allow attribute. Blaming the user for a site-level block
+      // sent people digging through browser settings that were already
+      // correct — check the document's own feature policy and say which
+      // one it actually is.
+      try {
+        const fp = (document as unknown as { featurePolicy?: { allowsFeature(f: string): boolean } }).featurePolicy;
+        if (fp && !fp.allowsFeature("camera"))
+          return {
+            reason: "Blocked by the site's security policy",
+            detail:
+              "This deployment's Permissions-Policy (or an embedding frame) forbids camera access for the page itself — no browser setting can override it. This is a site configuration issue, not your browser.",
+            retryable: false,
+          };
+      } catch {
+        /* featurePolicy API unavailable — fall through to the generic case */
+      }
       return {
         reason: "Camera & microphone blocked",
         detail:
           "You (or the browser) denied access. Allow camera and microphone for this site in the address-bar permissions, then try again.",
         retryable: true,
       };
+    }
     case "NotFoundError":
     case "DevicesNotFoundError":
       return {
