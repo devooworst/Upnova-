@@ -1,9 +1,14 @@
 import { execSync } from "child_process";
 
 let buildCommit = "unknown";
-try {
-  buildCommit = execSync("git rev-parse --short HEAD", { cwd: process.cwd() }).toString().trim();
-} catch {}
+if (process.env.VERCEL_GIT_COMMIT_SHA) {
+  // Vercel build containers may not carry .git — the platform provides the SHA
+  buildCommit = process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7);
+} else {
+  try {
+    buildCommit = execSync("git rev-parse --short HEAD", { cwd: process.cwd() }).toString().trim();
+  } catch {}
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
