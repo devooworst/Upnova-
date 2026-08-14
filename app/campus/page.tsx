@@ -32,16 +32,26 @@ import { creators, campusOrgs } from "@/lib/data";
 /* Booking / Payment systems.                                          */
 /* ------------------------------------------------------------------ */
 
+/* FOUR doors, not eight — one tile row: Marketplace (a real link) plus
+   three sections. Campus Services lives inside Opportunities (same
+   money system); Student Groups, Organizations and Campus Questions
+   are CHANNEL CATEGORIES inside Communities (exactly like Study Talk
+   and Late Night Conversations) — nothing was removed, only the
+   competing navigation. */
 const sections = [
-  { id: "communities", emoji: "💬", label: "Communities", desc: "Interest-based conversations" },
-  { id: "groups", emoji: "📚", label: "Student Groups", desc: "Study groups, orgs & clubs" },
-  { id: "services", emoji: "🛍️", label: "Campus Services", desc: "Find students who offer services" },
-  { id: "opps", emoji: "💰", label: "Opportunities", desc: "Jobs, gigs & collaborations" },
-  { id: "orgs", emoji: "🏛️", label: "Organizations", desc: "Student organizations & groups" },
-  { id: "events", emoji: "🎉", label: "Events", desc: "What's happening on campus" },
-  { id: "questions", emoji: "📚", label: "Campus Questions", desc: "Questions, advice & info" },
+  { id: "communities", label: "Communities", desc: "Chats · groups · orgs · questions" },
+  { id: "opps", label: "Opportunities", desc: "Gigs, collabs & student services" },
+  { id: "events", label: "Events", desc: "What's happening on campus" },
 ] as const;
 type SectionId = (typeof sections)[number]["id"];
+
+/* channel categories folded into Communities — selecting one swaps the
+   chat pane for that content, inside the same panel */
+const CAMPUS_LIFE_CHANNELS = [
+  { id: "#groups", name: "Student Groups" },
+  { id: "#orgs", name: "Organizations" },
+  { id: "#questions", name: "Campus Questions" },
+] as const;
 
 /* ---- 💬 interest communities: for talking, not selling ---- */
 const interestCommunities = [
@@ -163,7 +173,9 @@ export default function CampusPage() {
   const ava = creators.find((c) => c.id === "ava")!;
   const services = campusServices.filter((s) => !svcFilter || s.category === svcFilter);
   const chat = communityChats[community] ?? [];
-  const activeCommunity = interestCommunities.find((c) => c.id === community)!;
+  const specialChannel = CAMPUS_LIFE_CHANNELS.find((c) => c.id === community) ?? null;
+  const activeCommunity =
+    interestCommunities.find((c) => c.id === community) ?? interestCommunities[0];
 
   /* ---------------- locked: free verification first ---------------- */
   // session still being checked — decide NOTHING yet (no locked-state flash)
@@ -240,38 +252,38 @@ export default function CampusPage() {
   /* ---------------- the campus ---------------- */
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <header>
-        <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-400">
-          <GraduationCap className="h-3.5 w-3.5" /> your campus
-        </p>
-        <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{user?.campus?.name ?? "Bowie State University"}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-              {user?.campus ? (
-                <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-violet-300">
-                  {user.campus.affiliation === "alumni" ? "Alumni" : user.campus.affiliation === "faculty_staff" ? "Faculty / Staff" : "Current Student"}
-                  {user.campus.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
-                </span>
-              ) : (
-                <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-amber-300" title="DEMO MODE — you are not verified; access is open for testing only">
-                  Demo access — not verified
-                </span>
-              )}
-              <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> 2,841 verified students</span>
-              <span className="flex items-center gap-1 text-violet-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" /> 116 online
+      {/* COMPACT header — one tight block, not a hero. The page's real
+          content (channels + live chat) starts one tile-row below. */}
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <GraduationCap className="h-4 w-4 shrink-0 text-violet-400" />
+            <h1 className="text-lg font-bold leading-tight tracking-tight text-zinc-50">{user?.campus?.name ?? "Bowie State University"}</h1>
+            {user?.campus ? (
+              <span className="rounded-full border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-violet-300">
+                {user.campus.affiliation === "alumni" ? "Alumni" : user.campus.affiliation === "faculty_staff" ? "Faculty / Staff" : "Current Student"}
+                {user.campus.gradYear ? ` · Class of ${user.campus.gradYear}` : ""}
               </span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {user?.campus && <AcademicProfileCard />}
-            {!!user?.campus && user.campus.affiliation !== "alumni" && user.campus.affiliation !== "faculty_staff" && (
-              <button onClick={graduate} className="btn-ghost px-3.5 py-1.5 text-xs" title="Student → Alumni: nothing is deleted; student-only areas close, the alumni environment opens">
-                I graduated
-              </button>
+            ) : (
+              <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-amber-300" title="DEMO MODE — you are not verified; access is open for testing only">
+                Demo access — not verified
+              </span>
             )}
           </div>
+          <p className="mt-0.5 flex flex-wrap items-center gap-3 pl-6 text-[11px] text-zinc-500">
+            <span className="flex items-center gap-1"><Users className="h-3 w-3" /> 2,841 verified students</span>
+            <span className="flex items-center gap-1 text-violet-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse-dot" /> 116 online
+            </span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {user?.campus && <AcademicProfileCard />}
+          {!!user?.campus && user.campus.affiliation !== "alumni" && user.campus.affiliation !== "faculty_staff" && (
+            <button onClick={graduate} className="btn-ghost px-3 py-1.5 text-xs" title="Student → Alumni: nothing is deleted; student-only areas close, the alumni environment opens">
+              I graduated
+            </button>
+          )}
         </div>
       </header>
 
@@ -298,58 +310,54 @@ export default function CampusPage() {
         </div>
       )}
 
-      {/* section nav — conversation, discovery, and commerce are separate layers */}
-      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Campus sections">
-        {/* Marketplace is real and important enough to lead — a live link,
-            not a static module */}
+      {/* ONE consistent tile row — four doors, identical styling. The
+          only highlight is the OPEN section (violet + "open" tag): a
+          visible state with a visible reason, never decoration. */}
+      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Campus sections">
         {user?.campus?.affiliation === "current_student" || !user?.campus?.affiliation ? (
           <Link
             href="/campus/market"
-            className="rounded-lg border border-lime-400/40 bg-lime-400/5 p-2.5 text-left transition hover:bg-lime-400/10"
+            className="rounded-lg border border-line p-2 text-left transition hover:border-zinc-600 hover:bg-card-raised sm:p-2.5"
           >
-            <p className="text-sm font-semibold text-lime-300">Marketplace</p>
-            <p className="mt-0.5 truncate text-[10px] text-zinc-500">Buy · sell · free · trade · auction · borrow</p>
+            <p className="text-sm font-semibold text-zinc-100">Marketplace</p>
+            <p className="mt-0.5 hidden truncate text-[10px] text-zinc-500 sm:block">Buy · sell · trade · borrow</p>
           </Link>
         ) : (
-          <div className="rounded-lg border border-line p-2.5 text-left opacity-60" title="Student-to-student trading is for current students. Your communities, events, and alumni network stay open.">
+          <div className="rounded-lg border border-line p-2 text-left opacity-60 sm:p-2.5" title="Student-to-student trading is for current students. Your communities, events, and alumni network stay open.">
             <p className="text-sm font-semibold text-zinc-500">Marketplace</p>
-            <p className="mt-0.5 truncate text-[10px] text-zinc-600">Current students only</p>
+            <p className="mt-0.5 hidden truncate text-[10px] text-zinc-600 sm:block">Current students only</p>
           </div>
         )}
         {sections.map((s) => (
           <button
             key={s.id}
             onClick={() => setSection(s.id)}
-            className={`rounded-lg border p-2.5 text-left transition ${
+            aria-current={section === s.id ? "true" : undefined}
+            className={`rounded-lg border p-2 text-left transition sm:p-2.5 ${
               section === s.id
                 ? "border-violet-400/50 bg-violet-400/5"
                 : "border-line hover:border-zinc-600 hover:bg-card-raised"
             }`}
           >
-            <p className="text-sm font-semibold text-zinc-100">{s.label}</p>
-            <p className="mt-0.5 truncate text-[10px] text-zinc-500">{s.desc}</p>
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
+              {s.label}
+              {section === s.id && (
+                <span className="rounded-full border border-violet-400/40 px-1.5 py-px font-mono text-[8px] font-bold uppercase tracking-wide text-violet-300">open</span>
+              )}
+            </p>
+            <p className="mt-0.5 hidden truncate text-[10px] text-zinc-500 sm:block">{s.desc}</p>
           </button>
         ))}
       </nav>
 
-      {/* current module heading — campus → choose → interact */}
-      <h2 className="px-1 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
-        Campus {sections.find((s) => s.id === section)?.label.replace("Campus ", "")}
-      </h2>
-
-      {/* ================= COMMUNITIES — for talking ================= */}
-      {section === "communities" && (
-        <a href="/communities?category=Campus%20Social" className="card-people mb-3 block p-4 transition hover:border-violet-400/40 animate-fade-up">
-          <p className="text-sm font-semibold text-zinc-100">Real campus communities are live</p>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            Create your own, set the rules, and choose which identity modes it allows — real name, alias, or anonymous.
-          </p>
-          <span className="mt-2 inline-block font-mono text-[10px] tracking-[0.1em] text-violet-300">OPEN COMMUNITIES →</span>
-        </a>
-      )}
+      {/* ================= COMMUNITIES — for talking =================
+          The callout box that used to sit here was redundant (it promoted
+          the exact panel below it) — its one useful link now lives in the
+          panel header as "All communities →". */}
       {section === "communities" && (
         <div className="card-people flex h-[480px] overflow-hidden animate-fade-up">
           <nav className="hidden w-56 shrink-0 overflow-y-auto border-r border-line-soft p-2 sm:block" aria-label="Interest communities">
+            <p className="px-3 pb-1 pt-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-600">Channels</p>
             {interestCommunities.map((c) => (
               <button
                 key={c.id}
@@ -362,19 +370,97 @@ export default function CampusPage() {
                 <span className="shrink-0 font-mono text-[9px] text-zinc-600">{c.members}</span>
               </button>
             ))}
+            {/* Student Groups, Organizations, Campus Questions live HERE
+                now — channel categories, exactly like Study Talk. Their
+                full content opens in the pane on the right. */}
+            <p className="px-3 pb-1 pt-3 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-600">Campus life</p>
+            {CAMPUS_LIFE_CHANNELS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCommunity(c.id)}
+                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${
+                  community === c.id ? "bg-white/10 font-semibold text-zinc-50" : "text-zinc-400 hover:bg-card-raised hover:text-zinc-200"
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+              </button>
+            ))}
           </nav>
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="border-b border-line-soft px-4 py-3 sm:hidden">
               <select value={community} onChange={(e) => setCommunity(e.target.value)} className="input-dark py-2">
-                {interestCommunities.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                <optgroup label="Channels">
+                  {interestCommunities.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Campus life">
+                  {CAMPUS_LIFE_CHANNELS.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
             <div className="hidden items-center gap-2 border-b border-line-soft px-4 py-3 sm:flex">
-              <p className="text-sm font-semibold text-zinc-100">{activeCommunity.name}</p>
-              <span className="ml-auto font-mono text-[10px] text-zinc-600">{activeCommunity.members} members</span>
+              <p className="text-sm font-semibold text-zinc-100">{specialChannel ? specialChannel.name : activeCommunity.name}</p>
+              {!specialChannel && <span className="font-mono text-[10px] text-zinc-600">{activeCommunity.members} members</span>}
+              <a href="/communities?category=Campus%20Social" className="ml-auto font-mono text-[9px] font-semibold tracking-[0.1em] text-violet-300 hover:text-violet-200">
+                ALL COMMUNITIES →
+              </a>
             </div>
+            {/* CHANNEL CATEGORIES — Student Groups / Organizations /
+                Campus Questions render their full content right here in
+                the pane, like any other channel. Nothing was removed. */}
+            {specialChannel ? (
+              <div className="flex-1 overflow-y-auto p-4">
+                {community === "#groups" && <CampusGroups />}
+                {community === "#orgs" && (
+        <div className="animate-fade-up">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {campusOrgs.map((org) => (
+              <Link key={org.id} href={`/campus/${org.id}`} className="card-people card-lift overflow-hidden hover:border-zinc-600">
+                <div className={`h-14 bg-gradient-to-br ${org.gradient} opacity-70`} />
+                <div className="p-4">
+                  <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${org.gradient}`}>
+                    {org.emoji}
+                  </span>
+                  <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-zinc-100">
+                    {org.name}
+                    {org.verified && <span className="text-sky-400" title="Verified Organization">✓</span>}
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {org.verified ? org.category : "Community Group"} · {org.members} members
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
+            ✓ Verified Organization means the org is legitimate — it never proves who is a member.
+            Membership verification comes in V2, approved by org admins.
+          </p>
+        </div>
+                )}
+                {community === "#questions" && (
+        <div className="space-y-3 animate-fade-up">
+          <a href="/communities/bowie-campus-questions" className="card-people block p-5 transition hover:border-violet-400/40">
+            <p className="text-sm font-semibold text-zinc-100">Campus Questions is now a community</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+              Ask with your profile, an alias, or anonymously — the community decides nothing about who you are, and
+              moderators keep it safe. Your question, your visibility level.
+            </p>
+            <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-400 px-4 py-1.5 text-xs font-bold text-zinc-950">
+              Open Campus Questions →
+            </span>
+          </a>
+          <p className="px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-600">
+            Real name · alias · anonymous — anonymous to the community, always accountable to Mavyn
+          </p>
+        </div>
+                )}
+              </div>
+            ) : (
+              <>
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
               {chat.length === 0 && (
                 <p className="pt-10 text-center text-xs text-zinc-600">Quiet in here — start the conversation.</p>
@@ -429,12 +515,29 @@ export default function CampusPage() {
                 <Send className="h-4 w-4" />
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* ================= 🛍️ CAMPUS SERVICES — a directory, not a chat ================= */}
-      {section === "services" && (
+
+      {/* ================= 💰 CAMPUS OPPORTUNITIES ================= */}
+      {section === "opps" && (
+        <div className="space-y-4 animate-fade-up">
+          <p className="text-sm text-zinc-500">
+            Paid work, gigs, and collaborations on campus — same protected system as everywhere on Mavyn.
+          </p>
+          {campusOppIds.map((id) => (
+            <OpportunityCard key={id} id={id} />
+          ))}
+
+          {/* CAMPUS SERVICES — merged in: hiring a student and applying to
+              a gig are the same money system, so they share one door.
+              Requests still post as Campus Opportunities. */}
+          <h3 className="border-t border-line-soft px-1 pt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+            Student services
+          </h3>
         <div className="space-y-4 animate-fade-up">
           <div>
             <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
@@ -515,73 +618,14 @@ export default function CampusPage() {
             )}
           </div>
         </div>
-      )}
-
-      {/* ================= 💰 CAMPUS OPPORTUNITIES ================= */}
-      {section === "opps" && (
-        <div className="space-y-4 animate-fade-up">
-          <p className="text-sm text-zinc-500">
-            Paid work, gigs, and collaborations on campus — same protected system as everywhere on Mavyn.
-          </p>
-          {campusOppIds.map((id) => (
-            <OpportunityCard key={id} id={id} />
-          ))}
         </div>
       )}
 
-      {/* ================= 🏛️ ORGANIZATIONS ================= */}
-      {section === "orgs" && (
-        <div className="animate-fade-up">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {campusOrgs.map((org) => (
-              <Link key={org.id} href={`/campus/${org.id}`} className="card-people card-lift overflow-hidden hover:border-zinc-600">
-                <div className={`h-14 bg-gradient-to-br ${org.gradient} opacity-70`} />
-                <div className="p-4">
-                  <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${org.gradient}`}>
-                    {org.emoji}
-                  </span>
-                  <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-zinc-100">
-                    {org.name}
-                    {org.verified && <span className="text-sky-400" title="Verified Organization">✓</span>}
-                  </p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {org.verified ? org.category : "Community Group"} · {org.members} members
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
-            ✓ Verified Organization means the org is legitimate — it never proves who is a member.
-            Membership verification comes in V2, approved by org admins.
-          </p>
-        </div>
-      )}
 
-      {/* ================= 📚 STUDENT GROUPS — campus communities ================= */}
-      {section === "groups" && <CampusGroups />}
 
       {/* ================= 🎉 EVENTS — strictly campus ================= */}
       {section === "events" && <CampusEvents />}
 
-      {/* ================= 📚 CAMPUS QUESTIONS — lives in Communities ================= */}
-      {section === "questions" && (
-        <div className="space-y-3 animate-fade-up">
-          <a href="/communities/bowie-campus-questions" className="card-people block p-5 transition hover:border-violet-400/40">
-            <p className="text-sm font-semibold text-zinc-100">Campus Questions is now a community</p>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-              Ask with your profile, an alias, or anonymously — the community decides nothing about who you are, and
-              moderators keep it safe. Your question, your visibility level.
-            </p>
-            <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-400 px-4 py-1.5 text-xs font-bold text-zinc-950">
-              Open Campus Questions →
-            </span>
-          </a>
-          <p className="px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-600">
-            Real name · alias · anonymous — anonymous to the community, always accountable to Mavyn
-          </p>
-        </div>
-      )}
 
       {/* graduation → alumni */}
       <section className="rounded-xl border border-line p-4">

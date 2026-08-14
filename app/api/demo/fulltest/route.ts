@@ -2585,6 +2585,16 @@ export async function POST(req: NextRequest) {
       discoverSrc.includes("discover-trending") && discoverSrc.includes("!inSearch && trending.length"),
       { route: "GET /api/trending", actual: `${tr.items?.length} items across ${trTypes.size} types` });
 
+    const campusSrc = read("app/campus/page.tsx");
+    step(c, "YOUR CAMPUS: four doors, not eight — Marketplace/Communities/Opportunities/Events only; Services merged into Opportunities; Groups/Orgs/Questions are channel categories inside Communities; the redundant 'communities are live' callout is gone; tiles share ONE style where the only highlight is the open section",
+      campusSrc.includes("sm:grid-cols-4") &&
+      !campusSrc.includes("Real campus communities are live") &&
+      campusSrc.includes("CAMPUS_LIFE_CHANNELS") &&
+      campusSrc.includes("Student services") &&
+      !campusSrc.includes('id: "services", emoji') &&
+      !campusSrc.includes("border-lime-400/40 bg-lime-400/5 p-2.5") &&
+      campusSrc.includes('aria-current={section === s.id ? "true" : undefined}'));
+
     step(c, "PROFILE leads with identity: the full-width 'This is your profile' explanatory card is gone; Profile Studio + Management view live in the compact owner-only Manage profile dropdown (data-guide=profile-manage)",
       !pvSrc.includes('"This is your profile."') && !pvSrc.includes("This is your profile.</span>") && pvSrc.includes("profile-manage") && pvSrc.includes("Profile Studio") && pvSrc.includes("Management view") && pvSrc.includes("ResponsiveProfile"));
   }
