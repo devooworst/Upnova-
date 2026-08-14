@@ -24,6 +24,7 @@ import {
   UserPlus,
   ContactRound,
   Wallet,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
@@ -32,43 +33,33 @@ import { useSession } from "@/lib/session";
 import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
 import { COLLEGE_PRICE, ALUMNI_PRO_PRICE } from "@/lib/fees";
 
-/* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
-const navGroups: {
-  label: string | null;
-  dot?: string;
-  items: { href: string; label: string; icon: typeof Home; badge?: number; meta?: string; tour?: string }[];
-}[] = [
-  {
-    label: null,
-    items: [
-      { href: "/", label: "Home", icon: Home, tour: "home" },
-      { href: "/discover", label: "Discover", icon: Search, tour: "discover" },
-      { href: "/messages", label: "Messages", icon: MessageSquare, badge: 3, tour: "messages" },
-      { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
-    ],
-  },
-  {
-    label: "earn",
-    dot: "bg-lime-400",
-    items: [
-      { href: "/opportunities", label: "Opportunities", icon: Briefcase, tour: "opportunities" },
-      { href: "/services", label: "Services", icon: ShoppingBag, tour: "services" },
-      { href: "/shop", label: "Shop", icon: Tag },
-      { href: "/works", label: "Works", icon: Disc3 },
-      { href: "/calendar", label: "Bookings", icon: CalendarCheck, tour: "calendar" },
-      { href: "/clients", label: "Clients", icon: UserCheck },
-      { href: "/activity", label: "Activity", icon: ActivityIcon, tour: "activity" },
-      { href: "/analytics", label: "Analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "connect",
-    dot: "bg-violet-400",
-    items: [
-      { href: "/communities", label: "Communities", icon: Users, meta: "joined", tour: "communities" },
-      { href: "/events", label: "Events", icon: Calendar },
-    ],
-  },
+/* Simplified navigation: 5 primary surfaces always visible, secondary
+   items collapsed into expandable groups. The core loop is:
+   Home → Discover → Messages → Activity → Profile.
+   Everything else (services, opportunities, shop, etc.) is reachable
+   from within those surfaces or the expandable sections below. */
+
+const primaryNav: { href: string; label: string; icon: typeof Home; badge?: number; tour?: string }[] = [
+  { href: "/", label: "Home", icon: Home, tour: "home" },
+  { href: "/discover", label: "Discover", icon: Search, tour: "discover" },
+  { href: "/messages", label: "Messages", icon: MessageSquare, badge: 3, tour: "messages" },
+  { href: "/activity", label: "Activity", icon: ActivityIcon, tour: "activity" },
+  { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
+];
+
+const earnNav: { href: string; label: string; icon: typeof Home; tour?: string }[] = [
+  { href: "/opportunities", label: "Opportunities", icon: Briefcase, tour: "opportunities" },
+  { href: "/services", label: "Services", icon: ShoppingBag, tour: "services" },
+  { href: "/calendar", label: "Bookings", icon: CalendarCheck, tour: "calendar" },
+  { href: "/works", label: "Works", icon: Disc3 },
+  { href: "/shop", label: "Shop", icon: Tag },
+  { href: "/clients", label: "Clients", icon: UserCheck },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+];
+
+const connectNav: { href: string; label: string; icon: typeof Home; meta?: string; tour?: string }[] = [
+  { href: "/communities", label: "Communities", icon: Users, meta: "joined", tour: "communities" },
+  { href: "/events", label: "Events", icon: Calendar },
 ];
 
 /**
@@ -100,24 +91,18 @@ export default function Sidebar({
   const pro = plan === "pro";
   // campus access is a database fact (verified school), never a local flag
   const campus = user?.campus ?? null;
-  // BUSINESS accounts are hiring accounts, not profile pages: their nav
-  // swaps "Clients" for Hiring · People · Payments (sky = business).
-  // Same real routes, different lens — nothing is hidden from anyone.
+  // BUSINESS accounts get an extra section
   const isBusiness = user?.accountType === "business";
-  const groups = navGroups.map((g) => ({
-    ...g,
-    items: isBusiness ? g.items.filter((i) => i.href !== "/clients") : g.items,
-  }));
-  if (isBusiness)
-    groups.push({
-      label: "business",
-      dot: "bg-sky-400",
-      items: [
-        { href: "/hiring", label: "Hiring", icon: UserPlus, tour: "hiring" },
-        { href: "/people", label: "People", icon: ContactRound, tour: "people" },
-        { href: "/payments", label: "Payments", icon: Wallet, tour: "payments" },
-      ],
-    });
+  // Secondary nav is collapsible — reduce visual clutter by default
+  const [earnOpen, setEarnOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  // Auto-expand a section if the current page is inside it
+  const earnActive = earnNav.some((i) => pathname.startsWith(i.href));
+  const connectActive = connectNav.some((i) => pathname.startsWith(i.href));
+  const effectiveEarnOpen = earnOpen || earnActive;
+  const effectiveConnectOpen = connectOpen || connectActive;
+
+  const filteredEarn = isBusiness ? earnNav.filter((i) => i.href !== "/clients") : earnNav;
 
   return (
     <aside
@@ -132,23 +117,59 @@ export default function Sidebar({
       }
       aria-hidden={variant === "desktop" && collapsed ? true : undefined}
     >
-      {/* Main nav — unboxed; grouping does the work */}
-      <nav className="space-y-4 px-1">
-        {groups.map((g) => (
-          <div key={g.label ?? "base"}>
-            {g.label && (
-              <p className="flex items-center gap-1.5 px-3 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-                <span className={`h-1 w-1 rounded-full ${g.dot}`} />
-                {g.label}
-              </p>
-            )}
-            <ul className="space-y-0.5">
-              {g.items.map((item) => {
-                const base = item.href.split("?")[0];
-                const active =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : !item.href.includes("?") && pathname.startsWith(base);
+      {/* Primary nav — always visible, the 5 core surfaces */}
+      <nav className="space-y-1 px-1">
+        <ul className="space-y-0.5">
+          {primaryNav.map((item) => {
+            const base = item.href.split("?")[0];
+            const active =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(base);
+            return (
+              <li key={item.label}>
+                <Link
+                  href={item.href}
+                  data-tour={item.tour}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                    active
+                      ? "bg-white/10 text-zinc-50"
+                      : "text-zinc-300 hover:bg-card-raised hover:text-zinc-100"
+                  }`}
+                >
+                  <item.icon
+                    className={`h-[18px] w-[18px] ${active ? "text-zinc-50" : "text-zinc-500"}`}
+                  />
+                  {item.label}
+                  {item.badge ? (
+                    <span className="ml-auto rounded-full bg-violet-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-zinc-950">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Earn section — collapsible */}
+        <div className="mt-2">
+          <button
+            onClick={() => setEarnOpen(!effectiveEarnOpen)}
+            className="flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-left transition hover:bg-card-raised/50"
+          >
+            <span className="h-1 w-1 shrink-0 rounded-full bg-lime-400" />
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              Earn
+            </span>
+            <ChevronDown
+              className={`ml-auto h-3 w-3 text-zinc-600 transition ${effectiveEarnOpen ? "" : "-rotate-90"}`}
+            />
+          </button>
+          {effectiveEarnOpen && (
+            <ul className="mt-0.5 space-y-0.5">
+              {filteredEarn.map((item) => {
+                const active = pathname.startsWith(item.href);
                 return (
                   <li key={item.label}>
                     <Link
@@ -157,18 +178,51 @@ export default function Sidebar({
                       className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
                         active
                           ? "bg-white/10 text-zinc-50"
-                          : "text-zinc-300 hover:bg-card-raised hover:text-zinc-100"
+                          : "text-zinc-400 hover:bg-card-raised hover:text-zinc-100"
                       }`}
                     >
-                      <item.icon
-                        className={`h-[18px] w-[18px] ${active ? "text-zinc-50" : "text-zinc-500"}`}
-                      />
+                      <item.icon className={`h-[16px] w-[16px] ${active ? "text-zinc-50" : "text-zinc-500"}`} />
                       {item.label}
-                      {item.badge ? (
-                        <span className="ml-auto rounded-full bg-violet-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-zinc-950">
-                          {item.badge}
-                        </span>
-                      ) : item.meta === "joined" ? (
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Connect section — collapsible */}
+        <div>
+          <button
+            onClick={() => setConnectOpen(!effectiveConnectOpen)}
+            className="flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-left transition hover:bg-card-raised/50"
+          >
+            <span className="h-1 w-1 shrink-0 rounded-full bg-violet-400" />
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              Connect
+            </span>
+            <ChevronDown
+              className={`ml-auto h-3 w-3 text-zinc-600 transition ${effectiveConnectOpen ? "" : "-rotate-90"}`}
+            />
+          </button>
+          {effectiveConnectOpen && (
+            <ul className="mt-0.5 space-y-0.5">
+              {connectNav.map((item) => {
+                const active = pathname.startsWith(item.href);
+                return (
+                  <li key={item.label}>
+                    <Link
+                      href={item.href}
+                      data-tour={item.tour}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                        active
+                          ? "bg-white/10 text-zinc-50"
+                          : "text-zinc-400 hover:bg-card-raised hover:text-zinc-100"
+                      }`}
+                    >
+                      <item.icon className={`h-[16px] w-[16px] ${active ? "text-zinc-50" : "text-zinc-500"}`} />
+                      {item.label}
+                      {item.meta === "joined" ? (
                         <span className="ml-auto font-mono text-[9px] text-zinc-600">
                           {myCommunities.length} joined
                         </span>
@@ -178,8 +232,43 @@ export default function Sidebar({
                 );
               })}
             </ul>
+          )}
+        </div>
+
+        {/* Business section — only for business accounts */}
+        {isBusiness && (
+          <div>
+            <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              <span className="h-1 w-1 rounded-full bg-sky-400" />
+              Business
+            </p>
+            <ul className="space-y-0.5">
+              {[
+                { href: "/hiring", label: "Hiring", icon: UserPlus, tour: "hiring" },
+                { href: "/people", label: "People", icon: ContactRound, tour: "people" },
+                { href: "/payments", label: "Payments", icon: Wallet, tour: "payments" },
+              ].map((item) => {
+                const active = pathname.startsWith(item.href);
+                return (
+                  <li key={item.label}>
+                    <Link
+                      href={item.href}
+                      data-tour={item.tour}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                        active
+                          ? "bg-white/10 text-zinc-50"
+                          : "text-zinc-400 hover:bg-card-raised hover:text-zinc-100"
+                      }`}
+                    >
+                      <item.icon className={`h-[16px] w-[16px] ${active ? "text-zinc-50" : "text-zinc-500"}`} />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-        ))}
+        )}
         {/* Your Campus is a VERIFIED-IDENTITY feature: verified members get
             the live item; signed-in unverified members see it LOCKED with
             the path in (verification, always free — never a plan). Plan

@@ -36,23 +36,31 @@ export async function PATCH(req: NextRequest) {
       !!loc && !String(loc.countryCode || "").trim() && ![body.city, body.county, body.state, body.country].some((t) => String(t || "").trim());
     let locationCols: Record<string, unknown>;
     if (wantsStructured || wantsClear) {
-      const r = resolveLocation(
-        wantsClear ? {} : { countryCode: loc.countryCode, stateId: loc.stateId, countyId: loc.countyId, cityId: loc.cityId }
-      ); // throws ApiError(400) on any invalid combination
-      locationCols = {
-        city: r.cityName,
-        county: r.countyName,
-        state: r.stateShort,
-        country: r.countryName,
-        countryCode: r.countryCode,
-        stateId: r.stateId,
-        countyId: r.countyId,
-        cityId: r.cityId,
-        // city centroid only — never an exact address; used for the
-        // server-side distance scoping that already existed
-        lat: r.lat,
-        lng: r.lng,
-      };
+      try {
+        const r = resolveLocation(
+          wantsClear ? {} : { countryCode: loc.countryCode, stateId: loc.stateId, countyId: loc.countyId, cityId: loc.cityId }
+        ); // throws ApiError(400) on any invalid combination
+        locationCols = {
+          city: r.cityName,
+          county: r.countyName,
+          state: r.stateShort,
+          country: r.countryName,
+          countryCode: r.countryCode,
+          stateId: r.stateId,
+          countyId: r.countyId,
+          cityId: r.cityId,
+          // city centroid only — never an exact address; used for the
+          // server-side distance scoping that already existed
+          lat: r.lat,
+          lng: r.lng,
+        };
+      } catch (geoErr) {
+        // If the geo database isn't built or validation fails, fall back
+        // to free-text storage rather than blocking the save entirely.
+        // The user typed text; we keep it.
+        const next = { city: str(body.city, 60), state: str(body.state, 40), county: str(body.county, 60), country: str(body.country, 60) };
+        locationCols = next;
+      }
     } else {
       // legacy free-text path — if the text actually changed, the old
       // ids no longer describe it, so drop them rather than lie

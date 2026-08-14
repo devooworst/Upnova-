@@ -8,6 +8,7 @@ import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { seedAcceptsBooking, isSeedUser, seedBookingProgress } from "@/lib/server/demo";
 import { resolvePairConversation } from "@/lib/server/conversations";
+import { recordActivation } from "@/lib/server/activation";
 import { parseConfig, travelFeeFor, computeSelection } from "@/lib/servicePolicies";
 import { hasEarlyAccess, discountPercent, readEarlyAccess, readRelease, activeBookingsForService, clientBookingsSinceWindowStart } from "@/lib/server/preferred";
 import { recordInteraction } from "@/lib/server/recsys";
@@ -312,6 +313,10 @@ export async function POST(req: NextRequest) {
         conversationId,
       })
       .run();
+
+    // Both sides cross the "first transaction" threshold here
+    recordActivation(user.id, "first_transaction");
+    recordActivation(service.ownerId, "first_transaction");
 
     notify({
       userId: service.ownerId,

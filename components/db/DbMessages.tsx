@@ -22,6 +22,7 @@ import Avatar from "@/components/Avatar";
 import ReportModal from "@/components/ReportModal";
 import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
 import { useSession } from "@/lib/session";
+import { trackActivation } from "@/lib/activation";
 
 /* ------------------------------- types ------------------------------- */
 
@@ -225,6 +226,7 @@ export default function DbMessages() {
     const body = draft.trim();
     if (!body || !activeId) return;
     setDraft("");
+    trackActivation("first_connection");
     await fetch(`/api/conversations/${activeId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

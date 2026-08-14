@@ -17,7 +17,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import LocationPicker from "@/components/LocationPicker";
 import {
   User,
   Briefcase,
@@ -60,6 +59,7 @@ import {
   SocialLink,
 } from "@/lib/profile";
 import { useSession, invalidateSession } from "@/lib/session";
+import { trackActivation } from "@/lib/activation";
 
 /* ------------------------------ constants ------------------------------ */
 
@@ -279,21 +279,6 @@ export default function EditProfile() {
   const set = <K extends keyof ProfileData>(key: K, value: ProfileData[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
-  /* location-picker ephemera: level labels + which levels the selected
-     country actually uses (display only — never persisted) */
-  const [geoMeta, setGeoMeta] = useState<{
-    stateLabel?: string;
-    countyLabel?: string;
-    hasStates?: boolean;
-    hasCounties?: boolean;
-    stateHasCounties?: boolean;
-  }>({});
-  // a saved free-text location that predates the normalized system —
-  // shown, never destroyed; the user can re-pick to link it
-  const legacyLocationText =
-    !draft.countryCode && [draft.city, draft.county, draft.state, draft.country].some(Boolean)
-      ? [draft.city, draft.county, draft.state, draft.country].filter(Boolean).join(", ")
-      : null;
 
   const usernameStatus: UsernameStatus = checkUsername(draft.username, saved.username);
   const usernameBlocked = usernameStatus === "unavailable" || usernameStatus === "invalid";
@@ -304,6 +289,9 @@ export default function EditProfile() {
     const clean = { ...draft, username: draft.username.trim().replace(/^@/, "").toLowerCase() };
     const ok = await saveProfile(clean);
     if (!ok) return;
+    // Track profile completion — 5+ meaningful fields filled
+    const filled = [clean.displayName, clean.bio, clean.primaryRole, clean.city || clean.state, clean.avatar, clean.links?.length ? "links" : ""].filter(Boolean).length;
+    if (filled >= 4) trackActivation("profile_completed");
     setSaved(clean);
     setToast(true);
     setTimeout(() => router.push("/profile"), 900);
@@ -610,59 +598,54 @@ export default function EditProfile() {
               </div>
             </div>
 
-            {/* location — one cascading, validated selector system:
-                country → state/province → county/district → city.
-                Options at each level depend on the level above; changing
-                a parent clears its children (enforced again server-side). */}
+            {/* location — simple free-text inputs. No cascading dropdowns,
+                no geo database required. Users type their location directly. */}
             <div className="mt-5">
-              <FieldLabel hint="Pick from real geographic data — each level filters the next. Your exact address is never shown publicly.">
+              <FieldLabel hint="Your general area — your exact address is never shown publicly.">
                 Location
               </FieldLabel>
-              <LocationPicker
-                value={{
-                  countryCode: draft.countryCode,
-                  countryName: draft.country,
-                  stateId: draft.stateId,
-                  stateName: draft.stateId ? draft.state : "",
-                  countyId: draft.countyId,
-                  countyName: draft.county,
-                  cityId: draft.cityId,
-                  cityName: draft.city,
-                  ...geoMeta,
-                }}
-                onChange={(v) => {
-                  setGeoMeta({
-                    stateLabel: v.stateLabel,
-                    countyLabel: v.countyLabel,
-                    hasStates: v.hasStates,
-                    hasCounties: v.hasCounties,
-                    stateHasCounties: v.stateHasCounties,
-                  });
-                  setDraft((d) => ({
-                    ...d,
-                    countryCode: v.countryCode,
-                    stateId: v.stateId,
-                    countyId: v.countyId,
-                    cityId: v.cityId,
-                    // display text mirrors the selection; the server
-                    // re-derives canonical values on save
-                    country: v.countryName,
-                    state: v.stateName,
-                    county: v.countyName,
-                    city: v.cityName,
-                  }));
-                }}
-              />
-              {legacyLocationText && (
-                <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-200/90">
-                  Your saved location — {legacyLocationText} — predates the new selector. It still displays fine
-                  everywhere; re-pick it above once to link it to verified geographic data.
-                </p>
-              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">City</p>
+                  <input
+                    value={draft.city}
+                    onChange={(e) => set("city", e.target.value)}
+                    placeholder="Baltimore"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">County</p>
+                  <input
+                    value={draft.county}
+                    onChange={(e) => set("county", e.target.value)}
+                    placeholder="Baltimore County"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">State / Province</p>
+                  <input
+                    value={draft.state}
+                    onChange={(e) => set("state", e.target.value)}
+                    placeholder="MD"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Country</p>
+                  <input
+                    value={draft.country}
+                    onChange={(e) => set("country", e.target.value)}
+                    placeholder="United States"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
 
               {/* location visibility — the user decides the precision */}
               <div className="mt-3">
-                <FieldLabel hint="The most precise level anyone can see. Your exact address and coordinates are always private, no matter what you pick.">
+                <FieldLabel hint="The most precise level anyone can see. Your exact address and coordinates are always private.">
                   Location visibility
                 </FieldLabel>
                 <div className="flex flex-wrap gap-1.5">

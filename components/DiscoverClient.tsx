@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { trackActivation } from "@/lib/activation";
 import { Search, SlidersHorizontal, Store, Briefcase } from "lucide-react";
 import CreatorCard from "@/components/CreatorCard";
 import CommunityCard from "@/components/CommunityCard";
@@ -32,6 +33,9 @@ export default function DiscoverClient() {
   const [cats, setCats] = useState<string[]>([]);
   const [avail, setAvail] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Track first discovery — fires once per user (idempotent)
+  useEffect(() => { trackActivation("first_discovery"); }, []);
 
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);

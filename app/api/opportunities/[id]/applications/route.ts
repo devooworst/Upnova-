@@ -7,6 +7,7 @@ import { requireOpportunityPoster } from "@/lib/server/authz";
 import { publicUser } from "@/lib/server/serialize";
 import { notify } from "@/lib/server/notify";
 import { recordInteraction } from "@/lib/server/recsys";
+import { recordActivation } from "@/lib/server/activation";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 import { checkApplicantEligibility } from "@/lib/server/eligibility";
 import { sanitizeQuestions, validateAnswers, answersForStorage } from "@/lib/applicationSpec";
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .run();
 
     recordInteraction(user.id, "opportunity", opp.id, "apply");
+    recordActivation(user.id, "first_interaction");
 
     notify({
       userId: opp.posterId,

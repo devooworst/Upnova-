@@ -162,25 +162,31 @@ export async function POST(req: NextRequest) {
       city = `${campus.city}, ${campus.state}`;
       state = campus.state;
     } else {
-      // preferred: a validated geo chain from the cascading picker —
-      // the server re-checks every parent/child relationship and derives
-      // the display strings itself (invalid combos are rejected with 400)
+      // free-text location is the primary path. If a validated geo chain
+      // is provided, the server verifies it and derives the display
+      // strings; otherwise falls back to free text.
       const geoIn = body.geo && typeof body.geo === "object" ? body.geo : null;
+      let usedGeo = false;
       if (geoIn && String(geoIn.countryCode || "").trim()) {
-        const r = resolveLocation({
-          countryCode: geoIn.countryCode,
-          stateId: geoIn.stateId,
-          countyId: geoIn.countyId,
-          cityId: geoIn.cityId,
-        });
-        if (!r.cityName) throw new ApiError(400, "What city is the event in?");
-        city = r.cityName;
-        state = r.stateShort;
-        // city centroid for nearby discovery (never an exact address)
-        lat = r.lat ?? user.profile.lat ?? null;
-        lng = r.lng ?? user.profile.lng ?? null;
-      } else {
-        // legacy free-text path (older clients)
+        try {
+          const r = resolveLocation({
+            countryCode: geoIn.countryCode,
+            stateId: geoIn.stateId,
+            countyId: geoIn.countyId,
+            cityId: geoIn.cityId,
+          });
+          if (r.cityName) {
+            city = r.cityName;
+            state = r.stateShort;
+            lat = r.lat ?? user.profile.lat ?? null;
+            lng = r.lng ?? user.profile.lng ?? null;
+            usedGeo = true;
+          }
+        } catch {
+          // geo DB unavailable or validation failed — fall through to free text
+        }
+      }
+      if (!usedGeo) {
         city = String(body.city || "").trim().slice(0, 80);
         state = String(body.state || "").trim().slice(0, 20);
         if (!city) throw new ApiError(400, "What city is the event in?");

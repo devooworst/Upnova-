@@ -459,7 +459,13 @@ export async function POST(req: NextRequest) {
   {
     const c = cat("BOOKINGS");
     const svc = ((await api("rachel", "/api/services")).data as any).services.find((s: any) => s.owner?.handle === "lena");
-    const when = new Date(Date.now() + 30 * 3600e3); when.setHours(14, 0, 0, 0);
+    /* Providers set their own working days — lena takes weekdays only.
+       A fixed "+30h" offset silently lands on a weekend depending on the
+       day the suite runs, which failed the booking and cascaded into
+       PAYMENTS / ACTIVITY / DB INTEGRITY. Pick the next real weekday. */
+    const when = new Date(Date.now() + 30 * 3600e3);
+    while (when.getDay() === 0 || when.getDay() === 6) when.setDate(when.getDate() + 1);
+    when.setHours(14, 0, 0, 0);
     const bk = await api("rachel", "/api/bookings", { method: "POST", body: { serviceId: svc.id, startsAt: when.toISOString(), durationMin: 60, conversationId: convId } });
     bookingId = String((bk.data as any).id ?? "");
     step(c, "booking created through the real rules (seed provider accepts)", bk.status === 200 && (bk.data as any).status === "accepted", { route: "POST /api/bookings", record: bookingId });
@@ -2062,12 +2068,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  /* ================= LOCATION SYSTEM (GEO CASCADE) ================= */
-  /* One cascading location system: country → state/province → county/
-     district → city. These tests hit the REAL geo API endpoints and the
-     REAL profile save path — invalid parent/child combinations must be
-     rejected SERVER-SIDE, not just filtered by the dropdowns. Uses a
-     throwaway tonb* account only; never touches real profiles.        */
+  /* ================= LOCATION SYSTEM (GEO BACKEND) ================== */
+  /* The geo database + API endpoints are preserved for future use but
+     are NOT required by the user-facing forms (which now use simple
+     free-text inputs). These tests verify the backend infrastructure
+     still works correctly. Uses a throwaway tonb* account only.       */
   {
     const c = cat("LOCATION SYSTEM (GEO CASCADE)");
     type GeoItem = { id: string; code?: string; name: string; countyId?: string | null; countyName?: string | null; stateLabel?: string; hasStates?: boolean; hasCounties?: boolean };
@@ -2179,15 +2184,17 @@ export async function POST(req: NextRequest) {
       devinProfile?.city === "Baltimore" && devinProfile?.state === "MD" && devinProfile?.countryCode === "US" && devinProfile?.countyId === "US-24510",
       { actual: `${devinProfile?.city} → ${devinProfile?.cityId} / ${devinProfile?.countyId}` });
 
-    // -------- structural: the cascade reset really is in the component --------
-    const pickerSrc = fs.readFileSync(path.join(process.cwd(), "components", "LocationPicker.tsx"), "utf8");
-    step(c, "LocationPicker resets ALL children on country change and city+county on state change (source-verified)",
-      pickerSrc.includes("...EMPTY_GEO_LOCATION, // state, county, city all RESET") && (pickerSrc.match(/cityId: "", \/\/ RESET/g) || []).length >= 2);
+    // -------- structural: location UI uses simple free-text inputs --------
+    // The LocationPicker component is preserved in components/ for future
+    // geo-based development, but the user-facing forms now use plain text
+    // inputs that never depend on the geo database.
     const editSrc = fs.readFileSync(path.join(process.cwd(), "components", "profile", "EditProfile.tsx"), "utf8");
     const oppSrc = fs.readFileSync(path.join(process.cwd(), "app", "opportunities", "new", "page.tsx"), "utf8");
     const evtSrc = fs.readFileSync(path.join(process.cwd(), "app", "events", "create", "page.tsx"), "utf8");
-    step(c, "ONE location system everywhere: Edit Profile, opportunity posting and event creation all use LocationPicker (no free-text city/county/state inputs left)",
-      [editSrc, oppSrc, evtSrc].every((src) => src.includes("LocationPicker")) && !editSrc.includes('placeholder="County"') && !evtSrc.includes('placeholder="Baltimore, MD"'));
+    step(c, "Location UI uses simple free-text inputs (no LocationPicker in user-facing forms; no geo DB dependency)",
+      [editSrc, oppSrc, evtSrc].every((src) => !src.includes('import LocationPicker')) &&
+      editSrc.includes('placeholder="Baltimore"') &&
+      oppSrc.includes('placeholder="Baltimore, MD"'));
     /* -------- REAL BROWSER LAYER — headless Chromium ---------------
        scripts/browser-qa-location.mjs drives an actual bundled
        Chromium against THIS server: full cascade flows, keyboard
