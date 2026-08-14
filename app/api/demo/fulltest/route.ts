@@ -2344,6 +2344,59 @@ export async function POST(req: NextRequest) {
     await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" });
   }
 
+  /* ================= INFORMATION ARCHITECTURE ================= */
+  /* The four-surface mental model, enforced structurally + behaviorally:
+       Home = what should I see? · Discover = what can I find? ·
+       Sidebar = where do I want to go? · Profile = who is this person?
+     No surface duplicates another surface's navigation.               */
+  {
+    const c = cat("INFORMATION ARCHITECTURE");
+    const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), "utf8");
+    const feedSrc = read("components/db/DbFeed.tsx");
+    const recsysSrc = read("lib/server/recsys.ts");
+    const feedRouteSrc = read("app/api/feed/route.ts");
+    const discoverSrc = read("components/DiscoverGrid.tsx");
+    const pvSrc = read("components/profile/ProfileView.tsx");
+
+    step(c, "HOME = consumption only: the tab row is For You | Following — Opportunities (a sidebar destination) and Trending (a discovery mechanism, now in Discover) are gone from Home",
+      feedSrc.includes('const tabs: FeedTab[] = ["For You", "Following"]') && !feedSrc.includes("OpportunityList") && !feedSrc.includes('"Trending"'));
+
+    step(c, "FOR YOU is personalized AND arranged: the weighted ranker feeds arrangeFeed (author spacing, category-run breaking, periodic exploration slots labeled honestly) — never a raw score dump, never random",
+      recsysSrc.includes("export function arrangeFeed") && recsysSrc.includes("exploreEvery") && recsysSrc.includes("EXPLORE_REASON") && feedRouteSrc.includes("arrangeFeed("));
+
+    // behavioral: rachel's For You never shows the same author twice in a row
+    const fy2 = (await api("rachel", "/api/feed?tab=for-you")).data as { items?: { author: { id: string } }[]; reasons?: Record<string, string[]> };
+    const fyAuthors = (fy2.items ?? []).slice(0, 12).map((i) => i.author.id);
+    const adjacentDupes = fyAuthors.filter((a, i) => i > 0 && a === fyAuthors[i - 1]).length;
+    step(c, "FOR YOU anti-repetition holds live: first 12 items have ZERO adjacent same-author repeats, and ranked items carry human-readable reasons",
+      fyAuthors.length >= 6 && adjacentDupes === 0 && Object.keys(fy2.reasons ?? {}).length > 0,
+      { route: "GET /api/feed?tab=for-you", actual: `${fyAuthors.length} items, ${adjacentDupes} adjacent author dupes, ${Object.keys(fy2.reasons ?? {}).length} reason entries` });
+
+    // behavioral: Following = ONLY people rachel follows (plus herself), chronological
+    await api("rachel", `/api/follow/${lena.id}`, { method: "POST" });
+    const flw = new Set((await db.select().from(tables.follows).all()).filter((f) => f.followerId === rachel.id).map((f) => f.followingId));
+    flw.add(rachel.id);
+    const fol = (await api("rachel", "/api/feed?tab=following")).data as { items?: { author: { id: string }; createdAt: string }[] };
+    const folItems = fol.items ?? [];
+    const strangers = folItems.filter((i) => !flw.has(i.author.id)).length;
+    const chrono = folItems.every((i, x) => x === 0 || Date.parse(folItems[x - 1].createdAt) >= Date.parse(i.createdAt));
+    step(c, "FOLLOWING is exactly who you follow, chronological — zero recommended strangers, zero reordering",
+      folItems.length > 0 && strangers === 0 && chrono,
+      { route: "GET /api/feed?tab=following", actual: `${folItems.length} items, ${strangers} strangers, chronological=${chrono}` });
+    await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" });
+
+    // behavioral: Trending lives in Discover, computed from REAL engagement
+    const tr = (await api(null, "/api/trending")).data as { items?: { type: string; meta: string }[] };
+    const trTypes = new Set((tr.items ?? []).map((i) => i.type));
+    step(c, "TRENDING moved to Discover: /api/trending serves a compact mixed rail (≤12 items, ≥3 types) where every item cites its real engagement count, and DiscoverGrid renders it in browse mode only",
+      (tr.items ?? []).length > 0 && (tr.items ?? []).length <= 12 && trTypes.size >= 3 && (tr.items ?? []).every((i) => /\d/.test(i.meta)) &&
+      discoverSrc.includes("discover-trending") && discoverSrc.includes("!inSearch && trending.length"),
+      { route: "GET /api/trending", actual: `${tr.items?.length} items across ${trTypes.size} types` });
+
+    step(c, "PROFILE leads with identity: the full-width 'This is your profile' explanatory card is gone; Profile Studio + Management view live in the compact owner-only Manage profile dropdown (data-guide=profile-manage)",
+      !pvSrc.includes('"This is your profile."') && !pvSrc.includes("This is your profile.</span>") && pvSrc.includes("profile-manage") && pvSrc.includes("Profile Studio") && pvSrc.includes("Management view") && pvSrc.includes("ResponsiveProfile"));
+  }
+
   /* ================= MOBILE & TABLET EXPERIENCE ================= */
   /* The three-way responsive contract:
        < lg  = intentional touch experience (compact expandable-search

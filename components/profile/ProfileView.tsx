@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, Wrench, Palette, Sparkles } from "lucide-react";
+import { ChevronDown, Eye, Wrench, Palette, Settings2, Sparkles } from "lucide-react";
 import ProfileHeader from "./ProfileHeader";
 import ProfileTabs from "./ProfileTabs";
 import ResponsiveProfile from "@/components/ResponsiveProfile";
@@ -12,19 +12,26 @@ import { type StudioConfig } from "@/lib/profileStudio";
 /**
  * /profile — YOUR profile, rendered from the SAME saved data visitors get.
  *
- * The presentation below is the real public profile component
- * (DbCreatorProfile) reading the saved Profile Studio configuration from
- * the database — never a preview copy that can drift. Customize → Save in
- * Studio → this page (and every visitor) renders it.
+ * The profile itself leads: the page opens with cover → avatar → identity,
+ * exactly what a visitor sees (DbCreatorProfile / MobileProfile reading the
+ * saved Profile Studio configuration — never a preview copy that can drift).
+ *
+ * Owner tooling is deliberately COMPACT: one "Manage profile" dropdown in
+ * the top-right holding Profile Studio and the Management view toggle. The
+ * old full-width explanatory card is gone — it consumed the top of the page
+ * and pushed the actual profile down. Profile = "who is this person?", and
+ * the answer should start at the first pixel.
  *
  * "Management view" is the optional owner workspace (tabs, publishing
  * tools); it changes what YOU see while working, never what the profile is.
  */
 export default function ProfileView() {
   const [management, setManagement] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useSession();
 
-  // studio status for the banner — same endpoint the Studio editor uses
+  // studio status for the downgrade notice — same endpoint the Studio editor uses
   const [studio, setStudio] = useState<{ cfg: StudioConfig; active: boolean; saved: boolean } | null>(null);
   useEffect(() => {
     if (!user) return;
@@ -34,40 +41,66 @@ export default function ProfileView() {
       .catch(() => {});
   }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
   return (
-    <div className="space-y-5">
-      {/* state bar — ONE Studio entry, one view toggle */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-2.5">
-        <p className="text-xs text-zinc-400">
-          <span className="font-semibold text-zinc-200">This is your profile.</span>{" "}
-          {management ? "Management view — visitors never see these tools." : "What you see below is exactly what visitors see."}
-        </p>
-        <div className="flex shrink-0 gap-2">
-          <Link
-            href="/profile/studio"
-            className="flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/5 px-3.5 py-1.5 text-xs font-semibold text-lime-300 transition hover:bg-lime-400/15"
-          >
-            <Palette className="h-3.5 w-3.5" /> Profile Studio
-            <span className="rounded border border-lime-400/40 px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide">pro</span>
-          </Link>
+    <div className="space-y-4">
+      {/* compact owner controls — a slim right-aligned row, not a card.
+          In management view it also names the mode, honestly. */}
+      <div className="flex items-center justify-end gap-3 px-1">
+        {management && (
+          <p className="min-w-0 flex-1 truncate text-xs text-zinc-500">
+            <span className="font-semibold text-violet-300">Management view</span> — visitors never see these tools.
+          </p>
+        )}
+        <div className="relative shrink-0" ref={menuRef}>
           <button
-            onClick={() => setManagement(!management)}
-            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-              management
-                ? "bg-violet-400 text-zinc-950 hover:bg-violet-300"
-                : "border border-line text-zinc-300 hover:border-zinc-600 hover:bg-card-raised"
-            }`}
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            data-guide="profile-manage"
+            className="flex items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
           >
-            {management ? (
-              <>
-                <Eye className="h-3.5 w-3.5" /> Back to profile
-              </>
-            ) : (
-              <>
-                <Wrench className="h-3.5 w-3.5" /> Management view
-              </>
-            )}
+            <Settings2 className="h-3.5 w-3.5" /> Manage profile
+            <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
           </button>
+          {menuOpen && (
+            <div className="absolute right-0 z-30 mt-2 w-60 overflow-hidden rounded-xl border border-line bg-card shadow-2xl animate-fade-up">
+              <p className="border-b border-line-soft px-4 pb-2 pt-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                owner tools
+              </p>
+              <Link
+                href="/profile/studio"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-3 text-sm text-zinc-300 transition hover:bg-card-raised"
+              >
+                <Palette className="h-4 w-4 text-lime-300" /> Profile Studio
+                <span className="ml-auto rounded border border-lime-400/40 px-1 py-px font-mono text-[8px] font-bold uppercase tracking-wide text-lime-300">pro</span>
+              </Link>
+              <button
+                onClick={() => { setManagement(!management); setMenuOpen(false); }}
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-zinc-300 transition hover:bg-card-raised"
+              >
+                {management ? (
+                  <>
+                    <Eye className="h-4 w-4 text-zinc-400" /> Back to profile
+                  </>
+                ) : (
+                  <>
+                    <Wrench className="h-4 w-4 text-violet-300" /> Management view
+                  </>
+                )}
+              </button>
+              <p className="border-t border-line-soft px-4 py-2.5 text-[11px] leading-relaxed text-zinc-500">
+                What you see below is exactly what visitors see.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

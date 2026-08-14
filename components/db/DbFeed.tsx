@@ -10,15 +10,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import DbPostCard, { type FeedPost } from "./DbPostCard";
-import OpportunityList from "./OpportunityList";
 import Avatar from "@/components/Avatar";
 import { Zap } from "lucide-react";
 import { useSession } from "@/lib/session";
 import LiveNowRail from "./LiveNowRail";
 import type { FeedScope } from "@/components/Feed";
 
-export type FeedTab = "For You" | "Following" | "Opportunities" | "Trending";
-const tabs: FeedTab[] = ["For You", "Following", "Opportunities", "Trending"];
+export type FeedTab = "For You" | "Following";
+const tabs: FeedTab[] = ["For You", "Following"];
 
 export const FEED_EVENT = "mavyn:feed-changed";
 
@@ -37,8 +36,6 @@ const scopeParam: Record<FeedScope, string> = {
 const tabParam: Record<FeedTab, string> = {
   "For You": "for-you",
   Following: "following",
-  Opportunities: "opportunities",
-  Trending: "trending",
 };
 
 function Skeleton() {
@@ -138,7 +135,6 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
   }, []);
 
   const load = useCallback(async () => {
-    if (tab === "Opportunities") return; // handled by OpportunityList
     try {
       const res = await fetch(`/api/feed?tab=${tabParam[tab]}&scope=${scopeParam[scope]}`, {
         cache: "no-store",
@@ -182,10 +178,12 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
 
   return (
     <>
-      {/* feed type — what kind of content. Guests get the public Discover
-          set; member tabs (Following, Trending) need a taste to rank with */}
+      {/* feed type — Home is CONSUMPTION: For You (personalized) and
+          Following (chronological, people you chose). Opportunities is a
+          sidebar destination, Trending lives in Discover — no duplicate
+          navigation here. Guests see the public Discover preview. */}
       <div className="flex items-center gap-4 overflow-x-auto border-b border-line-soft pb-0 text-sm no-scrollbar">
-        {(guest ? (["For You", "Opportunities"] as FeedTab[]) : tabs).map((t) => (
+        {(guest ? (["For You"] as FeedTab[]) : tabs).map((t) => (
           <button
             key={t}
             onClick={() => onTabChange(t)}
@@ -217,9 +215,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       {/* LIVE NOW — currently active streams for this viewer */}
       {!guest && tab === "For You" && <LiveNowRail />}
 
-      {tab === "Opportunities" ? (
-        <OpportunityList scope={scopeParam[scope]} compact />
-      ) : error === "signin" ? (
+      {error === "signin" ? (
         <div className="card p-8 text-center">
           <p className="text-sm font-semibold text-zinc-200">Sign in to see your feed</p>
           <p className="mt-1 text-xs text-zinc-500">

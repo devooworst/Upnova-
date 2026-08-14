@@ -28,7 +28,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, Briefcase, ShoppingBag, Wrench, CalendarDays, Music2, Users, ImageIcon } from "lucide-react";
+import { Search, Briefcase, ShoppingBag, Wrench, CalendarDays, Music2, Users, ImageIcon, Flame } from "lucide-react";
 import { CATEGORY_META } from "@/lib/categories";
 import Avatar from "@/components/Avatar";
 
@@ -103,9 +103,23 @@ export default function DiscoverGrid() {
   const [q, setQ] = useState("");
   const [browse, setBrowse] = useState<Card[] | null>(null); // no-query catalog
   const [results, setResults] = useState<Card[] | null>(null); // search results
+  const [trending, setTrending] = useState<Card[]>([]); // compact entry points
   const [searching, setSearching] = useState(false);
   const [resultType, setResultType] = useState<"all" | Card["type"]>("all"); // in-search narrowing only
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ---------- Trending Now: a compact discovery entry point, not a feed.
+     Trending is fundamentally a DISCOVERY mechanism, so it lives here —
+     real engagement only (reactions, follows, bookings, licenses, RSVPs,
+     applications), every type mixed, capped small. ---------- */
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/trending")
+      .then((r) => r.json())
+      .then((d) => { if (alive) setTrending((d.items ?? []) as Card[]); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   /* ---------- browse catalog: one parallel round of the real APIs ---------- */
   useEffect(() => {
@@ -228,6 +242,52 @@ export default function DiscoverGrid() {
           className="w-full rounded-2xl border border-line bg-card py-3 pl-11 pr-4 text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/40 focus:ring-2 focus:ring-lime-400/15"
         />
       </div>
+
+      {/* TRENDING NOW — browse mode only: one compact horizontal rail of
+          what's currently popular (mixed types, real engagement counts),
+          each card an entry point into discovery — never another feed. */}
+      {!inSearch && trending.length > 0 && (
+        <section data-guide="discover-trending">
+          <p className="mb-1.5 flex items-center gap-1.5 px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            <Flame className="h-3.5 w-3.5 text-amber-400" /> Trending now
+          </p>
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+            {trending.map((t) => {
+              const badge = BADGE[t.type];
+              const Icon = PLACEHOLDER_ICON[t.type];
+              return (
+                <Link
+                  key={t.key}
+                  href={t.href}
+                  className="flex w-44 shrink-0 items-center gap-2.5 rounded-xl border border-line bg-card p-2 transition hover:border-zinc-600 active:scale-[0.98]"
+                >
+                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-card-raised">
+                    {t.type === "people" ? (
+                      <span className="flex h-full w-full items-center justify-center">
+                        <Avatar src={t.avatar} initials={t.title.charAt(0)} size="sm" />
+                      </span>
+                    ) : t.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={t.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center">
+                        <Icon className="h-4 w-4 text-zinc-600" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`inline-block rounded-full border px-1.5 py-px text-[7px] font-bold uppercase tracking-[0.08em] ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs font-semibold leading-tight text-zinc-100">{t.title}</span>
+                    <span className="block truncate text-[10px] text-zinc-500">{t.meta}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* narrowing pills — exist ONLY inside an active search with mixed
           results; browsing never shows category controls (the sidebar is

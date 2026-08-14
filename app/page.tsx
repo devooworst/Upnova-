@@ -10,10 +10,11 @@ import RightSidebar from "@/components/RightSidebar";
 import { useSession } from "@/lib/session";
 
 /* ------------------------------------------------------------------ */
-/* Home always stays Home. Two orthogonal controls:                    */
-/*   Feed Type  — For You | Following | Opportunities | Trending       */
+/* Home always stays Home — "what should I see right now?"             */
+/*   Feed Type  — For You (personalized) | Following (chronological)   */
 /*   Feed Scope — For You default → 5 mi → … → Global → My School      */
-/* Scope filters the feed; it never renames the page.                  */
+/* Scope filters the feed; it never renames the page. Opportunities    */
+/* is a sidebar destination; Trending lives in Discover.               */
 /* ------------------------------------------------------------------ */
 
 const scopes: { id: FeedScope; label: string; studentOnly?: boolean }[] = [

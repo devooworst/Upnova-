@@ -328,3 +328,72 @@ export const weightedRanker: Ranker = {
 
 /** The active ranker — routes call this, never a concrete implementation. */
 export const ranker: Ranker = weightedRanker;
+
+/* --------------------------- feed arrangement --------------------------- */
+
+/** Post-ranking arrangement for CONSUMPTION feeds (For You). Raw ranked
+ *  order maximizes per-item score but tolerates monotony — five posts in
+ *  a row from the creator you engage with most, or one category wall.
+ *  This pass trades a little score for a better session:
+ *
+ *    · author spacing  — an author repeats only after `authorGap` other
+ *      authors have appeared (greedy pick of the best non-violating item;
+ *      if EVERYTHING violates, score wins — small feeds never starve);
+ *    · category runs   — at most `categoryRun` consecutive items of one
+ *      category, same greedy rule;
+ *    · exploration     — every `exploreEvery`-th slot surfaces the
+ *      highest-ranked item that matched NONE of the viewer's personal
+ *      signals (no follow / interest / affinity reason), labeled
+ *      honestly. Taste keeps compounding from interactions without the
+ *      feed collapsing into a bubble.
+ *
+ *  Pure arrangement: no item is added or dropped, hides stay hidden,
+ *  Following is NEVER arranged (chronological, exactly who you follow). */
+export const ARRANGE = { authorGap: 2, categoryRun: 2, exploreEvery: 8 };
+export const EXPLORE_REASON = "outside your usual — exploring";
+
+export function arrangeFeed<T>(
+  ranked: ScoredItem<T>[],
+  meta: (item: T) => { authorId?: string; category?: string }
+): ScoredItem<T>[] {
+  const pool = ranked.slice();
+  const out: ScoredItem<T>[] = [];
+  const recentAuthors: string[] = []; // last `authorGap` authors
+  const recentCats: string[] = []; // last `categoryRun` categories
+
+  while (pool.length) {
+    let idx = -1;
+
+    // exploration slot: the best item with zero personal signals
+    if ((out.length + 1) % ARRANGE.exploreEvery === 0) {
+      idx = pool.findIndex((r) => r.reasons.length === 0);
+      if (idx >= 0) pool[idx] = { ...pool[idx], reasons: [EXPLORE_REASON] };
+    }
+
+    // normal slot: best item that keeps authors spaced and category runs short
+    if (idx < 0) {
+      idx = pool.findIndex((r) => {
+        const m = meta(r.item);
+        if (m.authorId && recentAuthors.includes(m.authorId)) return false;
+        const cat = (m.category ?? "").toLowerCase();
+        if (
+          cat &&
+          recentCats.length >= ARRANGE.categoryRun &&
+          recentCats.slice(-ARRANGE.categoryRun).every((c) => c === cat)
+        )
+          return false;
+        return true;
+      });
+      if (idx < 0) idx = 0; // every candidate violates spacing → score wins
+    }
+
+    const pick = pool.splice(idx, 1)[0];
+    const m = meta(pick.item);
+    recentAuthors.push(m.authorId ?? "");
+    if (recentAuthors.length > ARRANGE.authorGap) recentAuthors.shift();
+    recentCats.push((m.category ?? "").toLowerCase());
+    if (recentCats.length > ARRANGE.categoryRun) recentCats.shift();
+    out.push(pick);
+  }
+  return out;
+}

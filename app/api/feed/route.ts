@@ -5,7 +5,7 @@ import { buildAuthorCtx, maskAuthor, communityCounts } from "@/lib/server/commun
 import { getSessionUser, guarded } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
-import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
+import { buildTaste, ranker, arrangeFeed, type Scorable } from "@/lib/server/recsys";
 import { postTrustMap } from "@/lib/server/trust";
 import { parseConfig } from "@/lib/servicePolicies";
 import { ctaFor } from "@/lib/server/cta";
@@ -17,9 +17,12 @@ export const dynamic = "force-dynamic";
 const GUEST_FEED_LIMIT = 12;
 
 /**
- * GET /api/feed?tab=for-you|following|trending&scope=for-you|5mi|25mi|city|county|state|country|global|school
+ * GET /api/feed?tab=for-you|following&scope=for-you|5mi|25mi|city|county|state|country|global|school
  * Tab picks the ranking, scope picks the geography — orthogonal by design.
- * (The Opportunities feed tab is served by /api/opportunities.)
+ * Home is consumption: For You (personalized) and Following (chronological,
+ * exactly who you follow) only. Opportunities live at /opportunities (the
+ * sidebar destination); trending is a DISCOVERY mechanism and surfaces in
+ * Discover (/api/trending) — tab=trending stays supported for callers.
  */
 export async function GET(req: NextRequest) {
   return guarded(async () => {
@@ -153,9 +156,18 @@ export async function GET(req: NextRequest) {
         .sort((a, b) => b.scorable.engagement - a.scorable.engagement)
         .map(({ item }) => item);
     } else {
-      const ranked = ranker.rank(mapped.map(({ item, scorable }) => ({ item, scorable })), taste);
+      // FOR YOU = personalized ranking + arrangement: the weighted engine
+      // scores (follows, interests, affinity, proximity, freshness,
+      // engagement), then arrangeFeed spaces out repeat authors, breaks
+      // category walls, and reserves periodic exploration slots for
+      // content OUTSIDE the viewer's usual signals — personalization that
+      // compounds with interactions without becoming a bubble.
+      const ranked = arrangeFeed(
+        ranker.rank(mapped.map(({ item, scorable }) => ({ item, scorable })), taste),
+        (it) => ({ authorId: it.author.id, category: it.category })
+      );
       items = ranked.map((r) => r.item);
-      for (const r of ranked.slice(0, 20)) reasons[r.item.id] = r.reasons;
+      for (const r of ranked.slice(0, 24)) if (r.reasons.length) reasons[r.item.id] = r.reasons;
     }
 
     // ---- promoted slot: labeled, separate, NEVER part of organic ranking ----
