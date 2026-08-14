@@ -24,6 +24,7 @@ import { randomBytes } from "crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { haversineMi } from "./feed";
+import { parsePrefs } from "@/lib/onboardingPrefs";
 
 /* ------------------------------ recording ------------------------------ */
 
@@ -124,6 +125,15 @@ export interface Taste {
   downrankedAuthors: Set<string>;
   /** categories the user marked not-interested */
   downrankedCategories: Set<string>;
+  /** onboarding intent signals (goals + wantMore ids) — editable in Settings */
+  goals: Set<string>;
+  wantMore: Set<string>;
+  /** 0 → brand-new account, 1 → rich interaction history. Onboarding
+      selections are INITIAL signals: their weight decays as this grows,
+      so what the user actually does gradually outweighs what they said
+      on day one (searches, follows, likes, saves, views, not-interested
+      all land in the interactions log that drives this number). */
+  behaviorDepth: number;
 }
 
 const parse = (s: string): string[] => {
@@ -189,6 +199,8 @@ export async function buildTaste(userId: string, profile: typeof tables.profiles
 
   const squash = (m: Map<string, number>) => new Map(Array.from(m.entries()).map(([k, v]) => [k, Math.tanh(v / 10)]));
 
+  const prefs = parsePrefs(profile.onboardingPrefs);
+
   return {
     userId,
     lat: profile.lat,
@@ -197,6 +209,11 @@ export async function buildTaste(userId: string, profile: typeof tables.profiles
     interests: new Set([...parse(profile.interests), ...parse(profile.skills)].map((s) => s.toLowerCase())),
     followingIds,
     communityIds,
+    goals: new Set(prefs.goals),
+    wantMore: new Set(prefs.wantMore),
+    // 150 interactions ≈ a settled account: onboarding hints have fully
+    // ceded their extra influence to real behavior by then
+    behaviorDepth: Math.min(1, events.length / 150),
     authorAffinity: squash(authorRaw),
     categoryAffinity: squash(categoryRaw),
     hiddenTargets,
@@ -239,6 +256,11 @@ export const WEIGHTS = {
   engagementLog: 6, // × ln(engagement + 1)
   notInterestedAuthor: -40,
   notInterestedCategory: -25,
+  /** Onboarding = initial signal, not a permanent label: interest/intent
+      boosts scale by (1 − onboardingDecay·behaviorDepth), so a settled
+      account's ranking is driven mostly by its OWN behavior (affinities,
+      follows, hides) while day-one picks fade to half influence. */
+  onboardingDecay: 0.5,
 };
 
 export interface ScoredItem<T> {
@@ -260,7 +282,8 @@ export function scoreItem(s: Scorable, taste: Taste): { score: number; reasons: 
   const tags = (s.tags ?? []).map((t) => t.toLowerCase());
   const shared = tags.filter((t) => taste.interests.has(t)).length;
   if (shared > 0) {
-    score += Math.min(shared * WEIGHTS.interestMatch, WEIGHTS.interestCap);
+    const onboardingScale = 1 - WEIGHTS.onboardingDecay * (taste.behaviorDepth ?? 0);
+    score += Math.min(shared * WEIGHTS.interestMatch, WEIGHTS.interestCap) * onboardingScale;
     reasons.push(`matches ${shared} of your interests`);
   }
 
@@ -328,6 +351,33 @@ export const weightedRanker: Ranker = {
 
 /** The active ranker — routes call this, never a concrete implementation. */
 export const ranker: Ranker = weightedRanker;
+
+/* --------------------------- intent → suggestions --------------------------- */
+
+/** Which For You suggestion card leads. The feed renders one WORK, SERVICE,
+ *  PRODUCT and OPPORTUNITY card between posts; by default in that order.
+ *  Goals/wantMore from onboarding pull the types the user ASKED for into
+ *  the earliest slots ("Find opportunities" → the Opportunity·Apply card
+ *  appears first, not last). Explicit map, no inference — and because
+ *  it reads the editable preferences, changing them in Settings changes
+ *  the feed immediately. */
+const INTENT_HITS: Record<"work" | "service" | "product" | "opportunity", string[]> = {
+  work: ["creative-ideas", "inspiration", "create-share"],
+  service: ["services"],
+  product: ["products", "sell-something"],
+  opportunity: ["find-opportunities", "make-money", "opportunities", "jobs-projects"],
+};
+
+export function suggestionOrder(taste: Taste): ("work" | "service" | "product" | "opportunity")[] {
+  const base: ("work" | "service" | "product" | "opportunity")[] = ["work", "service", "product", "opportunity"];
+  const hits = (t: keyof typeof INTENT_HITS) =>
+    INTENT_HITS[t].filter((id) => taste.goals.has(id) || taste.wantMore.has(id)).length;
+  // stable sort: intent matches first, ties keep the established order
+  return base
+    .map((t, i) => ({ t, i, h: hits(t) }))
+    .sort((a, b) => b.h - a.h || a.i - b.i)
+    .map((x) => x.t);
+}
 
 /* --------------------------- feed arrangement --------------------------- */
 

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import SecurityCard from "@/components/SecurityCard";
+import PrefsEditor from "@/components/PrefsEditor";
 import { useSession, invalidateSession } from "@/lib/session";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import { setPlan, PRO_EVENT, type Plan } from "@/lib/pro";
@@ -35,6 +36,7 @@ import { currentUser, services, bookings } from "@/lib/data";
 const sections = [
   { id: "account", label: "Account", icon: User },
   { id: "creator", label: "Profile & Creator", icon: Palette },
+  { id: "personalization", label: "Personalization", icon: Compass },
   { id: "education", label: "School & Education", icon: GraduationCap },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "privacy", label: "Privacy & Safety", icon: ShieldCheck },
@@ -395,6 +397,17 @@ export default function SettingsPage() {
                 Deactivate or delete account <ChevronRight className="h-4 w-4" />
               </button>
             </>
+          )}
+
+          {section === "personalization" && (
+            <section className="card p-5">
+              <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Personalization</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                The four questions from your first day on Mavyn — interests, goals, vibe,
+                and what you want more of. Change them whenever; skip them entirely if you like.
+              </p>
+              <PrefsEditor />
+            </section>
           )}
 
           {section === "creator" && (

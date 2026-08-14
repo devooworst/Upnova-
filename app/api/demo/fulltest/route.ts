@@ -1128,6 +1128,65 @@ export async function POST(req: NextRequest) {
       const t5 = (await api("tonba", "/api/me/tours")).data as any;
       step(c, "scenario completion is tracked per user (learn-* keys) alongside page tours, without conflict", t5.tours?.["learn-preferred-clients"] === "done" && t5.tours?.payments === "dismissed", { actual: JSON.stringify(t5.tours) });
     }
+
+    /* ---- personalization: the 4 post-signup questions (interests /
+       goals / vibe / wantMore) — optional, validated, editable, and
+       wired into ranking as DECAYING initial signals ---- */
+    {
+      const p0 = (await api("tonba", "/api/me/preferences")).data as any;
+      step(c, "a brand-new account has NOT answered personalization (saved=false) — this is what pops the flow before the tour", p0.saved === false && Array.isArray(p0.interests), { route: "GET /api/me/preferences", actual: JSON.stringify(p0) });
+
+      const pw = await api("tonba", "/api/me/preferences", { method: "PATCH", body: {
+        interests: ["Music", "Photography", "NOT-A-REAL-INTEREST"],
+        goals: ["find-opportunities", "make-money", "hack-the-planet"],
+        vibe: ["creative", "low-key"],
+        wantMore: ["opportunities", "local-events"],
+      } });
+      const p1 = (await api("tonba", "/api/me/preferences")).data as any;
+      step(c, "answers persist and unknown values are DROPPED (canonical lists only — free-form is never stored)",
+        pw.status === 200 && p1.saved === true &&
+        JSON.stringify(p1.interests) === JSON.stringify(["Music", "Photography"]) &&
+        JSON.stringify(p1.goals) === JSON.stringify(["make-money", "find-opportunities"]) &&
+        p1.vibe.length === 2 && JSON.stringify(p1.wantMore) === JSON.stringify(["opportunities", "local-events"]),
+        { route: "PATCH /api/me/preferences", actual: JSON.stringify(p1) });
+
+      // intent → the feed leads with what they asked for: opportunity card FIRST
+      const fyP = (await api("tonba", "/api/feed?tab=for-you")).data as any;
+      step(c, "stated intent reorders the For You suggestion slots: asked for opportunities/money → the Opportunity·Apply card takes the earliest slot",
+        Array.isArray(fyP.suggestionOrder) && fyP.suggestionOrder[0] === "opportunity",
+        { route: "GET /api/feed?tab=for-you", actual: JSON.stringify(fyP.suggestionOrder) });
+
+      // interests land in the SAME field the profile editor curates
+      const meP = (await api("tonba", "/api/auth/me")).data as any;
+      step(c, "onboarding interests write to profiles.interests — one source of truth with profile editing (edit-later is real, not a copy)",
+        JSON.stringify(meP.user?.profile?.interests) === JSON.stringify(["Music", "Photography"]), { actual: JSON.stringify(meP.user?.profile?.interests) });
+
+      // decaying initial signals — structural: the exact mechanism exists
+      const recsysSrc = fs.readFileSync(path.join(process.cwd(), "lib", "server", "recsys.ts"), "utf8");
+      step(c, "onboarding selections are INITIAL signals, not labels: interest boosts scale by (1 − onboardingDecay·behaviorDepth), behavior (150 interactions) fully matures the account",
+        recsysSrc.includes("onboardingDecay") && recsysSrc.includes("behaviorDepth: Math.min(1, events.length / 150)") && recsysSrc.includes("WEIGHTS.onboardingDecay * (taste.behaviorDepth"));
+
+      // the flow itself: optional, skippable, runs BEFORE the tour, never on replay
+      const flowSrc = fs.readFileSync(path.join(process.cwd(), "components", "PersonalizeFlow.tsx"), "utf8");
+      const tourSrc = fs.readFileSync(path.join(process.cwd(), "components", "OnboardingTour.tsx"), "utf8");
+      step(c, "the flow is chips-not-forms, every step skippable, 'Skip all' records skipped (still counts as answered), and ?tour=1 replays NEVER re-run personalization",
+        flowSrc.includes("personalize-skip") && flowSrc.includes("Skip this step") && flowSrc.includes("skipped: true") &&
+        tourSrc.includes('setPhase(d.saved ? "welcome" : "personalize")') && tourSrc.includes("replaying the tour never re-runs personalization"));
+
+      // skip-all path on a second fresh account
+      const b2 = await mk("tonbprefs");
+      step(c, "second fresh account created for the skip path", b2.status === 200);
+      await api("tonbprefs", "/api/me/preferences", { method: "PATCH", body: { skipped: true } });
+      const p2 = (await api("tonbprefs", "/api/me/preferences")).data as any;
+      step(c, "'Skip all' marks personalization answered (saved=true, skipped=true) with zero selections stored — the flow never nags again",
+        p2.saved === true && p2.skipped === true && p2.interests.length === 0 && p2.goals.length === 0, { actual: JSON.stringify(p2) });
+
+      // editable later: Settings → Personalization uses the same API
+      const settingsSrc = fs.readFileSync(path.join(process.cwd(), "app", "settings", "page.tsx"), "utf8");
+      const editorSrc = fs.readFileSync(path.join(process.cwd(), "components", "PrefsEditor.tsx"), "utf8");
+      step(c, "preferences are editable forever: Settings → Personalization renders PrefsEditor against the same /api/me/preferences (plus interests in the profile editor)",
+        settingsSrc.includes("PrefsEditor") && settingsSrc.includes('"personalization"') && editorSrc.includes("/api/me/preferences"));
+    }
   }
 
   /* ================= BUSINESS PEOPLE & HIRING ================= */

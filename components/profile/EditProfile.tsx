@@ -14,6 +14,7 @@
 /*  shown read-only with an explanation of where they come from.       */
 /* ------------------------------------------------------------------ */
 
+import { INTEREST_OPTIONS } from "@/lib/onboardingPrefs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -96,20 +97,9 @@ const AVAILABLE_FOR = [
   "Full-time opportunities",
 ];
 
-const INTERESTS = [
-  "Music",
-  "Film",
-  "Fashion",
-  "Photography",
-  "Technology",
-  "Gaming",
-  "Brands",
-  "Events",
-  "Food",
-  "Sports",
-  "Art & Design",
-  "Education",
-];
+/* one source of truth with onboarding + Settings → Personalization —
+   legacy picks (Film, Brands, Events…) keep rendering via the union below */
+const INTERESTS: string[] = [...INTEREST_OPTIONS];
 
 const SERVICE_AREAS = ["5 miles", "25 miles", "50 miles", "City", "State", "Remote", "Custom"] as const;
 
@@ -1301,7 +1291,7 @@ export default function EditProfile() {
               </FieldLabel>
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-zinc-400">Interested in</p>
               <div className="flex flex-wrap gap-1.5">
-                {INTERESTS.map((it) => {
+                {[...INTERESTS, ...draft.interests.filter((x) => !INTERESTS.includes(x))].map((it) => {
                   const on = draft.interests.includes(it);
                   return (
                     <button

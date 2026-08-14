@@ -5,7 +5,7 @@ import { buildAuthorCtx, maskAuthor, communityCounts } from "@/lib/server/commun
 import { getSessionUser, guarded } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
-import { buildTaste, ranker, arrangeFeed, type Scorable } from "@/lib/server/recsys";
+import { buildTaste, ranker, arrangeFeed, suggestionOrder, type Scorable } from "@/lib/server/recsys";
 import { postTrustMap } from "@/lib/server/trust";
 import { parseConfig } from "@/lib/servicePolicies";
 import { ctaFor } from "@/lib/server/cta";
@@ -406,6 +406,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, suggestedWork, suggestedOpportunity, suggestedCommunityPost, guest: !user, totalPublic: mapped.length };
+    return { items: items.slice(0, 60), reasons, promoted, suggestedService, suggestedProduct, suggestedWork, suggestedOpportunity, suggestedCommunityPost, guest: !user, totalPublic: mapped.length,
+      // what the user said they want (onboarding, editable in Settings)
+      // decides which suggestion card leads — see suggestionOrder()
+      suggestionOrder: taste ? suggestionOrder(taste) : ["work", "service", "product", "opportunity"] };
   });
 }

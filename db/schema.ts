@@ -148,6 +148,11 @@ export const profiles = pgTable("profiles", {
   additionalRoles: text("additional_roles").notNull().default("[]"),
   skills: text("skills").notNull().default("[]"),
   interests: text("interests").notNull().default("[]"),
+  // Onboarding personalization (goals/vibe/wantMore as JSON) — light
+  // INTENT signals chosen at signup, editable any time in Settings.
+  // Initial recommendation hints only, never permanent labels: recsys
+  // decays their weight as real behavior accumulates.
+  onboardingPrefs: text("onboarding_prefs").notNull().default("{}"),
   serviceArea: text("service_area").notNull().default("25 miles"),
 
   // availability + hiring

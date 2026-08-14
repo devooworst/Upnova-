@@ -125,6 +125,10 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
     reactions: number; comments: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // which suggestion card leads — the server orders types by the user's
+  // stated goals/wantMore (onboarding, editable in Settings): asked for
+  // opportunities? the Opportunity·Apply card takes the earliest slot.
+  const [sugOrder, setSugOrder] = useState<("work" | "service" | "product" | "opportunity")[]>(["work", "service", "product", "opportunity"]);
 
   useEffect(() => {
     fetch("/api/bookmarks", { cache: "no-store" })
@@ -154,6 +158,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
       setSuggestedWork(data.suggestedWork ?? null);
       setSuggestedOpp(data.suggestedOpportunity ?? null);
       setSuggestedCommunity(data.suggestedCommunityPost ?? null);
+      if (Array.isArray(data.suggestionOrder) && data.suggestionOrder.length === 4) setSugOrder(data.suggestionOrder);
       // passive view signals for what actually rendered (deduped server-side)
       // — members only; guests have no interaction log to write to
       const viewed = (data.items ?? []).slice(0, 12).map((p: FeedPost) => ({ targetType: "post", targetId: p.id, action: "view" }));
@@ -239,7 +244,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
               />
               {/* organic service suggestion — ranked by the same engine as
                   everything else, with its reasons shown. NOT promoted. */}
-              {i === 5 && suggested && (
+              {sugOrder[[3,5,7,9].indexOf(i)] === "service" && suggested && (
                 <aside className="card flex flex-wrap items-center gap-3 p-4">
                   <span className="w-full font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                     Suggested service{suggested.reasons.length ? ` · ${suggested.reasons.join(" · ")}` : ""}
@@ -259,7 +264,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                 </aside>
               )}
               {/* WORK card — License is the action */}
-              {i === 3 && suggestedWork && (
+              {sugOrder[[3,5,7,9].indexOf(i)] === "work" && suggestedWork && (
                 <aside className="card flex flex-wrap items-center gap-3.5 p-4">
                   <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Work · License
@@ -306,7 +311,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                 </aside>
               )}
               {/* OPPORTUNITY card — Apply is the action */}
-              {i === 9 && suggestedOpp && (
+              {sugOrder[[3,5,7,9].indexOf(i)] === "opportunity" && suggestedOpp && (
                 <aside className="card flex flex-wrap items-center gap-3 p-4">
                   <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Opportunity · Apply
@@ -355,7 +360,7 @@ export default function DbFeed({ scope, tab, onTabChange, isStudent }: Props) {
                 </aside>
               )}
               {/* PRODUCT card — the feed knows a product is not a post */}
-              {i === 7 && suggestedProduct && (
+              {sugOrder[[3,5,7,9].indexOf(i)] === "product" && suggestedProduct && (
                 <aside className="card flex flex-wrap items-center gap-3 p-4">
                   <span className="flex w-full items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> Product

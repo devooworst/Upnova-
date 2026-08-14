@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/lib/session";
+import PersonalizeFlow from "@/components/PersonalizeFlow";
 
 type TourStep = { id: string; target: string; title: string; body: string; href?: string };
 type Tour = { audience: string; demoMode: "demo" | "simulation" | null; steps: TourStep[] };
@@ -39,8 +40,8 @@ export default function OnboardingTour() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // phase: idle → welcome → touring → finale → done
-  const [phase, setPhase] = useState<"idle" | "welcome" | "touring" | "finale">("idle");
+  // phase: idle → (personalize, first run only) → welcome → touring → finale → done
+  const [phase, setPhase] = useState<"idle" | "personalize" | "welcome" | "touring" | "finale">("idle");
   const [tour, setTour] = useState<Tour | null>(null);
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -52,9 +53,21 @@ export default function OnboardingTour() {
   useEffect(() => {
     if (!user || hiddenHere || startedRef.current) return;
     const forced = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tour") === "1";
-    if (forced || user.onboarding?.completed === false) {
+    if (forced) {
+      // replaying the tour never re-runs personalization
       startedRef.current = true;
       setPhase("welcome");
+      return;
+    }
+    if (user.onboarding?.completed === false) {
+      startedRef.current = true;
+      // brand-new account: the short personalization moment comes first
+      // (1 Interests → 2 Goals → 3 Your vibe → 4 More of → the tour).
+      // Already answered (e.g. reload mid-tour)? Straight to the tour.
+      fetch("/api/me/preferences", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { saved: true }))
+        .then((d) => setPhase(d.saved ? "welcome" : "personalize"))
+        .catch(() => setPhase("welcome")); // an error never traps onboarding
     }
   }, [user, hiddenHere]);
 
@@ -145,6 +158,9 @@ export default function OnboardingTour() {
   }, [user]);
 
   if (!user || hiddenHere || phase === "idle") return null;
+
+  /* ============================ PERSONALIZE ============================ */
+  if (phase === "personalize") return <PersonalizeFlow onDone={() => setPhase("welcome")} />;
 
   /* ================================ WELCOME ================================ */
   if (phase === "welcome")
