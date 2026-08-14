@@ -12,6 +12,7 @@ import { parseConfig, travelFeeFor, normalizeMenu, normalizeCategory, DEFAULT_CO
 import { haversineMi } from "@/lib/server/feed";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 import { createLinkedPost } from "@/lib/server/publish";
+import { notifySubscribers } from "@/lib/server/notify";
 
 /** GET /api/services — active marketplace listings with real owners. */
 export async function GET() {
@@ -223,6 +224,15 @@ export async function POST(req: NextRequest) {
         reach: String(body.reach || "Remote").slice(0, 60),
       })
       .run();
+
+    // "Notify me when bookings open" — bell subscribers on this provider
+    await notifySubscribers({
+      targetType: "creator", targetId: user.id, eventKind: "bookings", actorId: user.id,
+      type: "booking_available",
+      title: `${user.profile.displayName} just opened bookings`,
+      body: title,
+      href: `/services/${id}`,
+    });
     // publishing = feed presence: public services get ONE linked post so
     // they surface in For You and on the profile (shareToFeed opts out)
     if (visibility === "public" && body.shareToFeed !== false) {

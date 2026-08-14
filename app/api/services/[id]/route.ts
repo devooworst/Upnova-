@@ -7,6 +7,7 @@ import { publicUser } from "@/lib/server/serialize";
 import { ctaFor } from "@/lib/server/cta";
 import { parseConfig, travelFeeFor } from "@/lib/servicePolicies";
 import { haversineMi } from "@/lib/server/feed";
+import { notifySubscribers } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -159,7 +160,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       patch.config = JSON.stringify(full);
     }
 
+    const before = (await db.select().from(tables.services).where(eq(tables.services.id, params.id)).get())!;
     await db.update(tables.services).set(patch).where(eq(tables.services.id, params.id)).run();
+
+    // "Notify me about this service" — only REAL, user-visible changes:
+    // bookings opening back up (unpaused / reactivated) or a price change.
+    const opened = (before.paused && patch.paused === false) || (!before.active && patch.active === true);
+    const priceChanged = patch.price !== undefined && patch.price !== before.price;
+    if (opened || priceChanged) {
+      await notifySubscribers({
+        targetType: "service", targetId: params.id, actorId: user.id,
+        type: opened ? "booking_available" : "service_update",
+        title: opened ? `Bookings are open again: ${before.title}` : `Service updated: ${before.title}`,
+        body: opened ? "The provider is taking bookings — grab a slot." : `New price: $${patch.price}`,
+        href: `/services/${params.id}`,
+      });
+    }
     return { ok: true };
   });
 }

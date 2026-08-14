@@ -2403,6 +2403,106 @@ export async function POST(req: NextRequest) {
     await api("rachel", `/api/follow/${lena.id}`, { method: "DELETE" });
   }
 
+  /* ================= NOTIFICATION CONTROLS & MOTIVATION ================= */
+  /* The contract: users control WHAT they receive (per-kind switches),
+     WHO they hear about (per-creator bell levels), WHICH content they
+     watch (per-post/opportunity/service subscriptions, account-stored →
+     cross-device), and motivation is STRICTLY opt-in with frequency +
+     window. If it's off, it is not sent — notify() is the single gate,
+     so the same switches govern any future push transport. */
+  {
+    const c = cat("NOTIFICATION CONTROLS & MOTIVATION");
+    const notifCount = async (userId: string, type: string) =>
+      (await db.select().from(tables.notifications).where(and(eq(tables.notifications.userId, userId), eq(tables.notifications.type, type))).all()).length;
+    const rachelRaw = (await db.select().from(tables.users).where(eq(tables.users.id, rachel.id)).get())!.notifyPrefs;
+
+    // 1 · per-creator bell: rachel subscribes to lena's POSTS only
+    const sub1 = await api("rachel", "/api/me/subscriptions", { method: "PUT", body: { targetType: "creator", targetId: lena.id, mode: "posts" } });
+    const subGet = (await api("rachel", `/api/me/subscriptions?targetType=creator&targetId=${lena.id}`)).data as any;
+    step(c, "creator bell levels persist on the ACCOUNT (all/posts/live/bookings/opportunities/important/off) — cross-device by construction", sub1.status === 200 && subGet.mode === "posts", { route: "PUT /api/me/subscriptions" });
+
+    const before1 = await notifCount(rachel.id, "creator_post");
+    const post1 = await api("lena", "/api/posts", { method: "POST", body: { body: "[QA-NOTIF] new drop — first look" } });
+    step(c, "subscribed level fires: lena posts → rachel gets creator_post", post1.status === 200 && (await notifCount(rachel.id, "creator_post")) === before1 + 1, { route: "POST /api/posts → notifySubscribers(creator,posts)" });
+
+    // 2 · switching the level really switches: live-only hears live, not posts
+    await api("rachel", "/api/me/subscriptions", { method: "PUT", body: { targetType: "creator", targetId: lena.id, mode: "live" } });
+    const before2 = await notifCount(rachel.id, "creator_post");
+    await api("lena", "/api/posts", { method: "POST", body: { body: "[QA-NOTIF] second post — live-only sub must NOT hear this" } });
+    const beforeLive = await notifCount(rachel.id, "creator_live");
+    const live1 = await api("lena", "/api/live", { method: "POST", body: { title: "[TESTLIVE] notif fanout check", category: "music", audience: "everyone" } });
+    const liveId = String((live1.data as any).id ?? "");
+    step(c, "level = Live streams: a new post does NOT notify, going live DOES (creator_live)",
+      (await notifCount(rachel.id, "creator_post")) === before2 && (await notifCount(rachel.id, "creator_live")) === beforeLive + 1,
+      { actual: `posts ${before2}→${await notifCount(rachel.id, "creator_post")}, live ${beforeLive}→${await notifCount(rachel.id, "creator_live")}` });
+    if (liveId) await api("lena", `/api/live/${liveId}`, { method: "PATCH", body: { action: "end" } }).catch(() => {});
+
+    // 3 · the per-KIND switch beats everything: creators.posts off → silent even when subscribed
+    await api("rachel", "/api/me/subscriptions", { method: "PUT", body: { targetType: "creator", targetId: lena.id, mode: "posts" } });
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { types: { "creators.posts": false } } });
+    const before3 = await notifCount(rachel.id, "creator_post");
+    await api("lena", "/api/posts", { method: "POST", body: { body: "[QA-NOTIF] third post — the type switch is OFF" } });
+    step(c, "Settings switch wins: creators.posts OFF → nothing sent even to a subscriber (off means OFF, on every channel)",
+      (await notifCount(rachel.id, "creator_post")) === before3, { route: "PATCH /api/me/notifications {types}" });
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { types: { "creators.posts": true } } });
+
+    // 4 · channel save must NOT wipe type switches (the merge-writer contract)
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { types: { "social.likes": false } } });
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { prefs: { messages: { inapp: true, email: true, sms: false } } } });
+    const merged = (await api("rachel", "/api/me/notifications")).data as any;
+    step(c, "one JSON, one merge writer: saving channel prefs preserves type switches (and vice versa)", merged.types?.["social.likes"] === false && merged.prefs?.messages?.email === true, { actual: JSON.stringify({ likes: merged.types?.["social.likes"], msgEmail: merged.prefs?.messages?.email }) });
+
+    // 5 · security can never be silenced
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { types: { "system.security": false } } });
+    const sec = (await api("rachel", "/api/me/notifications")).data as any;
+    step(c, "system.security is un-silenceable — the API refuses to store false", sec.types?.["system.security"] === true);
+
+    // 6 · content subscription: "notify me when this opportunity changes"
+    const opp1 = await api("lena", "/api/opportunities", { method: "POST", body: { title: "[QA-NOTIF] flyer design — watch me change", description: "test", budget: 120 } });
+    const oppId = String((opp1.data as any).id ?? "");
+    await api("rachel", "/api/me/subscriptions", { method: "PUT", body: { targetType: "opportunity", targetId: oppId, mode: "on" } });
+    const beforeOpp = await notifCount(rachel.id, "opportunity_update");
+    await api("lena", `/api/opportunities/${oppId}`, { method: "PATCH", body: { action: "close" } });
+    step(c, "watching an opportunity: closing it notifies watchers (opportunity_update) — reopen/close are both 'changes'",
+      opp1.status === 200 && (await notifCount(rachel.id, "opportunity_update")) === beforeOpp + 1, { route: "PATCH /api/opportunities/[id] close" });
+
+    // 7 · motivation: strictly opt-in, honest source, idempotent per period
+    const motDefault = (await api("rachel", "/api/me/notifications")).data as any;
+    step(c, "motivation defaults OFF (opt-in) with frequency + window + source controls exposed", motDefault.motivation?.enabled === false && !!motDefault.motivation?.frequency && !!motDefault.motivation?.window);
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { motivation: { enabled: true, frequency: "daily", window: "any", general: true, fromFollowed: false } } });
+    const beforeMot = await notifCount(rachel.id, "motivation");
+    let tickM = await runJobsTick();
+    const afterMot = await notifCount(rachel.id, "motivation");
+    const motRow = (await db.select().from(tables.notifications).where(and(eq(tables.notifications.userId, rachel.id), eq(tables.notifications.type, "motivation"))).all()).pop();
+    step(c, "opted in + in window → ONE Mavyn Motivation lands via the jobs tick, titled and quoted from the curated pool", tickM.motivation >= 1 && afterMot === beforeMot + 1 && motRow?.title === "Mavyn Motivation" && (motRow?.body?.length ?? 0) > 20, { actual: `"${motRow?.body?.slice(0, 60)}…"` });
+    tickM = await runJobsTick();
+    step(c, "never excessive: an immediate second tick sends NOTHING (frequency gap enforced, idempotent)", (await notifCount(rachel.id, "motivation")) === afterMot, { actual: `motivation sends on 2nd tick: ${tickM.motivation - (tickM.motivation ? tickM.motivation : 0) === 0 ? "checked via count" : ""}${await notifCount(rachel.id, "motivation")} total` });
+    await api("rachel", "/api/me/notifications", { method: "PATCH", body: { motivation: { enabled: false } } });
+
+    // 8 · Worlds image display: Fit/Fill/Position round-trips the sanitizer
+    const putW = await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: true, environment: "cosmic", elements: {}, images: { qaimg: { src: "/images/ava.jpg", x: 10, y: 100, w: 40, rotate: 0, opacity: 1, layer: 5, locked: false, h: 300, fit: "fit", posX: 0, posY: 100 } } } } } });
+    const gotW = ((await api("lena", "/api/me/studio")).data as any).studio?.world?.images?.qaimg;
+    step(c, "Mavyn Worlds: Fit/Fill/Position persist per element (h=300 · fit · posX 0 · posY 100) through the allow-list sanitizer — object-fit semantics, never stretched",
+      putW.status === 200 && gotW?.h === 300 && gotW?.fit === "fit" && gotW?.posX === 0 && gotW?.posY === 100, { route: "PATCH /api/me/studio", actual: JSON.stringify(gotW ?? null) });
+    const putW2 = await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: true, environment: "cosmic", elements: {}, images: { qaimg: { src: "/images/ava.jpg", x: 10, y: 100, w: 40, rotate: 0, opacity: 1, layer: 5, locked: false, h: 99999, fit: "stretch", posX: 400, posY: -5 } } } } } });
+    const gotW2 = ((await api("lena", "/api/me/studio")).data as any).studio?.world?.images?.qaimg;
+    step(c, "off-menu display values can't persist: h clamps to 3000, unknown fit falls back to fill, position clamps 0–100",
+      putW2.status === 200 && gotW2?.h === 3000 && gotW2?.fit === "fill" && gotW2?.posX === 100 && gotW2?.posY === 0, { actual: JSON.stringify(gotW2 ?? null) });
+    await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: false, environment: "cosmic", elements: {}, images: {} } } } });
+
+    // ---- cleanup: this category leaves no trace ----
+    await db.update(tables.users).set({ notifyPrefs: rachelRaw }).where(eq(tables.users.id, rachel.id)).run();
+    for (const r of await db.select().from(tables.notifySubscriptions).all())
+      if (r.userId === rachel.id) await db.delete(tables.notifySubscriptions).where(and(eq(tables.notifySubscriptions.userId, r.userId), eq(tables.notifySubscriptions.targetType, r.targetType), eq(tables.notifySubscriptions.targetId, r.targetId))).run();
+    for (const p2 of await db.select().from(tables.posts).all())
+      if (p2.body.startsWith("[QA-NOTIF]")) await db.delete(tables.posts).where(eq(tables.posts.id, p2.id)).run();
+    if (oppId) await db.delete(tables.opportunities).where(eq(tables.opportunities.id, oppId)).run();
+    for (const l of await db.select().from(tables.liveStreams).all())
+      if (l.title.startsWith("[TESTLIVE] notif")) await db.delete(tables.liveStreams).where(eq(tables.liveStreams.id, l.id)).run();
+    for (const n of await db.select().from(tables.notifications).where(eq(tables.notifications.userId, rachel.id)).all())
+      if (["creator_post", "creator_live", "opportunity_update", "motivation"].includes(n.type)) await db.delete(tables.notifications).where(eq(tables.notifications.id, n.id)).run();
+  }
+
   /* ================= INFORMATION ARCHITECTURE ================= */
   /* The four-surface mental model, enforced structurally + behaviorally:
        Home = what should I see? · Discover = what can I find? ·

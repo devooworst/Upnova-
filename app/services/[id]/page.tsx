@@ -18,6 +18,7 @@ import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
+import { ContentNotifyToggle } from "@/components/NotifyControl";
 import {
   policyLines,
   travelLabel,
@@ -276,6 +277,9 @@ export default function ServicePage() {
                   ? `Book ${new Date(pickedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — pick a time`
                   : svc.cta}
               </button>
+              <div className="mt-2 flex justify-center">
+                <ContentNotifyToggle targetType="service" targetId={svc.id} label="Notify me when bookings open" activeLabel="You'll know when bookings open" />
+              </div>
               {me === null && (
                 <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-zinc-500">
                   <Lock className="h-3 w-3" /> Create a free account to book — bookings, payments, and messages in one place.

@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
+import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { rateLimit } from "@/lib/server/ratelimit";
 import { storeImage } from "@/lib/server/blobs";
 import { validateWorkLink } from "@/lib/server/trust";
 import { seedClientConfirmsWork } from "@/lib/server/demo";
-import { notify } from "@/lib/server/notify";
+import { notify, notifySubscribers } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,19 @@ export async function POST(req: NextRequest) {
         bookingId: link?.kind === "booking" ? link.id : null,
       })
       .run();
+
+    // fan out to people who tapped the bell for this creator ("New posts"
+    // or "All activity") — following alone never subscribes anyone
+    {
+      const me = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, user.id)).get();
+      await notifySubscribers({
+        targetType: "creator", targetId: user.id, eventKind: "posts", actorId: user.id,
+        type: "creator_post",
+        title: `${me?.displayName ?? "A creator you follow"} posted`,
+        body: text.split("\n")[0].slice(0, 140),
+        href: `/posts/${id}`,
+      });
+    }
 
     // the linked counterparty is asked to confirm — Client Confirmed comes
     // from THEM, never from the poster

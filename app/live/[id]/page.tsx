@@ -29,6 +29,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import LiveCameraStage from "@/components/LiveCameraStage";
+import { CreatorNotifyBell } from "@/components/NotifyControl";
 
 type Detail = {
   stream: {
@@ -327,7 +328,11 @@ export default function LiveStreamPage() {
             </div>
           </div>
 
-          <Link href={`/creator/${stream.host.handle}`} className="mt-3 flex items-center gap-3 rounded-xl border border-line bg-card p-3 transition hover:border-zinc-600">
+          {/* host card + the creator bell ("notify me when they go live")
+              side by side — the bell lives OUTSIDE the Link so its menu
+              never triggers navigation */}
+          <div className="mt-3 flex items-center gap-2">
+          <Link href={`/creator/${stream.host.handle}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-line bg-card p-3 transition hover:border-zinc-600">
             <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-sm font-bold text-zinc-300">
               {stream.host.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -352,6 +357,8 @@ export default function LiveStreamPage() {
               </button>
             )}
           </Link>
+          {!me.isHost && user && stream.host.id && <CreatorNotifyBell creatorId={stream.host.id} />}
+          </div>
 
           {/* reactions */}
           {live && stream.reactionsEnabled && (

@@ -14,6 +14,7 @@ import TrustChips from "@/components/TrustChips";
 import TrustReportModal from "@/components/TrustReportModal";
 import type { PostTrust } from "@/lib/trust";
 import { Flag, ArrowUpRight } from "lucide-react";
+import { ContentNotifyToggle } from "@/components/NotifyControl";
 
 /* linked feed items: the post is a POINTER to one canonical object —
    the CTA opens the real thing (book/apply/buy/license), never a copy */
@@ -219,6 +220,9 @@ export default function DbPostCard({
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 z-40 mt-1 w-56 overflow-hidden rounded-xl border border-line bg-card shadow-card">
+                  <div className="flex items-center px-3.5 py-2.5">
+                    <ContentNotifyToggle targetType="post" targetId={post.id} label="Notify me about this post" activeLabel="Following this post" />
+                  </div>
                   <button
                     onClick={() => feedback("hide")}
                     className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-card-raised"

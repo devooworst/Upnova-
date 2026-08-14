@@ -334,6 +334,26 @@ export const notifications = pgTable(
   (t) => [index("notif_user_read").on(t.userId, t.readAt), index("notif_user_created").on(t.userId, t.createdAt)]
 );
 
+/* Per-target notification subscriptions — "notify me about THIS".
+   creator targets carry a level (all | posts | live | bookings |
+   opportunities | important | off); content targets (post /
+   opportunity / service) are simple on-rows (delete = off).
+   Stored server-side on the account → respected across devices.
+   notify() + notifySubscribers() are the ONLY consumers. */
+export const notifySubscriptions = pgTable(
+  "notify_subscriptions",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetType: text("target_type").notNull(), // creator | post | opportunity | service
+    targetId: text("target_id").notNull(),
+    mode: text("mode").notNull().default("on"),
+    createdAt: ts("created_at"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.targetType, t.targetId] }), index("notif_sub_target").on(t.targetType, t.targetId)]
+);
+
 /* ------------------------------ communities ------------------------------ */
 
 export const communities = pgTable("communities", {

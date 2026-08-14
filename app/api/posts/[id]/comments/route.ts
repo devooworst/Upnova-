@@ -4,7 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
-import { notify } from "@/lib/server/notify";
+import { notify, notifySubscribers } from "@/lib/server/notify";
 import { recordInteraction } from "@/lib/server/recsys";
 
 export const dynamic = "force-dynamic";
@@ -46,10 +46,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await notify({
       userId: post.authorId,
       actorId: user.id,
-      type: "like",
+      // honest type: this IS a comment — governed by Social → Comments
+      // (was mislabeled "like", which put it under the wrong switch)
+      type: "comment",
       title: `${user.profile.displayName} commented on your post`,
       body: text.slice(0, 80),
       href: `/?post=${post.id}`,
+    });
+
+    // people who tapped "Notify me about this post" — activity fanout
+    // (the author is covered above; the commenter never notifies themself)
+    await notifySubscribers({
+      targetType: "post", targetId: post.id, actorId: user.id,
+      type: "post_activity",
+      title: `New comment on a post you follow`,
+      body: `${user.profile.displayName}: ${text.slice(0, 80)}`,
+      href: `/posts/${post.id}`,
     });
     return { id };
   });

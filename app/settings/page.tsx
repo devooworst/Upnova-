@@ -218,7 +218,13 @@ export default function SettingsPage() {
     }
   };
   /* ---- Phone & Login + real Notification Preferences (DB-backed) ---- */
-  const [np, setNp] = useState<{ prefs: Record<string, { inapp: boolean; email: boolean; sms: boolean }>; phone: string | null; phoneVerified: boolean; smsConsent: boolean } | null>(null);
+  const [np, setNp] = useState<{
+    prefs: Record<string, { inapp: boolean; email: boolean; sms: boolean }>;
+    types?: Record<string, boolean>;
+    motivation?: { enabled: boolean; frequency: string; window: string; general: boolean; fromFollowed: boolean };
+    typeGroups?: { group: string; items: { key: string; label: string; hint: string }[] }[];
+    phone: string | null; phoneVerified: boolean; smsConsent: boolean;
+  } | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
@@ -263,6 +269,18 @@ export default function SettingsPage() {
     const prefs = { ...np.prefs, [cat]: { ...np.prefs[cat], [ch]: !np.prefs[cat][ch] } };
     setNp({ ...np, prefs });
     patchNp({ prefs });
+  };
+  const toggleType = (key: string) => {
+    if (!np?.types) return;
+    const types = { ...np.types, [key]: !np.types[key] };
+    setNp({ ...np, types });
+    patchNp({ types: { [key]: types[key] } });
+  };
+  const patchMotivation = (patch: Record<string, unknown>) => {
+    if (!np?.motivation) return;
+    const motivation = { ...np.motivation, ...patch };
+    setNp({ ...np, motivation });
+    patchNp({ motivation });
   };
 
   const graduateFromSettings = async () => {
@@ -636,10 +654,118 @@ export default function SettingsPage() {
               ) : (
                 <div className="mt-3 h-24 animate-pulse rounded-lg bg-card-raised" />
               )}
+              {/* ---- WHAT you get notified about — one switch per kind.
+                   Off = never sent, on any channel, anywhere. The same
+                   switches will govern real push (iOS/Android/web) when a
+                   push transport is added — one decision point. ---- */}
+              {np?.types && np.typeGroups && (
+                <div className="mt-5 border-t border-line-soft pt-4" data-guide="notify-type-groups">
+                  <h3 className="text-sm font-bold text-zinc-100">What you get notified about</h3>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    Per kind, across every channel. Bell subscriptions on creators, posts,
+                    opportunities and services add to this — these switches always win.
+                  </p>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    {np.typeGroups.map((g) => (
+                      <div key={g.group} className="rounded-xl border border-line-soft p-3.5">
+                        <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{g.group}</p>
+                        <ul className="space-y-2">
+                          {g.items.map((it) => {
+                            const locked = it.key === "system.security";
+                            const on = np.types![it.key] !== false;
+                            return (
+                              <li key={it.key} className="flex items-center justify-between gap-3">
+                                <span className="min-w-0">
+                                  <span className="block text-xs font-medium text-zinc-200">{it.label}</span>
+                                  <span className="block text-[10px] leading-snug text-zinc-600">{it.hint}</span>
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  disabled={npBusy || locked}
+                                  onChange={() => toggleType(it.key)}
+                                  className="h-4 w-4 shrink-0 accent-lime-400 disabled:opacity-40"
+                                  title={locked ? "Security notifications are always on" : undefined}
+                                  aria-label={`${g.group}: ${it.label}`}
+                                />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ---- Mavyn Motivation — strictly opt-in, fully tunable ---- */}
+              {np?.motivation && (
+                <div className="mt-5 rounded-xl border border-amber-400/25 bg-amber-400/5 p-4" data-guide="notify-motivation">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-zinc-100">Mavyn Motivation</h3>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        Occasional encouragement — a positive push, a productivity nudge, or a
+                        motivational post from a creator you follow. Off unless you turn it on,
+                        and never more often than you choose.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={np.motivation.enabled}
+                      disabled={npBusy}
+                      onChange={() => patchMotivation({ enabled: !np.motivation!.enabled })}
+                      className="h-5 w-5 shrink-0 accent-amber-400"
+                      aria-label="Motivation notifications on/off"
+                    />
+                  </div>
+                  {np.motivation.enabled && (
+                    <div className="mt-3 grid gap-3 border-t border-amber-400/15 pt-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-500">How often</span>
+                        <select
+                          value={np.motivation.frequency}
+                          disabled={npBusy}
+                          onChange={(e) => patchMotivation({ frequency: e.target.value })}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-2 text-xs text-zinc-200"
+                        >
+                          <option value="daily">About once a day</option>
+                          <option value="few-week">A few times a week</option>
+                          <option value="weekly">About once a week</option>
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-500">When</span>
+                        <select
+                          value={np.motivation.window}
+                          disabled={npBusy}
+                          onChange={(e) => patchMotivation({ window: e.target.value })}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-2 text-xs text-zinc-200"
+                        >
+                          <option value="morning">Mornings (7am–12pm)</option>
+                          <option value="afternoon">Afternoons (12–5pm)</option>
+                          <option value="evening">Evenings (5–10pm)</option>
+                          <option value="any">Any time</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center justify-between gap-3 sm:col-span-1">
+                        <span className="text-xs text-zinc-300">General Mavyn motivation</span>
+                        <input type="checkbox" checked={np.motivation.general} disabled={npBusy} onChange={() => patchMotivation({ general: !np.motivation!.general })} className="h-4 w-4 accent-amber-400" />
+                      </label>
+                      <label className="flex items-center justify-between gap-3 sm:col-span-1">
+                        <span className="text-xs text-zinc-300">From creators you follow <span className="block text-[10px] text-zinc-600">Real motivational posts only — never invented quotes</span></span>
+                        <input type="checkbox" checked={np.motivation.fromFollowed} disabled={npBusy} onChange={() => patchMotivation({ fromFollowed: !np.motivation!.fromFollowed })} className="h-4 w-4 accent-amber-400" />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <p className="mt-3 border-t border-line-soft pt-2.5 text-[10px] leading-relaxed text-zinc-600">
                 No spam, by design: unmapped social noise never leaves the app, deliveries are
-                rate-capped per hour, there is no marketing SMS at all, and security alerts stay on
-                so your account is never silently taken over.
+                rate-capped per hour, there is no marketing SMS at all, motivation is opt-in with
+                your frequency and time window, and security alerts stay on so your account is
+                never silently taken over.
               </p>
             </section>
           )}

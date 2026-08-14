@@ -1,6 +1,8 @@
 import { and, eq, like } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { notify } from "@/lib/server/notify";
+import { notify, parseMotivationPrefs, parseTypePrefs } from "@/lib/server/notify";
+import { quoteFor, inWindow, minGapMs } from "@/lib/server/motivation";
+import { desc } from "drizzle-orm";
 import { readRelease, SLOT_HOLDING_STATUSES, preferredWithEarlyAccess } from "@/lib/server/preferred";
 import { parseConfig } from "@/lib/servicePolicies";
 
@@ -38,7 +40,7 @@ async function alreadySent(userId: string, type: string, hrefLike: string): Prom
 
 /** run one pass of every job; returns per-job send counts (for tests/ops) */
 export async function runJobsTick(now = new Date()) {
-  const counts = { reminders: 0, reviewNudges: 0, rebookNudges: 0, releaseAlerts: 0 };
+  const counts = { reminders: 0, reviewNudges: 0, rebookNudges: 0, releaseAlerts: 0, motivation: 0 };
   const t = now.getTime();
 
   const bookings = await db.select().from(tables.bookings).all();
@@ -135,6 +137,67 @@ export async function runJobsTick(now = new Date()) {
         href: `/services/${s.id}?open=${rel.releaseAt}`,
       });
       counts.releaseAlerts++;
+    }
+  }
+
+  /* ---- 5 · Mavyn Motivation: STRICTLY OPT-IN encouragement ----
+     Only for users who enabled it; frequency + time window are theirs;
+     idempotent per period (last send checked); "from followed" links a
+     REAL motivational post by someone the user follows — never an
+     invented quote — and falls back to the general pool only when the
+     user allows general motivation. */
+  {
+    const users = (await db.select().from(tables.users).all()).filter((u) => u.status === "active");
+    const optedIn = users.filter((u) => parseMotivationPrefs(u.notifyPrefs).enabled);
+    if (optedIn.length) {
+      const follows = await db.select().from(tables.follows).all();
+      const cutoff = new Date(t - 7 * DAY);
+      const recentPosts = (await db.select().from(tables.posts).all()).filter(
+        (p) => p.createdAt > cutoff && /motivat|keep going|discipline|consisten/i.test(`${p.category} ${p.body}`)
+      );
+      for (const u of optedIn) {
+        const m = parseMotivationPrefs(u.notifyPrefs);
+        if (!m.general && !m.fromFollowed) continue;
+        if (!inWindow(m.window, now)) continue;
+        const last = await db
+          .select()
+          .from(tables.notifications)
+          .where(and(eq(tables.notifications.userId, u.id), like(tables.notifications.type, "motivation%")))
+          .orderBy(desc(tables.notifications.createdAt))
+          .get();
+        if (last && t - last.createdAt.getTime() < minGapMs(m.frequency)) continue;
+
+        // prefer a real motivational post from someone they follow
+        const myFollows = new Set(follows.filter((f) => f.followerId === u.id).map((f) => f.followingId));
+        const followedPost = m.fromFollowed
+          ? recentPosts.find((p) => myFollows.has(p.authorId) && p.authorId !== u.id && (!last || !last.href.includes(p.id)))
+          : undefined;
+        const types = parseTypePrefs(u.notifyPrefs);
+        if (followedPost && types["motivation.followed"] !== false) {
+          await notify({
+            userId: u.id,
+            actorId: followedPost.authorId,
+            type: "motivation_followed",
+            title: `A push from ${nameOf(followedPost.authorId)}`,
+            body: followedPost.body.split("\n")[0].slice(0, 160),
+            href: `/posts/${followedPost.id}`,
+            category: "activity",
+            priority: "low",
+          });
+          counts.motivation++;
+        } else if (m.general) {
+          await notify({
+            userId: u.id,
+            type: "motivation",
+            title: "Mavyn Motivation",
+            body: quoteFor(u.id, now),
+            href: "/settings", // manage or turn off right where it links
+            category: "activity",
+            priority: "low",
+          });
+          counts.motivation++;
+        }
+      }
     }
   }
 

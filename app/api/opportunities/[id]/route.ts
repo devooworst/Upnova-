@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
-import { notify } from "@/lib/server/notify";
+import { notify, notifySubscribers } from "@/lib/server/notify";
 import { requireOpportunityPoster } from "@/lib/server/authz";
 import { requireUser } from "@/lib/server/auth";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
@@ -110,10 +110,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const action = String(body.action);
     if (action === "reopen") {
       await db.update(tables.opportunities).set({ status: "open" }).where(eq(tables.opportunities.id, opp.id)).run();
+      // "Notify me when this opportunity changes" — reopened IS a change
+      await notifySubscribers({
+        targetType: "opportunity", targetId: opp.id, actorId: user.id,
+        type: "opportunity_update",
+        title: `Reopened: ${opp.title}`,
+        body: "This opportunity is taking applications again.",
+        href: `/opportunities/${opp.id}`,
+      });
       return { status: "open" };
     }
     if (action !== "close") throw new ApiError(400, "Unknown action");
     await db.update(tables.opportunities).set({ status: "closed" }).where(eq(tables.opportunities.id, opp.id)).run();
+    await notifySubscribers({
+      targetType: "opportunity", targetId: opp.id, actorId: user.id,
+      type: "opportunity_update",
+      title: `Closed: ${opp.title}`,
+      body: "This opportunity stopped taking applications.",
+      href: `/opportunities/${opp.id}`,
+    });
 
     let cfg: { notifyUnselected?: boolean } = {};
     try { cfg = JSON.parse(opp.applyConfig); } catch {}

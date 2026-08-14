@@ -15,6 +15,7 @@ import { ELIGIBILITIES, eligibilityLabel, checkApplicantEligibility } from "@/li
 import { campusVerification } from "@/lib/server/campus";
 import { buildTaste, ranker, type Scorable } from "@/lib/server/recsys";
 import { sanitizeQuestions } from "@/lib/applicationSpec";
+import { notifySubscribers } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -226,6 +227,15 @@ export async function POST(req: NextRequest) {
         lng: user.profile.lng,
       })
       .run();
+
+    // bell subscribers ("New opportunities" / "All activity" on this poster)
+    await notifySubscribers({
+      targetType: "creator", targetId: user.id, eventKind: "opportunities", actorId: user.id,
+      type: "opportunity_new",
+      title: `New opportunity from ${user.profile.displayName}`,
+      body: title,
+      href: `/opportunities/${id}`,
+    });
     // ONE canonical opportunity + ONE linked feed post — it appears in
     // For You (ranked) and on the poster's profile immediately
     const rolesLine = roleList.length

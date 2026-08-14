@@ -30,8 +30,7 @@ import {
   type StudioConfig,
   type WorldConfig,
   type WorldDevice,
-  type WorldDeviceLayout,
-} from "@/lib/profileStudio";
+  type WorldDeviceLayout, WORLD_DEVICE_WIDTHS } from "@/lib/profileStudio";
 
 /* ------------------------------------------------------------------ */
 /* MY WORLD — full-screen Edit Mode.                                   */
@@ -187,6 +186,26 @@ export default function MyWorldEditor() {
   };
 
   /* ---- free image layers: add / patch / remove (history-aware) ---- */
+  /* one tap: Natural (no frame) · Fit (contain) · Fill (cover).
+     Choosing Fit/Fill without a frame measures the image's natural
+     aspect and frames it at the CURRENT rendered height — nothing
+     jumps, the mode simply becomes editable. */
+  const setImageDisplay = (id: string, mode: "natural" | "fit" | "fill") => {
+    const im = deviceLayoutOf(cfg?.world ?? DEFAULT_WORLD, device).images?.[id];
+    if (!im) return;
+    if (mode === "natural") return patchImage(id, { h: 0 });
+    if (im.h && im.h > 0) return patchImage(id, { fit: mode });
+    const designW = WORLD_DEVICE_WIDTHS[device];
+    const probe = new window.Image();
+    probe.onload = () => {
+      const aspect = probe.naturalWidth > 0 && probe.naturalHeight > 0 ? probe.naturalWidth / probe.naturalHeight : 4 / 3;
+      const h = Math.round(Math.min(3000, Math.max(24, ((im.w / 100) * designW) / aspect)));
+      patchImage(id, { h, fit: mode, posX: 50, posY: 50 });
+    };
+    probe.onerror = () => patchImage(id, { h: 240, fit: mode, posX: 50, posY: 50 });
+    probe.src = im.src;
+  };
+
   const patchImage = (id: string, patch: Record<string, unknown>) => {
     setCfg((c) => {
       if (!c) return c;
@@ -497,14 +516,66 @@ export default function MyWorldEditor() {
           {Object.keys(activeLayout.images).length > 0 && (
             <ul className="mt-2 space-y-1">
               {Object.entries(activeLayout.images).map(([iid, im]) => (
-                <li key={iid} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${selected === `img:${iid}` ? "border-sky-400/50 bg-sky-400/5" : "border-line"}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={im.src} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
-                  <button onClick={() => setSelected(`img:${iid}`)} className="min-w-0 flex-1 truncate text-left text-[10px] text-zinc-300 hover:text-zinc-100">
-                    z {im.layer} · {Math.round(im.opacity * 100)}%{im.locked ? " · locked" : ""}
-                  </button>
-                  <button onClick={() => patchImage(iid, { locked: !im.locked })} className="icon-btn h-6 w-6" title={im.locked ? "Unlock" : "Lock"}><Lock className={`h-3 w-3 ${im.locked ? "text-sky-300" : "text-zinc-600"}`} /></button>
-                  <button onClick={() => removeImage(iid)} className="icon-btn h-6 w-6" title="Delete"><Trash2 className="h-3 w-3 text-zinc-500 hover:text-rose-300" /></button>
+                <li key={iid} className={`rounded-lg border px-2 py-1.5 ${selected === `img:${iid}` ? "border-sky-400/50 bg-sky-400/5" : "border-line"}`}>
+                  <div className="flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={im.src} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
+                    <button onClick={() => setSelected(`img:${iid}`)} className="min-w-0 flex-1 truncate text-left text-[10px] text-zinc-300 hover:text-zinc-100">
+                      z {im.layer} · {Math.round(im.opacity * 100)}%{im.locked ? " · locked" : ""}
+                    </button>
+                    <button onClick={() => patchImage(iid, { locked: !im.locked })} className="icon-btn h-6 w-6" title={im.locked ? "Unlock" : "Lock"}><Lock className={`h-3 w-3 ${im.locked ? "text-sky-300" : "text-zinc-600"}`} /></button>
+                    <button onClick={() => removeImage(iid)} className="icon-btn h-6 w-6" title="Delete"><Trash2 className="h-3 w-3 text-zinc-500 hover:text-rose-300" /></button>
+                  </div>
+                  {selected === `img:${iid}` && (
+                    /* ---- Image Display: Natural | Fit | Fill (+ Position).
+                       Fit = contain (whole image, no crop) · Fill = cover
+                       (frame covered, edges crop) — standard object-fit,
+                       aspect ratio preserved in every mode, NEVER stretched.
+                       The canvas beside this panel is the live preview.
+                       Saved per element; survives leave-and-return. ---- */
+                    <div className="mt-1.5 border-t border-line-soft pt-1.5" data-guide="world-image-display">
+                      <p className="mb-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Image display</p>
+                      <div className="flex gap-1">
+                        {([
+                          ["natural", "Natural", "Own aspect, no frame"],
+                          ["fit", "Fit", "Whole image, no cropping"],
+                          ["fill", "Fill", "Cover the frame, edges crop"],
+                        ] as const).map(([mode, label, hint]) => {
+                          const active = mode === "natural" ? !im.h : im.h && (im.fit ?? "fill") === mode;
+                          return (
+                            <button
+                              key={mode}
+                              title={hint}
+                              onClick={() => setImageDisplay(iid, mode)}
+                              className={`flex-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition ${active ? "border-sky-400/60 bg-sky-400/10 text-sky-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {!!im.h && (im.fit ?? "fill") === "fill" && (
+                        <div className="mt-1.5">
+                          <p className="mb-1 text-[9px] text-zinc-600">Position — which part stays visible</p>
+                          <div className="grid w-16 grid-cols-3 gap-0.5" data-guide="world-image-position">
+                            {[0, 50, 100].map((py) =>
+                              [0, 50, 100].map((px) => (
+                                <button
+                                  key={`${px}-${py}`}
+                                  aria-label={`Position ${px}% ${py}%`}
+                                  onClick={() => patchImage(iid, { posX: px, posY: py })}
+                                  className={`h-4 rounded-sm border transition ${ (im.posX ?? 50) === px && (im.posY ?? 50) === py ? "border-sky-400 bg-sky-400/40" : "border-line bg-card-raised hover:border-zinc-600"}`}
+                                />
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
+                        Tip: drag the corner handle on the canvas to size the frame.
+                      </p>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

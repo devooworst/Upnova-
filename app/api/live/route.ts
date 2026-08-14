@@ -12,6 +12,7 @@ import {
   isCommunityMember,
   streamCard,
 } from "@/lib/server/live";
+import { notifySubscribers } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,15 @@ export async function POST(req: NextRequest) {
         lng: profile?.lng ?? null,
       })
       .run();
+
+    // "Notify me when this creator goes live" — bell subscribers (live/all)
+    await notifySubscribers({
+      targetType: "creator", targetId: user.id, eventKind: "live", actorId: user.id,
+      type: "creator_live",
+      title: `${profile?.displayName ?? "A creator you follow"} is LIVE`,
+      body: title,
+      href: `/live/${id}`,
+    });
 
     // the host counts as present from second zero
     await db.insert(tables.liveViewers).values({ streamId: id, userId: user.id }).run();

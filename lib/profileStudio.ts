@@ -103,6 +103,19 @@ export interface WorldImage {
   opacity: number; // 0.05–1
   layer: number; // z-order -10..30 (cards live at 0..20 → behind/between/front)
   locked: boolean; // safe from accidental drags; still selectable
+  /* ---- Image Display: Fit | Fill (+ Position) ----
+     h = frame height in DESIGN px. 0/absent = natural: the image keeps
+     its own aspect ratio at the chosen width (no frame, no cropping —
+     the historical behavior). With a frame:
+       fit  = object-fit: contain — the WHOLE image inside the frame
+       fill = object-fit: cover   — the frame fully covered, edges crop
+     posX/posY (0–100, % object-position) choose WHICH part stays
+     visible when filling. Width and height are NEVER stretched
+     independently — aspect ratio is preserved in every mode. */
+  h?: number; // frame height, design px (0 = natural)
+  fit?: "fill" | "fit";
+  posX?: number; // 0–100 (fill only)
+  posY?: number; // 0–100 (fill only)
 }
 
 export interface WorldConfig {
@@ -296,6 +309,12 @@ function sanitizeWorldImages(input: unknown): Record<string, WorldImage> {
       opacity: Math.max(0.05, Math.min(1, Number(r.opacity) || 1)),
       layer: clamp(r.layer, -10, 30, 25),
       locked: !!r.locked,
+      // display frame: 0 = natural aspect (no frame). fit/fill map to
+      // object-fit contain/cover — never independent stretching.
+      h: clamp(r.h, 0, 3000, 0),
+      fit: r.fit === "fit" ? "fit" : "fill",
+      posX: clamp(r.posX, 0, 100, 50),
+      posY: clamp(r.posY, 0, 100, 50),
     };
   }
   return out;

@@ -27,6 +27,7 @@ import PostsGrid from "@/components/db/PostsGrid";
 import LiveReplaysSection from "@/components/LiveReplaysSection";
 import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
+import { CreatorNotifyBell } from "@/components/NotifyControl";
 
 type Payload = {
   user: {
@@ -215,6 +216,7 @@ export default function MobileProfile({ handle }: { handle: string }) {
               <button onClick={follow} className={`${btn} ${data.followedByMe ? "border border-line bg-card text-zinc-300" : "bg-violet-400 text-zinc-950 hover:bg-violet-300"}`}>
                 {data.followedByMe ? "Following" : "Follow"}
               </button>
+              {viewer && <CreatorNotifyBell creatorId={user.id} />}
               <Link
                 href={viewer ? `/messages?to=${user.handle}` : "#"}
                 onClick={(e) => { if (!viewer) { e.preventDefault(); promptJoin("message"); } }}

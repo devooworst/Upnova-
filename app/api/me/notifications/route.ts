@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
-import { notify, parsePrefs, PREF_CATEGORIES, type NotifyPrefs } from "@/lib/server/notify";
+import { notify, parsePrefs, parseTypePrefs, parseMotivationPrefs, mergeNotifyPrefsRaw, NOTIF_TYPE_GROUPS, PREF_CATEGORIES, type NotifyPrefs } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,9 @@ export async function GET() {
     const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     return {
       prefs: parsePrefs(u.notifyPrefs),
+      types: parseTypePrefs(u.notifyPrefs),
+      motivation: parseMotivationPrefs(u.notifyPrefs),
+      typeGroups: NOTIF_TYPE_GROUPS,
       phone: u.phone ? `•••• ${u.phone.slice(-4)}` : null, // never echo the full number back out
       phoneVerified: !!u.phoneVerified,
       smsConsent: !!u.smsConsent,
@@ -33,10 +36,15 @@ export async function PATCH(req: NextRequest) {
     const u = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
     const patch: Record<string, unknown> = {};
 
-    if (body.prefs !== undefined) {
-      // sanitize through the same parser used at dispatch — one source of truth
-      const clean: NotifyPrefs = parsePrefs(JSON.stringify(body.prefs));
-      patch.notifyPrefs = JSON.stringify(clean);
+    if (body.prefs !== undefined || body.types !== undefined || body.motivation !== undefined) {
+      // ONE merge writer: channels, fine-grained type switches, and
+      // motivation live in the same JSON — saving one section can never
+      // wipe another, and everything passes the dispatch-time parsers.
+      patch.notifyPrefs = mergeNotifyPrefsRaw(u.notifyPrefs, {
+        channels: body.prefs,
+        types: body.types,
+        motivation: body.motivation,
+      });
     }
     if (typeof body.smsConsent === "boolean") {
       if (body.smsConsent && !u.phoneVerified)
@@ -54,7 +62,14 @@ export async function PATCH(req: NextRequest) {
     if (!Object.keys(patch).length) throw new ApiError(400, "Nothing to update");
     await db.update(tables.users).set(patch).where(eq(tables.users.id, user.id)).run();
     const fresh = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get())!;
-    return { ok: true, prefs: parsePrefs(fresh.notifyPrefs), smsConsent: !!fresh.smsConsent, categories: PREF_CATEGORIES };
+    return {
+      ok: true,
+      prefs: parsePrefs(fresh.notifyPrefs),
+      types: parseTypePrefs(fresh.notifyPrefs),
+      motivation: parseMotivationPrefs(fresh.notifyPrefs),
+      smsConsent: !!fresh.smsConsent,
+      categories: PREF_CATEGORIES,
+    };
   });
 }
 

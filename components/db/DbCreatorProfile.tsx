@@ -14,6 +14,7 @@ import Link from "next/link";
 import { MapPin, MessageSquare, Zap, Lock, Star, ShieldCheck, BadgeCheck, GraduationCap } from "lucide-react";
 import { ACCOUNT_BADGES } from "@/lib/trust";
 import Avatar from "@/components/Avatar";
+import { CreatorNotifyBell } from "@/components/NotifyControl";
 import LiveReplaysSection from "@/components/LiveReplaysSection";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PosterBadge, { posterTypeOf } from "@/components/PosterBadge";
@@ -308,6 +309,8 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden sm:inline">Message</span>
               </button>
+              {/* per-creator notification level — right where you follow */}
+              <CreatorNotifyBell creatorId={user.id} compact />
               {user.hiringEnabled && services.length > 0 && (
                 <Link href="/services" className="btn-lime px-4 py-1.5 text-xs sm:text-sm">
                   <Zap className="h-4 w-4" /> Book or Request
@@ -612,7 +615,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
       const img = isImgKey(id) ? imgOf(id) : null;
       if (img?.locked && mode !== "select") return; // locked layers never drag
       const el: WorldElement = img
-        ? { x: img.x, y: img.y, w: img.w, h: 0, rotate: img.rotate, layer: img.layer, hidden: false }
+        ? { x: img.x, y: img.y, w: img.w, h: img.h ?? 0, rotate: img.rotate, layer: img.layer, hidden: false }
         : resolved.elements[id];
       if (!el) return;
       const host = (e.currentTarget as HTMLElement).closest("[data-world-el]") as HTMLElement | null;
@@ -758,6 +761,10 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
           patch.y = Math.round(Math.min(4000, Math.max(0, d.el.y + dy)));
         }
         if (isImg && d.mode.includes("n")) patch.y = Math.round(Math.min(4000, Math.max(0, d.el.y + dy)));
+        // images: dragging the corner vertically creates/resizes a display
+        // FRAME (h in design px) — Fit/Fill then decides how the image
+        // occupies it. Width-only handles keep the natural flow.
+        if (isImg && d.mode.includes("s")) patch.h = Math.round(Math.min(3000, Math.max(24, baseH + dy)));
         routePatch(d.id, patch);
       }
     };
@@ -906,13 +913,36 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                         className="absolute"
                         style={{ left: `${im.x}%`, top: im.y, width: `${im.w}%`, zIndex: im.layer, transform: im.rotate ? `rotate(${im.rotate}deg)` : undefined }}
                       >
-                        <img
-                          src={im.src}
-                          alt=""
-                          draggable={false}
-                          className={`h-auto w-full select-none ${edit ? "" : "pointer-events-none"}`}
-                          style={{ opacity: im.opacity }}
-                        />
+                        {/* Image Display: natural (no frame) keeps the
+                            source aspect at the chosen width; a frame
+                            (h>0) renders Fit (contain — whole image, no
+                            crop) or Fill (cover — frame covered, edges
+                            crop, posX/posY picks the visible part).
+                            Aspect ratio is preserved in EVERY mode —
+                            width/height are never stretched apart. */}
+                        {im.h && im.h > 0 ? (
+                          <div className="w-full overflow-hidden" style={{ height: im.h }}>
+                            <img
+                              src={im.src}
+                              alt=""
+                              draggable={false}
+                              className={`h-full w-full select-none ${edit ? "" : "pointer-events-none"}`}
+                              style={{
+                                opacity: im.opacity,
+                                objectFit: im.fit === "fit" ? "contain" : "cover",
+                                objectPosition: `${im.posX ?? 50}% ${im.posY ?? 50}%`,
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <img
+                            src={im.src}
+                            alt=""
+                            draggable={false}
+                            className={`h-auto w-full select-none ${edit ? "" : "pointer-events-none"}`}
+                            style={{ opacity: im.opacity }}
+                          />
+                        )}
                         {edit && (
                           <div
                             onPointerDown={startInteraction(key, "move")}
@@ -928,7 +958,7 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
                                 <span className="absolute -top-6 left-0 z-10 flex items-center gap-1.5 whitespace-nowrap rounded bg-sky-400 px-1.5 py-0.5 text-[9px] font-bold text-zinc-950">
                                   Image layer{im.locked ? " · locked" : ""}
                                   <span className="rounded bg-zinc-950/20 px-1 font-mono font-semibold">
-                                    {im.x}% · {im.y}px · w{im.w}%{im.rotate ? ` · ${im.rotate}°` : ""} · {Math.round(im.opacity * 100)}%
+                                    {im.x}% · {im.y}px · w{im.w}%{im.h ? ` · ${im.fit === "fit" ? "fit" : "fill"} ${im.h}px` : ""}{im.rotate ? ` · ${im.rotate}°` : ""} · {Math.round(im.opacity * 100)}%
                                   </span>
                                 </span>
                                 {!im.locked && (

@@ -19,6 +19,7 @@ import { useSession } from "@/lib/session";
 import { promptJoin } from "@/components/GuestGate";
 import { PublishedBanner } from "@/components/ShareSheet";
 import { engagementTypeLabel, compLabel, type EngagementConfig } from "@/lib/engagement";
+import { ContentNotifyToggle } from "@/components/NotifyControl";
 
 interface Opp {
   id: string;
@@ -245,14 +246,22 @@ export default function OpportunityPage() {
               Applied — track it in My Applications
             </p>
           ) : opp.status !== "open" ? (
-            <p className="rounded-xl border border-line px-4 py-2.5 text-center text-sm text-zinc-500">
-              This opportunity is closed.
-            </p>
+            <div className="space-y-2">
+              <p className="rounded-xl border border-line px-4 py-2.5 text-center text-sm text-zinc-500">
+                This opportunity is closed.
+              </p>
+              <div className="flex justify-center">
+                <ContentNotifyToggle targetType="opportunity" targetId={opp.id} label="Notify me when this opportunity changes" activeLabel="Watching — you'll know if it reopens" />
+              </div>
+            </div>
           ) : (
             <>
               <button data-guide="opportunity-apply" onClick={apply} className="btn-lime w-full justify-center py-2.5 text-sm">
                 {opp.budget == null ? "Express Interest" : "Apply to Opportunity"}
               </button>
+              <div className="mt-2 flex justify-center">
+                <ContentNotifyToggle targetType="opportunity" targetId={opp.id} label="Notify me when this opportunity changes" activeLabel="Watching this opportunity" />
+              </div>
               {opp.viewerEligibility && !opp.viewerEligibility.eligible && (
                 <p className="mt-2 flex items-start gap-1.5 rounded-md border border-violet-400/25 bg-violet-400/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
                   <Lock className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />
