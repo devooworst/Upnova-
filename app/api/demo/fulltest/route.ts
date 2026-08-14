@@ -2489,6 +2489,20 @@ export async function POST(req: NextRequest) {
     step(c, "off-menu display values can't persist: h clamps to 3000, unknown fit falls back to fill, position clamps 0–100",
       putW2.status === 200 && gotW2?.h === 3000 && gotW2?.fit === "fill" && gotW2?.posX === 100 && gotW2?.posY === 0, { actual: JSON.stringify(gotW2 ?? null) });
     await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: false, environment: "cosmic", elements: {}, images: {} } } } });
+    // fixed-frame rendering model (regression-locked): frames are the
+    // container — born with the image (standard 4:3 box, fill), NEVER
+    // derived from the image's own aspect ratio, and Fit/Fill switching
+    // never touches frame dimensions. Legacy natural images freeze
+    // their CURRENT box on first Fit/Fill (offset metrics, no aspect
+    // probing) — applied immediately, no manual handle-dragging.
+    const worldPageSrc = fs.readFileSync(path.join(process.cwd(), "app", "profile", "studio", "world", "page.tsx"), "utf8");
+    step(c, "Worlds FIXED-FRAME model: images are framed at placement (4:3 fill), Fit/Fill toggles object-fit ONLY (frame untouched), and the frame is never derived from image aspect (no probe)",
+      worldPageSrc.includes('h: frameH, fit: "fill", posX: 50') &&
+      worldPageSrc.includes("frame untouched — image adapts") &&
+      worldPageSrc.includes("offsetHeight") &&
+      !worldPageSrc.includes("new window.Image()") &&
+      !worldPageSrc.includes("probe.naturalWidth"));
+
 
     // ---- cleanup: this category leaves no trace ----
     await db.update(tables.users).set({ notifyPrefs: rachelRaw }).where(eq(tables.users.id, rachel.id)).run();

@@ -186,24 +186,27 @@ export default function MyWorldEditor() {
   };
 
   /* ---- free image layers: add / patch / remove (history-aware) ---- */
-  /* one tap: Natural (no frame) · Fit (contain) · Fill (cover).
-     Choosing Fit/Fill without a frame measures the image's natural
-     aspect and frames it at the CURRENT rendered height — nothing
-     jumps, the mode simply becomes editable. */
+  /* one tap: Fit (object-fit: contain — whole image, empty space ok) ·
+     Fill (object-fit: cover — frame fully covered, edges crop) ·
+     Natural (legacy: no frame, image flows at its own aspect).
+
+     THE RENDERING MODEL: the frame is the container and it is FIXED —
+     switching Fit/Fill NEVER changes the frame's width or height, and
+     the frame is never derived from the image's aspect ratio (that was
+     the bug: it made the image its own frame, so the toggle did
+     nothing and resizing felt like free-transforming the image).
+     Legacy natural images: the first Fit/Fill click freezes the frame
+     at the element's CURRENT on-canvas box (offset metrics are design
+     units, transform-immune) — pixels don't jump, the mode applies
+     immediately, no handle-dragging required. */
   const setImageDisplay = (id: string, mode: "natural" | "fit" | "fill") => {
     const im = deviceLayoutOf(cfg?.world ?? DEFAULT_WORLD, device).images?.[id];
     if (!im) return;
     if (mode === "natural") return patchImage(id, { h: 0 });
-    if (im.h && im.h > 0) return patchImage(id, { fit: mode });
-    const designW = WORLD_DEVICE_WIDTHS[device];
-    const probe = new window.Image();
-    probe.onload = () => {
-      const aspect = probe.naturalWidth > 0 && probe.naturalHeight > 0 ? probe.naturalWidth / probe.naturalHeight : 4 / 3;
-      const h = Math.round(Math.min(3000, Math.max(24, ((im.w / 100) * designW) / aspect)));
-      patchImage(id, { h, fit: mode, posX: 50, posY: 50 });
-    };
-    probe.onerror = () => patchImage(id, { h: 240, fit: mode, posX: 50, posY: 50 });
-    probe.src = im.src;
+    if (im.h && im.h > 0) return patchImage(id, { fit: mode }); // frame untouched — image adapts
+    const el = document.querySelector<HTMLElement>(`[data-world-el="img:${id}"]`);
+    const h = Math.round(Math.min(3000, Math.max(24, el?.offsetHeight || 240)));
+    patchImage(id, { h, fit: mode, posX: 50, posY: 50 });
   };
 
   const patchImage = (id: string, patch: Record<string, unknown>) => {
@@ -233,7 +236,14 @@ export default function MyWorldEditor() {
         return c;
       }
       const id = Math.random().toString(36).slice(2, 10);
-      imgs[id] = { src: clean, x: 32, y: 120, w: 28, rotate: 0, opacity: 1, layer: 25, locked: false };
+      // THE FRAME IS THE CONTAINER: every image is placed inside a fixed
+      // standard frame (4:3 at the default width) and covers it (Fill).
+      // The image adapts to the frame — never the other way around.
+      // Portrait/landscape/square sources all land in the same clean box;
+      // Fit is one tap away and is immediately visible (letterboxing).
+      const frameW = 28;
+      const frameH = Math.round(((frameW / 100) * WORLD_DEVICE_WIDTHS[device] * 3) / 4);
+      imgs[id] = { src: clean, x: 32, y: 120, w: frameW, rotate: 0, opacity: 1, layer: 25, locked: false, h: frameH, fit: "fill", posX: 50, posY: 50 };
       setSelected(`img:${id}`);
       return writeActive(c, { images: imgs });
     });
@@ -572,7 +582,8 @@ export default function MyWorldEditor() {
                         </div>
                       )}
                       <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
-                        Tip: drag the corner handle on the canvas to size the frame.
+                        The frame stays fixed — the image adapts to it. Handles resize the frame,
+                        never stretch the image.
                       </p>
                     </div>
                   )}
