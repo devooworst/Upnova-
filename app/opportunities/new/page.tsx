@@ -54,7 +54,7 @@ export default function NewOpportunityPage() {
   }, []);
   // applicant requirements — poster-controlled
   const [requireMessage, setRequireMessage] = useState(true);
-  const [question, setQuestion] = useState("");
+  const [question] = useState("");
   /* APPLICATION BUILDER — the poster decides what to ask. Simple types,
      required toggles, reorder, preview. Simple by default: zero custom
      questions is a perfectly good application. */

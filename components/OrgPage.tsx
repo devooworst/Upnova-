@@ -10,7 +10,6 @@ import {
   GraduationCap,
   Lock,
   MapPin,
-  Plus,
   Users,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";

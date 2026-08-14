@@ -3,7 +3,6 @@ import { kvGetJson, kvSetJson } from "@/lib/server/kv";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError, isDemoMode, requireQaOperator } from "@/lib/server/auth";
-import { isSeedUser } from "@/lib/server/demo";
 import { worldDeviceForWidth, resolveWorldLayout } from "@/lib/profileStudio";
 import { readEarlyAccess, writeEarlyAccess, readRelease, writeRelease } from "@/lib/server/preferred";
 import { LEARN_SCENARIOS, LEARN_PATHS, TOUR_TO_SCENARIO } from "@/lib/learnScenarios";
@@ -158,7 +157,6 @@ export async function POST(req: NextRequest) {
     c.steps.push({ name, status: pass ? "PASSED" : "FAILED", ...detail });
     return pass;
   };
-  const blocked = (c: Category, name: string, why: string) => c.steps.push({ name, status: "BLOCKED", actual: why });
 
   /* ---------------- deterministic reset of designated test records ---------------- */
   const ids = async (h: string) => (await db.select().from(tables.users).where(eq(tables.users.handle, h)).get())!;

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Activity as ActivityIcon,
@@ -30,7 +29,7 @@ import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
 import { communities } from "@/lib/data";
 import { useSession } from "@/lib/session";
-import { getPlan, PRO_EVENT, type Plan } from "@/lib/pro";
+import { PRO_EVENT, type Plan } from "@/lib/pro";
 import { COLLEGE_PRICE, ALUMNI_PRO_PRICE } from "@/lib/fees";
 
 /* nav grouped by the accent-role system: base → earn (lime) → connect (violet) */
@@ -99,7 +98,6 @@ export default function Sidebar({
     return () => window.removeEventListener(PRO_EVENT, sync);
   }, []);
   const plan = (user?.plan ?? "free") as Plan;
-  const pro = plan === "pro";
   // campus access is a database fact (verified school), never a local flag
   const campus = user?.campus ?? null;
   // BUSINESS accounts are hiring accounts, not profile pages: their nav

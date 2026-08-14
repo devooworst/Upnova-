@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { assertCapacityById } from "@/lib/server/businessLimits";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
@@ -8,7 +8,7 @@ import { requireOpportunityPoster } from "@/lib/server/authz";
 import { notify } from "@/lib/server/notify";
 import { parseRoles, openingsLeft } from "@/lib/opportunityRoles";
 import { acceptRoleOffer, declineRoleOffer, conversationBetween, startEngagementCycle } from "@/lib/server/oppFlow";
-import { parseEngagement, normalizeEngagement, parseOffer, compLabel, cycleLabel, ENGAGEMENT_TYPES, COMP_MODELS } from "@/lib/engagement";
+import { parseEngagement, normalizeEngagement, parseOffer, cycleLabel, ENGAGEMENT_TYPES, COMP_MODELS } from "@/lib/engagement";
 import { seedAcceptsRoleOffer } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";

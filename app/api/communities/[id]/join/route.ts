@@ -13,7 +13,7 @@ import {
 } from "@/lib/server/communities";
 import { membershipQuote } from "@/lib/communityIdentity";
 import { notify } from "@/lib/server/notify";
-import { unrestrictedTester, demoCampusId } from "@/lib/server/campus";
+import { unrestrictedTester } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
 

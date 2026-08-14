@@ -11,7 +11,7 @@
 /*    engagement  +6·ln(likes + 2·comments + 1)                        */
 /* ------------------------------------------------------------------ */
 
-import { desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 
 export type FeedScope =

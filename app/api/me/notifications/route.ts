@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
-import { notify, parsePrefs, parseTypePrefs, parseMotivationPrefs, mergeNotifyPrefsRaw, NOTIF_TYPE_GROUPS, PREF_CATEGORIES, type NotifyPrefs } from "@/lib/server/notify";
+import { notify, parsePrefs, parseTypePrefs, parseMotivationPrefs, mergeNotifyPrefsRaw, NOTIF_TYPE_GROUPS, PREF_CATEGORIES } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 

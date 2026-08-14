@@ -1,7 +1,7 @@
 import { resolveLocation, geoReady } from "@/lib/server/geo";
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
-import { asc, eq, isNull } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { getSessionUser, requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { serializeEvent, rsvpCounts, verifiedCampusOf } from "@/lib/server/events";

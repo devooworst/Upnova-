@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
-import { findCommunity, requireActiveMember, isMod, logMod, memberIsMuted } from "@/lib/server/communities";
+import { findCommunity, requireActiveMember, isMod, logMod } from "@/lib/server/communities";
 
 export const dynamic = "force-dynamic";
 

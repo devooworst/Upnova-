@@ -213,7 +213,6 @@ export default function QaLab({ viewerHandle }: { viewerHandle: string }) {
   const lensScenarios = (scenarios ?? []).filter((s) => lens && s.personas.includes(lens));
   const otherCount = (scenarios ?? []).length - lensScenarios.length;
 
-  const mySteps = (steps: StepState[]) => steps.filter((s) => s.role === lens || s.role === "check");
   /* STRICT ORDER: the server marks exactly ONE step "pending" — the
      current task. Everything before it is done, everything after is
      LOCKED. Never derived from "whichever checkpoint happens to pass". */

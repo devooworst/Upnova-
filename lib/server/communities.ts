@@ -14,7 +14,7 @@
 /* ------------------------------------------------------------------ */
 
 import { randomBytes } from "crypto";
-import { and, desc, eq, gt, inArray, or } from "drizzle-orm";
+import { and, eq, gt, inArray, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { ApiError } from "@/lib/server/auth";
 import { ALIAS_RE, ANON_LIMITS, anonLabel, communityRefMeta, type IdentityMode } from "@/lib/communityIdentity";

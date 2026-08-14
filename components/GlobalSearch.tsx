@@ -11,7 +11,6 @@
 /* ------------------------------------------------------------------ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Briefcase, Building2, GraduationCap, Search, ShoppingBag, Users } from "lucide-react";
 import Avatar from "@/components/Avatar";

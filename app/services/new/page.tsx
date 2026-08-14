@@ -221,7 +221,6 @@ export default function NewServicePage() {
 
   /* ------------------------------ live screen ------------------------------ */
   if (liveId) {
-    const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/services/${liveId}` : `/services/${liveId}`;
     return (
       <div className="mx-auto max-w-md space-y-4 py-10 text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-lime-400/40 bg-lime-400/10">

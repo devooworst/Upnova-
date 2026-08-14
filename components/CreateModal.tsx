@@ -111,25 +111,17 @@ export default function CreateModal() {
   const [tags, setTags] = useState<string[]>([]);
 
   /* opportunity */
-  const [oppTitle, setOppTitle] = useState("");
-  const [oppType, setOppType] = useState("Gig");
-  const [roles, setRoles] = useState([{ role: "Videographer", count: 1 }]);
-  const [payType, setPayType] = useState("Paid");
-  const [budget, setBudget] = useState("");
-  const [payStructure, setPayStructure] = useState("Fixed payment");
-  const [oppNeeds, setOppNeeds] = useState<string[]>(["Portfolio"]);
-  const [respond, setRespond] = useState("Apply");
+  const [oppTitle] = useState("");
+  const [roles] = useState([{ role: "Videographer", count: 1 }]);
+  const [payType] = useState("Paid");
+  const [budget] = useState("");
 
   /* service */
-  const [svcName, setSvcName] = useState("");
-  const [svcCategory, setSvcCategory] = useState("Music");
-  const [deliverables, setDeliverables] = useState<string[]>([]);
-  const [priceModel, setPriceModel] = useState("Starting at");
-  const [svcPrice, setSvcPrice] = useState("");
-  const [availability, setAvailability] = useState("Accepting clients");
-  const [originalWork, setOriginalWork] = useState(true);
-  const [svcType, setSvcType] = useState("Creative");
-  const [highTrustDone, setHighTrustDone] = useState(false);
+  const [svcName] = useState("");
+  const [svcCategory] = useState("Music");
+  const [priceModel] = useState("Starting at");
+  const [svcPrice] = useState("");
+  const [availability] = useState("Accepting clients");
 
   /* poll */
   const [question, setQuestion] = useState("");
@@ -140,10 +132,8 @@ export default function CreateModal() {
   const [showResults, setShowResults] = useState("After voting");
 
   /* live */
-  const [liveTitle, setLiveTitle] = useState("");
-  const [liveCategory, setLiveCategory] = useState("Music");
-  const [liveChat, setLiveChat] = useState(true);
-  const [liveReactions, setLiveReactions] = useState(true);
+  const [liveTitle] = useState("");
+  const [liveCategory] = useState("Music");
 
   useEffect(() => {
     const handler = (e: Event) => {

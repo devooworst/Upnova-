@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PaymentDirection } from "@/components/PaymentDirection";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Send, ChevronLeft, Briefcase, Flag, X, Star, Check } from "lucide-react";
 import Avatar from "@/components/Avatar";
@@ -105,7 +105,6 @@ function timeAgo(iso: string) {
 
 export default function DbMessages() {
   const params = useSearchParams();
-  const router = useRouter();
   const { user } = useSession();
 
   const [convos, setConvos] = useState<Conv[] | null>(null);

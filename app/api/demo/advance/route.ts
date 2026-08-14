@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser, guarded, ApiError, isDemoMode , requireQaOperator } from "@/lib/server/auth";
+import { guarded, ApiError, isDemoMode, requireQaOperator } from "@/lib/server/auth";
 import { forceAdvanceBooking, forceAdvanceOrder, forceAdvanceApplication } from "@/lib/server/demo";
 
 export const dynamic = "force-dynamic";

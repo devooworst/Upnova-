@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { findCommunity, getMembership, logMod } from "@/lib/server/communities";

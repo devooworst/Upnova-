@@ -7,7 +7,6 @@ import { publicUser } from "@/lib/server/serialize";
 import { FeedScope, inScope, verifiedCampusMap, viewerContext } from "@/lib/server/feed";
 import { buildTaste, ranker, arrangeFeed, suggestionOrder, type Scorable } from "@/lib/server/recsys";
 import { postTrustMap } from "@/lib/server/trust";
-import { parseConfig } from "@/lib/servicePolicies";
 import { ctaFor } from "@/lib/server/cta";
 
 export const dynamic = "force-dynamic";

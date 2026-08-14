@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { PaymentDirection } from "@/components/PaymentDirection";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ArrowLeft, Tag, Star, Lock, Link2, Check, ExternalLink, BadgeCheck, ShieldCheck } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -48,7 +48,6 @@ const CONDITION_LABEL: Record<string, string> = { new: "New", like_new: "Like ne
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { user: me } = useSession();
   const [p, setP] = useState<ProductDetail | null>(null);
   const [error, setError] = useState<string | null>(null);

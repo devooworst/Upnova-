@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useSession } from "@/lib/session";
 import LiveCameraStage from "@/components/LiveCameraStage";
 import { CreatorNotifyBell } from "@/components/NotifyControl";
@@ -63,7 +63,6 @@ function uptime(startedAt: string) {
 
 export default function LiveStreamPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { user } = useSession();
   const [data, setData] = useState<Detail | null>(null);
   const [denied, setDenied] = useState<string | null>(null);
@@ -78,7 +77,7 @@ export default function LiveStreamPage() {
   const [showReport, setShowReport] = useState(false);
   const [reportDone, setReportDone] = useState(false);
   const [shared, setShared] = useState(false);
-  const [tick, setTick] = useState(0); // uptime re-render
+  const [, setTick] = useState(0); // uptime re-render
   const lastMsgAt = useRef(0);
   const chatBoxRef = useRef<HTMLDivElement>(null);
 

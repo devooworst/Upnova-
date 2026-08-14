@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { requireUser, guarded } from "@/lib/server/auth";
 import { getStream, assertCanWatch, viewerCount, PRESENCE_WINDOW_MS } from "@/lib/server/live";
 
 export const dynamic = "force-dynamic";

@@ -59,7 +59,6 @@ const AI_LABEL: Record<string, string> = {
 };
 
 export default function ServicesPage() {
-  const router = useRouter();
   const { user: me } = useSession();
   const [items, setItems] = useState<ServiceItem[] | null>(null);
   const [query, setQuery] = useState("");
@@ -310,7 +309,6 @@ export default function ServicesPage() {
 /* Appointment services: pick a date and time. The provider accepts, you
    pay, the calendar locks the slot — the server rejects double-booking. */
 
-const SLOT_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17];
 const DEFAULT_DURATION: Record<string, number> = {
   care: 60,
   beauty: 90,
@@ -347,9 +345,6 @@ function BookWizard({ service, initialDate, onClose }: { service: ServiceItem; i
     : null;
   const durationMin = selection?.durationMin ?? sched?.durationMin ?? DEFAULT_DURATION[service.category] ?? 60;
   const travelFee = service.travelEstimate ?? 0;
-  const slotHours = sched?.startHour != null && sched?.endHour != null
-    ? Array.from({ length: Math.max(0, sched.endHour - sched.startHour) }, (_, i) => sched.startHour! + i)
-    : SLOT_HOURS;
   const allowedDays = sched?.days && sched.days.length ? sched.days : null;
   const dayAllowed = !date || !allowedDays || allowedDays.includes(new Date(`${date}T12:00:00`).getDay());
 

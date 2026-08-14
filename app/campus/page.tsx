@@ -7,7 +7,6 @@ import {
   Lock,
   MessageSquare,
   Paperclip,
-  Plus,
   Search,
   Send,
   Star,
@@ -109,13 +108,6 @@ const campusServices = [
 ];
 
 const campusOppIds = ["org-promo", "campus-web", "campus-mv-collab", "social-video"];
-
-const campusQuestions = [
-  { q: "Anybody taken Prof. Okafor's digital media class? Project or exam final?", by: "Devon P.", answers: 6, time: "3h" },
-  { q: "Best spot on campus to shoot golden hour portraits?", by: "Toni A.", answers: 11, time: "8h" },
-  { q: "Is the media lab open during break week?", by: "Maya R.", answers: 3, time: "1d" },
-  { q: "Where do I submit an org budget request to SGA?", by: "Sasha G.", answers: 4, time: "2d" },
-];
 
 export default function CampusPage() {
   // campus access is a database fact: a verified campus_verifications row

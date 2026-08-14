@@ -135,10 +135,6 @@ body {
     @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-3 py-1 text-xs font-medium text-zinc-300 transition active:scale-[0.97];
   }
 
-  .chip-active {
-    @apply border-white/50 bg-white/10 text-zinc-100;
-  }
-
   .btn-lime {
     @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-lime-300 hover:shadow-glow active:scale-[0.98];
   }
@@ -195,12 +191,6 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
-}
-
-/* ---------- text gradient ---------- */
-
-.text-gradient-lime {
-  @apply bg-gradient-to-r from-lime-300 to-lime-500 bg-clip-text text-transparent;
 }
 
 /* ---------- category card DNA ----------

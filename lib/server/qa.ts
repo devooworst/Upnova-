@@ -15,7 +15,6 @@
 
 import { randomBytes } from "crypto";
 
-import { join } from "path";
 import { eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { hashPassword } from "./passwords";
@@ -229,8 +228,6 @@ export async function resetQaData(): Promise<number> {
    Which scenario is armed and since when. Test-lab metadata only (the
    checkpoints themselves are always derived from the REAL database), so
    a small file in db/ (snapshotted, demo-only) is the honest fit. */
-
-const RUNS_FILE = join(process.cwd(), "db", ".qa-runs.json");
 
 /** a completed scenario keeps its VERIFIED snapshot forever: the steps
     as they evaluated (against real DB state) at the moment everything

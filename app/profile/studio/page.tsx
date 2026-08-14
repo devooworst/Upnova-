@@ -5,8 +5,7 @@ import Link from "next/link";
 import { Palette, Sparkles, Check, RotateCcw, Eye, ArrowUp, ArrowDown, Lock, FlaskConical } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/lib/session";
-import { Globe2, Monitor, Tablet, Smartphone, Layers, EyeOff, LayoutTemplate, Move, Lock as LockIcon, Image as ImageIcon, Trash2 } from "lucide-react";
-import DbCreatorProfile from "@/components/db/DbCreatorProfile";
+import { Globe2, Image as ImageIcon, Trash2 } from "lucide-react";
 import {
   BANNERS,
   DECORATIONS,
@@ -19,9 +18,6 @@ import {
   SECTION_LABELS,
   DEFAULT_STUDIO,
   DEFAULT_WORLD,
-  ENVIRONMENTS,
-  WORLD_ELEMENT_IDS,
-  WORLD_ELEMENT_LABELS,
   type StudioConfig,
   type WorldConfig,
 } from "@/lib/profileStudio";
@@ -77,15 +73,6 @@ export default function ProfileStudioPage() {
     setDirty(true);
     setMsg(null);
   };
-  const patchEl = (id: string, patch: Partial<WorldConfig["elements"][string]>) => {
-    setCfg((c) => {
-      const w = c.world ?? DEFAULT_WORLD;
-      return { ...c, world: { ...w, elements: { ...w.elements, [id]: { ...w.elements[id], ...patch } } } };
-    });
-    setDirty(true);
-  };
-  const [selected, setSelected] = useState<string>("hero");
-  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   /* ---- banner/cover: the SAME profiles.coverUrl the profile renders.
      Loaded from the same public payload; saved through the same
      /api/me/profile PATCH Edit Profile uses. No second banner system. ---- */
@@ -109,11 +96,6 @@ export default function ProfileStudioPage() {
       setDirty(true);
     };
     reader.readAsDataURL(file);
-  };
-
-  const resetLayout = () => {
-    setWorld({ elements: { ...DEFAULT_WORLD.elements } });
-    setMsg({ kind: "ok", text: "Layout back to the default arrangement — environment and styling kept. Save to persist." });
   };
 
   const save = async () => {

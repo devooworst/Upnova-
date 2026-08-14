@@ -17,10 +17,9 @@
 
 import {
   BadgeCheck, GraduationCap, MapPin, PencilLine, Share2, MessageSquare, MoreHorizontal,
-  Briefcase, ShieldCheck, Star, Wrench, Radio, Sparkles, Building2,
+  Briefcase, ShieldCheck, Star, Wrench, Sparkles, Building2,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
 import PostsGrid from "@/components/db/PostsGrid";
@@ -49,7 +48,6 @@ type Payload = {
 const TABS = ["Posts", "Services", "Portfolio", "About"] as const;
 
 export default function MobileProfile({ handle }: { handle: string }) {
-  const router = useRouter();
   const { user: viewer } = useSession();
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);

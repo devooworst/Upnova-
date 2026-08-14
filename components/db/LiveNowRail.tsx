@@ -3,7 +3,7 @@
 /* LIVE NOW — the For You feed's live rail. Real streams from /api/live
    (audience-gated server-side per viewer). Hidden when nobody's live. */
 
-import { Radio, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 

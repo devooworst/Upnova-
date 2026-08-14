@@ -12,7 +12,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import * as Lucide from "lucide-react";
 import { useSession } from "@/lib/session";
-import { LEARN_PATHS, LEARN_SCENARIOS, scenarioById } from "@/lib/learnScenarios";
+import { LEARN_PATHS, LEARN_SCENARIOS } from "@/lib/learnScenarios";
 import { openLearnGuide } from "@/components/LearnGuide"; // overlay is mounted globally in the root layout
 
 function Icon({ name, className }: { name: string; className?: string }) {

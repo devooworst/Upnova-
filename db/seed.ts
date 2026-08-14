@@ -14,7 +14,6 @@ import { db } from "./index";
 import { and, eq, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import path from "path";
 import * as t from "./schema";
 
 const id = () => randomBytes(12).toString("hex");

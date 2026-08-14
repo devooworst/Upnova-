@@ -21,7 +21,7 @@ import {
   parseRefUrl,
   resolveRef,
 } from "@/lib/server/communities";
-import { campusVerification, unrestrictedTester, demoCampusId } from "@/lib/server/campus";
+import { campusVerification, unrestrictedTester } from "@/lib/server/campus";
 import { notify } from "@/lib/server/notify";
 import { seedRespondsInCommunity } from "@/lib/server/demo";
 

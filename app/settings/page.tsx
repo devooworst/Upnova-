@@ -13,7 +13,6 @@ import {
   Sparkles,
   AlertTriangle,
   ChevronRight,
-  CreditCard,
   Landmark,
   Receipt,
   Check,

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
-import { requireUser, guarded, ApiError, isDemoMode , requireQaOperator } from "@/lib/server/auth";
+import { guarded, ApiError, isDemoMode, requireQaOperator } from "@/lib/server/auth";
 
 export const dynamic = "force-dynamic";
 

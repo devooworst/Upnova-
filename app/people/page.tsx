@@ -88,7 +88,6 @@ const TABS = [
   { id: "contacts", label: "Contacts" },
 ] as const;
 
-const fmt = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const fmtShort = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 function PeopleInner() {

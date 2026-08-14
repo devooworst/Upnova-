@@ -10,15 +10,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Briefcase, ArrowRight, BadgeCheck, Star } from "lucide-react";
 
-interface ProjectRow {
-  id: string;
-  title: string;
-  amount: number;
-  state: string;
-  myRole: "client" | "creator";
-  with: { displayName: string };
-  updatedAt: string;
-}
 
 interface ApplicationRow {
   id: string;

@@ -7,7 +7,6 @@ import {
   Search,
   Plus,
   MessageSquare,
-  Bell,
   ChevronDown,
   User,
   Bookmark,
@@ -21,7 +20,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { getTheme, setTheme } from "@/lib/theme";
+import { setTheme } from "@/lib/theme";
 import DbNotificationBell from "./db/DbNotificationBell";
 import GlobalSearch from "./GlobalSearch";
 import Avatar from "./Avatar";
