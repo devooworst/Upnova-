@@ -828,6 +828,31 @@ export default function DbCreatorProfile({ handle, edit }: { handle: string; edi
     return (
       <div className={edit ? "" : "mx-auto max-w-5xl"}>
         <div className="relative overflow-hidden rounded-2xl border border-line" style={{ backgroundImage: env.css }}>
+          {/* ---- PAGE BACKGROUND — the LOWEST visual layer, attached to
+               the canvas itself. absolute inset-0 inside this relative,
+               content-sized wrapper = it always spans the FULL current
+               page height (more posts/services → the wrapper grows → the
+               wallpaper grows with it) at every viewport, in the editor,
+               the stacked phone flow, and the public profile alike.
+               fill = cover (no empty area) · fit = contain (whole image,
+               environment shows through). Content stacks above it; it
+               never captures a pointer. ---- */}
+          {world.background?.src && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={world.background.src}
+              alt=""
+              aria-hidden
+              draggable={false}
+              data-world-background
+              className="pointer-events-none absolute inset-0 h-full w-full select-none"
+              style={{
+                objectFit: world.background.fit === "fit" ? "contain" : "cover",
+                objectPosition: `${world.background.posX}% ${world.background.posY}%`,
+                opacity: world.background.opacity,
+              }}
+            />
+          )}
           {env.overlay !== "none" && (
             <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: env.overlay }} aria-hidden />
           )}

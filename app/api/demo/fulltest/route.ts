@@ -2495,6 +2495,25 @@ export async function POST(req: NextRequest) {
     // never touches frame dimensions. Legacy natural images freeze
     // their CURRENT box on first Fit/Fill (offset metrics, no aspect
     // probing) — applied immediately, no manual handle-dragging.
+    // PAGE BACKGROUND — a wallpaper attached to the canvas itself:
+    // round-trips the sanitizer, clamps off-menu values, and the
+    // renderer keeps it the LOWEST layer spanning the whole page.
+    const putBg = await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: true, environment: "cosmic", elements: {}, images: {}, background: { src: "/images/qa-portrait.svg", fit: "fit", posX: 0, posY: 100, opacity: 0.8 } } } } });
+    const gotBg = ((await api("lena", "/api/me/studio")).data as any).studio?.world?.background;
+    step(c, "Worlds PAGE BACKGROUND persists on the world itself (src · fit · posX/posY · opacity) — not on any layer rectangle",
+      putBg.status === 200 && gotBg?.src === "/images/qa-portrait.svg" && gotBg?.fit === "fit" && gotBg?.posX === 0 && gotBg?.posY === 100 && Math.abs((gotBg?.opacity ?? 0) - 0.8) < 0.01,
+      { route: "PATCH /api/me/studio {world.background}", actual: JSON.stringify(gotBg ?? null) });
+    const putBg2 = await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: true, environment: "cosmic", elements: {}, images: {}, background: { src: "javascript:alert(1)", fit: "stretch", posX: 999, posY: -4, opacity: 9 } } } } });
+    const gotBg2 = ((await api("lena", "/api/me/studio")).data as any).studio?.world?.background;
+    step(c, "background sanitizer: script/off-menu sources are DROPPED entirely, and valid ones clamp (fit→fill, pos 0–100, opacity ≤1)",
+      putBg2.status === 200 && gotBg2 === undefined, { actual: JSON.stringify(gotBg2 ?? null) });
+    const profileSrc2 = fs.readFileSync(path.join(process.cwd(), "components", "db", "DbCreatorProfile.tsx"), "utf8");
+    step(c, "renderer contract: the background is data-world-background, absolute inset-0 inside the content-sized canvas root (grows with the page, behind every card, pointer-transparent), object-fit cover/contain only",
+      profileSrc2.includes("data-world-background") &&
+      profileSrc2.includes('world.background.fit === "fit" ? "contain" : "cover"') &&
+      profileSrc2.includes("pointer-events-none absolute inset-0 h-full w-full"));
+    await api("lena", "/api/me/studio", { method: "PATCH", body: { studio: { world: { enabled: false, environment: "cosmic", elements: {}, images: {} } } } });
+
     const worldPageSrc = fs.readFileSync(path.join(process.cwd(), "app", "profile", "studio", "world", "page.tsx"), "utf8");
     step(c, "Worlds FIXED-FRAME model: images are framed at placement (4:3 fill), Fit/Fill toggles object-fit ONLY (frame untouched), and the frame is never derived from image aspect (no probe)",
       worldPageSrc.includes('h: frameH, fit: "fill", posX: 50') &&

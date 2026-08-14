@@ -58,6 +58,7 @@ export default function MyWorldEditor() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [defaultOpen, setDefaultOpen] = useState(false);
   const [imgUrl, setImgUrl] = useState("");
+  const [bgUrl, setBgUrl] = useState("");
   const [meta, setMeta] = useState<{ isPro: boolean; demoBypass: boolean } | null>(null);
 
   // undo/redo — snapshots of the whole studio config
@@ -207,6 +208,31 @@ export default function MyWorldEditor() {
     const el = document.querySelector<HTMLElement>(`[data-world-el="img:${id}"]`);
     const h = Math.round(Math.min(3000, Math.max(24, el?.offsetHeight || 240)));
     patchImage(id, { h, fit: mode, posX: 50, posY: 50 });
+  };
+
+  /* ---- PAGE BACKGROUND: attached to the canvas itself, the lowest
+     visual layer, spanning the whole My World page. Fit/Fill here are
+     rendered against the ENTIRE canvas — never a layer rectangle. ---- */
+  const setBackground = (src: string) => {
+    const clean = src.trim();
+    if (!clean) return;
+    mutate((c) => ({ ...c, world: { ...(c.world ?? DEFAULT_WORLD), background: { src: clean, fit: "fill" as const, posX: 50, posY: 50, opacity: 1 } } }));
+    setBgUrl("");
+  };
+  const patchBackground = (patch: Record<string, unknown>) => {
+    mutate((c) => {
+      const w = c.world ?? DEFAULT_WORLD;
+      if (!w.background) return c;
+      return { ...c, world: { ...w, background: { ...w.background, ...patch } } };
+    });
+  };
+  const removeBackground = () => mutate((c) => ({ ...c, world: { ...(c.world ?? DEFAULT_WORLD), background: undefined } }));
+  const pickBackgroundFile = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 600_000) { setMsg("Image too large — keep backgrounds under ~600 KB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setBackground(String(reader.result));
+    reader.readAsDataURL(file);
   };
 
   const patchImage = (id: string, patch: Record<string, unknown>) => {
@@ -504,6 +530,77 @@ export default function MyWorldEditor() {
             <button onClick={() => setDrawer(false)} className="icon-btn h-7 w-7" aria-label="Close design panel"><X className="h-3.5 w-3.5" /></button>
           </div>
 
+          <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Page background</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
+            A wallpaper behind your ENTIRE world — every card, post, and section, top to bottom.
+            It grows with the page and sits below everything. Fill covers the whole page;
+            Fit shows the complete image with the environment through the gaps.
+          </p>
+          <div data-guide="world-background-panel">
+            {world.background ? (
+              <div className="mt-2 rounded-lg border border-line p-2">
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={world.background.src} alt="" className="h-9 w-14 shrink-0 rounded object-cover" />
+                  <div className="flex min-w-0 flex-1 gap-1">
+                    {(["fit", "fill"] as const).map((m2) => (
+                      <button
+                        key={m2}
+                        onClick={() => patchBackground({ fit: m2 })}
+                        title={m2 === "fill" ? "Cover the whole page — no empty area, edges crop" : "Whole image visible — never cropped, gaps allowed"}
+                        className={`flex-1 rounded-md border px-2 py-1.5 text-[10px] font-semibold capitalize transition ${world.background!.fit === m2 ? "border-lime-400/60 bg-lime-400/10 text-lime-300" : "border-line text-zinc-400 hover:border-zinc-600"}`}
+                      >
+                        {m2}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={removeBackground} className="icon-btn h-7 w-7" title="Remove background"><Trash2 className="h-3.5 w-3.5 text-zinc-500 hover:text-rose-300" /></button>
+                </div>
+                {world.background.fit === "fill" && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <div>
+                      <p className="mb-1 text-[9px] text-zinc-600">Position</p>
+                      <div className="grid w-16 grid-cols-3 gap-0.5" data-guide="world-background-position">
+                        {[0, 50, 100].map((py) =>
+                          [0, 50, 100].map((px) => (
+                            <button
+                              key={`${px}-${py}`}
+                              aria-label={`Background position ${px}% ${py}%`}
+                              onClick={() => patchBackground({ posX: px, posY: py })}
+                              className={`h-4 rounded-sm border transition ${world.background!.posX === px && world.background!.posY === py ? "border-lime-400 bg-lime-400/40" : "border-line bg-card-raised hover:border-zinc-600"}`}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <label className="min-w-0 flex-1">
+                      <span className="mb-1 block text-[9px] text-zinc-600">Opacity · {Math.round(world.background.opacity * 100)}%</span>
+                      <input type="range" min={5} max={100} value={Math.round(world.background.opacity * 100)} onChange={(e) => patchBackground({ opacity: Number(e.target.value) / 100 })} className="w-full accent-lime-400" />
+                    </label>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 flex gap-1.5">
+                <input
+                  value={bgUrl}
+                  onChange={(e) => setBgUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && setBackground(bgUrl)}
+                  placeholder="Background image URL…"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-card-raised px-3 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-lime-400/50"
+                />
+                <button onClick={() => setBackground(bgUrl)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">Set</button>
+                <label className="btn-ghost shrink-0 cursor-pointer px-3 py-1.5 text-xs">
+                  Upload
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => pickBackgroundFile(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+            )}
+            {!world.background && (
+              <p className="mt-1 text-[9px] text-zinc-600">…or select an image layer below and tap &quot;Set as page background&quot;.</p>
+            )}
+          </div>
+
           <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Images &amp; layers</p>
           <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
             Free decorative layers — put them behind cards, between cards, or in front (select one on the
@@ -584,6 +681,16 @@ export default function MyWorldEditor() {
                       <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
                         The frame stays fixed — the image adapts to it. Handles resize the frame,
                         never stretch the image.
+                      </p>
+                      <button
+                        onClick={() => { setBackground(im.src); removeImage(iid); }}
+                        data-guide="world-make-background"
+                        className="mt-1.5 w-full rounded-md border border-lime-400/40 bg-lime-400/5 px-2 py-1.5 text-[10px] font-semibold text-lime-300 transition hover:bg-lime-400/15"
+                      >
+                        Set as page background
+                      </button>
+                      <p className="mt-1 text-[9px] leading-relaxed text-zinc-600">
+                        Wallpaper mode: covers the WHOLE world page behind everything — not this frame.
                       </p>
                     </div>
                   )}

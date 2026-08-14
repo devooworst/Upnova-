@@ -118,9 +118,28 @@ export interface WorldImage {
   posY?: number; // 0–100 (fill only)
 }
 
+/* ---- PAGE BACKGROUND — a wallpaper attached to the CANVAS ITSELF ----
+   The lowest visual layer of a world: it spans the entire My World page
+   (top to bottom, growing automatically with content) and sits behind
+   every card, post, and section. Fit/Fill here are rendered against the
+   WHOLE canvas, never a layer rectangle:
+     fill = object-fit: cover   — full-page wallpaper, zero empty area
+     fit  = object-fit: contain — entire image visible, environment
+            shows through the empty space
+   Distinct from decorative image LAYERS (which are framed objects). */
+export interface WorldBackground {
+  src: string; // https URL or site-relative path — validated like layers
+  fit: "fill" | "fit";
+  posX: number; // 0–100 — which part stays visible when filling
+  posY: number;
+  opacity: number; // 0.05–1 — blend with the environment
+}
+
 export interface WorldConfig {
   enabled: boolean;
   environment: string; // ENVIRONMENTS id — the full-bleed backdrop scene
+  /** the page-wide wallpaper behind everything (see WorldBackground) */
+  background?: WorldBackground;
   elements: Record<string, WorldElement>; // DESKTOP layout (keyed by APPROVED element ids)
   /** free decorative image layers for DESKTOP, keyed by generated ids (max 8) */
   images?: Record<string, WorldImage>;
@@ -272,6 +291,7 @@ export function sanitizeWorld(input: unknown): WorldConfig {
   return {
     enabled: !!o.enabled,
     environment: typeof o.environment === "string" && o.environment in ENVIRONMENTS ? o.environment : "cosmic",
+    background: sanitizeWorldBackground(o.background),
     elements: sanitizeWorldElements(o.elements),
     images: sanitizeWorldImages(o.images),
     tablet: sanitizeDeviceLayout(o.tablet),
@@ -280,6 +300,23 @@ export function sanitizeWorld(input: unknown): WorldConfig {
     // escaping keeps it inert everywhere it renders
     title: String(o.title ?? "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80),
     showTitle: o.showTitle !== false,
+  };
+}
+
+function sanitizeWorldBackground(input: unknown): WorldBackground | undefined {
+  if (typeof input !== "object" || input === null) return undefined;
+  const r = input as Record<string, unknown>;
+  const rawSrc = String(r.src ?? "").trim();
+  const isDataImg = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(rawSrc);
+  const src = rawSrc.slice(0, isDataImg ? 900_000 : 500);
+  const okSrc = isDataImg || /^https?:\/\/[^\s"'<>]+$/i.test(src) || /^\/[a-zA-Z0-9/_.%-]+$/.test(src);
+  if (!okSrc) return undefined;
+  return {
+    src,
+    fit: r.fit === "fit" ? "fit" : "fill",
+    posX: clamp(r.posX, 0, 100, 50),
+    posY: clamp(r.posY, 0, 100, 50),
+    opacity: Math.max(0.05, Math.min(1, Number(r.opacity) || 1)),
   };
 }
 

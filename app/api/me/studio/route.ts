@@ -96,6 +96,11 @@ export async function PATCH(req: NextRequest) {
       await externalizeImages(worldAny);
       await externalizeImages((worldAny as Record<string, unknown>).tablet);
       await externalizeImages((worldAny as Record<string, unknown>).phone);
+      // the page-wide background wallpaper: uploaded data-URIs go to disk
+      // exactly like decorative layers — the DB stores only the path
+      const bg = (worldAny as Record<string, unknown>).background as Record<string, unknown> | undefined;
+      if (bg && typeof bg.src === "string" && bg.src.startsWith("data:image/"))
+        bg.src = (await storeImage(bg.src, "world", 950_000)) ?? "";
     }
     let clean = sanitizeStudio(merged);
     // College+ = decorate the room (student themes, frames, accents,
