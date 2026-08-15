@@ -32,27 +32,45 @@ import { join } from "path";
    create one, sign-out really ends it. Single-user demo sandboxes only;
    NEVER set in production (any visitor would resume the demo session).  */
 const STICKY_FILE = join(process.cwd(), "db", ".demo-session");
-const stickyOn = () => process.env.MAVYN_DEMO_STICKY_SESSION === "1";
+const stickyOn = () =>
+  process.env.MAVYN_DEMO_STICKY_SESSION === "1" &&
+  // hard-off on Vercel Production: a sticky session would hand the demo
+  // session to ANY anonymous visitor — never acceptable there
+  (process.env.VERCEL_ENV !== "production" || process.env.MAVYN_FORCE_DEMO_IN_PRODUCTION === "1");
 /* Demo mode gate that SURVIVES instance swaps: env files are per-machine
    and do not travel with the platform's snapshots — a committed marker
-   file does. Production deletes db/DEMO_MODE (see README + the file
-   itself); until then every instance of this demo accepts demo tokens. */
-const demoModeOn = () =>
-  process.env.MAVYN_DEMO_MODE === "1" ||
-  stickyOn() ||
-  // Vercel PREVIEW deployments are QA environments by definition — the
-  // Test Center / demo·simulation tooling must be available there for
-  // full-site QA after the migration. Production (VERCEL_ENV=production)
-  // is NOT included: it stays realistic unless MAVYN_DEMO_MODE=1 or the
-  // committed marker file explicitly says otherwise. Tool ACCESS is
-  // still requireQaOperator (dev admins + the three QA personas) — this
-  // flag alone never shows controls to normal users.
-  process.env.VERCEL_ENV === "preview" ||
-  existsSync(join(process.cwd(), "db", "DEMO_MODE"));
+   file does.
+
+   PRODUCTION HARD-OFF: on Vercel Production (VERCEL_ENV=production),
+   demo mode is FORCED OFF no matter what — the committed db/DEMO_MODE
+   marker ships inside every build (it cannot be "deleted for
+   production" without breaking preview/dev), and env mistakes happen.
+   Fail closed: the only way to run demo auth in production is the
+   deliberately alarming MAVYN_FORCE_DEMO_IN_PRODUCTION=1, which exists
+   for emergency diagnosis and nothing else. */
+const isVercelProduction = () => process.env.VERCEL_ENV === "production";
+const forcedDemoInProd = () => process.env.MAVYN_FORCE_DEMO_IN_PRODUCTION === "1";
+
+const demoModeOn = () => {
+  if (isVercelProduction() && !forcedDemoInProd()) return false;
+  return (
+    process.env.MAVYN_DEMO_MODE === "1" ||
+    stickyOn() ||
+    // Vercel PREVIEW deployments are QA environments by definition — the
+    // Test Center / demo·simulation tooling must be available there for
+    // full-site QA. Tool ACCESS is still requireQaOperator (dev admins +
+    // the three QA personas) — this flag alone never shows controls to
+    // normal users.
+    process.env.VERCEL_ENV === "preview" ||
+    existsSync(join(process.cwd(), "db", "DEMO_MODE"))
+  );
+};
 
 /** why demo mode is on — surfaced by /api/debug/session for diagnosis */
 export function demoModeSources(): string[] {
   const via: string[] = [];
+  if (isVercelProduction() && !forcedDemoInProd()) return ["(vercel production — demo mode forced OFF)"];
+  if (isVercelProduction() && forcedDemoInProd()) via.push("⚠ MAVYN_FORCE_DEMO_IN_PRODUCTION override");
   if (process.env.MAVYN_DEMO_MODE === "1") via.push("MAVYN_DEMO_MODE env");
   if (stickyOn()) via.push("sticky-session env (dev)");
   if (process.env.VERCEL_ENV === "preview") via.push("vercel preview environment");

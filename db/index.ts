@@ -79,6 +79,17 @@ const globalForDb = globalThis as unknown as { __mavynDb?: AnyDb };
 
 function create(): AnyDb {
   const url = process.env.DATABASE_URL;
+  /* PRODUCTION FAIL-CLOSED: without DATABASE_URL, the fallback is an
+     ephemeral in-instance PGlite directory — on Vercel Production that
+     would silently serve an EMPTY database that loses every write on
+     redeploy. Refuse to boot instead; a loud error beats quiet data
+     loss. Preview/dev keep the PGlite convenience path. */
+  if (process.env.VERCEL_ENV === "production" && !(url && /^postgres(ql)?:\/\//.test(url))) {
+    throw new Error(
+      "FATAL: VERCEL_ENV=production but DATABASE_URL is missing or not a postgres:// URL. " +
+        "Production requires a real Postgres database (Neon). Set DATABASE_URL and redeploy."
+    );
+  }
   if (url && /^postgres(ql)?:\/\//.test(url)) {
     // Neon serverless over HTTP — no pools to leak in serverless functions.
     // (Cast: neon-http and pglite expose the same query-builder surface;

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "vercel-build": "drizzle-kit push --force && tsx db/seed.ts && next build",
+    "vercel-build": "drizzle-kit push --force && node scripts/seed-unless-production.mjs && next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint",
     "db:push": "drizzle-kit push --force",

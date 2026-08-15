@@ -1510,6 +1510,21 @@ const args = process.argv.slice(2);
 // must never trigger a run at import time.
 const runDirectly = !!process.argv[1] && /seed\.(ts|js|mjs|cjs)$/.test(process.argv[1]);
 if (runDirectly) {
+  /* PRODUCTION GUARD — fail closed. Demo users carry a PUBLIC password
+     (mavyn123) and include an admin account; they must NEVER exist in a
+     production database. Seeding on Vercel Production requires the
+     deliberately alarming override (emergency/staging use only). */
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    process.env.MAVYN_FORCE_DEMO_IN_PRODUCTION !== "1" &&
+    !args.includes("--wipe") // wiping seed data FROM production is always allowed
+  ) {
+    console.error(
+      "[seed] REFUSED: VERCEL_ENV=production. Demo users (public password, seeded admin) must not be created in a production database.\n" +
+        "[seed] Preview/dev seeding is unaffected. To remove stray seed data from production: tsx db/seed.ts --wipe"
+    );
+    process.exit(1);
+  }
   (async () => {
     if (args.includes("--wipe")) await wipe();
     else if (args.includes("--fresh")) {
