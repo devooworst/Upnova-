@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, ArrowUpRight, Sparkles, FlaskConical } from "lucide-react";
-import { analytics } from "@/lib/data";
+import { BarChart3, Sparkles, FlaskConical } from "lucide-react";
 import { useSession } from "@/lib/session";
 
 interface Summary {
@@ -14,10 +13,21 @@ interface Summary {
   completedEngagements: number;
   followers: number;
   followersNewThisMonth: number;
+  engagement: {
+    profileViews: number;
+    profileViews7d: number;
+    contentViews: number;
+    serviceViews: number;
+    likesReceived: number;
+    commentsReceived: number;
+    weekly: { day: string; contentViews: number; profileViews: number }[];
+    topPosts: { id: string; title: string; likes: number; comments: number; views: number; engagement: number }[];
+    audience: { place: string; count: number; pct: number }[];
+    applicationsSent: number;
+  };
 }
 
 export default function AnalyticsPage() {
-  const max = Math.max(...analytics.weeklyReach.map((d) => d.value));
   const { user } = useSession();
   const [summary, setSummary] = useState<Summary | null>(null);
   useEffect(() => {
@@ -31,6 +41,10 @@ export default function AnalyticsPage() {
   // production; DEMO MODE opens it for testing (clearly labeled below).
   const demoUnrestricted = !!user && user.testerMode !== "simulation";
   const hasPro = user?.plan === "pro";
+  // engagement block from the extended summary API (real interactions data)
+  const eng = summary?.engagement ?? null;
+  const weekTotal = eng ? eng.weekly.reduce((n, d) => n + d.contentViews + d.profileViews, 0) : 0;
+  const weekMax = eng ? Math.max(...eng.weekly.map((d) => d.contentViews + d.profileViews)) : 0;
 
   if (user === undefined) {
     return (
@@ -112,15 +126,11 @@ export default function AnalyticsPage() {
             </div>
           </div>
           <p className="mt-3 border-t border-line-soft pt-2 text-[10px] text-zinc-600">
-            Computed live from your payments, bookings, projects, and follows. Views/reach tracking
-            isn&apos;t collected yet — the sample dashboard below shows what it will look like.
+            Computed live from your payments, bookings, projects, follows, and recorded view events.
+            Views are counted from signed-in browsing only — real numbers, honestly small when they&apos;re small.
           </p>
         </section>
       )}
-
-      <p className="px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-600">
-        Sample dashboard — demo visuals until view tracking ships
-      </p>
 
       {!hasPro && demoUnrestricted && (
         <div className="flex items-start gap-2.5 rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-3">
@@ -133,98 +143,126 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {/* stat cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {analytics.stats.map((s) => (
-          <div key={s.label} className="card p-3.5">
-            <p className="text-xs text-zinc-500">{s.label}</p>
-            <p className="mt-0.5 text-2xl font-bold tracking-tight text-zinc-50">{s.value}</p>
-            <p className={`mt-0.5 flex items-center gap-1 text-xs font-semibold ${s.label === "Service Revenue" ? "text-lime-400" : "text-amber-400"}`}>
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              {s.delta}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* weekly reach chart */}
-        <section className="card p-4">
-          <h2 className="text-sm font-bold text-zinc-100">Post Reach</h2>
-          <p className="text-xs text-zinc-500">Impressions by day</p>
-          <div className="mt-3 flex h-36 items-end gap-2">
-            {analytics.weeklyReach.map((d) => (
-              <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
-                <div
-                  className={`w-full rounded-lg transition-all ${
-                    d.value === max
-                      ? "bg-amber-400"
-                      : "bg-zinc-700/60 hover:bg-zinc-600"
-                  }`}
-                  style={{ height: `${(d.value / max) * 100}%` }}
-                  title={`${d.value * 100} impressions`}
-                />
-                <span className="text-[10px] text-zinc-500">{d.day}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* audience */}
-        <section className="card p-4">
-          <h2 className="text-sm font-bold text-zinc-100">Audience Locations</h2>
-          <p className="text-xs text-zinc-500">Where your reach comes from</p>
-          <ul className="mt-5 space-y-3.5">
-            {analytics.audience.map((a) => (
-              <li key={a.place}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-medium text-zinc-300">{a.place}</span>
-                  <span className="text-zinc-500">{a.pct}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-line">
-                  <div className="h-full rounded-full bg-violet-400/80" style={{ width: `${a.pct}%` }} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      {/* top posts */}
-      <section className="card p-5">
-        <h2 className="text-sm font-bold text-zinc-100">Top Posts</h2>
-        <div className="mt-3 divide-y divide-line-soft">
-          {analytics.topPosts.map((p, i) => (
-            <div key={p.title} className="flex items-center gap-4 py-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-card-raised text-sm font-bold text-lime-400">
-                {i + 1}
-              </span>
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-200">{p.title}</p>
-              <p className="hidden text-xs text-zinc-500 sm:block">{p.reach} reach</p>
-              <p className="text-xs font-semibold text-amber-400">{p.engagement}</p>
+      {/* engagement stat cards — each labeled as EXACTLY what it counts */}
+      {eng && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {([
+            { label: "Profile Views", value: eng.profileViews, sub: `${eng.profileViews7d} in the last 7 days` },
+            { label: "Content Views", value: eng.contentViews, sub: "views recorded on your posts" },
+            { label: "Likes Received", value: eng.likesReceived, sub: `${eng.commentsReceived} comments received` },
+            { label: "Service Views", value: eng.serviceViews, sub: "views on your listings" },
+          ] as { label: string; value: number; sub: string }[]).map((s) => (
+            <div key={s.label} className="card p-3.5">
+              <p className="text-xs text-zinc-500">{s.label}</p>
+              <p className="mt-0.5 text-2xl font-bold tabular-nums tracking-tight text-zinc-50">{s.value.toLocaleString()}</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500">{s.sub}</p>
             </div>
           ))}
         </div>
-      </section>
-      {/* business — what a creator actually needs to know */}
-      <section className="card p-4">
-        <h2 className="text-sm font-bold text-zinc-100">Business</h2>
-        <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-          {([
-            ["Service views", "1,842"],
-            ["Hire requests", "17"],
-            ["Conversion", "4.2%"],
-            ["Applications sent", "6"],
-            ["Repeat clients", "5"],
-            ["Avg. project", "$212"],
-          ] as [string, string][]).map(([k, v]) => (
-            <p key={k} className="flex items-baseline justify-between border-b border-line-soft pb-1.5">
-              <span className="text-xs text-zinc-500">{k}</span>
-              <span className="font-bold tabular-nums tracking-tight text-zinc-100">{v}</span>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* last-7-days views chart — real daily buckets */}
+        <section className="card p-4">
+          <h2 className="text-sm font-bold text-zinc-100">Views · last 7 days</h2>
+          <p className="text-xs text-zinc-500">Recorded views of your posts and profile, by day</p>
+          {eng && weekTotal > 0 ? (
+            <div className="mt-3 flex h-36 items-end gap-2">
+              {eng.weekly.map((d) => {
+                const v = d.contentViews + d.profileViews;
+                return (
+                  <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
+                    <div
+                      className={`w-full rounded-lg transition-all ${
+                        v === weekMax && v > 0 ? "bg-amber-400" : "bg-zinc-700/60 hover:bg-zinc-600"
+                      }`}
+                      style={{ height: `${weekMax > 0 ? Math.max((v / weekMax) * 100, v > 0 ? 6 : 2) : 2}%` }}
+                      title={`${d.contentViews} post views · ${d.profileViews} profile views`}
+                    />
+                    <span className="text-[10px] text-zinc-500">{d.day}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-6 pb-4 text-center text-xs leading-relaxed text-zinc-500">
+              Not enough activity yet — views appear here as people find your posts and profile.
             </p>
-          ))}
-        </div>
+          )}
+        </section>
+
+        {/* audience — where the people who ENGAGED with you are from */}
+        <section className="card p-4">
+          <h2 className="text-sm font-bold text-zinc-100">Audience Locations</h2>
+          <p className="text-xs text-zinc-500">Where the accounts that engaged with you are located</p>
+          {eng && eng.audience.length > 0 ? (
+            <ul className="mt-5 space-y-3.5">
+              {eng.audience.map((a) => (
+                <li key={a.place}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-medium text-zinc-300">{a.place}</span>
+                    <span className="text-zinc-500">{a.count} {a.count === 1 ? "person" : "people"} · {a.pct}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-line">
+                    <div className="h-full rounded-full bg-violet-400/80" style={{ width: `${a.pct}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-6 pb-4 text-center text-xs leading-relaxed text-zinc-500">
+              Not enough activity yet — locations show up once people view, like, or follow you
+              (only for accounts that share their location).
+            </p>
+          )}
+        </section>
+      </div>
+
+      {/* top posts — ranked by real engagement */}
+      <section className="card p-5">
+        <h2 className="text-sm font-bold text-zinc-100">Top Posts</h2>
+        <p className="text-xs text-zinc-500">Your posts ranked by likes + comments + recorded views</p>
+        {eng && eng.topPosts.length > 0 ? (
+          <div className="mt-3 divide-y divide-line-soft">
+            {eng.topPosts.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-4 py-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-card-raised text-sm font-bold text-lime-400">
+                  {i + 1}
+                </span>
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-200">{p.title}</p>
+                <p className="hidden text-xs text-zinc-500 sm:block">{p.views} {p.views === 1 ? "view" : "views"}</p>
+                <p className="text-xs font-semibold text-amber-400">{p.likes} ♥ · {p.comments} 💬</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 pb-2 text-center text-xs leading-relaxed text-zinc-500">
+            Not enough activity yet — your most-engaged posts will rank here.
+          </p>
+        )}
       </section>
+
+      {/* business — real counts from your actual records */}
+      {summary && (
+        <section className="card p-4">
+          <h2 className="text-sm font-bold text-zinc-100">Business</h2>
+          <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            {([
+              ["Service views", String(eng?.serviceViews ?? 0)],
+              ["Clients", String(summary.clients)],
+              ["Repeat clients", String(summary.repeatClients)],
+              ["Applications sent", String(eng?.applicationsSent ?? 0)],
+              ["Completed engagements", String(summary.completedEngagements)],
+              ["Avg. engagement", `$${summary.avgValue}`],
+            ] as [string, string][]).map(([k, v]) => (
+              <p key={k} className="flex items-baseline justify-between border-b border-line-soft pb-1.5">
+                <span className="text-xs text-zinc-500">{k}</span>
+                <span className="font-bold tabular-nums tracking-tight text-zinc-100">{v}</span>
+              </p>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

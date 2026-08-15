@@ -797,34 +797,3 @@ export const campusOrgs: CampusOrg[] = [
   },
 ];
 
-/* --------------------------------- analytics ------------------------------- */
-
-export const analytics = {
-  stats: [
-    { label: "Profile Views", value: "1,842", delta: "+12.4%", up: true },
-    { label: "Post Reach", value: "24.3K", delta: "+31.2%", up: true },
-    { label: "New Followers", value: "128", delta: "+8.9%", up: true },
-    { label: "Service Revenue", value: "$1,250", delta: "+$450", up: true },
-  ],
-  weeklyReach: [
-    { day: "Mon", value: 42 },
-    { day: "Tue", value: 58 },
-    { day: "Wed", value: 47 },
-    { day: "Thu", value: 74 },
-    { day: "Fri", value: 96 },
-    { day: "Sat", value: 81 },
-    { day: "Sun", value: 63 },
-  ],
-  topPosts: [
-    { title: "Behind the shot 🎞️", reach: "8.2K", engagement: "6.1%" },
-    { title: "Late nights in the studio…", reach: "5.9K", engagement: "4.8%" },
-    { title: "What content do you want more of?", reach: "3.4K", engagement: "9.2%" },
-  ],
-  audience: [
-    { place: "Baltimore, MD", pct: 34 },
-    { place: "Washington, DC", pct: 27 },
-    { place: "Atlanta, GA", pct: 14 },
-    { place: "Philadelphia, PA", pct: 9 },
-    { place: "Other", pct: 16 },
-  ],
-};
