@@ -1,20 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Check,
-  Clock,
-  FileText,
   Flag,
   MessageSquare,
   Paperclip,
   Scale,
   ShieldCheck,
 } from "lucide-react";
-import Avatar from "@/components/Avatar";
 import ReportModal from "@/components/ReportModal";
-import { creators, currentUser } from "@/lib/data";
+import { useSession } from "@/lib/session";
+import { DISPUTE_STATUS_LABEL } from "@/lib/protection";
 
 /* ------------------------------------------------------------------ */
 /* Resolution Center: every protected transaction is documented —      */
@@ -24,18 +21,52 @@ import { creators, currentUser } from "@/lib/data";
 /* payment system — never auto-replaced with credits.                  */
 /* ------------------------------------------------------------------ */
 
-const timeline = [
-  { label: "Agreement created", done: true, date: "Aug 12" },
-  { label: "Payment submitted", done: true, date: "Aug 12" },
-  { label: "Work in progress", done: true, date: "Aug 13" },
-  { label: "Delivery submitted", done: true, date: "Aug 20" },
-  { label: "Client approval", done: false, date: "overdue" },
-  { label: "Payout", done: false, date: "paused" },
-];
+/* Real dispute cases from /api/me/disputes — the SAME records the order
+   pages and platform review work from. Open cases first, newest first. */
+interface DisputeCase {
+  id: string;
+  kind: string;
+  reason: string;
+  status: string;
+  openedByMe: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolutionNote: string;
+  evidenceCount: number;
+  order: { id: string; title: string; amount: number; myRole: "buyer" | "seller"; with: string };
+}
+
+const OPEN_STATES = ["open", "under_review", "return_authorized", "return_in_transit"];
 
 export default function ResolutionPage() {
   const [reportOpen, setReportOpen] = useState(false);
-  const jordan = creators.find((c) => c.id === "jordan")!;
+  const { user } = useSession();
+  // null = loading (or signed out) — the cases section waits, never fakes
+  const [cases, setCases] = useState<DisputeCase[] | null>(null);
+  useEffect(() => {
+    if (!user) {
+      setCases(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/me/disputes", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d?.disputes)) setCases(d.disputes);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ordered = (cases ?? []).slice().sort((a, b) => {
+    const ao = OPEN_STATES.includes(a.status) ? 0 : 1;
+    const bo = OPEN_STATES.includes(b.status) ? 0 : 1;
+    return ao - bo || +new Date(b.createdAt) - +new Date(a.createdAt);
+  });
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -51,95 +82,102 @@ export default function ResolutionPage() {
         </p>
       </header>
 
-      {/* active dispute */}
+      {/* your cases — real records from /api/me/disputes */}
       <section className="card-money overflow-hidden">
-        <div className="flex items-center justify-between border-b border-line-soft bg-red-500/[0.06] px-5 py-3">
-          <p className="flex items-center gap-2 text-sm font-bold text-red-300">
-            <Scale className="h-4 w-4" /> Payment Dispute · case UPN-2481
+        <div className="flex items-center justify-between border-b border-line-soft px-5 py-3">
+          <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+            <Scale className="h-4 w-4 text-zinc-400" /> Your cases
           </p>
-          <span className="rounded-full border border-amber-400/40 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-300">
-            under review
-          </span>
+          {ordered.length > 0 && (
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              {ordered.filter((c) => OPEN_STATES.includes(c.status)).length} open · {ordered.length} total
+            </span>
+          )}
         </div>
-        <div className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-zinc-100">Full Music Production</p>
-              <p className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
-                <Avatar src={jordan.avatar} initials={jordan.initials} gradient={jordan.gradient} size="xs" className="!h-5 !w-5" />
-                Client: {jordan.name}
-                <span>·</span>
-                <Avatar src={currentUser.avatar} initials={currentUser.initials} size="xs" className="!h-5 !w-5" />
-                Creator: {currentUser.name}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xl font-extrabold tracking-tight tabular-nums text-lime-400">$300</p>
-              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-                payment under review
-              </p>
-            </div>
+
+        {/* loading / signed out */}
+        {cases === null && (
+          <div className="p-5" aria-busy="true">
+            <div className="h-16 animate-pulse rounded-xl bg-card-raised" />
           </div>
+        )}
 
-          <p className="mt-3 rounded-md border border-line bg-card-raised p-3 text-xs leading-relaxed text-zinc-400">
-            <span className="font-semibold text-zinc-200">The claim:</span> client received the
-            delivery on Aug 20 and has not approved or paid out. The normal payout workflow is
-            paused while the dispute is investigated, per the payment provider&apos;s rules.
-          </p>
-
-          {/* project timeline — the evidence skeleton */}
-          <div className="mt-4">
-            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-              project timeline
+        {/* the polished empty state — most accounts, honestly */}
+        {cases !== null && ordered.length === 0 && (
+          <div className="p-8 text-center">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10">
+              <ShieldCheck className="h-5 w-5 text-lime-400" />
+            </span>
+            <p className="mt-3 text-sm font-semibold text-zinc-100">No open cases</p>
+            <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">
+              Nothing is in dispute on your account. If something goes wrong with an order,
+              open a case from that order — the payout freezes and both sides submit evidence.
             </p>
-            <ul className="mt-2 space-y-1.5">
-              {timeline.map((t) => (
-                <li key={t.label} className="flex items-center gap-2.5 text-xs">
-                  <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border ${t.done ? "border-lime-400 bg-lime-400/20" : "border-zinc-600"}`}>
-                    {t.done && <Check className="h-2.5 w-2.5 text-lime-400" />}
-                  </span>
-                  <span className={t.done ? "text-zinc-200" : "text-zinc-500"}>{t.label}</span>
-                  <span className={`ml-auto font-mono text-[10px] ${t.date === "paused" || t.date === "overdue" ? "font-semibold text-amber-400" : "text-zinc-600"}`}>
-                    {t.date}
-                  </span>
+            <Link href="/orders" className="btn-ghost mt-4 inline-flex px-4 py-1.5 text-xs">
+              View your orders
+            </Link>
+          </div>
+        )}
+
+        {/* real cases, open first */}
+        {ordered.length > 0 && (
+          <ul className="divide-y divide-line-soft">
+            {ordered.map((c) => {
+              const open = OPEN_STATES.includes(c.status);
+              return (
+                <li key={c.id} className="p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                        {c.kind === "return" ? "Return request" : "Problem report"} · {c.order.title}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {c.order.myRole === "buyer" ? "Seller" : "Buyer"}: {c.order.with} · opened{" "}
+                        {c.openedByMe ? "by you" : "by them"} {fmtDate(c.createdAt)} ·{" "}
+                        {c.evidenceCount} evidence {c.evidenceCount === 1 ? "entry" : "entries"}
+                      </p>
+                      <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                        <span className="font-semibold text-zinc-300">Reason:</span> {c.reason.replaceAll("_", " ")}
+                      </p>
+                      {c.resolutionNote && (
+                        <p className="mt-1.5 rounded-md border border-line bg-card-raised px-3 py-2 text-xs leading-relaxed text-zinc-400">
+                          <span className="font-semibold text-zinc-200">Resolution:</span> {c.resolutionNote}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xl font-extrabold tracking-tight tabular-nums text-lime-400">
+                        ${c.order.amount.toLocaleString()}
+                      </p>
+                      <span
+                        className={`mt-1 inline-block rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                          open ? "border-amber-400/40 text-amber-300" : "border-line text-zinc-500"
+                        }`}
+                      >
+                        {DISPUTE_STATUS_LABEL[c.status] ?? c.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-line-soft pt-3">
+                    <Link href="/orders" className="btn-ghost px-4 py-2 text-xs">
+                      <Paperclip className="h-3.5 w-3.5" /> {open ? "Add evidence" : "View order"}
+                    </Link>
+                    <Link href="/messages" className="btn-ghost px-4 py-2 text-xs">
+                      <MessageSquare className="h-3.5 w-3.5" /> Message the other side
+                    </Link>
+                  </div>
                 </li>
-              ))}
-            </ul>
-          </div>
+              );
+            })}
+          </ul>
+        )}
 
-          {/* evidence on file */}
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {[
-              { icon: FileText, label: "Project agreement", meta: "$300 · due Aug 20" },
-              { icon: MessageSquare, label: "Message history", meta: "42 messages" },
-              { icon: Paperclip, label: "Delivery files", meta: "final-mix.wav · Aug 20, 11:42 PM" },
-              { icon: Clock, label: "Payment record", meta: "paid Aug 12 · $315 incl. fee" },
-            ].map((e) => (
-              <div key={e.label} className="flex items-center gap-2.5 rounded-md border border-line bg-card-raised px-3 py-2.5">
-                <e.icon className="h-4 w-4 shrink-0 text-zinc-500" />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-zinc-200">{e.label}</p>
-                  <p className="truncate font-mono text-[10px] text-zinc-500">{e.meta}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-line-soft pt-4">
-            <button className="btn-ghost px-4 py-2 text-xs">
-              <Paperclip className="h-3.5 w-3.5" /> Add evidence
-            </button>
-            <button className="btn-ghost px-4 py-2 text-xs">
-              <MessageSquare className="h-3.5 w-3.5" /> Message the other side
-            </button>
-          </div>
-
-          <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
-            Possible outcomes: creator wins → payout proceeds · client wins → refund through the
-            payment system · partial resolution where supported. Refunds are never auto-replaced
-            with credits.
-          </p>
-        </div>
+        <p className="border-t border-line-soft px-5 py-3 text-[10px] leading-relaxed text-zinc-600">
+          Possible outcomes: creator wins → payout proceeds · client wins → refund through the
+          payment system · partial resolution where supported. Refunds are never auto-replaced
+          with credits. While a case is open, the normal payout workflow is paused rather than
+          automatically favoring either side.
+        </p>
       </section>
 
       {/* creative integrity */}
