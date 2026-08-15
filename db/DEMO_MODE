@@ -1,0 +1,10 @@
+This marker file enables Mavyn's DEMO authentication conveniences
+(signed demo tokens, seed logins, Test Center) on dev/preview instances
+built from this checkout.
+
+PRODUCTION IS SAFE EVEN WITH THIS FILE PRESENT: on Vercel Production
+(VERCEL_ENV=production) demo mode is FORCED OFF in code
+(lib/server/auth.ts), production builds SKIP demo seeding
+(scripts/seed-unless-production.mjs), and the seed script itself
+refuses to run against production. The only override is
+MAVYN_FORCE_DEMO_IN_PRODUCTION=1 — never set it on a real deployment.

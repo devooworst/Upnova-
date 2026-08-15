@@ -1,0 +1,47 @@
+import { NextRequest } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { db, tables } from "@/db";
+import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { notify } from "@/lib/server/notify";
+import { recordInteraction } from "@/lib/server/recsys";
+
+export const dynamic = "force-dynamic";
+
+/** POST = follow, DELETE = unfollow. */
+export async function POST(_req: NextRequest, { params }: { params: { userId: string } }) {
+  return guarded(async () => {
+    const user = await requireUser();
+    if (params.userId === user.id) throw new ApiError(400, "You can't follow yourself");
+    const target = await db.select().from(tables.users).where(eq(tables.users.id, params.userId)).get();
+    if (!target || target.status !== "active") throw new ApiError(404, "User not found");
+
+    const existing = await db
+      .select()
+      .from(tables.follows)
+      .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, target.id)))
+      .get();
+    if (!existing) {
+      await db.insert(tables.follows).values({ followerId: user.id, followingId: target.id }).run();
+      await recordInteraction(user.id, "user", target.id, "follow");
+      await notify({
+        userId: target.id,
+        actorId: user.id,
+        type: "follow",
+        title: `${user.profile.displayName} started following you`,
+        href: `/creator/${user.handle}`,
+      });
+    }
+    return { following: true };
+  });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { userId: string } }) {
+  return guarded(async () => {
+    const user = await requireUser();
+    await db.delete(tables.follows)
+      .where(and(eq(tables.follows.followerId, user.id), eq(tables.follows.followingId, params.userId)))
+      .run();
+    await recordInteraction(user.id, "user", params.userId, "unfollow");
+    return { following: false };
+  });
+}

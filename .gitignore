@@ -1,0 +1,63 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# database (local sqlite dev db — production uses Postgres)
+prisma/dev.db
+prisma/dev.db-journal
+.env
+
+# drizzle sqlite dev db
+db/mavyn.dev.db
+db/mavyn.dev.db-shm
+db/mavyn.dev.db-wal
+db/.demo-session
+db/.preserved-sessions.json
+db/.demo-signout.json
+db/.instance-id
+db/.demo-revoked.json
+db/.qa-runs.json
+db/upnova.dev.db
+db/upnova.dev.db-shm
+db/upnova.dev.db-wal
+
+# compiled geographic reference data — regenerate with: npm run geo:build
+db/geo.db
+db/geo.db-shm
+db/geo.db-wal
+public/uploads/
+db/.qa-guide-defects.json
+qa-artifacts/
+
+# PGlite local Postgres data directory (dev/sandbox only)
+db/pgdata/

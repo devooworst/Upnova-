@@ -1,0 +1,247 @@
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/syne";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --font-sans: "Plus Jakarta Sans Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-display: "Syne Variable", "Plus Jakarta Sans Variable", sans-serif;
+
+  /* ---------- dark (default) palette · RGB triplets ---------- */
+  --c-ink: 10 10 15;
+  --c-ink-soft: 14 14 20;
+  --c-card: 17 17 17;
+  --c-card-raised: 22 22 28;
+  --c-card-hover: 26 26 33;
+  --c-line: 38 38 46;
+  --c-line-soft: 29 29 36;
+  /* contrast surface: white in dark mode, near-black in light */
+  --c-contrast: 255 255 255;
+  --c-on-contrast: 9 9 11;
+  --c-z50: 250 250 250;
+  --c-z100: 244 244 245;
+  --c-z200: 228 228 231;
+  --c-z300: 212 212 216;
+  --c-z400: 161 161 170;
+  --c-z500: 113 113 122;
+  --c-z600: 82 82 91;
+  --c-lime-300: 190 242 100;
+  --c-lime-400: 163 230 53;
+  --c-violet-300: 196 181 253;
+  --c-violet-400: 167 139 250;
+  --c-amber-300: 252 211 77;
+  --c-amber-400: 251 191 36;
+  --c-sky-300: 125 211 252;
+  --c-sky-400: 56 189 248;
+  --c-red-300: 252 165 165;
+  --c-red-400: 248 113 113;
+  --scrollbar: #2b2b33;
+}
+
+/* ---------- light mode: same Mavyn, different room ---------- */
+html.light {
+  color-scheme: light;
+  --c-ink: 244 244 246;
+  --c-ink-soft: 238 238 242;
+  --c-card: 255 255 255;
+  --c-card-raised: 244 244 246;
+  --c-card-hover: 235 235 240;
+  --c-line: 214 214 222;
+  --c-line-soft: 228 228 234;
+  --c-contrast: 24 24 27;
+  --c-on-contrast: 250 250 250;
+  --c-z50: 24 24 27;
+  --c-z100: 39 39 42;
+  --c-z200: 63 63 70;
+  --c-z300: 82 82 91;
+  --c-z400: 113 113 122;
+  --c-z500: 113 113 122;
+  --c-z600: 161 161 170;
+  /* accents darken for contrast on light — lime stays lime */
+  --c-lime-300: 77 124 15;
+  --c-lime-400: 101 163 13;
+  --c-violet-300: 109 40 217;
+  --c-violet-400: 124 58 237;
+  --c-amber-300: 180 83 9;
+  --c-amber-400: 217 119 6;
+  --c-sky-300: 3 105 161;
+  --c-sky-400: 2 132 199;
+  --c-red-300: 185 28 28;
+  --c-red-400: 220 38 38;
+  --scrollbar: #c8c8d2;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* MOBILE FOUNDATION — applied once, globally, instead of per-component:
+     no gray tap flashes, no landscape font inflation, no double-tap-zoom
+     delay on controls. Content behaves like a native app, desktop unchanged. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation; /* removes the 300ms double-tap-zoom wait on touch */
+}
+
+/* iOS Safari zooms the whole page when a focused field's font is <16px —
+   the single most common mobile-form complaint. On phones every field
+   renders at 16px; ≥sm keeps the existing compact desktop sizing. */
+@media (max-width: 639.98px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 1rem !important;
+  }
+}
+
+body {
+  @apply bg-ink text-zinc-200 antialiased;
+}
+
+::selection {
+  @apply bg-lime-400/30 text-lime-100;
+}
+
+/* designed focus state — never browser-default blue */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 3px;
+}
+
+/* ---------- shared component classes ---------- */
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-card shadow-card;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-card-raised px-3 py-1 text-xs font-medium text-zinc-300 transition active:scale-[0.97];
+  }
+
+  .btn-lime {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-lime-300 hover:shadow-glow active:scale-[0.98];
+  }
+
+  /* client-side payment CTA — sky, because BLUE = "you're the client
+     paying for a service" in the category system. Same geometry as
+     btn-lime; lime remains the provider/earning color. */
+  .btn-pay {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-sky-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-sky-300 active:scale-[0.98];
+  }
+
+  /* purposeful micro-interaction: clickable cards lift slightly */
+  .card-lift {
+    @apply transition duration-200 hover:-translate-y-0.5;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-transparent px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-card-raised active:scale-[0.98];
+  }
+
+  .icon-btn {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-400 transition hover:bg-card-raised hover:text-zinc-100 active:scale-95;
+  }
+
+  .input-dark {
+    @apply w-full rounded-xl border border-line bg-card-raised px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-lime-400/50 focus:ring-2 focus:ring-lime-400/15;
+  }
+}
+
+/* ---------- scrollbars ---------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- category card DNA ----------
+   Accent color roles (see README):
+   lime   = money / opportunity / availability
+   violet = people / community
+   amber  = events / energy / trending
+   white  = navigation / active / verified
+
+   Card shapes also carry the category:
+   money  = sharp corners, receipt/ticket, perforations
+   people = round corners, avatar-forward
+   events = ticket with date block                   */
+
+.card-money {
+  /* the lime top edge stays as the money signature — as an accent line,
+     not a glow wall when twelve cards share a grid */
+  @apply rounded-xl border border-line border-t-2 border-t-lime-400/35 bg-card shadow-card transition-colors hover:border-t-lime-400/60;
+}
+
+/* ------------------- CATEGORY COLOR SYSTEM (cards) -------------------
+   Same geometry as .card-money — only the top-edge hue differs, so a
+   card's TYPE reads at a glance: lime=opportunity · sky=service ·
+   amber=shop · violet=work · orange=booking · rose=client · zinc=activity.
+   Single source of truth for chips/dots/labels: lib/categories.tsx.  */
+.card-opportunity {
+  @apply rounded-xl border border-line border-t-2 border-t-lime-400/35 bg-card shadow-card transition-colors hover:border-t-lime-400/60;
+}
+.card-service {
+  @apply rounded-xl border border-line border-t-2 border-t-sky-400/35 bg-card shadow-card transition-colors hover:border-t-sky-400/60;
+}
+.card-shop {
+  @apply rounded-xl border border-line border-t-2 border-t-amber-400/35 bg-card shadow-card transition-colors hover:border-t-amber-400/60;
+}
+.card-work {
+  @apply rounded-xl border border-line border-t-2 border-t-violet-400/35 bg-card shadow-card transition-colors hover:border-t-violet-400/60;
+}
+.card-booking {
+  @apply rounded-xl border border-line border-t-2 border-t-orange-400/35 bg-card shadow-card transition-colors hover:border-t-orange-400/60;
+}
+.card-client {
+  @apply rounded-xl border border-line border-t-2 border-t-rose-400/35 bg-card shadow-card transition-colors hover:border-t-rose-400/60;
+}
+.card-activity {
+  @apply rounded-xl border border-line border-t-2 border-t-zinc-500/35 bg-card shadow-card transition-colors hover:border-t-zinc-500/60;
+}
+
+.card-people {
+  @apply rounded-3xl border border-line bg-card shadow-card;
+}
+
+.card-event {
+  @apply rounded-xl border border-line bg-card shadow-card;
+}

@@ -1,0 +1,68 @@
+import { NextRequest } from "next/server";
+import { randomBytes } from "crypto";
+import { asc, eq } from "drizzle-orm";
+import { db, tables } from "@/db";
+import { requireUser, guarded, ApiError } from "@/lib/server/auth";
+import { publicUser } from "@/lib/server/serialize";
+import { notify, notifySubscribers } from "@/lib/server/notify";
+import { recordInteraction } from "@/lib/server/recsys";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  return guarded(async () => {
+    await requireUser();
+    const rows = await db
+      .select({ comment: tables.comments, user: tables.users, profile: tables.profiles })
+      .from(tables.comments)
+      .innerJoin(tables.users, eq(tables.comments.authorId, tables.users.id))
+      .innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id))
+      .where(eq(tables.comments.postId, params.id))
+      .orderBy(asc(tables.comments.createdAt))
+      .all();
+    return {
+      comments: rows.map((r) => ({
+        id: r.comment.id,
+        body: r.comment.body,
+        createdAt: r.comment.createdAt.toISOString(),
+        author: publicUser(r.user, r.profile),
+      })),
+    };
+  });
+}
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+  return guarded(async () => {
+    const user = await requireUser();
+    const post = await db.select().from(tables.posts).where(eq(tables.posts.id, params.id)).get();
+    if (!post) throw new ApiError(404, "Post not found");
+    const text = String(body.body || "").trim();
+    if (!text) throw new ApiError(400, "Comment is required");
+
+    const id = randomBytes(12).toString("hex");
+    await db.insert(tables.comments).values({ id, postId: post.id, authorId: user.id, body: text }).run();
+    await recordInteraction(user.id, "post", post.id, "comment");
+    await notify({
+      userId: post.authorId,
+      actorId: user.id,
+      // honest type: this IS a comment — governed by Social → Comments
+      // (was mislabeled "like", which put it under the wrong switch)
+      type: "comment",
+      title: `${user.profile.displayName} commented on your post`,
+      body: text.slice(0, 80),
+      href: `/?post=${post.id}`,
+    });
+
+    // people who tapped "Notify me about this post" — activity fanout
+    // (the author is covered above; the commenter never notifies themself)
+    await notifySubscribers({
+      targetType: "post", targetId: post.id, actorId: user.id,
+      type: "post_activity",
+      title: `New comment on a post you follow`,
+      body: `${user.profile.displayName}: ${text.slice(0, 80)}`,
+      href: `/posts/${post.id}`,
+    });
+    return { id };
+  });
+}

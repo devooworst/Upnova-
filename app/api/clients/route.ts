@@ -1,0 +1,86 @@
+import { eq, and } from "drizzle-orm";
+import { db, tables } from "@/db";
+import { requireUser, guarded } from "@/lib/server/auth";
+import { clientIdsOf, clientStats, parseBenefits, readEarlyAccess, readRelease, activeBookingsForService } from "@/lib/server/preferred";
+import { parseConfig } from "@/lib/servicePolicies";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/clients — the provider's PRIVATE client dashboard: everyone
+ * who has booked/hired them, with completed-work stats, eligibility,
+ * and the preferred-client relationship (including removed history).
+ * Visible only to the provider themself — never to clients, visitors,
+ * or other providers.
+ */
+export async function GET() {
+  return guarded(async () => {
+    const user = await requireUser();
+
+    const rows = await Promise.all((await clientIdsOf(user.id)).map(async (clientId) => {
+      const u = await db.select().from(tables.users).where(eq(tables.users.id, clientId)).get();
+      const p = await db.select().from(tables.profiles).where(eq(tables.profiles.userId, clientId)).get();
+      const stats = await clientStats(user.id, clientId);
+      const rel = await db
+        .select()
+        .from(tables.preferredClients)
+        .where(and(eq(tables.preferredClients.providerId, user.id), eq(tables.preferredClients.clientId, clientId)))
+        .get();
+      return {
+        id: clientId,
+        handle: u?.handle ?? "?",
+        displayName: p?.displayName ?? "?",
+        avatarUrl: p?.avatarUrl ?? null,
+        ...stats,
+        preferred: rel
+          ? {
+              id: rel!.id,
+              status: rel!.status,
+              benefits: parseBenefits(rel!.benefits),
+              note: rel!.note,
+              addedAt: rel!.addedAt.toISOString(),
+              removedAt: rel!.removedAt?.toISOString() ?? null,
+            }
+          : null,
+      };
+    }));
+
+    // services + their preferred-only windows (for the early-access control)
+    const services = await Promise.all((await db
+      .select()
+      .from(tables.services)
+      .where(eq(tables.services.ownerId, user.id))
+      .all())
+      .filter((s) => s.active)
+      .map(async (s) => ({
+        id: s.id,
+        title: s.title,
+        price: s.price,
+        // BOOKING HORIZON + RELEASE MODE — separate dimensions from early access
+        horizonDays: parseConfig(s.config).scheduling.horizonDays ?? 60,
+        releaseMode: parseConfig(s.config).scheduling.releaseMode ?? "rolling",
+        release: readRelease(s.config),
+        preferredUntil: s.preferredUntil && s.preferredUntil.getTime() > Date.now() ? s.preferredUntil.toISOString() : null,
+        // Preferred Early Access setup: the slot cap counts for EVERYONE;
+        // the preferred limit bounds bookings during the window only
+        earlyAccess: await (async () => {
+          const ea = readEarlyAccess(s.config);
+          if (!ea) return null;
+          const active = await activeBookingsForService(s.id);
+          return {
+            slots: ea.slots,
+            preferredLimit: ea.preferredLimit,
+            activeBookings: active,
+            slotsLeft: ea.slots != null ? Math.max(0, ea.slots - active) : null,
+          };
+        })(),
+      })));
+
+    rows.sort((a, b) => (b.lastCompletedAt ?? "").localeCompare(a.lastCompletedAt ?? ""));
+    return {
+      clients: rows,
+      preferredCount: rows.filter((r) => r.preferred?.status === "active").length,
+      services,
+    };
+  });
+}

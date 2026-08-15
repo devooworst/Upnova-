@@ -1,0 +1,409 @@
+"use client";
+
+/* ------------------------------------------------------------------ */
+/*  Admin dashboard — user management, moderation, and marketplace     */
+/*  oversight. Access is enforced server-side (role=admin); this page  */
+/*  just renders what the admin APIs allow.                            */
+/* ------------------------------------------------------------------ */
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ShieldCheck, Users, Flag, BarChart3, Scale } from "lucide-react";
+
+interface Overview {
+  users: number;
+  posts: number;
+  messages: number;
+  communities: number;
+  campuses: number;
+  services: number;
+  opportunities: number;
+  applications: number;
+  projects: number;
+  bookings: number;
+  reportsOpen: number;
+  grossVolumeCents: number;
+  feesCents: number;
+  customCategories?: { name: string; services: number }[];
+}
+
+interface AdminUser {
+  id: string;
+  handle: string;
+  email: string;
+  displayName: string;
+  role: string;
+  plan: string;
+  status: string;
+  accountType?: string;
+  businessVerified?: boolean;
+  isSeed: boolean;
+  createdAt: string;
+}
+
+interface AdminReport {
+  id: string;
+  targetType: string;
+  targetId: string;
+  category: string;
+  details: string;
+  signals?: string[];
+  status: string;
+  reporter: string;
+  createdAt: string;
+}
+
+type Tab = "overview" | "users" | "reports" | "disputes";
+
+interface AdminDispute {
+  id: string;
+  kind: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  resolutionNote: string;
+  order: {
+    id: string; title: string; amount: number; status: string; buyer: string; seller: string;
+    tracking: { carrier?: string; code?: string; eta?: string };
+    sellerEvidence: { serial?: string; weightLb?: number; note?: string; photos?: string[] };
+  } | null;
+  evidence: { by: string; at: string; note: string; photos: string[] }[];
+  timeline: { at: string; actor: string; kind: string; note: string }[];
+  risk: { buyerPriorDisputes: number; sellerPriorDisputes: number };
+}
+
+export default function AdminPage() {
+  const [tab, setTab] = useState<Tab>("overview");
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [reports, setReports] = useState<AdminReport[]>([]);
+  const [disputes, setDisputes] = useState<AdminDispute[]>([]);
+  const [denied, setDenied] = useState(false);
+
+  const load = useCallback(async () => {
+    const [o, u, r, dp] = await Promise.all([
+      fetch("/api/admin/overview", { cache: "no-store" }),
+      fetch("/api/admin/users", { cache: "no-store" }),
+      fetch("/api/admin/reports", { cache: "no-store" }),
+      fetch("/api/admin/disputes", { cache: "no-store" }),
+    ]);
+    if (o.status === 401 || o.status === 403) {
+      setDenied(true);
+      return;
+    }
+    setOverview((await o.json()) as Overview);
+    setUsers((await u.json()).users ?? []);
+    setReports((await r.json()).reports ?? []);
+    setDisputes((await dp.json()).disputes ?? []);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const moderate = async (userId: string, action: "suspend" | "activate" | "verify_business" | "revoke_business") => {
+    await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, action }),
+    });
+    load();
+  };
+
+  const setReportStatus = async (reportId: string, status: string) => {
+    await fetch("/api/admin/reports", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reportId, status }),
+    });
+    load();
+  };
+
+  if (denied)
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <ShieldCheck className="mx-auto h-6 w-6 text-zinc-500" />
+        <p className="mt-2 text-sm font-semibold text-zinc-200">Admin only</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          This dashboard requires an admin account.{" "}
+          <Link href="/login" className="text-violet-300 hover:underline">Sign in</Link> as one.
+        </p>
+      </div>
+    );
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-400/10">
+          <ShieldCheck className="h-5 w-5 text-violet-400" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Admin</h1>
+          <p className="text-sm text-zinc-400">Users, moderation, and marketplace activity.</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-1.5">
+        {(
+          [
+            { id: "overview", label: "Overview", icon: BarChart3 },
+            { id: "users", label: "Users", icon: Users },
+            { id: "reports", label: "Reports", icon: Flag },
+            { id: "disputes", label: "Disputes", icon: Scale },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+              tab === t.id ? "border-violet-400/50 bg-violet-400/10 font-semibold text-violet-300" : "border-line text-zinc-400"
+            }`}
+          >
+            <t.icon className="h-3.5 w-3.5" /> {t.label}
+            {t.id === "reports" && overview && overview.reportsOpen > 0 && (
+              <span className="rounded-full bg-amber-400/20 px-1.5 text-[10px] font-bold text-amber-300">
+                {overview.reportsOpen}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ------------------------------ overview ------------------------------ */}
+      {tab === "overview" && overview && (
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { l: "Users", v: overview.users },
+            { l: "Posts", v: overview.posts },
+            { l: "Messages", v: overview.messages },
+            { l: "Communities", v: overview.communities },
+            { l: "Services", v: overview.services },
+            { l: "Opportunities", v: overview.opportunities },
+            { l: "Applications", v: overview.applications },
+            { l: "Projects", v: overview.projects },
+            { l: "Bookings", v: overview.bookings },
+            { l: "Open reports", v: overview.reportsOpen },
+            { l: "Gross volume", v: `$${(overview.grossVolumeCents / 100).toFixed(0)}` },
+            { l: "Platform fees", v: `$${(overview.feesCents / 100).toFixed(2)}` },
+          ].map((m) => (
+            <div key={m.l} className="card px-4 py-3">
+              <p className="font-mono text-lg font-medium tracking-[0.08em] text-zinc-50">{m.v}</p>
+              <p className="text-[11px] text-zinc-500">{m.l}</p>
+            </div>
+          ))}
+          {/* custom categories in use — promotion candidates, tracked live */}
+          {(overview.customCategories?.length ?? 0) > 0 && (
+            <div className="card col-span-full px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                Custom categories in use — promote frequent ones to official
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {overview.customCategories!.map((c) => (
+                  <span key={c.name} className="rounded-full border border-line px-2.5 py-1 font-mono text-[11px] tracking-[0.05em] text-zinc-300">
+                    {c.name} <span className="text-zinc-600">×{c.services}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ------------------------------ disputes ------------------------------ */}
+      {tab === "disputes" && (
+        <div className="mt-5 space-y-3">
+          {disputes.length === 0 && <p className="card p-8 text-center text-sm text-zinc-500">No disputes.</p>}
+          {disputes.map((d) => (
+            <div key={d.id} className="card p-4">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
+                {d.order?.title ?? "—"}
+                <span className="font-mono text-xs tracking-[0.08em] text-lime-300">${d.order?.amount ?? 0}</span>
+                <span className="rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-400">{d.kind} · {d.reason.replace(/_/g, " ")}</span>
+                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${d.status.startsWith("resolved") || d.status === "withdrawn" ? "border-line text-zinc-500" : "border-amber-400/40 text-amber-300"}`}>
+                  {d.status.replace(/_/g, " ")}
+                </span>
+              </p>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Buyer {d.order?.buyer} · Seller {d.order?.seller} · opened {new Date(d.createdAt).toLocaleDateString()}
+                {d.order?.tracking.code ? ` · tracking ${d.order.tracking.carrier} ${d.order.tracking.code}` : " · no tracking"}
+              </p>
+
+              {/* seller shipment evidence — serial visible HERE (platform review), never publicly */}
+              {d.order?.sellerEvidence && (d.order.sellerEvidence.serial || d.order.sellerEvidence.photos?.length || d.order.sellerEvidence.weightLb) && (
+                <p className="mt-1.5 rounded-lg border border-line-soft bg-card-raised/50 px-3 py-1.5 text-[11px] text-zinc-400">
+                  Seller shipment record: {d.order.sellerEvidence.serial ? `serial ${d.order.sellerEvidence.serial}` : "no serial"}
+                  {d.order.sellerEvidence.weightLb ? ` · ${d.order.sellerEvidence.weightLb} lb (weight ≠ proof of contents)` : ""}
+                  {d.order.sellerEvidence.photos?.length ? ` · ${d.order.sellerEvidence.photos.length} pre-ship photo(s)` : ""}
+                </p>
+              )}
+
+              {d.evidence.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {d.evidence.map((e, i) => (
+                    <div key={i} className="text-[11px] text-zinc-400">
+                      <span className="font-semibold text-zinc-300">{e.by}</span> — {e.note}
+                      {e.photos.length > 0 && (
+                        <span className="mt-1 flex gap-1.5">
+                          {e.photos.map((ph, j) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={j} src={ph} alt="Evidence" className="h-14 w-14 rounded-lg border border-line object-cover" />
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* INTERNAL risk context — advisory, never a verdict, never public */}
+              <p className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-1.5 font-mono text-[10px] tracking-[0.05em] text-amber-300/90">
+                internal risk context · buyer prior disputes: {d.risk.buyerPriorDisputes} · seller prior disputes: {d.risk.sellerPriorDisputes} — context for review, not proof
+              </p>
+
+              {!d.status.startsWith("resolved") && d.status !== "withdrawn" ? (
+                <div className="mt-2.5 flex flex-wrap gap-2 border-t border-line-soft pt-2.5">
+                  <button
+                    onClick={async () => {
+                      const note = window.prompt("Resolution note (both parties see it):") ?? "";
+                      await fetch("/api/admin/disputes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disputeId: d.id, resolution: "refund_buyer", note }) });
+                      load();
+                    }}
+                    className="rounded-full border border-rose-400/40 px-3.5 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-400/10"
+                  >
+                    Refund buyer
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const note = window.prompt("Resolution note (both parties see it):") ?? "";
+                      await fetch("/api/admin/disputes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disputeId: d.id, resolution: "release_seller", note }) });
+                      load();
+                    }}
+                    className="rounded-full border border-lime-400/40 px-3.5 py-1.5 text-[11px] font-semibold text-lime-300 transition hover:bg-lime-400/10"
+                  >
+                    Release to seller
+                  </button>
+                </div>
+              ) : (
+                d.resolutionNote && <p className="mt-2 text-[11px] text-zinc-400">Resolution: {d.resolutionNote}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ------------------------------- users ------------------------------- */}
+      {tab === "users" && (
+        <div className="card mt-5 divide-y divide-line-soft">
+          {users.map((u) => (
+            <div key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
+                  {u.displayName}
+                  <span className="text-xs font-normal text-zinc-500">@{u.handle} · {u.email}</span>
+                  {u.role === "admin" && (
+                    <span className="rounded-full border border-violet-400/40 px-2 py-0.5 text-[9px] font-bold uppercase text-violet-300">admin</span>
+                  )}
+                  {u.accountType === "business" && (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${
+                        u.businessVerified ? "border-sky-400/40 bg-sky-400/10 text-sky-300" : "border-line text-zinc-500"
+                      }`}
+                    >
+                      {u.businessVerified ? "verified business" : "business · pending"}
+                    </span>
+                  )}
+                  {u.isSeed && (
+                    <span className="rounded-full border border-line px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-500">seed</span>
+                  )}
+                  {u.status === "suspended" && (
+                    <span className="rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[9px] font-bold uppercase text-rose-300">suspended</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-zinc-600">
+                  Plan: {u.plan} · Joined {new Date(u.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              {u.accountType === "business" &&
+                (u.businessVerified ? (
+                  <button onClick={() => moderate(u.id, "revoke_business")} className="rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:text-rose-300">
+                    Revoke verification
+                  </button>
+                ) : (
+                  <button onClick={() => moderate(u.id, "verify_business")} className="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1.5 text-[11px] font-semibold text-sky-300 transition hover:bg-sky-400/20">
+                    Verify business
+                  </button>
+                ))}
+              {u.role !== "admin" &&
+                (u.status === "active" ? (
+                  <button onClick={() => moderate(u.id, "suspend")} className="rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-zinc-400 transition hover:border-rose-400/40 hover:text-rose-300">
+                    Suspend
+                  </button>
+                ) : (
+                  <button onClick={() => moderate(u.id, "activate")} className="btn-lime px-3 py-1.5 text-[11px]">
+                    Reactivate
+                  </button>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ------------------------------ reports ------------------------------ */}
+      {tab === "reports" && (
+        <div className="mt-5 space-y-3">
+          {reports.length === 0 && (
+            <div className="card p-8 text-center text-sm text-zinc-500">No reports filed.</div>
+          )}
+          {reports.map((r) => (
+            <div key={r.id} className="card p-4">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
+                {r.category === "emergency" && (
+                  <span className="rounded-full border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[9px] font-bold uppercase text-rose-300">Emergency</span>
+                )}
+                {r.targetType} · {r.category.replace(/_/g, " ")}
+                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${
+                  r.status === "open" ? "border-amber-400/40 text-amber-300" : "border-line text-zinc-500"
+                }`}>
+                  {r.status}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-zinc-400">{r.details || "No details provided."}</p>
+              {(r.signals?.length ?? 0) > 0 && (
+                <div className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-2">
+                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-300">
+                    Automated risk signals — advisory only, not proof
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[11px] text-zinc-400">
+                    {r.signals!.map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400/60" /> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="mt-1 text-[10px] text-zinc-600">
+                Reported by {r.reporter} · {new Date(r.createdAt).toLocaleString()} · target {r.targetId || "n/a"}
+              </p>
+              {r.status !== "resolved" && r.status !== "dismissed" && (
+                <div className="mt-2.5 flex gap-2 border-t border-line-soft pt-2.5">
+                  {r.status === "open" && (
+                    <button onClick={() => setReportStatus(r.id, "reviewing")} className="rounded-full border border-violet-400/40 px-3 py-1.5 text-[11px] font-semibold text-violet-300">
+                      Start review
+                    </button>
+                  )}
+                  <button onClick={() => setReportStatus(r.id, "resolved")} className="btn-lime px-3 py-1.5 text-[11px]">
+                    Resolve
+                  </button>
+                  <button onClick={() => setReportStatus(r.id, "dismissed")} className="rounded-full px-3 py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300">
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
