@@ -210,9 +210,12 @@ export default function EventPage() {
               </Link>
             )}
             {event.isHost && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-4 py-2 font-mono text-[11px] tracking-[0.06em] text-zinc-300">
-                <ClipboardList className="h-3.5 w-3.5" /> You&apos;re hosting — {event.attending} going
-              </span>
+              <Link
+                href={`/events/${event.slug}/manage`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-4 py-2 font-mono text-[11px] tracking-[0.06em] text-zinc-300 transition hover:border-lime-400/50 hover:text-lime-300"
+              >
+                <ClipboardList className="h-3.5 w-3.5" /> You&apos;re hosting — {event.attending} going · Manage
+              </Link>
             )}
             <button
               onClick={toggleSave}

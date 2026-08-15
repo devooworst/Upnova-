@@ -4,6 +4,7 @@ import { db, tables } from "@/db";
 import { getSessionUser, requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { serializeEvent, rsvpCounts, verifiedCampusOf } from "@/lib/server/events";
 import { unrestrictedTester } from "@/lib/server/campus";
+import { notify } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -106,5 +107,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (r!.event.capacity != null && current >= r!.event.capacity) throw new ApiError(409, "This event is full");
     await db.insert(tables.eventRsvps).values({ eventId: r!.event.id, userId: user.id }).run();
     return { ok: true, going: true };
+  });
+}
+
+/** PATCH — HOST actions. Today exactly one: { action: "cancel" }.
+ *  Uses the schema's existing status vocabulary (active | cancelled).
+ *  The event and every RSVP record are PRESERVED — cancelled events
+ *  disappear from discovery (the list already filters on status) and
+ *  the RSVP route already refuses them; nothing is deleted. Every
+ *  RSVPed attendee is notified. */
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json().catch(() => ({}));
+  return guarded(async () => {
+    const user = await requireUser();
+    const r = await findEvent(params.id);
+    if (!r) throw new ApiError(404, "Event not found");
+    if (r!.event.hostId !== user.id) throw new ApiError(403, "Only the host can manage this event");
+
+    if (body.action !== "cancel") throw new ApiError(400, "Unknown action — the only host action today is cancel");
+    if (r!.event.status === "cancelled") throw new ApiError(409, "This event is already cancelled");
+
+    await db.update(tables.events).set({ status: "cancelled" }).where(eq(tables.events.id, r!.event.id)).run();
+
+    // tell everyone who RSVPed — their records stay, the plan changed
+    const rsvps = await db.select().from(tables.eventRsvps).where(eq(tables.eventRsvps.eventId, r!.event.id)).all();
+    for (const rsvp of rsvps) {
+      await notify({
+        userId: rsvp.userId,
+        actorId: user.id,
+        type: "event_cancelled",
+        title: `Cancelled: ${r!.event.title}`,
+        body: "The host cancelled this event. Your RSVP record is kept for reference.",
+        href: `/events/${r!.event.slug}`,
+        category: "activity",
+      });
+    }
+    return { ok: true, status: "cancelled", notified: rsvps.length };
   });
 }
