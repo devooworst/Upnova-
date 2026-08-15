@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Avatar from "./Avatar";
-import { communities } from "@/lib/data";
+
 import { useSession } from "@/lib/session";
 import { PRO_EVENT, type Plan } from "@/lib/pro";
 import { COLLEGE_PRICE, ALUMNI_PRO_PRICE } from "@/lib/fees";
@@ -88,7 +88,25 @@ export default function Sidebar({
 } = {}) {
   const pathname = usePathname();
   const { user } = useSession();
-  const myCommunities = communities.filter((c) => c.joined);
+  // real joined-community count from the DB (/api/communities → mine).
+  // null = not loaded yet / signed out → the badge simply doesn't render.
+  const [joinedCount, setJoinedCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!user) {
+      setJoinedCount(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/communities", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d && Array.isArray(d.mine)) setJoinedCount(d.mine.length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
   // plan is account state from the session; PRO_EVENT re-render covers
   // same-tab changes made on /pro before the session refetch lands
   const [, forceTick] = useState(0);
@@ -168,9 +186,9 @@ export default function Sidebar({
                         <span className="ml-auto rounded-full bg-violet-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-zinc-950">
                           {item.badge}
                         </span>
-                      ) : item.meta === "joined" ? (
+                      ) : item.meta === "joined" && joinedCount !== null ? (
                         <span className="ml-auto font-mono text-[9px] text-zinc-600">
-                          {myCommunities.length} joined
+                          {joinedCount} joined
                         </span>
                       ) : null}
                     </Link>

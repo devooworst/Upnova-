@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { CREATE_MODAL_EVENT } from "./CreateModalTrigger";
 import Avatar from "./Avatar";
-import { currentUser } from "@/lib/data";
+
 import { useSession } from "@/lib/session";
 import { promptJoin } from "./GuestGate";
 
@@ -236,9 +236,13 @@ export default function CreateModal() {
               {kind === "Post" && (
                 <div className="card-people p-4">
                   <div className="flex items-center gap-2.5">
-                    <Avatar src={currentUser.avatar} initials="D" size="sm" />
+                    <Avatar
+                      src={sessionUser?.profile.avatarUrl ?? null}
+                      initials={(sessionUser?.profile.displayName || "?").charAt(0)}
+                      size="sm"
+                    />
                     <div>
-                      <p className="text-sm font-semibold text-zinc-100">{currentUser.name}</p>
+                      <p className="text-sm font-semibold text-zinc-100">{sessionUser?.profile.displayName ?? "You"}</p>
                       <p className="text-[10px] text-zinc-500">{postType !== "Normal post" && `${postType} · `}{audience}</p>
                     </div>
                   </div>
@@ -262,7 +266,7 @@ export default function CreateModal() {
               {kind === "Service" && (
                 <div className="card-people p-4">
                   <p className="text-base font-bold text-zinc-50">{svcName || "Your service"}</p>
-                  <p className="text-xs text-zinc-500">by {currentUser.name} ✓ · {svcCategory}</p>
+                  <p className="text-xs text-zinc-500">by {sessionUser?.profile.displayName ?? "You"} ✓ · {svcCategory}</p>
                   <p className="mt-1.5 text-sm text-zinc-400">
                     {priceModel} <span className="text-base font-extrabold tabular-nums text-lime-400">${svcPrice || "—"}</span>
                     <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-lime-300"><span className="h-1.5 w-1.5 rounded-full bg-lime-400" /> {availability}</span>
