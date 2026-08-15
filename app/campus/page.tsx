@@ -14,7 +14,6 @@ import {
   Zap,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import FollowButton from "@/components/FollowButton";
 import OpportunityCard from "@/components/OpportunityCard";
 import { useSession, invalidateSession } from "@/lib/session";
 import { creators, campusOrgs } from "@/lib/data";
@@ -477,7 +476,6 @@ export default function CampusPage() {
                           </div>
                         </div>
                         <div className="mt-2.5 flex gap-1.5">
-                          <FollowButton id={ava.id} size="xs" />
                           <Link href={`/messages?to=${ava.handle}`} className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
                             <MessageSquare className="h-3 w-3" /> Message
                           </Link>

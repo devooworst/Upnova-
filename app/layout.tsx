@@ -9,7 +9,6 @@ import FeatureTour from "@/components/FeatureTour";
 import LearnGuide from "@/components/LearnGuide";
 import OnboardingTour from "@/components/OnboardingTour";
 import QaPersonaBar from "@/components/QaPersonaBar";
-import { FollowProvider } from "@/lib/follow";
 
 export const metadata: Metadata = {
   // canonical base for social previews (og:image URLs). Set
@@ -41,7 +40,6 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen font-sans">
-        <FollowProvider>
         <Navbar />
         <div className="mx-auto flex w-full max-w-[1440px] gap-6 px-3 pb-28 pt-20 transition-all duration-300 sm:px-4 lg:pb-10 lg:px-6 2xl:max-w-[1560px]">
           <SidebarShell />
@@ -54,7 +52,6 @@ export default function RootLayout({
         <LearnGuide />
         <OnboardingTour />
         <QaPersonaBar />
-        </FollowProvider>
       </body>
     </html>
   );

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { PencilLine, MapPin, MessageSquare, Megaphone, Zap, FolderPlus, GraduationCap } from "lucide-react";
 import PromoteModal from "../PromoteModal";
-import FollowListModal from "../FollowListModal";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { useProfile, roleLine, locationLine } from "@/lib/profile";
@@ -22,7 +21,6 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
   const { user } = useSession();
   const [following, setFollowing] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
-  const [listOpen, setListOpen] = useState<"followers" | "following" | null>(null);
   const [stats, setStats] = useState<{
     followers: number | null;
     following: number | null;
@@ -205,14 +203,16 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
           </p>
         </div>
 
-        {/* stats */}
+        {/* stats — counts are real (/api/users/[handle]); the follower/following
+            NAME lists were a mock modal and are retired until a real
+            follower-list API exists. */}
         <dl className="mt-5 grid grid-cols-4 gap-2 border-t border-line-soft pt-4">
           {(
             [
-              { label: "Followers", value: stats.followers, interactive: true },
-              { label: "Following", value: stats.following, interactive: true },
-              { label: "Projects", value: projectCounts.total, interactive: false },
-              { label: "Completed", value: projectCounts.completed, interactive: false },
+              { label: "Followers", value: stats.followers },
+              { label: "Following", value: stats.following },
+              { label: "Projects", value: projectCounts.total },
+              { label: "Completed", value: projectCounts.completed },
             ] as const
           ).map((s) => {
             const hidden =
@@ -220,23 +220,12 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
               ((s.label === "Followers" && !profile.showFollowers) ||
                 (s.label === "Following" && !profile.showFollowing));
             return (
-              <button
-                key={s.label}
-                disabled={!s.interactive || hidden}
-                onClick={() =>
-                  s.interactive &&
-                  !hidden &&
-                  setListOpen(s.label === "Followers" ? "followers" : "following")
-                }
-                className={`text-center sm:text-left ${
-                  s.interactive && !hidden ? "transition hover:opacity-80" : "cursor-default"
-                }`}
-              >
+              <div key={s.label} className="text-center sm:text-left">
                 <dd className="text-xl font-bold text-zinc-50">
                   {hidden ? "—" : (s.value ?? "—")}
                 </dd>
                 <dt className="text-xs text-zinc-500">{s.label}</dt>
-              </button>
+              </div>
             );
           })}
         </dl>
@@ -251,7 +240,6 @@ export default function ProfileHeader({ isOwner }: { isOwner: boolean }) {
         </div>
       </div>
       {promoteOpen && <PromoteModal onClose={() => setPromoteOpen(false)} />}
-      {listOpen && <FollowListModal mode={listOpen} onClose={() => setListOpen(null)} />}
     </header>
   );
 }
