@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   User,
   Palette,
@@ -25,7 +26,6 @@ import PrefsEditor from "@/components/PrefsEditor";
 import { useSession, invalidateSession } from "@/lib/session";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import { setPlan, PRO_EVENT, type Plan } from "@/lib/pro";
-import { currentUser, services, bookings } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
 /* Settings: full account control. Left nav, one clean panel per       */
@@ -298,17 +298,48 @@ export default function SettingsPage() {
   };
   const setT = (k: string) => (v: boolean) => setToggles((s) => ({ ...s, [k]: v }));
 
-  const earned = 4850;
-  const pending = bookings
-    .filter((b) => b.status === "pending")
-    .reduce((n, b) => n + (Number(b.price.replace(/[^0-9.]/g, "")) || 0), 0);
-
-  const transactions = [
-    { id: "t1", label: "Event Photography · paid to Ava Chen", amount: "-$315", date: "Aug 7", kind: "out" },
-    { id: "t2", label: "Mixing session · Maya Reyes", amount: "+$200", date: "Aug 3", kind: "in" },
-    { id: "t3", label: "Brand audio package · Harbor & Oak (deposit)", amount: "+$225", date: "Jul 29", kind: "in" },
-    { id: "t4", label: "Loop kit sales payout", amount: "+$140", date: "Jul 22", kind: "in" },
-  ];
+  /* Payments & Earnings — REAL records from /api/me/payments (the same
+     source the /payments page renders). null = loading / signed out. */
+  const [payData, setPayData] = useState<{
+    summary: { totalEarned: number; pendingIn: number };
+    transactions: {
+      id: string;
+      direction: "in" | "out";
+      amountCents: number;
+      status: string;
+      title: string;
+      with: { displayName: string };
+      at: string;
+    }[];
+  } | null>(null);
+  /* Your services — REAL listings from /api/me/services (the same source
+     the profile editor uses). null = loading / signed out. */
+  const [myServices, setMyServices] = useState<
+    { id: string; title: string; price: number; category: string; active: boolean }[] | null
+  >(null);
+  useEffect(() => {
+    if (!user) {
+      setPayData(null);
+      setMyServices(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/me/payments", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.summary) setPayData(d);
+      })
+      .catch(() => {});
+    fetch("/api/me/services", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d?.services)) setMyServices(d.services);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [!!user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -430,26 +461,26 @@ export default function SettingsPage() {
           {section === "creator" && (
             <section className="card p-5">
               <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Profile &amp; Creator</h2>
+              {/* photo, banner, bio, and skills are edited in ONE place — the
+                  real profile editor. This card links there instead of
+                  duplicating a second (previously non-saving) form. */}
               <div className="mt-4 flex items-center gap-4">
                 <Avatar src={user?.profile.avatarUrl} initials={user?.profile.displayName.charAt(0) ?? "?"} size="lg" />
-                <div className="flex gap-2">
-                  <button className="btn-ghost px-3.5 py-1.5 text-xs">Change photo</button>
-                  <button className="btn-ghost px-3.5 py-1.5 text-xs">Change banner</button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-zinc-100">{user?.profile.displayName}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-zinc-500">
+                    {user?.profile.bio || "No bio yet — tell people what you do."}
+                  </p>
                 </div>
+                <Link href="/profile/edit" className="btn-ghost shrink-0 px-3.5 py-1.5 text-xs">
+                  Edit Profile
+                </Link>
               </div>
-              <div className="mt-4">
-                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Bio</label>
-                <textarea defaultValue={currentUser.bio} rows={3} className="input-dark mt-1.5 resize-none" />
-              </div>
-              <div className="mt-4">
-                <label className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Skills</label>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {currentUser.skills.map((s) => (
-                    <span key={s} className="chip">{s} ×</span>
-                  ))}
-                  <button className="chip border-dashed text-zinc-500 hover:text-zinc-300">+ Add skill</button>
-                </div>
-              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
+                Photo, banner, bio, skills, location, and visibility all live in{" "}
+                <Link href="/profile/edit" className="text-zinc-400 underline-offset-2 hover:underline">Edit Profile</Link>{" "}
+                — one editor, no duplicates.
+              </p>
               <div className="mt-4 divide-y divide-line-soft border-t border-line-soft">
                 <Row label="Open to Work" hint="Shows the lime badge on your profile and in search">
                   <Toggle on={t("openToWork")} onChange={setT("openToWork")} />
@@ -808,7 +839,7 @@ export default function SettingsPage() {
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-2xl font-extrabold tracking-tight tabular-nums text-lime-400">
-                      ${earned.toLocaleString()}
+                      ${(payData?.summary.totalEarned ?? 0).toLocaleString()}
                     </p>
                     <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
                       lifetime earnings
@@ -816,7 +847,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-extrabold tracking-tight tabular-nums text-amber-400">
-                      ${pending}
+                      ${(payData?.summary.pendingIn ?? 0).toLocaleString()}
                     </p>
                     <p className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
                       pending
@@ -843,22 +874,35 @@ export default function SettingsPage() {
               <section className="card p-5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Transaction history</h2>
-                  <button className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 hover:text-zinc-200">
-                    <Receipt className="h-3.5 w-3.5" /> receipts
-                  </button>
+                  <Link
+                    href="/payments"
+                    className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 hover:text-zinc-200"
+                  >
+                    <Receipt className="h-3.5 w-3.5" /> all payments
+                  </Link>
                 </div>
                 <ul className="mt-2 divide-y divide-line-soft">
-                  {transactions.map((tx) => (
+                  {(payData?.transactions ?? []).slice(0, 6).map((tx) => (
                     <li key={tx.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                       <span className="min-w-0">
-                        <span className="block truncate text-zinc-200">{tx.label}</span>
-                        <span className="font-mono text-[10px] font-medium text-zinc-500">{tx.date}</span>
+                        <span className="block truncate text-zinc-200">
+                          {tx.title} · {tx.direction === "out" ? "paid to" : "from"} {tx.with.displayName}
+                        </span>
+                        <span className="font-mono text-[10px] font-medium text-zinc-500">
+                          {new Date(tx.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {tx.status === "held" ? " · held" : tx.status === "refunded" ? " · refunded" : ""}
+                        </span>
                       </span>
-                      <span className={`shrink-0 font-bold tabular-nums tracking-tight ${tx.kind === "in" ? "text-lime-400" : "text-zinc-400"}`}>
-                        {tx.amount}
+                      <span className={`shrink-0 font-bold tabular-nums tracking-tight ${tx.direction === "in" ? "text-lime-400" : "text-zinc-400"}`}>
+                        {tx.direction === "in" ? "+" : "-"}${Math.round(tx.amountCents / 100).toLocaleString()}
                       </span>
                     </li>
                   ))}
+                  {payData !== null && payData.transactions.length === 0 && (
+                    <li className="py-4 text-center text-xs text-zinc-500">
+                      No transactions yet — payments from bookings, projects, and orders appear here.
+                    </li>
+                  )}
                 </ul>
               </section>
             </>
@@ -869,21 +913,30 @@ export default function SettingsPage() {
               <section className="card p-5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[15px] font-bold tracking-tight text-zinc-50">Your services</h2>
-                  <button className="btn-ghost px-3.5 py-1.5 text-xs">+ Add service</button>
+                  <Link href="/services/new" className="btn-ghost px-3.5 py-1.5 text-xs">+ Add service</Link>
                 </div>
                 <ul className="mt-2 divide-y divide-line-soft">
-                  {services.map((s) => (
+                  {(myServices ?? []).map((s) => (
                     <li key={s.id} className="flex items-center justify-between gap-3 py-3">
                       <span className="flex min-w-0 items-center gap-2.5 text-sm">
-                        <span aria-hidden>{s.emoji}</span>
                         <span className="truncate font-medium text-zinc-200">{s.title}</span>
+                        {!s.active && (
+                          <span className="shrink-0 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-zinc-500">
+                            inactive
+                          </span>
+                        )}
                       </span>
                       <span className="flex shrink-0 items-center gap-3">
-                        <span className="font-bold tabular-nums tracking-tight text-lime-400">${s.startingAt}</span>
-                        <button className="btn-ghost px-3 py-1 text-[11px]">Edit</button>
+                        <span className="font-bold tabular-nums tracking-tight text-lime-400">${s.price}</span>
+                        <Link href={`/services/${s.id}`} className="btn-ghost px-3 py-1 text-[11px]">View</Link>
                       </span>
                     </li>
                   ))}
+                  {myServices !== null && myServices.length === 0 && (
+                    <li className="py-4 text-center text-xs text-zinc-500">
+                      No services yet — <Link href="/services/new" className="text-lime-300 hover:underline">create your first listing</Link>.
+                    </li>
+                  )}
                 </ul>
               </section>
               <section className="card p-5">
