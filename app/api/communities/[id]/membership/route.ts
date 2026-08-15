@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { findCommunity, getMembership, refreshMembership, communityPeriodDays } from "@/lib/server/communities";
+import { createPayment } from "@/lib/server/paymentProvider";
 import { membershipQuote } from "@/lib/communityIdentity";
 import { notify } from "@/lib/server/notify";
 
@@ -49,15 +50,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (Math.abs(Number(body.expectedTotal) - quote.total) > 0.009)
       throw new ApiError(409, `The total changed — it's now $${quote.total.toFixed(2)} ($${c.price} + $${quote.fee.toFixed(2)} platform fee). Review and confirm again.`);
 
+    const paymentId = randomBytes(12).toString("hex");
+    const charge = await createPayment({
+      paymentId,
+      amountCents: Math.round(c.price * 100),
+      feeCents: Math.round(quote.fee * 100),
+      payerId: user.id,
+      payeeId: c.createdById,
+      description: `Mavyn membership renewal — ${c.name}`,
+    });
     await db.insert(tables.payments)
       .values({
-        id: randomBytes(12).toString("hex"),
+        id: paymentId,
         communityId: c.id,
         payerId: user.id,
         payeeId: c.createdById,
         amountCents: Math.round(c.price * 100),
         feeCents: Math.round(quote.fee * 100),
-        status: "released",
+        status: charge.settled ? "released" : "pending",
+        provider: charge.provider,
+        providerRef: charge.providerRef,
       })
       .run();
 

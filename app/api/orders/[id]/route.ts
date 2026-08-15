@@ -6,6 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 import { conversationBetween } from "@/lib/server/oppFlow";
 import { seedSellerFulfills } from "@/lib/server/demo";
+import { createPayment, refundPayment } from "@/lib/server/paymentProvider";
 import type { OrderTracking } from "@/lib/products";
 import { protectionRules } from "@/lib/protection";
 import { logOrderEvent } from "@/lib/server/orderEvents";
@@ -56,15 +57,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         : null;
       if (product && product.quantity - product.sold < o.qty) throw new ApiError(409, "Sold out while you were checking out");
 
+      const paymentId = randomBytes(12).toString("hex");
+      const charge = await createPayment({
+        paymentId,
+        amountCents: subtotal * 100,
+        feeCents: Math.round(subtotal * 5),
+        payerId: o.buyerId,
+        payeeId: o.sellerId,
+        description: `Mavyn order — ${o.title}`,
+      });
       await db.insert(tables.payments)
         .values({
-          id: randomBytes(12).toString("hex"),
+          id: paymentId,
           orderId: o.id,
           payerId: o.buyerId,
           payeeId: o.sellerId,
           amountCents: subtotal * 100,
           feeCents: Math.round(subtotal * 5),
-          status: "held",
+          status: charge.settled ? "held" : "pending",
+          provider: charge.provider,
+          providerRef: charge.providerRef,
         })
         .run();
       if (product) {
@@ -171,6 +183,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!["placed", "secured", "preparing"].includes(o.status))
         throw new ApiError(409, "Shipped orders can't be cancelled — use Report a problem instead");
       const hadPayment = ["secured", "preparing"].includes(o.status);
+      if (hadPayment) {
+        const held = await db.select().from(tables.payments)
+          .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
+          .get();
+        if (held) await refundPayment(held); // provider-side; state guard below stays
+      }
       await db.update(tables.payments)
         .set({ status: "refunded" })
         .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))

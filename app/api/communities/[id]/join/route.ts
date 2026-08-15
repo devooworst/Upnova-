@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/communities";
 import { membershipQuote } from "@/lib/communityIdentity";
 import { notify } from "@/lib/server/notify";
+import { createPayment } from "@/lib/server/paymentProvider";
 import { unrestrictedTester } from "@/lib/server/campus";
 
 export const dynamic = "force-dynamic";
@@ -26,15 +27,27 @@ async function chargePeriod(c: typeof tables.communities.$inferSelect, userId: s
   const quote = membershipQuote(c.price);
   if (Math.abs(Number(expectedTotal) - quote.total) > 0.009)
     throw new ApiError(409, `The total changed — it's now $${quote.total.toFixed(2)} ($${c.price} + $${quote.fee.toFixed(2)} platform fee). Review and confirm again.`);
+  const paymentId = rid();
+  const charge = await createPayment({
+    paymentId,
+    amountCents: Math.round(c.price * 100),
+    feeCents: Math.round(quote.fee * 100),
+    payerId: userId,
+    payeeId: c.createdById,
+    description: `Mavyn membership — ${c.name}`,
+  });
   await db.insert(tables.payments)
     .values({
-      id: rid(),
+      id: paymentId,
       communityId: c.id,
       payerId: userId,
       payeeId: c.createdById,
       amountCents: Math.round(c.price * 100),
       feeCents: Math.round(quote.fee * 100),
-      status: "released", // membership periods pay the creator directly
+      // membership periods pay the creator directly; webhook confirms if pending
+      status: charge.settled ? "released" : "pending",
+      provider: charge.provider,
+      providerRef: charge.providerRef,
     })
     .run();
 }

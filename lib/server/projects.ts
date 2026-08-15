@@ -15,6 +15,7 @@ import { and, eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { ApiError } from "./auth";
 import { notify } from "./notify";
+import { createPayment } from "./paymentProvider";
 
 export const PROJECT_STATES = [
   "draft",
@@ -187,15 +188,27 @@ export async function transition(
     // payment secured — the Stripe Connect PaymentIntent slots in here.
     // (Deliberately not called "escrow": that's a specific legal service.)
     const amountCents = project.amount * 100;
+    const paymentId = randomBytes(12).toString("hex");
+    const feeCents = Math.round(amountCents * 0.05);
+    const charge = await createPayment({
+      paymentId,
+      amountCents,
+      feeCents,
+      payerId: project.clientId,
+      payeeId: project.creatorId,
+      description: `Mavyn project — ${project.title}`,
+    });
     await db.insert(tables.payments)
       .values({
-        id: randomBytes(12).toString("hex"),
+        id: paymentId,
         projectId: project.id,
         payerId: project.clientId,
         payeeId: project.creatorId,
         amountCents,
-        feeCents: Math.round(amountCents * 0.05),
-        status: "held",
+        feeCents,
+        status: charge.settled ? "held" : "pending",
+        provider: charge.provider,
+        providerRef: charge.providerRef,
       })
       .run();
     await systemMessage(project, userId, `Payment secured — ${money(project.amount)}. ${await displayName(project.creatorId)} can begin work. Funds release when the delivery is approved.`);

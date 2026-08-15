@@ -6,6 +6,7 @@ import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 import { logOrderEvent, orderTimeline } from "@/lib/server/orderEvents";
 import { PROBLEM_REASONS, RETURN_REASONS, PROTECTED_REASONS, parseReturnPolicy, protectionRules } from "@/lib/protection";
+import { refundPayment } from "@/lib/server/paymentProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -218,6 +219,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const policy = parseReturnPolicy(product?.returnPolicy);
       const ordinary = d.kind === "return" && !PROTECTED_REASONS.has(d.reason);
       const pct = ordinary ? 100 - policy.restockingPct : 100;
+      // provider-side refund (seller-confirmed return; parties-only authz
+      // enforced by getOrder above; held-status guard remains)
+      const heldRow = await db.select().from(tables.payments)
+        .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
+        .get();
+      if (heldRow) await refundPayment(heldRow);
       await db.update(tables.payments)
         .set({ status: "refunded" })
         .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))

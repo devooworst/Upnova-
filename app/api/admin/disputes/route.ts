@@ -4,6 +4,7 @@ import { db, tables } from "@/db";
 import { requireAdmin, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 import { logOrderEvent, orderTimeline } from "@/lib/server/orderEvents";
+import { refundPayment } from "@/lib/server/paymentProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,12 @@ export async function PATCH(req: NextRequest) {
     const note = String(body.note || "").slice(0, 500);
 
     if (resolution === "refund_buyer") {
+      // provider-side refund first (admin authorization already enforced
+      // above via requireAdmin; the held-status guard stays the second layer)
+      const held = await db.select().from(tables.payments)
+        .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
+        .get();
+      if (held) await refundPayment(held);
       await db.update(tables.payments)
         .set({ status: "refunded" })
         .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))

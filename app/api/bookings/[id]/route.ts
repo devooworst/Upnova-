@@ -5,6 +5,7 @@ import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { notify } from "@/lib/server/notify";
 import { seedConfirmsBookingPayment } from "@/lib/server/demo";
+import { createPayment, refundPayment } from "@/lib/server/paymentProvider";
 import { parseConfig, cancellationLabel } from "@/lib/servicePolicies";
 import { randomBytes as rb } from "crypto";
 
@@ -70,15 +71,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       // total = selected menu items + creator-defined travel fee, all disclosed pre-pay
       const amountCents = (b.price + b.travelFee) * 100;
+      const paymentId = randomBytes(12).toString("hex");
+      const feeCents = Math.round(amountCents * 0.05);
+      // external charge through the provider seam (simulated on dev/preview/
+      // demo; Stripe test-mode when configured; fails closed on production
+      // without credentials). Idempotency: paymentId keys the provider call.
+      const charge = await createPayment({
+        paymentId,
+        amountCents,
+        feeCents,
+        payerId: b.clientId,
+        payeeId: b.providerId,
+        description: `Mavyn booking — ${b.title}`,
+      });
       await db.insert(tables.payments)
         .values({
-          id: randomBytes(12).toString("hex"),
+          id: paymentId,
           bookingId: b.id,
           payerId: b.clientId,
           payeeId: b.providerId,
           amountCents,
-          feeCents: Math.round(amountCents * 0.05),
-          status: "held",
+          feeCents,
+          status: charge.settled ? "held" : "pending", // webhook confirms pending → held
+          provider: charge.provider,
+          providerRef: charge.providerRef,
         })
         .run();
       await set({ status: "confirmed" });
@@ -110,6 +126,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         (policy.cancellation === "free_24h" && hoursOut >= 24) ||
         (policy.cancellation === "partial_48h" && hoursOut >= 48) ||
         policy.cancellation === "custom";
+      // provider-side refund BEFORE the state flip (policy already
+      // authorized above; the status guard below stays the second layer)
+      if (fullRefund) {
+        const held = await db.select().from(tables.payments)
+          .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))
+          .get();
+        if (held) await refundPayment(held);
+      }
       await db.update(tables.payments)
         .set({ status: fullRefund ? "refunded" : "released" })
         .where(and(eq(tables.payments.bookingId, b.id), eq(tables.payments.status, "held")))

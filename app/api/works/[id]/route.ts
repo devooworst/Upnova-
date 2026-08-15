@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, getSessionUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
+import { createPayment } from "@/lib/server/paymentProvider";
 import { notify } from "@/lib/server/notify";
 import { conversationBetween } from "@/lib/server/oppFlow";
 import { parseLicenseOptions } from "@/lib/licensing";
@@ -144,15 +145,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .run();
 
     if (!free) {
+      const paymentId = randomBytes(12).toString("hex");
+      const charge = await createPayment({
+        paymentId,
+        amountCents: option.price * 100,
+        feeCents: Math.round(option.price * 5),
+        payerId: user.id,
+        payeeId: work.creatorId,
+        description: `Mavyn license — ${work.title}`,
+      });
       await db.insert(tables.payments)
         .values({
-          id: randomBytes(12).toString("hex"),
+          id: paymentId,
           licenseId,
           payerId: user.id,
           payeeId: work.creatorId,
           amountCents: option.price * 100,
           feeCents: Math.round(option.price * 5),
-          status: "held",
+          status: charge.settled ? "held" : "pending",
+          provider: charge.provider,
+          providerRef: charge.providerRef,
         })
         .run();
     }

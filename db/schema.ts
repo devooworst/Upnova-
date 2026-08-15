@@ -1363,7 +1363,7 @@ export const payments = pgTable("payments", {
   // will drive status transitions.
   amountCents: integer("amount_cents").notNull(),
   feeCents: integer("fee_cents").notNull(),
-  status: text("status").notNull().default("pending"), // pending | held | released | refunded
+  status: text("status").notNull().default("pending"), // pending | held | released | refunded | failed
   provider: text("provider").notNull().default("stripe_connect"),
   providerRef: text("provider_ref"),
   createdAt: ts("created_at"),
