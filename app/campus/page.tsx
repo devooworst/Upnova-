@@ -16,7 +16,6 @@ import {
 import Avatar from "@/components/Avatar";
 import OpportunityList from "@/components/db/OpportunityList";
 import { useSession, invalidateSession } from "@/lib/session";
-import { campusOrgs } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
 /* Your Campus — NOT one giant collection of group chats.              */
@@ -429,33 +428,12 @@ export default function CampusPage() {
             {specialChannel ? (
               <div className="flex-1 overflow-y-auto p-4">
                 {community === "#groups" && <CampusGroups />}
-                {community === "#orgs" && (
-        <div className="animate-fade-up">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {campusOrgs.map((org) => (
-              <Link key={org.id} href={`/campus/${org.id}`} className="card-people card-lift overflow-hidden hover:border-zinc-600">
-                <div className={`h-14 bg-gradient-to-br ${org.gradient} opacity-70`} />
-                <div className="p-4">
-                  <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${org.gradient}`}>
-                    {org.emoji}
-                  </span>
-                  <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-zinc-100">
-                    {org.name}
-                    {org.verified && <span className="text-sky-400" title="Verified Organization">✓</span>}
-                  </p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {org.verified ? org.category : "Community Group"} · {org.members} members
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <p className="mt-2.5 text-[10px] leading-relaxed text-zinc-600">
-            ✓ Verified Organization means the org is legitimate — it never proves who is a member.
-            Membership verification comes in V2, approved by org admins.
-          </p>
-        </div>
-                )}
+                {/* ORGANIZATIONS — the same REAL campus-community records
+                    (category "Student Organizations"), presented as the
+                    orgs directory. One membership/moderation system —
+                    an org is another type of community, not a separate
+                    product. */}
+                {community === "#orgs" && <CampusOrgs />}
                 {community === "#questions" && (
         <div className="space-y-3 animate-fade-up">
           <a href="/communities/bowie-campus-questions" className="card-people block p-5 transition hover:border-violet-400/40">
@@ -880,6 +858,118 @@ function CampusGroups() {
       <p className="px-1 text-[11px] text-zinc-600">
         Looking for broader conversations — music, photo, late-night talk? Those live in{" "}
         <a href="/communities" className="font-semibold text-violet-300 hover:text-violet-200">Communities</a>.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- Campus Organizations — REAL records ----------------
+   The orgs directory renders the campus's "Student Organizations"
+   communities (the same records /api/campus/groups serves) with the
+   directory presentation the section always had: cover band, tile,
+   member count, and a straight path into the org's real home at
+   /communities/[slug] — one membership, moderation, and posting
+   system for everything. */
+function CampusOrgs() {
+  const [data, setData] = useState<{
+    campusName: string;
+    groups: {
+      id: string; slug: string; name: string; description: string; access: string;
+      category: string; members: number; activeMembers: number;
+      viewer: { status: string } | null;
+    }[];
+  } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const load = async () => {
+    const res = await fetch("/api/campus/groups", { cache: "no-store" });
+    if (res.ok) setData(await res.json());
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const join = async (g: { id: string; name: string }) => {
+    const res = await fetch(`/api/communities/${g.id}/join`, { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) setNote(j.error || "Couldn't join");
+    else setNote(j.status === "pending" ? `Request sent — ${g.name}'s moderators will review it.` : `Welcome to ${g.name}.`);
+    void load();
+  };
+
+  const orgs = data ? data.groups.filter((g) => g.category === "Student Organizations") : [];
+  // deterministic cosmetic gradient per org — branding only, never data
+  const gradients = ["from-violet-500 to-fuchsia-600", "from-sky-500 to-indigo-600", "from-amber-500 to-orange-600", "from-emerald-500 to-teal-600"];
+  const gradientFor = (slug: string) => gradients[slug.split("").reduce((n, ch) => n + ch.charCodeAt(0), 0) % gradients.length];
+
+  return (
+    <div className="space-y-3 animate-fade-up">
+      <div className="flex items-center justify-between px-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+          {data ? `Student organizations · ${data.campusName}` : "Student organizations"}
+        </p>
+        <a href="/communities/create" className="btn-ghost px-4 py-1.5 text-xs">+ Register your org</a>
+      </div>
+
+      {note && (
+        <div className="rounded-xl border border-violet-400/30 bg-violet-400/10 px-4 py-2.5 text-sm text-violet-200">
+          {note}
+          <button onClick={() => setNote(null)} className="float-right text-violet-300/60 hover:text-violet-200">✕</button>
+        </div>
+      )}
+
+      {data === null ? (
+        <div className="card-people h-32 animate-pulse" />
+      ) : orgs.length === 0 ? (
+        <p className="py-8 text-center text-sm text-zinc-600">
+          No organizations here yet — register yours and give it a home.
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {orgs.map((org) => (
+            <article key={org.id} className="card-people card-lift overflow-hidden hover:border-zinc-600">
+              <Link href={`/communities/${org.slug}`} className="block">
+                <div className={`h-14 bg-gradient-to-br ${gradientFor(org.slug)} opacity-70`} />
+                <div className="p-4 pb-2">
+                  <span className={`-mt-9 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-card bg-gradient-to-br text-xl shadow-card ${gradientFor(org.slug)}`}>
+                    🏛️
+                  </span>
+                  <p className="mt-2 text-sm font-bold text-zinc-100">{org.name}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-zinc-500">{org.description}</p>
+                  <p className="mt-1.5 font-mono text-[10px] tracking-[0.08em] text-zinc-500">
+                    {org.members} MEMBERS · {org.activeMembers} ACTIVE
+                  </p>
+                </div>
+              </Link>
+              <div className="flex items-center gap-2 px-4 pb-4 pt-1">
+                <Link href={`/communities/${org.slug}`} className="rounded-full border border-zinc-700 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-violet-400/40 hover:text-violet-300">
+                  View
+                </Link>
+                {!org.viewer && org.access !== "invite" && (
+                  <button onClick={() => void join(org)} className="rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-bold text-zinc-950 transition hover:bg-violet-300">
+                    {org.access === "private" ? "Request to join" : "Join"}
+                  </button>
+                )}
+                {!org.viewer && org.access === "invite" && (
+                  <span className="font-mono text-[10px] tracking-[0.1em] text-zinc-500">INVITATION NEEDED</span>
+                )}
+                {org.viewer?.status === "active" && <span className="font-mono text-[10px] tracking-[0.1em] text-lime-300">MEMBER</span>}
+                {org.viewer?.status === "pending" && <span className="font-mono text-[10px] tracking-[0.1em] text-amber-300">REQUEST PENDING</span>}
+                {org.viewer?.status === "invited" && (
+                  <button onClick={() => void join(org)} className="rounded-full bg-violet-400 px-3.5 py-1.5 text-xs font-bold text-zinc-950 hover:bg-violet-300">
+                    Accept invitation
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <p className="px-1 text-[11px] leading-relaxed text-zinc-600">
+        Organizations are campus communities — same membership, posting, and moderation
+        system. Verified-organization status comes later, once a real verification
+        process exists; nothing here claims a legitimacy we can't check yet.
       </p>
     </div>
   );

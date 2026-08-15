@@ -1,18 +1,21 @@
-import { notFound } from "next/navigation";
-import { campusOrgs } from "@/lib/data";
-import OrgPage from "@/components/OrgPage";
+import { redirect } from "next/navigation";
+import { findCommunity } from "@/lib/server/communities";
 
-export function generateStaticParams() {
-  return campusOrgs.map((o) => ({ org: o.id }));
-}
+export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }: { params: { org: string } }) {
-  const o = campusOrgs.find((x) => x.id === params.org);
-  return { title: o ? o.name : "Organization" };
-}
+/* ------------------------------------------------------------------ */
+/*  /campus/[org] — RETIRED as a separate page.                        */
+/*                                                                     */
+/*  Organizations are campus communities — another type of community,  */
+/*  not a separate product (one membership, posting, and moderation    */
+/*  system). An org slug that resolves to a real community redirects   */
+/*  to its real home at /communities/[slug]; anything else (including  */
+/*  the old demo org ids that never had real records) lands on the     */
+/*  campus Organizations door.                                         */
+/* ------------------------------------------------------------------ */
 
-export default function CampusOrgPage({ params }: { params: { org: string } }) {
-  const org = campusOrgs.find((o) => o.id === params.org);
-  if (!org) notFound();
-  return <OrgPage id={params.org} />;
+export default async function CampusOrgRedirect({ params }: { params: { org: string } }) {
+  const community = await findCommunity(params.org);
+  if (community) redirect(`/communities/${community.slug}`);
+  redirect("/campus");
 }
