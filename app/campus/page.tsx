@@ -14,9 +14,9 @@ import {
   Zap,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
-import OpportunityCard from "@/components/OpportunityCard";
+import OpportunityList from "@/components/db/OpportunityList";
 import { useSession, invalidateSession } from "@/lib/session";
-import { creators, campusOrgs } from "@/lib/data";
+import { campusOrgs } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
 /* Your Campus — NOT one giant collection of group chats.              */
@@ -106,8 +106,6 @@ const campusServices = [
   { id: "cs-kb", name: "K. Boateng", initials: "K", gradient: "from-emerald-500 to-teal-600", service: "Beats & Mixing", category: "Music", startingAt: 45, rating: 4.7, verified: true, spot: "Media building" },
 ];
 
-const campusOppIds = ["org-promo", "campus-web", "campus-mv-collab", "social-video"];
-
 export default function CampusPage() {
   // campus access is a database fact: a verified campus_verifications row
   const { user } = useSession();
@@ -161,7 +159,33 @@ export default function CampusPage() {
     invalidateSession();
   };
 
-  const ava = creators.find((c) => c.id === "ava")!;
+  /* The scripted chat's shared-profile card points at the REAL seeded ava
+     account (/api/users/ava) — live avatar, name, rating, and links into
+     the real messaging/profile flows. null = not loaded → card hidden. */
+  const [ava, setAva] = useState<{
+    handle: string;
+    displayName: string;
+    avatarUrl: string | null;
+    rating: number | null;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/users/ava", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.user)
+          setAva({
+            handle: d.user.handle,
+            displayName: d.user.displayName,
+            avatarUrl: d.user.avatarUrl ?? null,
+            rating: d.stats?.rating ?? null,
+          });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const services = campusServices.filter((s) => !svcFilter || s.category === svcFilter);
   const chat = communityChats[community] ?? [];
   const specialChannel = CAMPUS_LIFE_CHANNELS.find((c) => c.id === community) ?? null;
@@ -466,20 +490,22 @@ export default function CampusPage() {
                     </p>
                     <p className="mt-0.5 text-sm leading-relaxed text-zinc-300">{m.text}</p>
                     {/* social → discovery → business: a shared profile is hireable */}
-                    {m.creatorCard === "ava" && (
+                    {m.creatorCard === "ava" && ava && (
                       <div className="card-people mt-2 max-w-sm p-3">
                         <div className="flex items-center gap-2.5">
-                          <Avatar src={ava.avatar} initials={ava.initials} gradient={ava.gradient} size="sm" className="ring-1 ring-line" />
+                          <Avatar src={ava.avatarUrl} initials={ava.displayName.charAt(0)} size="sm" className="ring-1 ring-line" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-zinc-100">{ava.name}</p>
-                            <p className="truncate text-xs text-zinc-500">Nails + photography · ★ {ava.rating} · on campus</p>
+                            <p className="truncate text-sm font-semibold text-zinc-100">{ava.displayName}</p>
+                            <p className="truncate text-xs text-zinc-500">
+                              {ava.rating != null ? `★ ${ava.rating} · ` : ""}on campus
+                            </p>
                           </div>
                         </div>
                         <div className="mt-2.5 flex gap-1.5">
                           <Link href={`/messages?to=${ava.handle}`} className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
                             <MessageSquare className="h-3 w-3" /> Message
                           </Link>
-                          <Link href={`/creator/${ava.id}`} className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
+                          <Link href={`/creator/${ava.handle}`} className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-600">
                             View Services
                           </Link>
                           <Link href={`/messages?to=${ava.handle}`} className="flex items-center gap-1 rounded-full bg-lime-400 px-2.5 py-1 text-[11px] font-bold text-zinc-950 transition hover:bg-lime-300">
@@ -518,9 +544,11 @@ export default function CampusPage() {
           <p className="text-sm text-zinc-500">
             Paid work, gigs, and collaborations on campus — same protected system as everywhere on Mavyn.
           </p>
-          {campusOppIds.map((id) => (
-            <OpportunityCard key={id} id={id} />
-          ))}
+          {/* REAL opportunities, campus-scoped: the same DB-backed list and
+              application flow as /opportunities. scope=school is enforced
+              SERVER-side (verified campus match between viewer and poster),
+              so permissions/privacy behavior is identical everywhere. */}
+          <OpportunityList scope="school" />
 
           {/* CAMPUS SERVICES — merged in: hiring a student and applying to
               a gig are the same money system, so they share one door.
@@ -552,7 +580,7 @@ export default function CampusPage() {
             {services.map((s) => (
               <article key={s.id} className="card-people card-lift flex items-center gap-3 p-4 hover:border-zinc-600">
                 {"creatorId" in s && s.creatorId ? (
-                  <Avatar src={ava.avatar} initials="A" size="md" className="ring-1 ring-line" />
+                  <Avatar src={ava?.avatarUrl ?? null} initials="A" size="md" className="ring-1 ring-line" />
                 ) : (
                   <Avatar initials={(s as { initials?: string }).initials ?? s.name[0]} gradient={(s as { gradient?: string }).gradient} size="md" className="ring-1 ring-line" />
                 )}
