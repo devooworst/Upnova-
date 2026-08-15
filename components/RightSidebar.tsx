@@ -12,7 +12,7 @@ import Link from "next/link";
 import { ArrowRight, Briefcase, ChevronDown, MapPin } from "lucide-react";
 import Avatar from "./Avatar";
 import { useSession } from "@/lib/session";
-import type { FeedScope } from "./Feed";
+import type { FeedScope } from "./db/DbFeed";
 
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 

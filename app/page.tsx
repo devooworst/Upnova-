@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, MapPin } from "lucide-react";
 import DbComposer from "@/components/db/DbComposer";
-import DbFeed, { type FeedTab } from "@/components/db/DbFeed";
-import type { FeedScope } from "@/components/Feed";
+import DbFeed, { type FeedTab, type FeedScope } from "@/components/db/DbFeed";
 import RightSidebar from "@/components/RightSidebar";
 import { useSession } from "@/lib/session";
 

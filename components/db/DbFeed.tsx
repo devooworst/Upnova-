@@ -14,7 +14,12 @@ import Avatar from "@/components/Avatar";
 import { Zap } from "lucide-react";
 import { useSession } from "@/lib/session";
 import LiveNowRail from "./LiveNowRail";
-import type { FeedScope } from "@/components/Feed";
+
+/* CLIENT feed-scope dialect (URL-param keys used by the scope dropdown).
+   Deliberately separate from lib/server/feed.ts's FeedScope — that is the
+   server enum ("for-you" | "5mi" | …); scopeParam below maps between them. */
+export type FeedScope =
+  | "foryou" | "5" | "25" | "city" | "county" | "state" | "country" | "global" | "school";
 
 export type FeedTab = "For You" | "Following";
 const tabs: FeedTab[] = ["For You", "Following"];
