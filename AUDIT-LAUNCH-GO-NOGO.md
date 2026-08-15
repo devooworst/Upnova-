@@ -170,3 +170,34 @@ delta is the schedule. Restore `*/10 * * * *` after a Hobby→Pro upgrade if the
 pass. No further code changes are required for launch. Per standing
 instructions, no P1/P2 work, no Stripe Connect, and no live Stripe activation
 have been started.
+
+---
+
+# ADDENDUM — Re-verification after "manual configuration complete" (2026-08-15, later same day)
+
+**Result: NO-GO — no observable configuration change detected.** Every programmatic signal
+is byte-identical to the prior NO-GO state:
+
+1. **Production deployment commit/branch**: GitHub Deployments API still shows exactly
+   3 Production deployments, all 2026-08-10, all at `86cdb94` (`main` = bare README).
+   Zero Production deployments created since. `main` is still at `86cdb94`; no PRs exist.
+2. **Probe test**: pushed an empty commit `eadbd62` to `arena/01a0026a-upnova`.
+   It triggered **4 Preview deployments and 0 Production deployments** (upnova: success,
+   upnova-7wqt: success, upnova-tibp: success, upnova-arena-019fdecc-upnova-20: still
+   blocked/paused). Conclusion: no Vercel project has its Production branch pointed at
+   the hardened branch, and `main` has not been promoted.
+3. **Production URLs**: `upnova-6qqz.vercel.app`, `upnova-7wqt.vercel.app`,
+   `upnova-tibp.vercel.app` all still 404 `DEPLOYMENT_NOT_FOUND`. Nothing serves Production.
+4. **Env vars / forbidden flags**: still MANUAL — sandbox has no Vercel API egress
+   (api.vercel.com → 000) and no Vercel credentials; dashboard state cannot be read.
+5. **Preview**: ✅ healthy — `eadbd62` deployed green to canonical `upnova`
+   (`upnova-12ju9ddfi-upnova.vercel.app`), behind the expected SSO protection wall.
+6. **Stripe smoke test**: NOT RUN — blocked (Preview SSO wall + no egress to api.stripe.com
+   + keys unverifiable).
+7. **Resend smoke test**: NOT RUN — same blocks.
+
+If configuration was performed in the Vercel dashboard, it has not resulted in any
+Production deployment. Most likely missing step: the Production **branch** setting —
+either merge/promote `arena/01a0026a-upnova` → `main`, or set the project's production
+branch to `arena/01a0026a-upnova` and trigger a deploy. Until a Production deployment
+object exists, no dashboard env-var work is testable end-to-end.
