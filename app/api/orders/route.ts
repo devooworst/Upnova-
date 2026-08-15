@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
-import { and, desc, eq, or } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { db, tables } from "@/db";
 import { requireUser, guarded, ApiError } from "@/lib/server/auth";
 import { publicUser } from "@/lib/server/serialize";
-import { notify } from "@/lib/server/notify";
-import { parseVariants, parseFulfillment, type OrderTracking } from "@/lib/products";
+import { parseVariants, parseFulfillment } from "@/lib/products";
 import { protectionRules } from "@/lib/protection";
 import { logOrderEvent } from "@/lib/server/orderEvents";
+import { sweepOrderRows } from "@/lib/server/orderSweep";
 
 export const dynamic = "force-dynamic";
 
@@ -22,49 +22,12 @@ export async function GET() {
       .orderBy(desc(tables.orders.createdAt))
       .all();
 
-    // open disputes freeze everything — fetch once for the lazy transitions
+    // time-driven transitions (delivery + payout release) — the same
+    // idempotent sweep the cron runs platform-wide; here it keeps THIS
+    // user's page instantly fresh between ticks.
+    await sweepOrderRows(rows);
+
     const allDisputes = await db.select().from(tables.disputes).all();
-    const hasOpenDispute = (orderId: string) =>
-      allDisputes.some((d) => d.orderId === orderId && ["open", "under_review", "return_authorized", "return_in_transit"].includes(d.status));
-
-    for (const o of rows) {
-      // carrier confirms delivery (demo: ETA passed) → the buyer-protection
-      // window STARTS. No eternal manual confirmation required.
-      if (o.status === "shipped") {
-        try {
-          const t = JSON.parse(o.tracking) as OrderTracking;
-          if (t.eta && new Date(t.eta).getTime() < Date.now()) {
-            const rules = protectionRules(o.price * o.qty);
-            const ends = new Date(Date.now() + rules.protectionHours * 3600_000);
-            await db.update(tables.orders).set({ status: "delivered", protectionEndsAt: ends }).where(eq(tables.orders.id, o.id)).run();
-            o.status = "delivered";
-            o.protectionEndsAt = ends;
-            await logOrderEvent(o.id, null, "delivered", "Carrier confirmed delivery");
-            await logOrderEvent(o.id, null, "protection_started", `${rules.protectionHours}h buyer-protection window`);
-            await notify({
-              userId: o.buyerId,
-              actorId: o.sellerId,
-              type: "order",
-              title: `Delivered — ${o.title}`,
-              body: `Everything good? Confirm anytime — otherwise the order completes automatically when your ${rules.protectionHours}h protection window ends. Problems? Report them before then.`,
-              href: "/orders",
-            });
-          }
-        } catch {}
-      }
-      // protection window over + no open case → auto-complete, release funds
-      if (o.status === "delivered" && o.protectionEndsAt && o.protectionEndsAt.getTime() < Date.now() && !hasOpenDispute(o.id)) {
-        await db.update(tables.orders).set({ status: "completed" }).where(eq(tables.orders.id, o.id)).run();
-        await db.update(tables.payments)
-          .set({ status: "released" })
-          .where(and(eq(tables.payments.orderId, o.id), eq(tables.payments.status, "held")))
-          .run();
-        o.status = "completed";
-        await logOrderEvent(o.id, null, "completed", "Protection window ended with no reported problem — funds released");
-        await notify({ userId: o.sellerId, actorId: o.buyerId, type: "payment", title: `Order completed — $${o.price * o.qty} released`, body: `${o.title} · protection window ended with no reported problems`, href: "/orders", category: "payments" });
-      }
-    }
-
     const payments = (await db.select().from(tables.payments).all()).filter((p) => p.orderId);
     return {
       orders: await Promise.all(rows.map(async (o) => {

@@ -5,6 +5,7 @@ import { quoteFor, inWindow, minGapMs } from "@/lib/server/motivation";
 import { desc } from "drizzle-orm";
 import { readRelease, SLOT_HOLDING_STATUSES, preferredWithEarlyAccess } from "@/lib/server/preferred";
 import { parseConfig } from "@/lib/servicePolicies";
+import { sweepAllOrders } from "@/lib/server/orderSweep";
 
 /* ------------------------------------------------------------------ */
 /*  BACKGROUND JOBS — the platform's heartbeat.                        */
@@ -40,8 +41,20 @@ async function alreadySent(userId: string, type: string, hrefLike: string): Prom
 
 /** run one pass of every job; returns per-job send counts (for tests/ops) */
 export async function runJobsTick(now = new Date()) {
-  const counts = { reminders: 0, reviewNudges: 0, rebookNudges: 0, releaseAlerts: 0, motivation: 0 };
+  const counts = { reminders: 0, reviewNudges: 0, rebookNudges: 0, releaseAlerts: 0, motivation: 0, ordersDelivered: 0, payoutsReleased: 0 };
   const t = now.getTime();
+
+  /* ---- 0 · order lifecycle sweep — the PAYOUT TIMER ----
+     shipped→delivered when the carrier ETA passes; delivered→completed
+     (+ held payment RELEASED) when the protection window ends with no
+     open dispute. Previously this ran only when a party opened their
+     orders page; the cron tick makes it unconditional. Idempotent:
+     status-guarded transitions + release targets held rows only. */
+  {
+    const sweep = await sweepAllOrders();
+    counts.ordersDelivered = sweep.delivered;
+    counts.payoutsReleased = sweep.released;
+  }
 
   const bookings = await db.select().from(tables.bookings).all();
   const profiles = new Map((await db.select().from(tables.profiles).all()).map((p) => [p.userId, p] as const));
@@ -204,17 +217,21 @@ export async function runJobsTick(now = new Date()) {
   return counts;
 }
 
-/* ---- the scheduler: one interval per process, never blocks exit ---- */
-const g = globalThis as unknown as { __mavynJobs?: ReturnType<typeof setInterval> };
-
-export function startJobScheduler() {
-  if (g.__mavynJobs) return;
-  if (process.env.MAVYN_JOBS === "0") return;
-  const timer = setInterval(() => {
-    runJobsTick().catch((err) => {
-      console.warn("[mavyn] job tick failed:", (err as Error).message);
-    });
-  }, 60_000);
-  timer.unref?.(); // builds, scripts, and tests exit normally
-  g.__mavynJobs = timer;
-}
+/* ------------------------------------------------------------------ */
+/*  SCHEDULING MODEL (Vercel serverless — no long-lived process):      */
+/*                                                                     */
+/*  There is deliberately NO in-process setInterval scheduler. On      */
+/*  serverless, an interval only lives as long as a warm instance —    */
+/*  and multiple concurrent instances would each run their own,        */
+/*  overlapping timer. Instead:                                        */
+/*                                                                     */
+/*   · production/preview: Vercel Cron (vercel.json) calls             */
+/*     GET /api/jobs/tick every 10 minutes with the platform-set       */
+/*     CRON_SECRET Authorization header. Stateless, single caller,     */
+/*     safe to repeat — every job verifies its own send/transition     */
+/*     state in the DATABASE, never in memory.                         */
+/*   · Test Center / demo ops: POST /api/demo/jobs (admin, demo mode)  */
+/*     runs the same tick deterministically.                           */
+/*   · any other host: run `curl` against /api/jobs/tick from the      */
+/*     platform's scheduler of choice with JOBS_TICK_SECRET set.       */
+/* ------------------------------------------------------------------ */
